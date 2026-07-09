@@ -1,18 +1,25 @@
 "use client";
 
-import { CalendarDays, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import AccountRegisterModal from "@/components/AccountRegisterModal";
+import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import CategorySelect from "@/components/CategorySelect";
 import InstitutionSelect from "@/components/InstitutionSelect";
+import MerchantSelect from "@/components/MerchantSelect";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import {
   CategoryPresets,
   Currency,
   EXPENSE_CATEGORY_INVESTMENT,
+  FinancialAccount,
   INCOME_CATEGORY_SETTLEMENT,
   SUB_CATEGORY_SETTLEMENT,
+  TRANSFER_CATEGORY,
+  TRANSFER_SUB_CARD_REPAYMENT,
+  TRANSFER_SUB_INVESTMENT_FUNDING,
   SettleableExpense,
   NewTransaction,
   Transaction,
@@ -20,23 +27,38 @@ import {
   addCustomCategory,
   addCustomSubCategory,
   addInstitution,
+  accountLabel,
   categoriesForType,
   createTransaction,
+  defaultAccountId,
+  deleteTransaction,
+  fetchAccounts,
   fetchInstitutionSuggestions,
   fetchMerchantSuggestions,
   fetchSettleableExpenses,
+  effectiveExpenseAmount,
   formatAmount,
+  hasSettlement,
+  isNonCashflowTransaction,
+  isTransferTransaction,
+  normalizeTransferCategory,
   subCategoriesFor,
+  updateTransaction,
 } from "@/lib/api";
 import { dayKey, formatDayLabel } from "@/lib/date";
 
 interface Props {
   currency: Currency;
+  allowCurrencyPick?: boolean;
+  onCurrencyChange?: (currency: Currency) => void;
   presets: CategoryPresets;
   defaultDate: Date;
+  onDateChange: (date: Date) => void;
   dayTransactions: Transaction[];
+  editingTransaction?: Transaction | null;
   onClose: () => void;
-  onCreated: (tx: Transaction) => void;
+  onSaved: () => void;
+  onSelectTransaction?: (tx: Transaction) => void;
   onPresetsChange: (presets: CategoryPresets) => void;
 }
 
@@ -47,13 +69,20 @@ const LEDGER_LABEL: Record<Currency, string> = {
 
 export default function TransactionModal({
   currency,
+  allowCurrencyPick = false,
+  onCurrencyChange,
   presets,
   defaultDate,
+  onDateChange,
   dayTransactions,
+  editingTransaction = null,
   onClose,
-  onCreated,
+  onSaved,
+  onSelectTransaction,
   onPresetsChange,
 }: Props) {
+  const isEditing = Boolean(editingTransaction);
+
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -66,8 +95,19 @@ export default function TransactionModal({
   const [settleableExpenses, setSettleableExpenses] = useState<SettleableExpense[]>(
     []
   );
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [accountId, setAccountId] = useState(ACCOUNT_NONE);
+  const [counterAccountId, setCounterAccountId] = useState(ACCOUNT_NONE);
+  const [showAccountRegister, setShowAccountRegister] = useState(false);
+  const [accountRegisterTarget, setAccountRegisterTarget] = useState<
+    "primary" | "counter"
+  >("primary");
+  const [accountsLoading, setAccountsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hydratedEditId, setHydratedEditId] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const dateStr = dayKey(defaultDate);
 
@@ -89,9 +129,22 @@ export default function TransactionModal({
     category === INCOME_CATEGORY_SETTLEMENT &&
     subCategory === SUB_CATEGORY_SETTLEMENT;
 
+  const isTransfer = type === "expense" && category === TRANSFER_CATEGORY;
+  const isCardRepayment =
+    isTransfer && subCategory === TRANSFER_SUB_CARD_REPAYMENT;
+  const isInvestmentFunding =
+    isTransfer && subCategory === TRANSFER_SUB_INVESTMENT_FUNDING;
+
   const selectedSettleable = settleableExpenses.find(
     (e) => e.id === settlesExpenseId
   );
+
+  const fromAccountFilter = (acc: FinancialAccount) => !acc.is_liability;
+  const toAccountFilter = (acc: FinancialAccount) => {
+    if (isCardRepayment) return acc.is_liability;
+    if (isInvestmentFunding) return acc.kind === "investment";
+    return !acc.is_liability;
+  };
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -102,7 +155,102 @@ export default function TransactionModal({
   }, [onClose]);
 
   useEffect(() => {
-    if (!category || !subCategory || isSettlement) {
+    let active = true;
+    setAccountsLoading(true);
+    fetchAccounts({ currency })
+      .then((list) => {
+        if (!active) return;
+        setAccounts(list);
+      })
+      .catch(() => {
+        if (active) setAccounts([]);
+      })
+      .finally(() => {
+        if (active) setAccountsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [currency]);
+
+  // Hydrate form when opening an existing transaction for edit.
+  // Reset to blank create form when editingTransaction is cleared.
+  useEffect(() => {
+    if (!editingTransaction) {
+      if (hydratedEditId !== null) {
+        setType("expense");
+        setAmount("");
+        setCategory("");
+        setSubCategory("");
+        setSettlesExpenseId("");
+        setMerchant("");
+        setInstitution("");
+        setAccountId(ACCOUNT_NONE);
+        setCounterAccountId(ACCOUNT_NONE);
+        setError(null);
+        setHydratedEditId(null);
+      }
+      return;
+    }
+    if (hydratedEditId === editingTransaction.id) return;
+
+    const tx = editingTransaction;
+    setType(tx.type);
+    setAmount(String(tx.amount));
+    setCategory(normalizeTransferCategory(tx.category));
+    setSubCategory(tx.sub_category || "");
+    setSettlesExpenseId(tx.settles_expense_id || "");
+    setMerchant(tx.merchant || "");
+    setInstitution(tx.institution || "");
+    setAccountId(tx.account_id || ACCOUNT_NONE);
+    setCounterAccountId(tx.counter_account_id || ACCOUNT_NONE);
+    setError(null);
+    setHydratedEditId(tx.id);
+  }, [editingTransaction, hydratedEditId]);
+
+  useEffect(() => {
+    // Always re-apply the default for the active type (expense vs income).
+    // Skip while editing — keep the transaction's own account.
+    if (isEditing || isTransfer) return;
+    setAccountId(defaultAccountId(accounts, type));
+  }, [type, accounts, isTransfer, isEditing]);
+
+  useEffect(() => {
+    // Never wipe transfer accounts while editing — keep the saved from/to cards.
+    if (isEditing) return;
+    if (!isTransfer) {
+      setCounterAccountId(ACCOUNT_NONE);
+      return;
+    }
+    setCounterAccountId(ACCOUNT_NONE);
+    setAccountId((prev) => {
+      const stillValid = accounts.some(
+        (a) => a.id === prev && !a.is_liability
+      );
+      if (stillValid) return prev;
+      const preferred = defaultAccountId(accounts, "expense");
+      const preferredOk = accounts.some(
+        (a) => a.id === preferred && !a.is_liability
+      );
+      return preferredOk ? preferred : ACCOUNT_NONE;
+    });
+  }, [isTransfer, accounts, isEditing]);
+
+  useEffect(() => {
+    if (!isTransfer || isEditing) return;
+    setCounterAccountId(ACCOUNT_NONE);
+  }, [subCategory, isTransfer, isEditing]);
+
+  // Re-apply saved transfer accounts once the account list finishes loading.
+  useEffect(() => {
+    if (!editingTransaction || accountsLoading) return;
+    if (!isTransferTransaction(editingTransaction)) return;
+    setAccountId(editingTransaction.account_id || ACCOUNT_NONE);
+    setCounterAccountId(editingTransaction.counter_account_id || ACCOUNT_NONE);
+  }, [editingTransaction, accountsLoading, accounts]);
+
+  useEffect(() => {
+    if (!category || !subCategory || isTransfer || isSettlement) {
       setMerchantHints([]);
       return;
     }
@@ -113,7 +261,7 @@ export default function TransactionModal({
     return () => {
       active = false;
     };
-  }, [category, subCategory, currency, isSettlement]);
+  }, [category, subCategory, currency, isTransfer, isSettlement]);
 
   useEffect(() => {
     if (!isInvestment) {
@@ -134,17 +282,20 @@ export default function TransactionModal({
   useEffect(() => {
     if (!isSettlement) {
       setSettleableExpenses([]);
-      setSettlesExpenseId("");
+      if (!isEditing) setSettlesExpenseId("");
       return;
     }
     let active = true;
-    fetchSettleableExpenses(currency).then((list) => {
+    fetchSettleableExpenses(
+      currency,
+      editingTransaction?.id
+    ).then((list) => {
       if (active) setSettleableExpenses(list);
     });
     return () => {
       active = false;
     };
-  }, [isSettlement, currency]);
+  }, [isSettlement, currency, isEditing, editingTransaction?.id]);
 
   function handleTypeChange(next: TransactionType) {
     setType(next);
@@ -161,14 +312,31 @@ export default function TransactionModal({
     setSubCategory("");
     setSettlesExpenseId("");
     setMerchant("");
+    setMerchantHints([]);
     setInstitution("");
+    // Keep saved transfer accounts when editing; only clear on create.
+    if (!isEditing) setCounterAccountId(ACCOUNT_NONE);
     setError(null);
   }
 
   function handleSubCategoryChange(next: string) {
     setSubCategory(next);
     setSettlesExpenseId("");
+    setMerchant("");
+    if (category === TRANSFER_CATEGORY && !isEditing) {
+      setCounterAccountId(ACCOUNT_NONE);
+    }
     setError(null);
+  }
+
+  async function handleAddMerchant(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setMerchantHints((prev) => [
+      trimmed,
+      ...prev.filter((m) => m !== trimmed),
+    ]);
+    setMerchant(trimmed);
   }
 
   async function handleAddCategory(name: string) {
@@ -216,6 +384,20 @@ export default function TransactionModal({
       setError("정산 대상 지출을 선택해 주세요.");
       return;
     }
+    if (isTransfer) {
+      if (!accountId) {
+        setError("출금 계좌를 선택해 주세요.");
+        return;
+      }
+      if (!counterAccountId) {
+        setError("입금 계좌를 선택해 주세요.");
+        return;
+      }
+      if (accountId === counterAccountId) {
+        setError("출금 계좌와 입금 계좌는 서로 달라야 합니다.");
+        return;
+      }
+    }
     if (
       isSettlement &&
       selectedSettleable &&
@@ -227,6 +409,13 @@ export default function TransactionModal({
       return;
     }
 
+    const fromLabel = accounts.find((a) => a.id === accountId);
+    const toLabel = accounts.find((a) => a.id === counterAccountId);
+    const transferMerchant =
+      fromLabel && toLabel
+        ? `${accountLabel(fromLabel)} → ${accountLabel(toLabel)}`
+        : "자산 이동/카드";
+
     const payload: NewTransaction = {
       date: `${dateStr}T00:00:00`,
       amount: numericAmount,
@@ -235,21 +424,49 @@ export default function TransactionModal({
       account_type: "personal",
       category,
       sub_category: subCategory,
-      merchant: merchant.trim() || (isSettlement ? "미지정" : "미지정"),
+      merchant: isTransfer
+        ? transferMerchant
+        : merchant.trim() || "미지정",
       institution: isInvestment ? institution.trim() : null,
       settles_expense_id: isSettlement ? settlesExpenseId : null,
+      account_id: accountId || null,
+      counter_account_id: isTransfer ? counterAccountId || null : null,
+      kind: isTransfer ? "transfer" : "normal",
     };
 
     setSubmitting(true);
     try {
-      const created = await createTransaction(payload);
-      onCreated(created);
+      if (editingTransaction) {
+        await updateTransaction(editingTransaction.id, payload);
+      } else {
+        await createTransaction(payload);
+      }
+      onSaved();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "저장 중 오류가 발생했습니다."
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!editingTransaction) return;
+    const ok = window.confirm("이 거래를 삭제할까요?");
+    if (!ok) return;
+
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteTransaction(editingTransaction.id);
+      onSaved();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "삭제 중 오류가 발생했습니다."
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -284,42 +501,34 @@ export default function TransactionModal({
     </div>
   );
 
-  const merchantField = (
+  const merchantField = isSettlement ? (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-        {isSettlement ? "정산 상대 (누구에게 받았나요)" : "사용처"}
+        정산 상대 (누구에게 받았나요)
       </label>
       <input
         value={merchant}
         onChange={(e) => setMerchant(e.target.value)}
-        placeholder={
-          isSettlement
-            ? "예: Lucy"
-            : subCategory
-              ? "사용처 입력"
-              : "먼저 중분류를 선택하세요"
-        }
-        disabled={!isSettlement && !subCategory}
-        className="input-field disabled:opacity-50"
+        placeholder="예: Lucy"
+        className="input-field"
       />
-      {!isSettlement && merchantHints.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {merchantHints.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMerchant(m)}
-              className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                merchant === m
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      )}
+    </div>
+  ) : (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+        사용처
+      </label>
+      <MerchantSelect
+        options={merchantHints}
+        value={merchant}
+        onChange={setMerchant}
+        onAdd={handleAddMerchant}
+        disabled={!subCategory}
+        placeholder={
+          subCategory ? "사용처 선택" : "먼저 중분류를 선택하세요"
+        }
+        addLabel="새 사용처 추가"
+      />
     </div>
   );
 
@@ -338,7 +547,54 @@ export default function TransactionModal({
     </div>
   );
 
+  const transferFields = isTransfer && (
+    <div className="space-y-3">
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+          출금 계좌
+        </label>
+        <AccountSelect
+          accounts={accounts}
+          value={accountId}
+          onChange={setAccountId}
+          onRegister={() => {
+            setAccountRegisterTarget("primary");
+            setShowAccountRegister(true);
+          }}
+          disabled={accountsLoading || !subCategory}
+          allowNone={false}
+          placeholder="출금 계좌 선택"
+          variant="field"
+          filterAccounts={fromAccountFilter}
+        />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+          {isCardRepayment ? "상환할 카드" : "입금 계좌"}
+        </label>
+        <AccountSelect
+          accounts={accounts}
+          value={counterAccountId}
+          onChange={setCounterAccountId}
+          onRegister={() => {
+            setAccountRegisterTarget("counter");
+            setShowAccountRegister(true);
+          }}
+          disabled={accountsLoading || !subCategory}
+          allowNone={false}
+          placeholder={isCardRepayment ? "카드 선택" : "입금 계좌 선택"}
+          variant="field"
+          filterAccounts={toAccountFilter}
+        />
+      </div>
+      <p className="text-xs text-gray-400">
+        자산 이동/카드는 지출/수입 합계에 포함되지 않고, 계좌 잔액만 이동합니다.
+      </p>
+    </div>
+  );
+
   const detailFields = () => {
+    if (isTransfer) return transferFields;
     if (isInvestment) {
       return (
         <>
@@ -361,63 +617,157 @@ export default function TransactionModal({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
-      onMouseDown={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto"
-        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">새 거래</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold tracking-tight">
+              {isEditing ? "거래 수정" : "새 거래"}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
               {LEDGER_LABEL[currency]} · {currency}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {allowCurrencyPick && onCurrencyChange && (
+              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+                {(["CAD", "KRW"] as Currency[]).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => onCurrencyChange(c)}
+                    className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
+                      currency === c
+                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!isTransfer && (
+              <AccountSelect
+                accounts={accounts}
+                value={accountId}
+                onChange={setAccountId}
+                onRegister={() => {
+                  setAccountRegisterTarget("primary");
+                  setShowAccountRegister(true);
+                }}
+                disabled={accountsLoading}
+              />
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="닫기"
+              className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3">
-          <CalendarDays className="h-5 w-5 text-blue-500 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {formatDayLabel(defaultDate)}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              달력에서 선택한 날짜 · 다른 날짜는 달력에서 클릭하세요
-            </p>
-          </div>
+        <div className="mt-4 relative">
+          <button
+            type="button"
+            onClick={() => {
+              const input = dateInputRef.current;
+              if (!input) return;
+              if (typeof input.showPicker === "function") input.showPicker();
+              else input.click();
+            }}
+            className="w-full flex items-center gap-3 rounded-2xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3 text-left hover:bg-blue-100/80 dark:hover:bg-blue-500/20 transition-colors"
+          >
+            <CalendarDays className="h-5 w-5 text-blue-500 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                {formatDayLabel(defaultDate)}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                달력 아이콘을 눌러 날짜를 변경할 수 있어요
+              </p>
+            </div>
+          </button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={dateStr}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              const [y, m, d] = e.target.value.split("-").map(Number);
+              onDateChange(new Date(y, m - 1, d));
+            }}
+            className="sr-only"
+            tabIndex={-1}
+            aria-label="거래 날짜"
+          />
         </div>
 
         {dayTransactions.length > 0 && (
           <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-32 overflow-auto">
-            {dayTransactions.map((tx) => (
-              <li
-                key={tx.id}
-                className="flex items-center justify-between gap-2 px-4 py-2.5"
-              >
-                <span className="text-sm truncate">
-                  {tx.category} › {tx.sub_category || "—"} · {tx.merchant}
-                </span>
-                <span
-                  className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
-                    tx.type === "income"
-                      ? "text-blue-500"
-                      : "text-gray-700 dark:text-gray-200"
-                  }`}
-                >
-                  {tx.type === "income" ? "+" : "-"}
-                  {formatAmount(tx.amount, currency)}
-                </span>
-              </li>
-            ))}
+            {dayTransactions.map((tx) => {
+              const settled = hasSettlement(tx);
+              const nonCashflow = isNonCashflowTransaction(tx);
+              const displayAmt =
+                tx.type === "expense"
+                  ? effectiveExpenseAmount(tx)
+                  : tx.amount;
+              const isActive = editingTransaction?.id === tx.id;
+              return (
+                <li key={tx.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectTransaction?.(tx)}
+                    className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors ${
+                      isActive
+                        ? "bg-blue-50 dark:bg-blue-500/10"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-800/80"
+                    }`}
+                  >
+                    <span className="text-sm truncate">
+                      {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"}{" "}
+                      {tx.category} › {tx.sub_category || "—"} · {tx.merchant}
+                    </span>
+                    <span
+                      className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
+                        nonCashflow
+                          ? "text-gray-500 dark:text-gray-400"
+                          : tx.type === "income"
+                            ? "text-blue-500"
+                            : "text-red-500"
+                      }`}
+                    >
+                      {settled ? (
+                        <span className="flex flex-col items-end">
+                          <span className="text-[10px] text-gray-400 line-through font-normal">
+                            {formatAmount(tx.amount, tx.currency)}
+                          </span>
+                          <span>{formatAmount(displayAmt, tx.currency)}</span>
+                        </span>
+                      ) : (
+                        <>
+                          {nonCashflow
+                            ? ""
+                            : tx.type === "income"
+                              ? "+"
+                              : ""}
+                          {formatAmount(displayAmt, tx.currency)}
+                        </>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -495,15 +845,60 @@ export default function TransactionModal({
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full btn-primary disabled:opacity-50"
-          >
-            {submitting ? "저장 중..." : "저장"}
-          </button>
+          <div className="flex gap-2">
+            {isEditing && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={submitting || deleting}
+                className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-semibold text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleting ? "삭제 중..." : "삭제"}
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={submitting || deleting}
+              className="flex-1 btn-primary disabled:opacity-50"
+            >
+              {submitting
+                ? "저장 중..."
+                : isEditing
+                  ? "수정 저장"
+                  : "저장"}
+            </button>
+          </div>
         </form>
       </div>
+
+      {showAccountRegister && (
+        <AccountRegisterModal
+          currency={currency}
+          preferredType={type}
+          onClose={() => setShowAccountRegister(false)}
+          onCreated={(created) => {
+            setAccounts((prev) => {
+              const cleared = prev.map((a) => ({
+                ...a,
+                is_default_expense: created.is_default_expense
+                  ? false
+                  : a.is_default_expense,
+                is_default_income: created.is_default_income
+                  ? false
+                  : a.is_default_income,
+              }));
+              return [...cleared, created];
+            });
+            if (accountRegisterTarget === "counter") {
+              setCounterAccountId(created.id);
+            } else {
+              setAccountId(created.id);
+            }
+            setShowAccountRegister(false);
+          }}
+        />
+      )}
     </div>
   );
 }

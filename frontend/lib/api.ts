@@ -4,8 +4,47 @@ export const API_BASE_URL =
 const TOKEN_KEY = "pairpocket_token";
 
 export const EXPENSE_CATEGORY_INVESTMENT = "투자/저축";
+export const TRANSFER_CATEGORY = "자산 이동/카드";
+export const TRANSFER_CATEGORY_LEGACY = "자산 이동";
+export const TRANSFER_SUB_CARD_REPAYMENT = "카드 대금 상환";
+export const TRANSFER_SUB_ACCOUNT_TRANSFER = "계좌 이체";
+export const TRANSFER_SUB_INVESTMENT_FUNDING = "투자 계좌 입금";
 export const INCOME_CATEGORY_SETTLEMENT = "정산";
 export const SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급";
+
+export function normalizeTransferCategory(category: string): string {
+  return category === TRANSFER_CATEGORY_LEGACY ? TRANSFER_CATEGORY : category;
+}
+
+export function isTransferTransaction(tx: {
+  kind?: TransactionKind | null;
+  category: string;
+}): boolean {
+  return (
+    tx.kind === "transfer" ||
+    tx.category === TRANSFER_CATEGORY ||
+    tx.category === TRANSFER_CATEGORY_LEGACY
+  );
+}
+
+export function isSettlementTransaction(tx: {
+  category: string;
+  sub_category?: string | null;
+}): boolean {
+  return (
+    tx.category === INCOME_CATEGORY_SETTLEMENT &&
+    tx.sub_category === SUB_CATEGORY_SETTLEMENT
+  );
+}
+
+/** Transfers and N빵 settlements — shown grey, excluded from income/expense totals. */
+export function isNonCashflowTransaction(tx: {
+  kind?: TransactionKind | null;
+  category: string;
+  sub_category?: string | null;
+}): boolean {
+  return isTransferTransaction(tx) || isSettlementTransaction(tx);
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -47,8 +86,58 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
 export const loginUrl = `${API_BASE_URL}/api/auth/login`;
 
 export type Currency = "KRW" | "CAD";
+export type LedgerScope = Currency | "ALL";
 export type TransactionType = "income" | "expense";
 export type AccountType = "shared" | "personal";
+export type FinancialAccountKind =
+  | "checking"
+  | "savings"
+  | "credit_card"
+  | "investment"
+  | "cash";
+export type TransactionKind = "normal" | "transfer";
+
+export interface FinancialAccount {
+  id: string;
+  owner_id: string;
+  name: string;
+  nickname: string | null;
+  kind: FinancialAccountKind;
+  currency: Currency;
+  account_type: AccountType;
+  opening_balance: number;
+  is_liability: boolean;
+  is_default_expense: boolean;
+  is_default_income: boolean;
+  is_active: boolean;
+  institution: string | null;
+  last_four: string | null;
+  account_number: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewFinancialAccount {
+  name: string;
+  nickname?: string | null;
+  kind: FinancialAccountKind;
+  currency: Currency;
+  account_type?: AccountType;
+  opening_balance?: number;
+  is_default_expense?: boolean;
+  is_default_income?: boolean;
+  institution?: string | null;
+  last_four?: string | null;
+  account_number?: string | null;
+}
+
+export const ACCOUNT_KIND_LABEL: Record<FinancialAccountKind, string> = {
+  checking: "입출금",
+  savings: "저축",
+  credit_card: "신용카드",
+  investment: "투자",
+  cash: "현금",
+};
 
 export interface Transaction {
   id: string;
@@ -62,7 +151,12 @@ export interface Transaction {
   merchant: string;
   institution: string | null;
   settles_expense_id: string | null;
+  account_id?: string | null;
+  counter_account_id?: string | null;
+  kind?: TransactionKind;
   owner_id: string;
+  settled_amount?: number;
+  effective_amount?: number;
 }
 
 export interface NewTransaction {
@@ -76,6 +170,9 @@ export interface NewTransaction {
   merchant: string;
   institution?: string | null;
   settles_expense_id?: string | null;
+  account_id?: string | null;
+  counter_account_id?: string | null;
+  kind?: TransactionKind;
 }
 
 export interface CategoryGroup {
@@ -143,6 +240,33 @@ export async function fetchTransactions(
   );
   if (!res.ok) throw new Error("거래 내역을 불러오지 못했습니다.");
   return (await res.json()) as Transaction[];
+}
+
+/** Fetch and merge CAD + KRW transactions for the ALL ledger view. */
+export async function fetchAllTransactions(
+  filters: Omit<TransactionFilters, "currency"> = {}
+): Promise<Transaction[]> {
+  const [cad, krw] = await Promise.all([
+    fetchTransactions({ ...filters, currency: "CAD" }),
+    fetchTransactions({ ...filters, currency: "KRW" }),
+  ]);
+  return [...cad, ...krw].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+}
+
+/** Expense amount after N빵 settlements (for calendar/list display). */
+export function effectiveExpenseAmount(tx: Transaction): number {
+  if (tx.type !== "expense") return tx.amount;
+  return tx.effective_amount ?? tx.amount;
+}
+
+export function hasSettlement(tx: Transaction): boolean {
+  return (
+    tx.type === "expense" &&
+    (tx.settled_amount ?? 0) > 0 &&
+    (tx.effective_amount ?? tx.amount) < tx.amount
+  );
 }
 
 export async function fetchCategoryPresets(): Promise<CategoryPresets> {
@@ -245,9 +369,13 @@ export interface SettleableExpense {
 }
 
 export async function fetchSettleableExpenses(
-  currency: Currency
+  currency: Currency,
+  excludeSettlementId?: string
 ): Promise<SettleableExpense[]> {
   const params = new URLSearchParams({ currency });
+  if (excludeSettlementId) {
+    params.set("exclude_settlement_id", excludeSettlementId);
+  }
   const res = await fetch(
     `${API_BASE_URL}/api/transactions/settleable?${params.toString()}`,
     { headers: authHeaders() }
@@ -291,6 +419,7 @@ export interface ExchangeRate {
   krw_cad: number;
   date: string | null;
   stale: boolean;
+  source?: string;
 }
 
 export async function fetchExchangeRate(): Promise<ExchangeRate> {
@@ -299,6 +428,48 @@ export async function fetchExchangeRate(): Promise<ExchangeRate> {
   });
   if (!res.ok) throw new Error("환율을 불러오지 못했습니다.");
   return (await res.json()) as ExchangeRate;
+}
+
+export interface AccountBalance {
+  account_id: string;
+  name: string;
+  nickname: string | null;
+  kind: FinancialAccountKind;
+  currency: Currency;
+  account_type: AccountType;
+  is_liability: boolean;
+  balance: number;
+  net_worth_contribution: number;
+}
+
+export interface NetWorthSummary {
+  account_type: AccountType;
+  currency: Currency | null;
+  total_assets: number;
+  total_liabilities: number;
+  net_worth: number;
+  accounts: AccountBalance[];
+}
+
+export async function fetchNetWorth(filters: {
+  currency?: Currency;
+  accountType?: AccountType;
+} = {}): Promise<NetWorthSummary> {
+  const params = new URLSearchParams();
+  params.set("account_type", filters.accountType ?? "personal");
+  if (filters.currency) params.set("currency", filters.currency);
+
+  const res = await fetch(
+    `${API_BASE_URL}/api/accounts/net-worth?${params.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error("총자산을 불러오지 못했습니다.");
+  return (await res.json()) as NetWorthSummary;
+}
+
+async function readApiError(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => null);
+  return body && typeof body.detail === "string" ? body.detail : fallback;
 }
 
 export async function createTransaction(
@@ -310,14 +481,126 @@ export async function createTransaction(
     body: JSON.stringify(tx),
   });
   if (!res.ok) {
+    throw new Error(await readApiError(res, "거래를 저장하지 못했습니다."));
+  }
+  return (await res.json()) as Transaction;
+}
+
+export async function updateTransaction(
+  id: string,
+  tx: NewTransaction
+): Promise<Transaction> {
+  const res = await fetch(`${API_BASE_URL}/api/transactions/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(tx),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "거래를 수정하지 못했습니다."));
+  }
+  return (await res.json()) as Transaction;
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/transactions/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "거래를 삭제하지 못했습니다."));
+  }
+}
+
+export async function fetchAccounts(filters: {
+  currency?: Currency;
+  accountType?: AccountType;
+  activeOnly?: boolean;
+} = {}): Promise<FinancialAccount[]> {
+  const params = new URLSearchParams();
+  params.set("account_type", filters.accountType ?? "personal");
+  if (filters.currency) params.set("currency", filters.currency);
+  if (filters.activeOnly === false) params.set("active_only", "false");
+
+  const res = await fetch(
+    `${API_BASE_URL}/api/accounts?${params.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error("계좌 목록을 불러오지 못했습니다.");
+  return (await res.json()) as FinancialAccount[];
+}
+
+export async function createAccount(
+  payload: NewFinancialAccount
+): Promise<FinancialAccount> {
+  const res = await fetch(`${API_BASE_URL}/api/accounts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      account_type: "personal",
+      opening_balance: 0,
+      ...payload,
+    }),
+  });
+  if (!res.ok) {
     const body = await res.json().catch(() => null);
     const detail =
       body && typeof body.detail === "string"
         ? body.detail
-        : "거래를 저장하지 못했습니다.";
+        : "계좌를 등록하지 못했습니다.";
     throw new Error(detail);
   }
-  return (await res.json()) as Transaction;
+  return (await res.json()) as FinancialAccount;
+}
+
+export async function updateAccount(
+  accountId: string,
+  payload: Partial<
+    Pick<
+      FinancialAccount,
+      | "name"
+      | "opening_balance"
+      | "is_default_expense"
+      | "is_default_income"
+      | "is_active"
+      | "institution"
+      | "last_four"
+    >
+  >
+): Promise<FinancialAccount> {
+  const res = await fetch(`${API_BASE_URL}/api/accounts/${accountId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("계좌를 수정하지 못했습니다.");
+  return (await res.json()) as FinancialAccount;
+}
+
+export function defaultAccountId(
+  accounts: FinancialAccount[],
+  type: TransactionType
+): string {
+  // Only use the type-specific default. Do not fall back to another account —
+  // expense and income defaults are independent; missing means "없음/현금".
+  const flag = type === "expense" ? "is_default_expense" : "is_default_income";
+  return accounts.find((a) => a[flag])?.id ?? "";
+}
+
+export function accountLabel(account: FinancialAccount): string {
+  return account.nickname?.trim() || account.name;
+}
+
+export function accountDetail(account: FinancialAccount): string {
+  const parts = [
+    ACCOUNT_KIND_LABEL[account.kind],
+    account.kind === "credit_card" && account.last_four
+      ? `···${account.last_four}`
+      : null,
+    account.kind !== "credit_card" && account.account_number
+      ? account.account_number
+      : null,
+  ].filter(Boolean);
+  return parts.join(" · ");
 }
 
 export function formatAmount(amount: number, currency: Currency): string {
