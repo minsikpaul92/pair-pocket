@@ -1,0 +1,11 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/static/pretendard.min.css");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  @apply bg-gray-50 dark:bg-black text-gray-900 dark:text-white;
+  -webkit-tap-highlight-color: transparent;
+}
