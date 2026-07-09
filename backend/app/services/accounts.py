@@ -140,6 +140,7 @@ async def compute_net_worth(
             AccountBalanceOut(
                 account_id=str(doc["_id"]),
                 name=doc["name"],
+                nickname=doc.get("nickname"),
                 kind=FinancialAccountKind(doc["kind"]),
                 currency=Currency(doc["currency"]),
                 account_type=AccountType(doc["account_type"]),

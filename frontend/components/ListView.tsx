@@ -14,6 +14,7 @@ import {
   effectiveExpenseAmount,
   formatAmount,
   hasSettlement,
+  isNonCashflowTransaction,
   subCategoriesFor,
 } from "@/lib/api";
 
@@ -140,6 +141,7 @@ export default function ListView({ scope, presets, transactions }: Props) {
     for (const tx of sorted) {
       const bucket = byCurrency[tx.currency];
       bucket.count += 1;
+      if (isNonCashflowTransaction(tx)) continue;
       if (tx.type === "income") bucket.income += tx.amount;
       else bucket.expense += effectiveExpenseAmount(tx);
     }
@@ -280,6 +282,7 @@ export default function ListView({ scope, presets, transactions }: Props) {
               ) : (
                 sorted.map((tx, i) => {
                   const settled = hasSettlement(tx);
+                  const transfer = isNonCashflowTransaction(tx);
                   const effective = displayAmount(tx);
                   return (
                     <tr
@@ -316,19 +319,29 @@ export default function ListView({ scope, presets, transactions }: Props) {
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         <span
                           className={`text-xs font-medium ${
-                            tx.type === "income"
-                              ? "text-blue-500"
-                              : "text-gray-500"
+                            transfer
+                              ? "text-gray-500"
+                              : tx.type === "income"
+                                ? "text-blue-500"
+                                : "text-gray-500"
                           }`}
                         >
-                          {tx.type === "income" ? "수입" : "지출"}
+                          {transfer
+                            ? tx.category === "정산"
+                              ? "정산"
+                              : "이동"
+                            : tx.type === "income"
+                              ? "수입"
+                              : "지출"}
                         </span>
                       </td>
                       <td
                         className={`px-3 py-2.5 whitespace-nowrap text-right tabular-nums ${
-                          tx.type === "income"
-                            ? "text-blue-500 font-semibold"
-                            : "text-gray-900 dark:text-white font-semibold"
+                          transfer
+                            ? "text-gray-500 dark:text-gray-400 font-semibold"
+                            : tx.type === "income"
+                              ? "text-blue-500 font-semibold"
+                              : "text-gray-900 dark:text-white font-semibold"
                         }`}
                       >
                         {settled ? (
@@ -342,7 +355,11 @@ export default function ListView({ scope, presets, transactions }: Props) {
                           </div>
                         ) : (
                           <>
-                            {tx.type === "income" ? "+" : ""}
+                            {transfer
+                              ? ""
+                              : tx.type === "income"
+                                ? "+"
+                                : ""}
                             {formatAmount(effective, tx.currency)}
                           </>
                         )}

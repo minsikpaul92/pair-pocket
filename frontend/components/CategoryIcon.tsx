@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRight,
   Banknote,
   Bus,
   Gift,
@@ -26,11 +27,13 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "경조사/선물": Gift,
   "투자/저축": PiggyBank,
   세금: Receipt,
+  "자산 이동/카드": ArrowLeftRight,
   급여: Wallet,
   부수입: Banknote,
   정산: TrendingUp,
   "금융/기타": Landmark,
   // legacy
+  "자산 이동": ArrowLeftRight,
   "카페/간식": Utensils,
 };
 

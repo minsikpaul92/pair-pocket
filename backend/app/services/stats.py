@@ -10,7 +10,9 @@ from app.models.category_preset import (
     SUB_CATEGORY_SETTLEMENT,
     is_investment_expense,
     is_settlement_income,
+    is_transfer_expense,
 )
+from app.models.ledger import TransactionKind
 from app.models.transaction import AccountType, Currency, TransactionType
 from app.services.settlement import get_settled_amounts
 
@@ -87,8 +89,13 @@ async def compute_stats(
         institution=institution,
     )
 
+    # Exclude internal asset moves from cashflow stats (kind is authoritative).
+    stats_filter = {
+        **base_filter,
+        "kind": {"$ne": TransactionKind.TRANSFER.value},
+    }
     pipeline = [
-        {"$match": base_filter},
+        {"$match": stats_filter},
         {
             "$group": {
                 "_id": {
@@ -118,9 +125,11 @@ async def compute_stats(
         sub = key.get("sub_category", "")
 
         if tx_type == TransactionType.INCOME.value:
-            total_income += amount
+            # N빵 정산 is an expense offset, not income — exclude from income totals.
             if is_settlement_income(cat, sub):
                 settlement_refund_total += amount
+                continue
+            total_income += amount
             by_category[cat] = by_category.get(cat, 0) + amount
             by_sub_category[f"{cat} › {sub}"] = (
                 by_sub_category.get(f"{cat} › {sub}", 0) + amount
@@ -140,12 +149,18 @@ async def compute_stats(
     # Per-expense effective spending after linked N빵 settlements
     settled_map = await get_settled_amounts(db, owner_id)
     expense_docs = await db[COLLECTION].find(
-        {**base_filter, "type": TransactionType.EXPENSE.value}
+        {
+            **base_filter,
+            "type": TransactionType.EXPENSE.value,
+            "kind": {"$ne": TransactionKind.TRANSFER.value},
+        }
     ).to_list(length=1000)
 
     effective_by_merchant: dict[str, float] = {}
     settlement_details: list[dict] = []
     for doc in expense_docs:
+        if is_transfer_expense(doc.get("category", "")):
+            continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)
         effective = max(doc["amount"] - settled, 0.0)
@@ -171,7 +186,8 @@ async def compute_stats(
         "settlement_refund_total": settlement_refund_total,
         "adjusted_expense": adjusted_expense,
         "pure_consumption": pure_consumption,
-        "net_cashflow": total_income - total_expense,
+        # Settlement reduces out-of-pocket spend; do not also count it as income.
+        "net_cashflow": total_income - adjusted_expense,
         "breakdown_by_category": [
             {"category": k, "amount": v}
             for k, v in sorted(by_category.items(), key=lambda x: -x[1])

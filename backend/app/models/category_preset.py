@@ -113,12 +113,12 @@ def is_investment_expense(category: str) -> bool:
 
 
 def is_transfer_expense(category: str) -> bool:
-    return category == TRANSFER_CATEGORY
+    return category in (TRANSFER_CATEGORY, "자산 이동")
 
 
 def is_card_repayment(category: str, sub_category: str) -> bool:
     return (
-        category == TRANSFER_CATEGORY
+        category in (TRANSFER_CATEGORY, "자산 이동")
         and sub_category == TRANSFER_SUB_CARD_REPAYMENT
     )
 

@@ -93,6 +93,7 @@ class AccountBalanceOut(BaseModel):
 
     account_id: str
     name: str
+    nickname: str | None = None
     kind: FinancialAccountKind
     currency: Currency
     account_type: AccountType

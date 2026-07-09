@@ -18,6 +18,14 @@ interface Props {
   onChange: (accountId: string) => void;
   onRegister: () => void;
   disabled?: boolean;
+  /** When false, hide the "없음/현금" option (required for transfers). */
+  allowNone?: boolean;
+  /** Optional label shown when nothing is selected and allowNone is false. */
+  placeholder?: string;
+  /** Compact header trigger vs full-width form field. */
+  variant?: "compact" | "field";
+  /** Restrict which accounts appear in the list. */
+  filterAccounts?: (account: FinancialAccount) => boolean;
 }
 
 export default function AccountSelect({
@@ -26,10 +34,15 @@ export default function AccountSelect({
   onChange,
   onRegister,
   disabled = false,
+  allowNone = true,
+  placeholder = "계좌 선택",
+  variant = "compact",
+  filterAccounts,
 }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const selected = accounts.find((a) => a.id === value);
+  const visible = filterAccounts ? accounts.filter(filterAccounts) : accounts;
+  const selected = visible.find((a) => a.id === value) ?? accounts.find((a) => a.id === value);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -43,9 +56,19 @@ export default function AccountSelect({
 
   const triggerLabel = selected
     ? accountLabel(selected)
-    : value === ACCOUNT_NONE
+    : value === ACCOUNT_NONE && allowNone
       ? "없음/현금"
-      : "결제수단";
+      : placeholder;
+
+  const triggerClass =
+    variant === "field"
+      ? "w-full flex items-center justify-between gap-2 rounded-xl bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm font-medium text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+      : "flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 max-w-[9rem]";
+
+  const menuClass =
+    variant === "field"
+      ? "absolute left-0 right-0 z-30 mt-1.5 max-h-64 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10"
+      : "absolute right-0 z-30 mt-1.5 w-56 max-h-64 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10";
 
   return (
     <div ref={ref} className="relative">
@@ -53,32 +76,34 @@ export default function AccountSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 max-w-[9rem]"
+        className={triggerClass}
       >
         <span className="truncate">{triggerLabel}</span>
         <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-1.5 w-56 max-h-64 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10">
+        <div className={menuClass}>
           <ul className="py-1">
-            <li>
-              <button
-                type="button"
-                onClick={() => {
-                  onChange(ACCOUNT_NONE);
-                  setOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
-                <span className="flex-1">없음 / 현금</span>
-                {value === ACCOUNT_NONE && (
-                  <Check className="h-4 w-4 text-blue-500 shrink-0" />
-                )}
-              </button>
-            </li>
-            {accounts.map((acc) => (
+            {allowNone && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(ACCOUNT_NONE);
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
+                  <span className="flex-1">없음 / 현금</span>
+                  {value === ACCOUNT_NONE && (
+                    <Check className="h-4 w-4 text-blue-500 shrink-0" />
+                  )}
+                </button>
+              </li>
+            )}
+            {visible.map((acc) => (
               <li key={acc.id}>
                 <button
                   type="button"
@@ -102,6 +127,11 @@ export default function AccountSelect({
                 </button>
               </li>
             ))}
+            {visible.length === 0 && (
+              <li className="px-3 py-2 text-sm text-gray-400">
+                선택 가능한 계좌가 없습니다
+              </li>
+            )}
           </ul>
           <div className="border-t border-gray-100 dark:border-gray-700 p-1">
             <button

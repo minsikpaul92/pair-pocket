@@ -8,6 +8,7 @@ import {
   Transaction,
   effectiveExpenseAmount,
   formatAmount,
+  isNonCashflowTransaction,
 } from "@/lib/api";
 import {
   buildCalendarGrid,
@@ -46,6 +47,31 @@ function accumulate(
   tx: Transaction,
   scope: LedgerScope
 ) {
+  // Transfers / N빵 settlements offset balances or expenses — not income/expense flow.
+  if (isNonCashflowTransaction(tx)) {
+    const existing = map.get(key);
+    if (scope === "ALL") {
+      const entry = (existing as AllDayTotals | undefined) ?? {
+        cadIncome: 0,
+        krwIncome: 0,
+        cadExpense: 0,
+        krwExpense: 0,
+        count: 0,
+      };
+      entry.count += 1;
+      map.set(key, entry);
+    } else {
+      const entry = (existing as SingleDayTotals | undefined) ?? {
+        income: 0,
+        expense: 0,
+        count: 0,
+      };
+      entry.count += 1;
+      map.set(key, entry);
+    }
+    return;
+  }
+
   if (scope === "ALL") {
     const entry = (map.get(key) as AllDayTotals | undefined) ?? {
       cadIncome: 0,

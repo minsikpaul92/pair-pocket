@@ -127,8 +127,12 @@ async def merchant_suggestions(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[str]:
-    """Most frequently used merchants for a category (+ optional sub-category)."""
-    match: dict = {"owner_id": current_user.id, "category": category}
+    """Merchants used under this category/sub_category, most recently used first."""
+    match: dict = {
+        "owner_id": current_user.id,
+        "category": category,
+        "merchant": {"$nin": [None, "", "미지정"]},
+    }
     if sub_category is not None:
         match["sub_category"] = sub_category
     if currency is not None:
@@ -136,12 +140,17 @@ async def merchant_suggestions(
 
     pipeline = [
         {"$match": match},
-        {"$group": {"_id": "$merchant", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 8},
+        {
+            "$group": {
+                "_id": "$merchant",
+                "last_used": {"$max": "$date"},
+            }
+        },
+        {"$sort": {"last_used": -1}},
+        {"$limit": 30},
     ]
-    docs = await db[COLLECTION].aggregate(pipeline).to_list(length=8)
-    return [d["_id"] for d in docs if d["_id"] and d["_id"] != "미지정"]
+    docs = await db[COLLECTION].aggregate(pipeline).to_list(length=30)
+    return [d["_id"] for d in docs if d["_id"]]
 
 
 @router.get("/institutions", response_model=list[str])
@@ -205,7 +214,15 @@ async def list_settleable_expenses(
     )
 
     results: list[dict] = []
+    from app.models.category_preset import is_transfer_expense
+    from app.models.ledger import TransactionKind
+
     for doc in expenses:
+        if (
+            doc.get("kind") == TransactionKind.TRANSFER.value
+            or is_transfer_expense(doc.get("category", ""))
+        ):
+            continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)
         remaining = max(doc["amount"] - settled, 0.0)
@@ -234,11 +251,19 @@ async def create_transaction(
 ) -> dict:
     await validate_transaction_payload(payload, db, current_user.id)
 
+    from app.models.category_preset import is_transfer_expense
+    from app.models.ledger import TransactionKind
+
     document = payload.model_dump(exclude={"effective_amount", "settled_amount"})
     document["currency"] = payload.currency.value
     document["type"] = payload.type.value
     document["account_type"] = payload.account_type.value
-    document["kind"] = payload.kind.value
+    # Asset moves always store kind=transfer so stats/balance logic stay consistent.
+    if is_transfer_expense(payload.category):
+        document["kind"] = TransactionKind.TRANSFER.value
+    else:
+        document["kind"] = TransactionKind.NORMAL.value
+        document["counter_account_id"] = None
     document["owner_id"] = current_user.id
     if not document.get("merchant"):
         document["merchant"] = "미지정"

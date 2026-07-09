@@ -4,8 +4,42 @@ export const API_BASE_URL =
 const TOKEN_KEY = "pairpocket_token";
 
 export const EXPENSE_CATEGORY_INVESTMENT = "투자/저축";
+export const TRANSFER_CATEGORY = "자산 이동/카드";
+export const TRANSFER_SUB_CARD_REPAYMENT = "카드 대금 상환";
+export const TRANSFER_SUB_ACCOUNT_TRANSFER = "계좌 이체";
+export const TRANSFER_SUB_INVESTMENT_FUNDING = "투자 계좌 입금";
 export const INCOME_CATEGORY_SETTLEMENT = "정산";
 export const SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급";
+
+export function isTransferTransaction(tx: {
+  kind?: TransactionKind | null;
+  category: string;
+}): boolean {
+  return (
+    tx.kind === "transfer" ||
+    tx.category === TRANSFER_CATEGORY ||
+    tx.category === "자산 이동"
+  );
+}
+
+export function isSettlementTransaction(tx: {
+  category: string;
+  sub_category?: string | null;
+}): boolean {
+  return (
+    tx.category === INCOME_CATEGORY_SETTLEMENT &&
+    tx.sub_category === SUB_CATEGORY_SETTLEMENT
+  );
+}
+
+/** Transfers and N빵 settlements — shown grey, excluded from income/expense totals. */
+export function isNonCashflowTransaction(tx: {
+  kind?: TransactionKind | null;
+  category: string;
+  sub_category?: string | null;
+}): boolean {
+  return isTransferTransaction(tx) || isSettlementTransaction(tx);
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -376,6 +410,7 @@ export interface ExchangeRate {
   krw_cad: number;
   date: string | null;
   stale: boolean;
+  source?: string;
 }
 
 export async function fetchExchangeRate(): Promise<ExchangeRate> {
@@ -384,6 +419,43 @@ export async function fetchExchangeRate(): Promise<ExchangeRate> {
   });
   if (!res.ok) throw new Error("환율을 불러오지 못했습니다.");
   return (await res.json()) as ExchangeRate;
+}
+
+export interface AccountBalance {
+  account_id: string;
+  name: string;
+  nickname: string | null;
+  kind: FinancialAccountKind;
+  currency: Currency;
+  account_type: AccountType;
+  is_liability: boolean;
+  balance: number;
+  net_worth_contribution: number;
+}
+
+export interface NetWorthSummary {
+  account_type: AccountType;
+  currency: Currency | null;
+  total_assets: number;
+  total_liabilities: number;
+  net_worth: number;
+  accounts: AccountBalance[];
+}
+
+export async function fetchNetWorth(filters: {
+  currency?: Currency;
+  accountType?: AccountType;
+} = {}): Promise<NetWorthSummary> {
+  const params = new URLSearchParams();
+  params.set("account_type", filters.accountType ?? "personal");
+  if (filters.currency) params.set("currency", filters.currency);
+
+  const res = await fetch(
+    `${API_BASE_URL}/api/accounts/net-worth?${params.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error("총자산을 불러오지 못했습니다.");
+  return (await res.json()) as NetWorthSummary;
 }
 
 export async function createTransaction(

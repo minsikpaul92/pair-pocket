@@ -306,7 +306,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 }
                 className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
-                오늘
+                이번달
               </button>
               <button
                 type="button"
@@ -335,7 +335,7 @@ export default function AppShell({ user, onLogout }: Props) {
               transactions={transactions}
             />
           ) : (
-            <DashboardView month={month} version={version} />
+            <DashboardView month={month} version={version} scope={scope} />
           )}
         </main>
       </div>
