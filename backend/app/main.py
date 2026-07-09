@@ -6,7 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
 from app.database import close_mongo_connection, connect_to_mongo
-from app.routers import auth, transactions
+from app.routers import auth, categories, exchange, settings as settings_router, stats, transactions
 
 
 @asynccontextmanager
@@ -32,7 +32,11 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(categories.router)
 app.include_router(transactions.router)
+app.include_router(stats.router)
+app.include_router(settings_router.router)
+app.include_router(exchange.router)
 
 
 @app.get("/", tags=["health"])

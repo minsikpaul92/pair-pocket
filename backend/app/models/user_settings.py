@@ -1,14 +1,17 @@
 from pydantic import BaseModel, Field
 
 
+class CustomCategoryMap(BaseModel):
+    """User-added categories: { category_name: [sub_category, ...] }."""
+
+    expense: dict[str, list[str]] = Field(default_factory=dict)
+    income: dict[str, list[str]] = Field(default_factory=dict)
+
+
 class UserSettingsBase(BaseModel):
-    """Per-user customization data (PRD.md §4 `user_settings`).
-
-    Holds array lists used for custom categories and merchant auto-complete.
-    """
-
-    categories: list[str] = Field(default_factory=list)
     merchants: list[str] = Field(default_factory=list)
+    institutions: list[str] = Field(default_factory=list)
+    custom_categories: CustomCategoryMap = Field(default_factory=CustomCategoryMap)
 
 
 class UserSettingsInDB(UserSettingsBase):
@@ -16,5 +19,8 @@ class UserSettingsInDB(UserSettingsBase):
 
 
 class UserSettingsOut(UserSettingsBase):
-    id: str
-    owner_id: str
+    pass
+
+
+class AddInstitutionBody(BaseModel):
+    name: str

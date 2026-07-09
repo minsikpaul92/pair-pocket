@@ -26,6 +26,20 @@ async def _ensure_indexes() -> None:
     await db.database["users"].create_index("google_id", unique=True)
     await db.database["users"].create_index("email", unique=True)
     await db.database["user_settings"].create_index("owner_id", unique=True)
+    await db.database["transactions"].create_index(
+        [("owner_id", 1), ("date", -1)]
+    )
+    await db.database["transactions"].create_index(
+        [("owner_id", 1), ("category", 1), ("sub_category", 1)]
+    )
+    await db.database["transactions"].create_index(
+        [("owner_id", 1), ("institution", 1)],
+        sparse=True,
+    )
+    await db.database["transactions"].create_index(
+        [("owner_id", 1), ("settles_expense_id", 1)],
+        sparse=True,
+    )
 
 
 async def close_mongo_connection() -> None:

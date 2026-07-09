@@ -75,10 +75,17 @@ async def callback(request: Request, db: AsyncIOMotorDatabase = Depends(get_data
     document = await db["users"].find_one({"google_id": google_id})
     user_id = str(document["_id"])
 
-    # Ensure a settings document exists for this user (empty arrays by default).
+    # Ensure a settings document exists for merchant/institution autocomplete hints.
     await db["user_settings"].update_one(
         {"owner_id": user_id},
-        {"$setOnInsert": {"owner_id": user_id, "categories": [], "merchants": []}},
+        {
+            "$setOnInsert": {
+                "owner_id": user_id,
+                "merchants": [],
+                "institutions": [],
+                "custom_categories": {"expense": {}, "income": {}},
+            }
+        },
         upsert=True,
     )
 

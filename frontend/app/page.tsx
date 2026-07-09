@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import LedgerView from "@/components/LedgerView";
+import AppShell from "@/components/AppShell";
 import LoginLanding from "@/components/LoginLanding";
 import { CurrentUser, fetchCurrentUser } from "@/lib/api";
 
@@ -28,5 +28,5 @@ export default function Home() {
     return <LoginLanding />;
   }
 
-  return <LedgerView user={user} onLogout={() => setUser(null)} />;
+  return <AppShell user={user} onLogout={() => setUser(null)} />;
 }

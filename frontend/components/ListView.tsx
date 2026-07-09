@@ -1,0 +1,329 @@
+"use client";
+
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import {
+  CategoryPresets,
+  Currency,
+  EXPENSE_CATEGORY_INVESTMENT,
+  Transaction,
+  TransactionType,
+  categoriesForType,
+  formatAmount,
+  subCategoriesFor,
+} from "@/lib/api";
+
+interface Props {
+  currency: Currency;
+  presets: CategoryPresets | null;
+  transactions: Transaction[];
+}
+
+type TypeFilter = "all" | TransactionType;
+type SortKey = "date" | "category" | "sub_category" | "merchant" | "type" | "amount";
+type SortDir = "asc" | "desc";
+
+function formatDay(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
+export default function ListView({ currency, presets, transactions }: Props) {
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [subCategoryFilter, setSubCategoryFilter] = useState<string>("all");
+  const [merchantQuery, setMerchantQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const allCategories = useMemo(() => {
+    if (!presets) return [];
+    const set = new Set<string>();
+    for (const tx of transactions) set.add(tx.category);
+    const expense = categoriesForType(presets, "expense");
+    const income = categoriesForType(presets, "income");
+    return [...expense, ...income].filter((c) => set.has(c));
+  }, [presets, transactions]);
+
+  const subCategoryOptions = useMemo(() => {
+    if (categoryFilter === "all") {
+      const set = new Set(transactions.map((t) => t.sub_category).filter(Boolean));
+      return [...set].sort((a, b) => a.localeCompare(b, "ko"));
+    }
+    const set = new Set(
+      transactions
+        .filter((t) => t.category === categoryFilter)
+        .map((t) => t.sub_category)
+        .filter(Boolean)
+    );
+    if (presets) {
+      const expenseSubs = subCategoriesFor(presets, "expense", categoryFilter);
+      const incomeSubs = subCategoriesFor(presets, "income", categoryFilter);
+      for (const s of [...expenseSubs, ...incomeSubs]) {
+        if (set.has(s) || categoryFilter !== "all") set.add(s);
+      }
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "ko"));
+  }, [transactions, categoryFilter, presets]);
+
+  const filtered = useMemo(() => {
+    const q = merchantQuery.trim().toLowerCase();
+    return transactions.filter((tx) => {
+      if (typeFilter !== "all" && tx.type !== typeFilter) return false;
+      if (categoryFilter !== "all" && tx.category !== categoryFilter) return false;
+      if (subCategoryFilter !== "all" && tx.sub_category !== subCategoryFilter)
+        return false;
+      if (q && !tx.merchant.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [transactions, typeFilter, categoryFilter, subCategoryFilter, merchantQuery]);
+
+  const sorted = useMemo(() => {
+    const list = [...filtered];
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "date":
+          cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
+          break;
+        case "amount":
+          cmp = a.amount - b.amount;
+          break;
+        case "category":
+          cmp = a.category.localeCompare(b.category, "ko");
+          break;
+        case "sub_category":
+          cmp = (a.sub_category || "").localeCompare(b.sub_category || "", "ko");
+          break;
+        case "merchant":
+          cmp = a.merchant.localeCompare(b.merchant, "ko");
+          break;
+        case "type":
+          cmp = a.type.localeCompare(b.type);
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [filtered, sortKey, sortDir]);
+
+  const totals = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    for (const tx of sorted) {
+      if (tx.type === "income") income += tx.amount;
+      else expense += tx.amount;
+    }
+    return { income, expense, net: income - expense, count: sorted.length };
+  }, [sorted]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir(key === "date" ? "desc" : "asc");
+    }
+  }
+
+  function SortIcon({ col }: { col: SortKey }) {
+    if (sortKey !== col)
+      return <ArrowUpDown className="inline h-3 w-3 opacity-40" />;
+    return sortDir === "asc" ? (
+      <ArrowUp className="inline h-3 w-3 text-blue-500" />
+    ) : (
+      <ArrowDown className="inline h-3 w-3 text-blue-500" />
+    );
+  }
+
+  const thClass =
+    "px-3 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors";
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+          {(["all", "expense", "income"] as TypeFilter[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTypeFilter(t)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                typeFilter === t
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              {t === "all" ? "전체" : t === "expense" ? "지출" : "수입"}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={categoryFilter}
+          onChange={(e) => {
+            setCategoryFilter(e.target.value);
+            setSubCategoryFilter("all");
+          }}
+          className="input-field w-auto py-2 text-sm"
+        >
+          <option value="all">전체 대분류</option>
+          {allCategories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={subCategoryFilter}
+          onChange={(e) => setSubCategoryFilter(e.target.value)}
+          className="input-field w-auto py-2 text-sm"
+          disabled={categoryFilter === "all" && subCategoryOptions.length === 0}
+        >
+          <option value="all">전체 중분류</option>
+          {subCategoryOptions.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <div className="relative flex-1 min-w-[10rem]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            value={merchantQuery}
+            onChange={(e) => setMerchantQuery(e.target.value)}
+            placeholder="사용처 검색"
+            className="input-field pl-9 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 card-inset overflow-hidden">
+        <div className="overflow-x-auto max-h-[28rem] overflow-y-auto">
+          <table className="min-w-full text-sm border-collapse">
+            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/95 backdrop-blur-sm">
+              <tr className="border-b border-gray-200 dark:border-gray-700">
+                <th className={thClass} onClick={() => toggleSort("date")}>
+                  날짜 <SortIcon col="date" />
+                </th>
+                <th className={thClass} onClick={() => toggleSort("category")}>
+                  대분류 <SortIcon col="category" />
+                </th>
+                <th className={thClass} onClick={() => toggleSort("sub_category")}>
+                  중분류 <SortIcon col="sub_category" />
+                </th>
+                <th className={thClass} onClick={() => toggleSort("merchant")}>
+                  사용처 <SortIcon col="merchant" />
+                </th>
+                <th className={thClass} onClick={() => toggleSort("type")}>
+                  구분 <SortIcon col="type" />
+                </th>
+                <th
+                  className={`${thClass} text-right`}
+                  onClick={() => toggleSort("amount")}
+                >
+                  금액 <SortIcon col="amount" />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-gray-400"
+                  >
+                    해당 조건의 거래가 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                sorted.map((tx, i) => (
+                  <tr
+                    key={tx.id}
+                    className={`border-b border-gray-100 dark:border-gray-700/60 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 transition-colors ${
+                      i % 2 === 0
+                        ? "bg-white dark:bg-gray-800"
+                        : "bg-gray-50/50 dark:bg-gray-800/60"
+                    }`}
+                  >
+                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-500 dark:text-gray-400 tabular-nums">
+                      {formatDay(tx.date)}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {tx.category}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap max-w-[7rem] truncate">
+                      {tx.sub_category || "—"}
+                    </td>
+                    <td className="px-3 py-2.5 max-w-[8rem] truncate">
+                      {tx.merchant}
+                      {tx.category === EXPENSE_CATEGORY_INVESTMENT &&
+                        tx.institution && (
+                          <span className="block text-xs text-gray-400 truncate">
+                            {tx.institution}
+                          </span>
+                        )}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <span
+                        className={`text-xs font-medium ${
+                          tx.type === "income"
+                            ? "text-blue-500"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        {tx.type === "income" ? "수입" : "지출"}
+                      </span>
+                    </td>
+                    <td
+                      className={`px-3 py-2.5 whitespace-nowrap text-right font-semibold tabular-nums ${
+                        tx.type === "income"
+                          ? "text-blue-500"
+                          : "text-gray-900 dark:text-white"
+                      }`}
+                    >
+                      {tx.type === "income" ? "+" : "-"}
+                      {formatAmount(tx.amount, currency)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {sorted.length > 0 && (
+              <tfoot className="sticky bottom-0 bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-200 dark:border-gray-600">
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400"
+                  >
+                    합계 ({totals.count}건)
+                  </td>
+                  <td className="px-3 py-3 text-xs whitespace-nowrap">
+                    <span className="text-blue-500">
+                      +{formatAmount(totals.income, currency)}
+                    </span>
+                    <span className="mx-1 text-gray-300">/</span>
+                    <span className="text-gray-600 dark:text-gray-300">
+                      -{formatAmount(totals.expense, currency)}
+                    </span>
+                  </td>
+                  <td
+                    className={`px-3 py-3 text-right font-bold whitespace-nowrap tabular-nums ${
+                      totals.net < 0 ? "text-red-500" : "text-gray-900 dark:text-white"
+                    }`}
+                  >
+                    {formatAmount(totals.net, currency)}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
