@@ -12,6 +12,7 @@ from app.models.ledger import (
     TRANSFER_SUB_ACCOUNT_TRANSFER,
     TRANSFER_SUB_INVESTMENT_FUNDING,
     TransactionKind,
+    normalize_transfer_category,
 )
 from app.models.transaction import TransactionCreate, TransactionType
 from app.routers.settings import _get_or_create, _parse_custom
@@ -67,9 +68,17 @@ async def validate_transaction_payload(
     payload: TransactionCreate,
     db: AsyncIOMotorDatabase,
     owner_id: str,
+    *,
+    exclude_settlement_id: str | None = None,
 ) -> None:
     doc = await _get_or_create(db, owner_id)
     custom = _parse_custom(doc)
+
+    # Normalize legacy "자산 이동" → "자산 이동/카드" before validation.
+    normalized_category = normalize_transfer_category(payload.category)
+    if normalized_category != payload.category:
+        payload.category = normalized_category
+
     is_transfer = is_transfer_expense(payload.category)
 
     if is_transfer and payload.type != TransactionType.EXPENSE:
@@ -109,7 +118,10 @@ async def validate_transaction_payload(
                 detail="[N빵 정산/환급]은 정산 대상 지출(settles_expense_id) 선택이 필요합니다.",
             )
         remaining = await get_remaining_settlement(
-            db, owner_id, payload.settles_expense_id
+            db,
+            owner_id,
+            payload.settles_expense_id,
+            exclude_settlement_id=exclude_settlement_id,
         )
         if remaining is None:
             raise HTTPException(

@@ -14,6 +14,7 @@ from app.models.transaction import TransactionType
 
 from app.models.ledger import (
     TRANSFER_CATEGORY,
+    TRANSFER_CATEGORY_LEGACY,
     TRANSFER_SUB_ACCOUNT_TRANSFER,
     TRANSFER_SUB_CARD_REPAYMENT,
     TRANSFER_SUB_INVESTMENT_FUNDING,
@@ -113,12 +114,12 @@ def is_investment_expense(category: str) -> bool:
 
 
 def is_transfer_expense(category: str) -> bool:
-    return category in (TRANSFER_CATEGORY, "자산 이동")
+    return category in (TRANSFER_CATEGORY, TRANSFER_CATEGORY_LEGACY)
 
 
 def is_card_repayment(category: str, sub_category: str) -> bool:
     return (
-        category in (TRANSFER_CATEGORY, "자산 이동")
+        category in (TRANSFER_CATEGORY, TRANSFER_CATEGORY_LEGACY)
         and sub_category == TRANSFER_SUB_CARD_REPAYMENT
     )
 

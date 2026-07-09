@@ -39,9 +39,17 @@ async def get_settled_amounts(
 
 
 async def get_remaining_settlement(
-    db: AsyncIOMotorDatabase, owner_id: str, expense_id: str
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+    expense_id: str,
+    *,
+    exclude_settlement_id: str | None = None,
 ) -> float | None:
-    """Return how much of an expense can still be settled, or None if not found."""
+    """Return how much of an expense can still be settled, or None if not found.
+
+    When editing an existing settlement, pass exclude_settlement_id so that
+    settlement's own amount is not counted against the remaining balance.
+    """
     try:
         oid = ObjectId(expense_id)
     except InvalidId:
@@ -55,4 +63,16 @@ async def get_remaining_settlement(
 
     settled_map = await get_settled_amounts(db, owner_id)
     already = settled_map.get(expense_id, 0.0)
+
+    if exclude_settlement_id and ObjectId.is_valid(exclude_settlement_id):
+        existing = await db[COLLECTION].find_one(
+            {
+                "_id": ObjectId(exclude_settlement_id),
+                "owner_id": owner_id,
+                "settles_expense_id": expense_id,
+            }
+        )
+        if existing:
+            already = max(already - float(existing["amount"]), 0.0)
+
     return max(expense["amount"] - already, 0.0)

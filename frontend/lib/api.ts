@@ -5,11 +5,16 @@ const TOKEN_KEY = "pairpocket_token";
 
 export const EXPENSE_CATEGORY_INVESTMENT = "투자/저축";
 export const TRANSFER_CATEGORY = "자산 이동/카드";
+export const TRANSFER_CATEGORY_LEGACY = "자산 이동";
 export const TRANSFER_SUB_CARD_REPAYMENT = "카드 대금 상환";
 export const TRANSFER_SUB_ACCOUNT_TRANSFER = "계좌 이체";
 export const TRANSFER_SUB_INVESTMENT_FUNDING = "투자 계좌 입금";
 export const INCOME_CATEGORY_SETTLEMENT = "정산";
 export const SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급";
+
+export function normalizeTransferCategory(category: string): string {
+  return category === TRANSFER_CATEGORY_LEGACY ? TRANSFER_CATEGORY : category;
+}
 
 export function isTransferTransaction(tx: {
   kind?: TransactionKind | null;
@@ -18,7 +23,7 @@ export function isTransferTransaction(tx: {
   return (
     tx.kind === "transfer" ||
     tx.category === TRANSFER_CATEGORY ||
-    tx.category === "자산 이동"
+    tx.category === TRANSFER_CATEGORY_LEGACY
   );
 }
 
@@ -364,9 +369,13 @@ export interface SettleableExpense {
 }
 
 export async function fetchSettleableExpenses(
-  currency: Currency
+  currency: Currency,
+  excludeSettlementId?: string
 ): Promise<SettleableExpense[]> {
   const params = new URLSearchParams({ currency });
+  if (excludeSettlementId) {
+    params.set("exclude_settlement_id", excludeSettlementId);
+  }
   const res = await fetch(
     `${API_BASE_URL}/api/transactions/settleable?${params.toString()}`,
     { headers: authHeaders() }
@@ -458,6 +467,11 @@ export async function fetchNetWorth(filters: {
   return (await res.json()) as NetWorthSummary;
 }
 
+async function readApiError(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => null);
+  return body && typeof body.detail === "string" ? body.detail : fallback;
+}
+
 export async function createTransaction(
   tx: NewTransaction
 ): Promise<Transaction> {
@@ -467,14 +481,34 @@ export async function createTransaction(
     body: JSON.stringify(tx),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    const detail =
-      body && typeof body.detail === "string"
-        ? body.detail
-        : "거래를 저장하지 못했습니다.";
-    throw new Error(detail);
+    throw new Error(await readApiError(res, "거래를 저장하지 못했습니다."));
   }
   return (await res.json()) as Transaction;
+}
+
+export async function updateTransaction(
+  id: string,
+  tx: NewTransaction
+): Promise<Transaction> {
+  const res = await fetch(`${API_BASE_URL}/api/transactions/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(tx),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "거래를 수정하지 못했습니다."));
+  }
+  return (await res.json()) as Transaction;
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/transactions/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "거래를 삭제하지 못했습니다."));
+  }
 }
 
 export async function fetchAccounts(filters: {

@@ -75,6 +75,8 @@ export default function AppShell({ user, onLogout }: Props) {
 
   const [modalDate, setModalDate] = useState<Date | null>(null);
   const [modalCurrency, setModalCurrency] = useState<Currency>("CAD");
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -119,14 +121,27 @@ export default function AppShell({ user, onLogout }: Props) {
     alert("파트너 초대 기능은 곧 제공될 예정입니다. 지금은 개인 가계부를 사용할 수 있어요.");
   }
 
-  function handleCreated() {
+  function handleSaved() {
     setModalDate(null);
+    setEditingTransaction(null);
     setVersion((v) => v + 1);
   }
 
+  function closeModal() {
+    setModalDate(null);
+    setEditingTransaction(null);
+  }
+
   function openModal(date: Date) {
+    setEditingTransaction(null);
     setModalDate(date);
     if (scope !== "ALL") setModalCurrency(scope);
+  }
+
+  function openEdit(tx: Transaction) {
+    setEditingTransaction(tx);
+    setModalCurrency(tx.currency);
+    setModalDate(new Date(tx.date));
   }
 
   const modalDayTransactions = modalDate
@@ -333,6 +348,7 @@ export default function AppShell({ user, onLogout }: Props) {
               scope={scope}
               presets={presets}
               transactions={transactions}
+              onEditTransaction={openEdit}
             />
           ) : (
             <DashboardView month={month} version={version} scope={scope} />
@@ -374,14 +390,16 @@ export default function AppShell({ user, onLogout }: Props) {
       {modalDate && presets && (
         <TransactionModal
           currency={modalCurrency}
-          allowCurrencyPick={scope === "ALL"}
+          allowCurrencyPick={scope === "ALL" && !editingTransaction}
           onCurrencyChange={setModalCurrency}
           presets={presets}
           defaultDate={modalDate}
           onDateChange={setModalDate}
           dayTransactions={modalDayTransactions}
-          onClose={() => setModalDate(null)}
-          onCreated={handleCreated}
+          editingTransaction={editingTransaction}
+          onClose={closeModal}
+          onSaved={handleSaved}
+          onSelectTransaction={openEdit}
           onPresetsChange={setPresets}
         />
       )}

@@ -198,11 +198,33 @@ async def institution_suggestions(
 async def list_settleable_expenses(
     currency: Currency,
     account_type: AccountType = AccountType.PERSONAL,
+    exclude_settlement_id: str | None = Query(
+        default=None,
+        description="When editing a settlement, exclude it from remaining calc.",
+    ),
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[dict]:
     """Expenses with remaining balance that can still be N빵-settled."""
+    from bson import ObjectId
+
+    from app.models.category_preset import is_transfer_expense
+    from app.models.ledger import TransactionKind
+
     settled_map = await get_settled_amounts(db, current_user.id)
+    exclude_amount = 0.0
+    exclude_expense_id: str | None = None
+    if exclude_settlement_id and ObjectId.is_valid(exclude_settlement_id):
+        existing = await db[COLLECTION].find_one(
+            {
+                "_id": ObjectId(exclude_settlement_id),
+                "owner_id": current_user.id,
+            }
+        )
+        if existing and existing.get("settles_expense_id"):
+            exclude_expense_id = existing["settles_expense_id"]
+            exclude_amount = float(existing["amount"])
+
     query = {
         "owner_id": current_user.id,
         "account_type": account_type.value,
@@ -214,9 +236,6 @@ async def list_settleable_expenses(
     )
 
     results: list[dict] = []
-    from app.models.category_preset import is_transfer_expense
-    from app.models.ledger import TransactionKind
-
     for doc in expenses:
         if (
             doc.get("kind") == TransactionKind.TRANSFER.value
@@ -225,6 +244,8 @@ async def list_settleable_expenses(
             continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)
+        if exclude_expense_id == exp_id:
+            settled = max(settled - exclude_amount, 0.0)
         remaining = max(doc["amount"] - settled, 0.0)
         if remaining <= 0:
             continue
@@ -243,6 +264,29 @@ async def list_settleable_expenses(
     return results
 
 
+def _document_from_payload(
+    payload: TransactionCreate, *, owner_id: str
+) -> dict:
+    from app.models.category_preset import is_transfer_expense
+    from app.models.ledger import TransactionKind, normalize_transfer_category
+
+    document = payload.model_dump(exclude={"effective_amount", "settled_amount"})
+    document["category"] = normalize_transfer_category(payload.category)
+    document["currency"] = payload.currency.value
+    document["type"] = payload.type.value
+    document["account_type"] = payload.account_type.value
+    # Asset moves always store kind=transfer so stats/balance logic stay consistent.
+    if is_transfer_expense(document["category"]):
+        document["kind"] = TransactionKind.TRANSFER.value
+    else:
+        document["kind"] = TransactionKind.NORMAL.value
+        document["counter_account_id"] = None
+    document["owner_id"] = owner_id
+    if not document.get("merchant"):
+        document["merchant"] = "미지정"
+    return document
+
+
 @router.post("", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     payload: TransactionCreate,
@@ -250,24 +294,77 @@ async def create_transaction(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     await validate_transaction_payload(payload, db, current_user.id)
-
-    from app.models.category_preset import is_transfer_expense
-    from app.models.ledger import TransactionKind
-
-    document = payload.model_dump(exclude={"effective_amount", "settled_amount"})
-    document["currency"] = payload.currency.value
-    document["type"] = payload.type.value
-    document["account_type"] = payload.account_type.value
-    # Asset moves always store kind=transfer so stats/balance logic stay consistent.
-    if is_transfer_expense(payload.category):
-        document["kind"] = TransactionKind.TRANSFER.value
-    else:
-        document["kind"] = TransactionKind.NORMAL.value
-        document["counter_account_id"] = None
-    document["owner_id"] = current_user.id
-    if not document.get("merchant"):
-        document["merchant"] = "미지정"
-
+    document = _document_from_payload(payload, owner_id=current_user.id)
     result = await db[COLLECTION].insert_one(document)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
     return _serialize(created)
+
+
+@router.put("/{transaction_id}", response_model=TransactionOut)
+async def update_transaction(
+    transaction_id: str,
+    payload: TransactionCreate,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(transaction_id):
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    existing = await db[COLLECTION].find_one(
+        {"_id": ObjectId(transaction_id), "owner_id": current_user.id}
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    await validate_transaction_payload(
+        payload,
+        db,
+        current_user.id,
+        exclude_settlement_id=transaction_id,
+    )
+    document = _document_from_payload(payload, owner_id=current_user.id)
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(transaction_id)}, {"$set": document}
+    )
+    updated = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
+    return _serialize(updated)
+
+
+@router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_transaction(
+    transaction_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> None:
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(transaction_id):
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    existing = await db[COLLECTION].find_one(
+        {"_id": ObjectId(transaction_id), "owner_id": current_user.id}
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    # Block deleting an expense that still has linked N빵 settlements.
+    if existing.get("type") == TransactionType.EXPENSE.value:
+        linked = await db[COLLECTION].count_documents(
+            {
+                "owner_id": current_user.id,
+                "settles_expense_id": transaction_id,
+            }
+        )
+        if linked > 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="이 지출에 연결된 N빵 정산이 있어 삭제할 수 없습니다. 정산을 먼저 삭제해 주세요.",
+            )
+
+    result = await db[COLLECTION].delete_one(
+        {"_id": ObjectId(transaction_id), "owner_id": current_user.id}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Transaction not found.")

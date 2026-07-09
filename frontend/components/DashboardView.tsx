@@ -197,7 +197,7 @@ export default function DashboardView({ month, version, scope }: Props) {
       <section className="card-inset p-5">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            총자산
+            총 순자산
           </p>
           {showCombinedToggle && (
             <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
@@ -231,7 +231,7 @@ export default function DashboardView({ month, version, scope }: Props) {
         </p>
         <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
-            <p className="text-gray-400">자산</p>
+            <p className="text-gray-400">통장 / 자산</p>
             <p className="mt-0.5 font-semibold text-blue-500">
               {netWorth
                 ? formatAmount(netWorth.total_assets, heroCurrency)
@@ -240,11 +240,25 @@ export default function DashboardView({ month, version, scope }: Props) {
           </div>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
             <p className="text-gray-400">총 부채</p>
-            <p className="mt-0.5 font-semibold text-red-500">
-              {netWorth
-                ? formatAmount(netWorth.total_liabilities, heroCurrency)
-                : "—"}
-            </p>
+            {(() => {
+              const liabilities = netWorth?.total_liabilities ?? 0;
+              const overpaid = liabilities < 0;
+              const display = netWorth
+                ? formatAmount(
+                    overpaid ? Math.abs(liabilities) : liabilities,
+                    heroCurrency
+                  )
+                : "—";
+              return (
+                <p
+                  className={`mt-0.5 font-semibold ${
+                    overpaid ? "text-blue-500" : "text-red-500"
+                  }`}
+                >
+                  {overpaid && netWorth ? `+${display}` : display}
+                </p>
+              );
+            })()}
           </div>
         </div>
       </section>
@@ -326,6 +340,12 @@ export default function DashboardView({ month, version, scope }: Props) {
           <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {liabilityAccounts.map((acc) => {
               const label = acc.nickname?.trim() || acc.name;
+              // Negative liability = overpayment / credit balance.
+              const overpaid = acc.balance < 0;
+              const display = formatAmount(
+                overpaid ? Math.abs(acc.balance) : acc.balance,
+                acc.currency
+              );
               return (
                 <li
                   key={acc.account_id}
@@ -339,8 +359,12 @@ export default function DashboardView({ month, version, scope }: Props) {
                       {label}
                     </p>
                   </div>
-                  <p className="mt-1.5 text-base font-bold tabular-nums text-red-500 truncate">
-                    {formatAmount(acc.balance, acc.currency)}
+                  <p
+                    className={`mt-1.5 text-base font-bold tabular-nums truncate ${
+                      overpaid ? "text-blue-500" : "text-red-500"
+                    }`}
+                  >
+                    {overpaid ? `+${display}` : display}
                   </p>
                 </li>
               );

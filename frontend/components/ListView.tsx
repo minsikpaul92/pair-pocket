@@ -22,6 +22,7 @@ interface Props {
   scope: LedgerScope;
   presets: CategoryPresets | null;
   transactions: Transaction[];
+  onEditTransaction?: (tx: Transaction) => void;
 }
 
 type TypeFilter = "all" | TransactionType;
@@ -46,7 +47,12 @@ function displayAmount(tx: Transaction): number {
   return tx.type === "expense" ? effectiveExpenseAmount(tx) : tx.amount;
 }
 
-export default function ListView({ scope, presets, transactions }: Props) {
+export default function ListView({
+  scope,
+  presets,
+  transactions,
+  onEditTransaction,
+}: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [subCategoryFilter, setSubCategoryFilter] = useState<string>("all");
@@ -287,7 +293,10 @@ export default function ListView({ scope, presets, transactions }: Props) {
                   return (
                     <tr
                       key={tx.id}
+                      onClick={() => onEditTransaction?.(tx)}
                       className={`border-b border-gray-100 dark:border-gray-700/60 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 transition-colors ${
+                        onEditTransaction ? "cursor-pointer" : ""
+                      } ${
                         i % 2 === 0
                           ? "bg-white dark:bg-gray-800"
                           : "bg-gray-50/50 dark:bg-gray-800/60"

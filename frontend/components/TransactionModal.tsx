@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, X } from "lucide-react";
+import { CalendarDays, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
@@ -31,6 +31,7 @@ import {
   categoriesForType,
   createTransaction,
   defaultAccountId,
+  deleteTransaction,
   fetchAccounts,
   fetchInstitutionSuggestions,
   fetchMerchantSuggestions,
@@ -39,7 +40,10 @@ import {
   formatAmount,
   hasSettlement,
   isNonCashflowTransaction,
+  isTransferTransaction,
+  normalizeTransferCategory,
   subCategoriesFor,
+  updateTransaction,
 } from "@/lib/api";
 import { dayKey, formatDayLabel } from "@/lib/date";
 
@@ -51,8 +55,10 @@ interface Props {
   defaultDate: Date;
   onDateChange: (date: Date) => void;
   dayTransactions: Transaction[];
+  editingTransaction?: Transaction | null;
   onClose: () => void;
-  onCreated: (tx: Transaction) => void;
+  onSaved: () => void;
+  onSelectTransaction?: (tx: Transaction) => void;
   onPresetsChange: (presets: CategoryPresets) => void;
 }
 
@@ -69,10 +75,14 @@ export default function TransactionModal({
   defaultDate,
   onDateChange,
   dayTransactions,
+  editingTransaction = null,
   onClose,
-  onCreated,
+  onSaved,
+  onSelectTransaction,
   onPresetsChange,
 }: Props) {
+  const isEditing = Boolean(editingTransaction);
+
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -94,7 +104,9 @@ export default function TransactionModal({
   >("primary");
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hydratedEditId, setHydratedEditId] = useState<string | null>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const dateStr = dayKey(defaultDate);
@@ -161,14 +173,51 @@ export default function TransactionModal({
     };
   }, [currency]);
 
+  // Hydrate form when opening an existing transaction for edit.
+  // Reset to blank create form when editingTransaction is cleared.
   useEffect(() => {
-    // Always re-apply the default for the active type (expense vs income).
-    // If that type has no default, clear to "없음/현금".
-    if (isTransfer) return;
-    setAccountId(defaultAccountId(accounts, type));
-  }, [type, accounts, isTransfer]);
+    if (!editingTransaction) {
+      if (hydratedEditId !== null) {
+        setType("expense");
+        setAmount("");
+        setCategory("");
+        setSubCategory("");
+        setSettlesExpenseId("");
+        setMerchant("");
+        setInstitution("");
+        setAccountId(ACCOUNT_NONE);
+        setCounterAccountId(ACCOUNT_NONE);
+        setError(null);
+        setHydratedEditId(null);
+      }
+      return;
+    }
+    if (hydratedEditId === editingTransaction.id) return;
+
+    const tx = editingTransaction;
+    setType(tx.type);
+    setAmount(String(tx.amount));
+    setCategory(normalizeTransferCategory(tx.category));
+    setSubCategory(tx.sub_category || "");
+    setSettlesExpenseId(tx.settles_expense_id || "");
+    setMerchant(tx.merchant || "");
+    setInstitution(tx.institution || "");
+    setAccountId(tx.account_id || ACCOUNT_NONE);
+    setCounterAccountId(tx.counter_account_id || ACCOUNT_NONE);
+    setError(null);
+    setHydratedEditId(tx.id);
+  }, [editingTransaction, hydratedEditId]);
 
   useEffect(() => {
+    // Always re-apply the default for the active type (expense vs income).
+    // Skip while editing — keep the transaction's own account.
+    if (isEditing || isTransfer) return;
+    setAccountId(defaultAccountId(accounts, type));
+  }, [type, accounts, isTransfer, isEditing]);
+
+  useEffect(() => {
+    // Never wipe transfer accounts while editing — keep the saved from/to cards.
+    if (isEditing) return;
     if (!isTransfer) {
       setCounterAccountId(ACCOUNT_NONE);
       return;
@@ -185,12 +234,20 @@ export default function TransactionModal({
       );
       return preferredOk ? preferred : ACCOUNT_NONE;
     });
-  }, [isTransfer, accounts]);
+  }, [isTransfer, accounts, isEditing]);
 
   useEffect(() => {
-    if (!isTransfer) return;
+    if (!isTransfer || isEditing) return;
     setCounterAccountId(ACCOUNT_NONE);
-  }, [subCategory, isTransfer]);
+  }, [subCategory, isTransfer, isEditing]);
+
+  // Re-apply saved transfer accounts once the account list finishes loading.
+  useEffect(() => {
+    if (!editingTransaction || accountsLoading) return;
+    if (!isTransferTransaction(editingTransaction)) return;
+    setAccountId(editingTransaction.account_id || ACCOUNT_NONE);
+    setCounterAccountId(editingTransaction.counter_account_id || ACCOUNT_NONE);
+  }, [editingTransaction, accountsLoading, accounts]);
 
   useEffect(() => {
     if (!category || !subCategory || isTransfer || isSettlement) {
@@ -225,17 +282,20 @@ export default function TransactionModal({
   useEffect(() => {
     if (!isSettlement) {
       setSettleableExpenses([]);
-      setSettlesExpenseId("");
+      if (!isEditing) setSettlesExpenseId("");
       return;
     }
     let active = true;
-    fetchSettleableExpenses(currency).then((list) => {
+    fetchSettleableExpenses(
+      currency,
+      editingTransaction?.id
+    ).then((list) => {
       if (active) setSettleableExpenses(list);
     });
     return () => {
       active = false;
     };
-  }, [isSettlement, currency]);
+  }, [isSettlement, currency, isEditing, editingTransaction?.id]);
 
   function handleTypeChange(next: TransactionType) {
     setType(next);
@@ -254,7 +314,8 @@ export default function TransactionModal({
     setMerchant("");
     setMerchantHints([]);
     setInstitution("");
-    setCounterAccountId(ACCOUNT_NONE);
+    // Keep saved transfer accounts when editing; only clear on create.
+    if (!isEditing) setCounterAccountId(ACCOUNT_NONE);
     setError(null);
   }
 
@@ -262,7 +323,7 @@ export default function TransactionModal({
     setSubCategory(next);
     setSettlesExpenseId("");
     setMerchant("");
-    if (category === TRANSFER_CATEGORY) {
+    if (category === TRANSFER_CATEGORY && !isEditing) {
       setCounterAccountId(ACCOUNT_NONE);
     }
     setError(null);
@@ -375,14 +436,37 @@ export default function TransactionModal({
 
     setSubmitting(true);
     try {
-      const created = await createTransaction(payload);
-      onCreated(created);
+      if (editingTransaction) {
+        await updateTransaction(editingTransaction.id, payload);
+      } else {
+        await createTransaction(payload);
+      }
+      onSaved();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "저장 중 오류가 발생했습니다."
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!editingTransaction) return;
+    const ok = window.confirm("이 거래를 삭제할까요?");
+    if (!ok) return;
+
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteTransaction(editingTransaction.id);
+      onSaved();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "삭제 중 오류가 발생했습니다."
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -543,7 +627,9 @@ export default function TransactionModal({
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-xl font-bold tracking-tight">새 거래</h2>
+            <h2 className="text-xl font-bold tracking-tight">
+              {isEditing ? "거래 수정" : "새 거래"}
+            </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
               {LEDGER_LABEL[currency]} · {currency}
             </p>
@@ -635,42 +721,50 @@ export default function TransactionModal({
                 tx.type === "expense"
                   ? effectiveExpenseAmount(tx)
                   : tx.amount;
+              const isActive = editingTransaction?.id === tx.id;
               return (
-                <li
-                  key={tx.id}
-                  className="flex items-center justify-between gap-2 px-4 py-2.5"
-                >
-                  <span className="text-sm truncate">
-                    {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"}{" "}
-                    {tx.category} › {tx.sub_category || "—"} · {tx.merchant}
-                  </span>
-                  <span
-                    className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
-                      nonCashflow
-                        ? "text-gray-500 dark:text-gray-400"
-                        : tx.type === "income"
-                          ? "text-blue-500"
-                          : "text-red-500"
+                <li key={tx.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectTransaction?.(tx)}
+                    className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors ${
+                      isActive
+                        ? "bg-blue-50 dark:bg-blue-500/10"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-800/80"
                     }`}
                   >
-                    {settled ? (
-                      <span className="flex flex-col items-end">
-                        <span className="text-[10px] text-gray-400 line-through font-normal">
-                          {formatAmount(tx.amount, tx.currency)}
-                        </span>
-                        <span>{formatAmount(displayAmt, tx.currency)}</span>
-                      </span>
-                    ) : (
-                      <>
-                        {nonCashflow
-                          ? ""
+                    <span className="text-sm truncate">
+                      {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"}{" "}
+                      {tx.category} › {tx.sub_category || "—"} · {tx.merchant}
+                    </span>
+                    <span
+                      className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
+                        nonCashflow
+                          ? "text-gray-500 dark:text-gray-400"
                           : tx.type === "income"
-                            ? "+"
-                            : ""}
-                        {formatAmount(displayAmt, tx.currency)}
-                      </>
-                    )}
-                  </span>
+                            ? "text-blue-500"
+                            : "text-red-500"
+                      }`}
+                    >
+                      {settled ? (
+                        <span className="flex flex-col items-end">
+                          <span className="text-[10px] text-gray-400 line-through font-normal">
+                            {formatAmount(tx.amount, tx.currency)}
+                          </span>
+                          <span>{formatAmount(displayAmt, tx.currency)}</span>
+                        </span>
+                      ) : (
+                        <>
+                          {nonCashflow
+                            ? ""
+                            : tx.type === "income"
+                              ? "+"
+                              : ""}
+                          {formatAmount(displayAmt, tx.currency)}
+                        </>
+                      )}
+                    </span>
+                  </button>
                 </li>
               );
             })}
@@ -751,13 +845,30 @@ export default function TransactionModal({
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full btn-primary disabled:opacity-50"
-          >
-            {submitting ? "저장 중..." : "저장"}
-          </button>
+          <div className="flex gap-2">
+            {isEditing && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={submitting || deleting}
+                className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-semibold text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleting ? "삭제 중..." : "삭제"}
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={submitting || deleting}
+              className="flex-1 btn-primary disabled:opacity-50"
+            >
+              {submitting
+                ? "저장 중..."
+                : isEditing
+                  ? "수정 저장"
+                  : "저장"}
+            </button>
+          </div>
         </form>
       </div>
 
