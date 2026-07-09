@@ -18,11 +18,13 @@ import {
   LedgerScope,
   NetWorthSummary,
   StatsSummary,
+  TRANSFER_CATEGORY,
   fetchExchangeRate,
   fetchNetWorth,
   fetchStatsSummary,
   formatAmount,
 } from "@/lib/api";
+import { translateCategory } from "@/lib/category-i18n";
 import { monthKey, monthLabel } from "@/lib/date";
 
 interface Props {
@@ -47,6 +49,7 @@ export default function DashboardView({ month, version, scope }: Props) {
   const tLedger = useTranslations("ledger");
   const tCommon = useTranslations("common");
   const tAccountKinds = useTranslations("accountKinds");
+  const tCategories = useTranslations("categories");
 
   const [cadStats, setCadStats] = useState<StatsSummary | null>(null);
   const [krwStats, setKrwStats] = useState<StatsSummary | null>(null);
@@ -197,6 +200,9 @@ export default function DashboardView({ month, version, scope }: Props) {
     netWorth?.accounts.filter((a) => !a.is_liability) ?? [];
   const liabilityAccounts =
     netWorth?.accounts.filter((a) => a.is_liability) ?? [];
+  const cardBalancesLabel =
+    tDashboard("cardBalances") ||
+    translateCategory(TRANSFER_CATEGORY, tCategories);
 
   return (
     <div className="space-y-4">
@@ -346,7 +352,7 @@ export default function DashboardView({ month, version, scope }: Props) {
       {liabilityAccounts.length > 0 && (
         <section className="card-inset p-4">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-            {tDashboard("cardBalances")}
+            {cardBalancesLabel}
           </p>
           <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {liabilityAccounts.map((acc) => {
