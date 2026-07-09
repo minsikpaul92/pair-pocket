@@ -78,6 +78,14 @@ web_modules/
 .next
 out
 
+# next-pwa generated service worker files
+frontend/public/sw.js
+frontend/public/sw.js.map
+frontend/public/workbox-*.js
+frontend/public/workbox-*.js.map
+frontend/public/swe-worker-*.js
+frontend/public/fallback-*.js
+
 # Nuxt.js build / generate output
 .nuxt
 dist
@@ -141,3 +149,23 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backend (Python & FastAPI)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+pip-log.txt
+.pytest_cache/
+
+# IDE and Editor settings
+.vscode/
+.idea/
+.cursor/
+*.swp

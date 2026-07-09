@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+motor
+pydantic
+pydantic[email]
+pydantic-settings
+python-dotenv
+authlib
+httpx
+itsdangerous
+pyjwt
