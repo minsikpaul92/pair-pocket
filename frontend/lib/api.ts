@@ -47,6 +47,7 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
 export const loginUrl = `${API_BASE_URL}/api/auth/login`;
 
 export type Currency = "KRW" | "CAD";
+export type LedgerScope = Currency | "ALL";
 export type TransactionType = "income" | "expense";
 export type AccountType = "shared" | "personal";
 
@@ -63,6 +64,8 @@ export interface Transaction {
   institution: string | null;
   settles_expense_id: string | null;
   owner_id: string;
+  settled_amount?: number;
+  effective_amount?: number;
 }
 
 export interface NewTransaction {
@@ -143,6 +146,33 @@ export async function fetchTransactions(
   );
   if (!res.ok) throw new Error("거래 내역을 불러오지 못했습니다.");
   return (await res.json()) as Transaction[];
+}
+
+/** Fetch and merge CAD + KRW transactions for the ALL ledger view. */
+export async function fetchAllTransactions(
+  filters: Omit<TransactionFilters, "currency"> = {}
+): Promise<Transaction[]> {
+  const [cad, krw] = await Promise.all([
+    fetchTransactions({ ...filters, currency: "CAD" }),
+    fetchTransactions({ ...filters, currency: "KRW" }),
+  ]);
+  return [...cad, ...krw].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+}
+
+/** Expense amount after N빵 settlements (for calendar/list display). */
+export function effectiveExpenseAmount(tx: Transaction): number {
+  if (tx.type !== "expense") return tx.amount;
+  return tx.effective_amount ?? tx.amount;
+}
+
+export function hasSettlement(tx: Transaction): boolean {
+  return (
+    tx.type === "expense" &&
+    (tx.settled_amount ?? 0) > 0 &&
+    (tx.effective_amount ?? tx.amount) < tx.amount
+  );
 }
 
 export async function fetchCategoryPresets(): Promise<CategoryPresets> {

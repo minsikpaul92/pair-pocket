@@ -100,7 +100,18 @@ async def list_transactions(
         query["institution"] = institution
 
     documents = await db[COLLECTION].find(query).sort("date", -1).to_list(length=500)
-    return [_serialize(doc) for doc in documents]
+    settled_map = await get_settled_amounts(db, current_user.id)
+
+    results: list[dict] = []
+    for doc in documents:
+        row = _serialize(doc)
+        if doc.get("type") == TransactionType.EXPENSE.value:
+            exp_id = str(doc["_id"])
+            settled = settled_map.get(exp_id, 0.0)
+            row["settled_amount"] = settled
+            row["effective_amount"] = max(float(doc["amount"]) - settled, 0.0)
+        results.append(row)
+    return results
 
 
 @router.get("/merchants", response_model=list[str])

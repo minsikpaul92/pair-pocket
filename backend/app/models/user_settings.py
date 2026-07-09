@@ -12,6 +12,8 @@ class UserSettingsBase(BaseModel):
     merchants: list[str] = Field(default_factory=list)
     institutions: list[str] = Field(default_factory=list)
     custom_categories: CustomCategoryMap = Field(default_factory=CustomCategoryMap)
+    default_expense_account_id: str | None = None
+    default_income_account_id: str | None = None
 
 
 class UserSettingsInDB(UserSettingsBase):

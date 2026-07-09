@@ -7,21 +7,31 @@ import {
   CategoryPresets,
   Currency,
   EXPENSE_CATEGORY_INVESTMENT,
+  LedgerScope,
   Transaction,
   TransactionType,
   categoriesForType,
+  effectiveExpenseAmount,
   formatAmount,
+  hasSettlement,
   subCategoriesFor,
 } from "@/lib/api";
 
 interface Props {
-  currency: Currency;
+  scope: LedgerScope;
   presets: CategoryPresets | null;
   transactions: Transaction[];
 }
 
 type TypeFilter = "all" | TransactionType;
-type SortKey = "date" | "category" | "sub_category" | "merchant" | "type" | "amount";
+type SortKey =
+  | "date"
+  | "currency"
+  | "category"
+  | "sub_category"
+  | "merchant"
+  | "type"
+  | "amount";
 type SortDir = "asc" | "desc";
 
 function formatDay(iso: string): string {
@@ -31,13 +41,19 @@ function formatDay(iso: string): string {
   ).padStart(2, "0")}`;
 }
 
-export default function ListView({ currency, presets, transactions }: Props) {
+function displayAmount(tx: Transaction): number {
+  return tx.type === "expense" ? effectiveExpenseAmount(tx) : tx.amount;
+}
+
+export default function ListView({ scope, presets, transactions }: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [subCategoryFilter, setSubCategoryFilter] = useState<string>("all");
   const [merchantQuery, setMerchantQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const showCurrencyCol = scope === "ALL";
 
   const allCategories = useMemo(() => {
     if (!presets) return [];
@@ -89,8 +105,11 @@ export default function ListView({ currency, presets, transactions }: Props) {
         case "date":
           cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
           break;
+        case "currency":
+          cmp = a.currency.localeCompare(b.currency);
+          break;
         case "amount":
-          cmp = a.amount - b.amount;
+          cmp = displayAmount(a) - displayAmount(b);
           break;
         case "category":
           cmp = a.category.localeCompare(b.category, "ko");
@@ -111,13 +130,20 @@ export default function ListView({ currency, presets, transactions }: Props) {
   }, [filtered, sortKey, sortDir]);
 
   const totals = useMemo(() => {
-    let income = 0;
-    let expense = 0;
+    const byCurrency: Record<
+      Currency,
+      { income: number; expense: number; count: number }
+    > = {
+      CAD: { income: 0, expense: 0, count: 0 },
+      KRW: { income: 0, expense: 0, count: 0 },
+    };
     for (const tx of sorted) {
-      if (tx.type === "income") income += tx.amount;
-      else expense += tx.amount;
+      const bucket = byCurrency[tx.currency];
+      bucket.count += 1;
+      if (tx.type === "income") bucket.income += tx.amount;
+      else bucket.expense += effectiveExpenseAmount(tx);
     }
-    return { income, expense, net: income - expense, count: sorted.length };
+    return byCurrency;
   }, [sorted]);
 
   function toggleSort(key: SortKey) {
@@ -140,6 +166,12 @@ export default function ListView({ currency, presets, transactions }: Props) {
 
   const thClass =
     "px-3 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors";
+
+  const colSpan = showCurrencyCol ? 7 : 6;
+  const activeCurrencies: Currency[] =
+    scope === "ALL"
+      ? (["CAD", "KRW"] as Currency[]).filter((c) => totals[c].count > 0)
+      : [scope as Currency];
 
   return (
     <div>
@@ -210,6 +242,11 @@ export default function ListView({ currency, presets, transactions }: Props) {
                 <th className={thClass} onClick={() => toggleSort("date")}>
                   날짜 <SortIcon col="date" />
                 </th>
+                {showCurrencyCol && (
+                  <th className={thClass} onClick={() => toggleSort("currency")}>
+                    통화 <SortIcon col="currency" />
+                  </th>
+                )}
                 <th className={thClass} onClick={() => toggleSort("category")}>
                   대분류 <SortIcon col="category" />
                 </th>
@@ -234,91 +271,124 @@ export default function ListView({ currency, presets, transactions }: Props) {
               {sorted.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={colSpan}
                     className="px-4 py-12 text-center text-gray-400"
                   >
                     해당 조건의 거래가 없습니다.
                   </td>
                 </tr>
               ) : (
-                sorted.map((tx, i) => (
-                  <tr
-                    key={tx.id}
-                    className={`border-b border-gray-100 dark:border-gray-700/60 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 transition-colors ${
-                      i % 2 === 0
-                        ? "bg-white dark:bg-gray-800"
-                        : "bg-gray-50/50 dark:bg-gray-800/60"
-                    }`}
-                  >
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-500 dark:text-gray-400 tabular-nums">
-                      {formatDay(tx.date)}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      {tx.category}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap max-w-[7rem] truncate">
-                      {tx.sub_category || "—"}
-                    </td>
-                    <td className="px-3 py-2.5 max-w-[8rem] truncate">
-                      {tx.merchant}
-                      {tx.category === EXPENSE_CATEGORY_INVESTMENT &&
-                        tx.institution && (
-                          <span className="block text-xs text-gray-400 truncate">
-                            {tx.institution}
-                          </span>
-                        )}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <span
-                        className={`text-xs font-medium ${
-                          tx.type === "income"
-                            ? "text-blue-500"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        {tx.type === "income" ? "수입" : "지출"}
-                      </span>
-                    </td>
-                    <td
-                      className={`px-3 py-2.5 whitespace-nowrap text-right font-semibold tabular-nums ${
-                        tx.type === "income"
-                          ? "text-blue-500"
-                          : "text-gray-900 dark:text-white"
+                sorted.map((tx, i) => {
+                  const settled = hasSettlement(tx);
+                  const effective = displayAmount(tx);
+                  return (
+                    <tr
+                      key={tx.id}
+                      className={`border-b border-gray-100 dark:border-gray-700/60 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 transition-colors ${
+                        i % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-gray-50/50 dark:bg-gray-800/60"
                       }`}
                     >
-                      {tx.type === "income" ? "+" : "-"}
-                      {formatAmount(tx.amount, currency)}
-                    </td>
-                  </tr>
-                ))
+                      <td className="px-3 py-2.5 whitespace-nowrap text-gray-500 dark:text-gray-400 tabular-nums">
+                        {formatDay(tx.date)}
+                      </td>
+                      {showCurrencyCol && (
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs font-medium text-gray-500">
+                          {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"} {tx.currency}
+                        </td>
+                      )}
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        {tx.category}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap max-w-[7rem] truncate">
+                        {tx.sub_category || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 max-w-[8rem] truncate">
+                        {tx.merchant}
+                        {tx.category === EXPENSE_CATEGORY_INVESTMENT &&
+                          tx.institution && (
+                            <span className="block text-xs text-gray-400 truncate">
+                              {tx.institution}
+                            </span>
+                          )}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <span
+                          className={`text-xs font-medium ${
+                            tx.type === "income"
+                              ? "text-blue-500"
+                              : "text-gray-500"
+                          }`}
+                        >
+                          {tx.type === "income" ? "수입" : "지출"}
+                        </span>
+                      </td>
+                      <td
+                        className={`px-3 py-2.5 whitespace-nowrap text-right tabular-nums ${
+                          tx.type === "income"
+                            ? "text-blue-500 font-semibold"
+                            : "text-gray-900 dark:text-white font-semibold"
+                        }`}
+                      >
+                        {settled ? (
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-xs text-gray-400 line-through font-normal">
+                              {formatAmount(tx.amount, tx.currency)}
+                            </span>
+                            <span className="text-red-500">
+                              {formatAmount(effective, tx.currency)}
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            {tx.type === "income" ? "+" : ""}
+                            {formatAmount(effective, tx.currency)}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
             {sorted.length > 0 && (
               <tfoot className="sticky bottom-0 bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-200 dark:border-gray-600">
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400"
-                  >
-                    합계 ({totals.count}건)
-                  </td>
-                  <td className="px-3 py-3 text-xs whitespace-nowrap">
-                    <span className="text-blue-500">
-                      +{formatAmount(totals.income, currency)}
-                    </span>
-                    <span className="mx-1 text-gray-300">/</span>
-                    <span className="text-gray-600 dark:text-gray-300">
-                      -{formatAmount(totals.expense, currency)}
-                    </span>
-                  </td>
-                  <td
-                    className={`px-3 py-3 text-right font-bold whitespace-nowrap tabular-nums ${
-                      totals.net < 0 ? "text-red-500" : "text-gray-900 dark:text-white"
-                    }`}
-                  >
-                    {formatAmount(totals.net, currency)}
-                  </td>
-                </tr>
+                {activeCurrencies.map((cur) => {
+                  const t = totals[cur];
+                  const net = t.income - t.expense;
+                  return (
+                    <tr key={cur}>
+                      <td
+                        colSpan={showCurrencyCol ? 5 : 4}
+                        className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400"
+                      >
+                        합계 ({t.count}건)
+                        {showCurrencyCol && (
+                          <span className="ml-1">
+                            {cur === "CAD" ? "🇨🇦" : "🇰🇷"} {cur}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-xs whitespace-nowrap">
+                        <span className="text-blue-500">
+                          +{formatAmount(t.income, cur)}
+                        </span>
+                        <span className="mx-1 text-gray-300">/</span>
+                        <span className="text-red-500">
+                          -{formatAmount(t.expense, cur)}
+                        </span>
+                      </td>
+                      <td
+                        className={`px-3 py-2 text-right font-bold whitespace-nowrap tabular-nums text-xs ${
+                          net < 0 ? "text-red-500" : "text-gray-900 dark:text-white"
+                        }`}
+                      >
+                        {formatAmount(net, cur)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tfoot>
             )}
           </table>

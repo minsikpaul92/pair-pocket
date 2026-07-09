@@ -3,6 +3,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.models.ledger import TransactionKind
+
 
 class Currency(str, Enum):
     KRW = "KRW"
@@ -44,6 +46,16 @@ class TransactionBase(BaseModel):
 
     # Links [정산 › N빵 정산/환급] income to the original expense transaction
     settles_expense_id: str | None = None
+
+    # Financial account this movement touches (card, bank, etc.)
+    account_id: str | None = None
+    # For TRANSFER: the counterpart account (e.g. checking → credit card repayment)
+    counter_account_id: str | None = None
+    kind: TransactionKind = TransactionKind.NORMAL
+
+    # Populated by stats layer — effective spend after N빵 settlements (read-only)
+    effective_amount: float | None = None
+    settled_amount: float | None = None
 
     @field_validator(
         "category", "sub_category", "merchant", "institution", mode="before"

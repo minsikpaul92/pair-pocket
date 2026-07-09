@@ -12,6 +12,13 @@ from app.models.transaction import TransactionType
 
 # --- Special category / sub-category identifiers for stats logic ---
 
+from app.models.ledger import (
+    TRANSFER_CATEGORY,
+    TRANSFER_SUB_ACCOUNT_TRANSFER,
+    TRANSFER_SUB_CARD_REPAYMENT,
+    TRANSFER_SUB_INVESTMENT_FUNDING,
+)
+
 EXPENSE_CATEGORY_INVESTMENT = "투자/저축"
 INCOME_CATEGORY_SETTLEMENT = "정산"
 SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급"
@@ -27,6 +34,11 @@ EXPENSE_PRESETS: dict[str, list[str]] = {
     "경조사/선물": ["경조사비", "선물/기념일", "모임/회비"],
     "투자/저축": ["주식 매수", "FHSA 납입", "TFSA 납입", "저축성 예금"],
     "세금": ["세금"],
+    TRANSFER_CATEGORY: [
+        TRANSFER_SUB_CARD_REPAYMENT,
+        TRANSFER_SUB_ACCOUNT_TRANSFER,
+        TRANSFER_SUB_INVESTMENT_FUNDING,
+    ],
 }
 
 INCOME_PRESETS: dict[str, list[str]] = {
@@ -98,6 +110,17 @@ def is_settlement_income(category: str, sub_category: str) -> bool:
 
 def is_investment_expense(category: str) -> bool:
     return category == EXPENSE_CATEGORY_INVESTMENT
+
+
+def is_transfer_expense(category: str) -> bool:
+    return category == TRANSFER_CATEGORY
+
+
+def is_card_repayment(category: str, sub_category: str) -> bool:
+    return (
+        category == TRANSFER_CATEGORY
+        and sub_category == TRANSFER_SUB_CARD_REPAYMENT
+    )
 
 
 def requires_settlement_link(

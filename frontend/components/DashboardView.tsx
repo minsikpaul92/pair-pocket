@@ -69,10 +69,6 @@ export default function DashboardView({ month, version }: Props) {
         cadStats.adjusted_expense,
         krwStats.adjusted_expense
       ),
-      settlementRefund: toDisplay(
-        cadStats.settlement_refund_total,
-        krwStats.settlement_refund_total
-      ),
       investmentSavings: toDisplay(
         cadStats.investment_savings_total,
         krwStats.investment_savings_total
@@ -125,7 +121,7 @@ export default function DashboardView({ month, version }: Props) {
       </section>
 
       {combined && (
-        <section className="grid grid-cols-2 gap-3">
+        <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <MetricCard
             label="순수 소비"
             hint="투자/저축 제외"
@@ -133,13 +129,8 @@ export default function DashboardView({ month, version }: Props) {
           />
           <MetricCard
             label="실제 지출"
-            hint="N빵 정산 차감"
+            hint="N빵 정산 반영"
             value={formatAmount(combined.adjustedExpense, display)}
-          />
-          <MetricCard
-            label="N빵 환급"
-            hint="정산 수입"
-            value={formatAmount(combined.settlementRefund, display)}
           />
           <MetricCard
             label="투자/저축"
@@ -214,7 +205,7 @@ function LedgerStatsCard({
         <div className="flex justify-between">
           <span className="text-gray-400">지출</span>
           <span className="text-gray-600 dark:text-gray-300">
-            -{formatAmount(stats.total_expense, currency)}
+            -{formatAmount(stats.adjusted_expense, currency)}
           </span>
         </div>
         <div className="flex justify-between">

@@ -6,7 +6,16 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
 from app.database import close_mongo_connection, connect_to_mongo
-from app.routers import auth, categories, exchange, settings as settings_router, stats, transactions
+from app.routers import (
+    accounts,
+    auth,
+    categories,
+    exchange,
+    settings as settings_router,
+    stats,
+    subscriptions,
+    transactions,
+)
 
 
 @asynccontextmanager
@@ -31,6 +40,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(accounts.router)
+app.include_router(subscriptions.router)
 app.include_router(auth.router)
 app.include_router(categories.router)
 app.include_router(transactions.router)

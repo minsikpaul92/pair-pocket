@@ -25,13 +25,17 @@ import {
   fetchInstitutionSuggestions,
   fetchMerchantSuggestions,
   fetchSettleableExpenses,
+  effectiveExpenseAmount,
   formatAmount,
+  hasSettlement,
   subCategoriesFor,
 } from "@/lib/api";
 import { dayKey, formatDayLabel } from "@/lib/date";
 
 interface Props {
   currency: Currency;
+  allowCurrencyPick?: boolean;
+  onCurrencyChange?: (currency: Currency) => void;
   presets: CategoryPresets;
   defaultDate: Date;
   dayTransactions: Transaction[];
@@ -47,6 +51,8 @@ const LEDGER_LABEL: Record<Currency, string> = {
 
 export default function TransactionModal({
   currency,
+  allowCurrencyPick = false,
+  onCurrencyChange,
   presets,
   defaultDate,
   dayTransactions,
@@ -367,21 +373,41 @@ export default function TransactionModal({
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-xl font-bold tracking-tight">새 거래</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
               {LEDGER_LABEL[currency]} · {currency}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {allowCurrencyPick && onCurrencyChange && (
+              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+                {(["CAD", "KRW"] as Currency[]).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => onCurrencyChange(c)}
+                    className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
+                      currency === c
+                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="닫기"
+              className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex items-center gap-3 rounded-2xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3">
@@ -398,26 +424,45 @@ export default function TransactionModal({
 
         {dayTransactions.length > 0 && (
           <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-32 overflow-auto">
-            {dayTransactions.map((tx) => (
-              <li
-                key={tx.id}
-                className="flex items-center justify-between gap-2 px-4 py-2.5"
-              >
-                <span className="text-sm truncate">
-                  {tx.category} › {tx.sub_category || "—"} · {tx.merchant}
-                </span>
-                <span
-                  className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
-                    tx.type === "income"
-                      ? "text-blue-500"
-                      : "text-gray-700 dark:text-gray-200"
-                  }`}
+            {dayTransactions.map((tx) => {
+              const settled = hasSettlement(tx);
+              const displayAmt =
+                tx.type === "expense"
+                  ? effectiveExpenseAmount(tx)
+                  : tx.amount;
+              return (
+                <li
+                  key={tx.id}
+                  className="flex items-center justify-between gap-2 px-4 py-2.5"
                 >
-                  {tx.type === "income" ? "+" : "-"}
-                  {formatAmount(tx.amount, currency)}
-                </span>
-              </li>
-            ))}
+                  <span className="text-sm truncate">
+                    {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"}{" "}
+                    {tx.category} › {tx.sub_category || "—"} · {tx.merchant}
+                  </span>
+                  <span
+                    className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
+                      tx.type === "income"
+                        ? "text-blue-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {settled ? (
+                      <span className="flex flex-col items-end">
+                        <span className="text-[10px] text-gray-400 line-through font-normal">
+                          {formatAmount(tx.amount, tx.currency)}
+                        </span>
+                        <span>{formatAmount(displayAmt, tx.currency)}</span>
+                      </span>
+                    ) : (
+                      <>
+                        {tx.type === "income" ? "+" : ""}
+                        {formatAmount(displayAmt, tx.currency)}
+                      </>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
 
