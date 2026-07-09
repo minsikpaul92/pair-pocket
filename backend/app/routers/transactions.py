@@ -35,6 +35,8 @@ class SettleableExpenseOut(BaseModel):
 
 def _serialize(document: dict) -> dict:
     """Shape a raw MongoDB document into the TransactionOut schema."""
+    from app.models.ledger import TransactionKind
+
     return {
         "id": str(document["_id"]),
         "date": document["date"],
@@ -47,6 +49,9 @@ def _serialize(document: dict) -> dict:
         "merchant": document.get("merchant", "미지정"),
         "institution": document.get("institution"),
         "settles_expense_id": document.get("settles_expense_id"),
+        "account_id": document.get("account_id"),
+        "counter_account_id": document.get("counter_account_id"),
+        "kind": document.get("kind", TransactionKind.NORMAL.value),
         "owner_id": document["owner_id"],
     }
 
@@ -229,10 +234,11 @@ async def create_transaction(
 ) -> dict:
     await validate_transaction_payload(payload, db, current_user.id)
 
-    document = payload.model_dump()
+    document = payload.model_dump(exclude={"effective_amount", "settled_amount"})
     document["currency"] = payload.currency.value
     document["type"] = payload.type.value
     document["account_type"] = payload.account_type.value
+    document["kind"] = payload.kind.value
     document["owner_id"] = current_user.id
     if not document.get("merchant"):
         document["merchant"] = "미지정"

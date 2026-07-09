@@ -1,3 +1,4 @@
+from bson import ObjectId
 from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -6,6 +7,8 @@ from app.models.transaction import TransactionCreate
 from app.routers.settings import _get_or_create, _parse_custom
 from app.services.category_merge import is_valid_merged_pair
 from app.services.settlement import get_remaining_settlement
+
+ACCOUNTS_COL = "accounts"
 
 
 async def validate_transaction_payload(
@@ -64,3 +67,32 @@ async def validate_transaction_payload(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="settles_expense_id는 [N빵 정산/환급] 수입에서만 사용할 수 있습니다.",
         )
+
+    if payload.account_id:
+        if not ObjectId.is_valid(payload.account_id):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="유효하지 않은 계좌 ID입니다.",
+            )
+        account = await db[ACCOUNTS_COL].find_one(
+            {
+                "_id": ObjectId(payload.account_id),
+                "owner_id": owner_id,
+                "is_active": True,
+            }
+        )
+        if not account:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="선택한 카드/은행을 찾을 수 없습니다.",
+            )
+        if account.get("currency") != payload.currency.value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="계좌 통화와 거래 통화가 일치하지 않습니다.",
+            )
+        if account.get("account_type") != payload.account_type.value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="계좌의 공용/개인 구분이 거래와 일치하지 않습니다.",
+            )

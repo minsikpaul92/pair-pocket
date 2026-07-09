@@ -16,6 +16,7 @@ def _serialize_account(doc: dict) -> dict:
         "id": str(doc["_id"]),
         "owner_id": doc["owner_id"],
         "name": doc["name"],
+        "nickname": doc.get("nickname"),
         "kind": doc["kind"],
         "currency": doc["currency"],
         "account_type": doc["account_type"],
@@ -26,6 +27,7 @@ def _serialize_account(doc: dict) -> dict:
         "is_active": doc.get("is_active", True),
         "institution": doc.get("institution"),
         "last_four": doc.get("last_four"),
+        "account_number": doc.get("account_number"),
         "created_at": doc["created_at"],
         "updated_at": doc["updated_at"],
     }

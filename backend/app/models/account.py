@@ -26,6 +26,7 @@ class AccountBase(BaseModel):
     """A trackable wallet: bank account, credit card, brokerage, etc."""
 
     name: str = Field(min_length=1, max_length=80)
+    nickname: str | None = Field(default=None, max_length=40)
     kind: FinancialAccountKind
     currency: Currency
     account_type: AccountType = AccountType.PERSONAL
@@ -44,12 +45,23 @@ class AccountBase(BaseModel):
     # Optional display metadata (issuer icon, last four digits, etc.)
     institution: str | None = None
     last_four: str | None = None
+    # Optional full/partial account number for non-credit-card accounts
+    account_number: str | None = None
 
-    @field_validator("name", "institution", "last_four", mode="before")
+    @field_validator("name", mode="before")
     @classmethod
-    def strip_strings(cls, v):
+    def strip_name(cls, v):
         if isinstance(v, str):
             return v.strip()
+        return v
+
+    @field_validator(
+        "nickname", "institution", "last_four", "account_number", mode="before"
+    )
+    @classmethod
+    def strip_optional(cls, v):
+        if isinstance(v, str):
+            return v.strip() or None
         return v
 
 
@@ -59,12 +71,14 @@ class AccountCreate(AccountBase):
 
 class AccountUpdate(BaseModel):
     name: str | None = None
+    nickname: str | None = None
     opening_balance: float | None = None
     is_default_expense: bool | None = None
     is_default_income: bool | None = None
     is_active: bool | None = None
     institution: str | None = None
     last_four: str | None = None
+    account_number: str | None = None
 
 
 class AccountOut(AccountBase):

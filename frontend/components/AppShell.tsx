@@ -378,6 +378,7 @@ export default function AppShell({ user, onLogout }: Props) {
           onCurrencyChange={setModalCurrency}
           presets={presets}
           defaultDate={modalDate}
+          onDateChange={setModalDate}
           dayTransactions={modalDayTransactions}
           onClose={() => setModalDate(null)}
           onCreated={handleCreated}

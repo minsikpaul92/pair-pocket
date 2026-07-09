@@ -1,8 +1,10 @@
 "use client";
 
 import { CalendarDays, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import AccountRegisterModal from "@/components/AccountRegisterModal";
+import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import CategorySelect from "@/components/CategorySelect";
 import InstitutionSelect from "@/components/InstitutionSelect";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
@@ -11,6 +13,7 @@ import {
   CategoryPresets,
   Currency,
   EXPENSE_CATEGORY_INVESTMENT,
+  FinancialAccount,
   INCOME_CATEGORY_SETTLEMENT,
   SUB_CATEGORY_SETTLEMENT,
   SettleableExpense,
@@ -22,6 +25,8 @@ import {
   addInstitution,
   categoriesForType,
   createTransaction,
+  defaultAccountId,
+  fetchAccounts,
   fetchInstitutionSuggestions,
   fetchMerchantSuggestions,
   fetchSettleableExpenses,
@@ -38,6 +43,7 @@ interface Props {
   onCurrencyChange?: (currency: Currency) => void;
   presets: CategoryPresets;
   defaultDate: Date;
+  onDateChange: (date: Date) => void;
   dayTransactions: Transaction[];
   onClose: () => void;
   onCreated: (tx: Transaction) => void;
@@ -55,6 +61,7 @@ export default function TransactionModal({
   onCurrencyChange,
   presets,
   defaultDate,
+  onDateChange,
   dayTransactions,
   onClose,
   onCreated,
@@ -72,8 +79,13 @@ export default function TransactionModal({
   const [settleableExpenses, setSettleableExpenses] = useState<SettleableExpense[]>(
     []
   );
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [accountId, setAccountId] = useState(ACCOUNT_NONE);
+  const [showAccountRegister, setShowAccountRegister] = useState(false);
+  const [accountsLoading, setAccountsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const dateStr = dayKey(defaultDate);
 
@@ -106,6 +118,31 @@ export default function TransactionModal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    setAccountsLoading(true);
+    fetchAccounts({ currency })
+      .then((list) => {
+        if (!active) return;
+        setAccounts(list);
+      })
+      .catch(() => {
+        if (active) setAccounts([]);
+      })
+      .finally(() => {
+        if (active) setAccountsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [currency]);
+
+  useEffect(() => {
+    // Always re-apply the default for the active type (expense vs income).
+    // If that type has no default, clear to "없음/현금".
+    setAccountId(defaultAccountId(accounts, type));
+  }, [type, accounts]);
 
   useEffect(() => {
     if (!category || !subCategory || isSettlement) {
@@ -244,6 +281,8 @@ export default function TransactionModal({
       merchant: merchant.trim() || (isSettlement ? "미지정" : "미지정"),
       institution: isInvestment ? institution.trim() : null,
       settles_expense_id: isSettlement ? settlesExpenseId : null,
+      account_id: accountId || null,
+      kind: "normal",
     };
 
     setSubmitting(true);
@@ -399,6 +438,13 @@ export default function TransactionModal({
                 ))}
               </div>
             )}
+            <AccountSelect
+              accounts={accounts}
+              value={accountId}
+              onChange={setAccountId}
+              onRegister={() => setShowAccountRegister(true)}
+              disabled={accountsLoading}
+            />
             <button
               type="button"
               onClick={onClose}
@@ -410,16 +456,40 @@ export default function TransactionModal({
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3">
-          <CalendarDays className="h-5 w-5 text-blue-500 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {formatDayLabel(defaultDate)}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              달력에서 선택한 날짜 · 다른 날짜는 달력에서 클릭하세요
-            </p>
-          </div>
+        <div className="mt-4 relative">
+          <button
+            type="button"
+            onClick={() => {
+              const input = dateInputRef.current;
+              if (!input) return;
+              if (typeof input.showPicker === "function") input.showPicker();
+              else input.click();
+            }}
+            className="w-full flex items-center gap-3 rounded-2xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3 text-left hover:bg-blue-100/80 dark:hover:bg-blue-500/20 transition-colors"
+          >
+            <CalendarDays className="h-5 w-5 text-blue-500 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                {formatDayLabel(defaultDate)}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                달력 아이콘을 눌러 날짜를 변경할 수 있어요
+              </p>
+            </div>
+          </button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={dateStr}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              const [y, m, d] = e.target.value.split("-").map(Number);
+              onDateChange(new Date(y, m - 1, d));
+            }}
+            className="sr-only"
+            tabIndex={-1}
+            aria-label="거래 날짜"
+          />
         </div>
 
         {dayTransactions.length > 0 && (
@@ -549,6 +619,30 @@ export default function TransactionModal({
           </button>
         </form>
       </div>
+
+      {showAccountRegister && (
+        <AccountRegisterModal
+          currency={currency}
+          preferredType={type}
+          onClose={() => setShowAccountRegister(false)}
+          onCreated={(created) => {
+            setAccounts((prev) => {
+              const cleared = prev.map((a) => ({
+                ...a,
+                is_default_expense: created.is_default_expense
+                  ? false
+                  : a.is_default_expense,
+                is_default_income: created.is_default_income
+                  ? false
+                  : a.is_default_income,
+              }));
+              return [...cleared, created];
+            });
+            setAccountId(created.id);
+            setShowAccountRegister(false);
+          }}
+        />
+      )}
     </div>
   );
 }
