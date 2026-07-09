@@ -1,21 +1,24 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Suspense, useEffect, useState } from "react";
 
+import { useRouter } from "@/i18n/navigation";
 import { setToken } from "@/lib/api";
 
 function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [message, setMessage] = useState("로그인 처리 중...");
+  const t = useTranslations("auth");
+  const [message, setMessage] = useState(t("processing"));
 
   useEffect(() => {
     const token = searchParams.get("token");
     const error = searchParams.get("error");
 
     if (error) {
-      setMessage("로그인에 실패했습니다. 다시 시도해 주세요.");
+      setMessage(t("failed"));
       const timer = setTimeout(() => router.replace("/"), 2000);
       return () => clearTimeout(timer);
     }
@@ -26,10 +29,10 @@ function CallbackHandler() {
       return;
     }
 
-    setMessage("잘못된 접근입니다.");
+    setMessage(t("invalidAccess"));
     const timer = setTimeout(() => router.replace("/"), 2000);
     return () => clearTimeout(timer);
-  }, [router, searchParams]);
+  }, [router, searchParams, t]);
 
   return (
     <p className="text-base text-gray-700 dark:text-gray-300">{message}</p>

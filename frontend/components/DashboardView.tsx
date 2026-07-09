@@ -6,10 +6,11 @@ import {
   RefreshCw,
   Wallet,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  ACCOUNT_KIND_LABEL,
+  ACCOUNT_KIND_KEYS,
   AccountBalance,
   Currency,
   ExchangeRate,
@@ -17,11 +18,13 @@ import {
   LedgerScope,
   NetWorthSummary,
   StatsSummary,
+  TRANSFER_CATEGORY,
   fetchExchangeRate,
   fetchNetWorth,
   fetchStatsSummary,
   formatAmount,
 } from "@/lib/api";
+import { translateCategory } from "@/lib/category-i18n";
 import { monthKey, monthLabel } from "@/lib/date";
 
 interface Props {
@@ -41,6 +44,13 @@ function KindIcon({ kind }: { kind: FinancialAccountKind }) {
 }
 
 export default function DashboardView({ month, version, scope }: Props) {
+  const locale = useLocale();
+  const tDashboard = useTranslations("dashboard");
+  const tLedger = useTranslations("ledger");
+  const tCommon = useTranslations("common");
+  const tAccountKinds = useTranslations("accountKinds");
+  const tCategories = useTranslations("categories");
+
   const [cadStats, setCadStats] = useState<StatsSummary | null>(null);
   const [krwStats, setKrwStats] = useState<StatsSummary | null>(null);
   const [cadWorth, setCadWorth] = useState<NetWorthSummary | null>(null);
@@ -179,17 +189,20 @@ export default function DashboardView({ month, version, scope }: Props) {
 
   const showCombinedToggle = scope === "ALL";
   const heroCurrency = flow?.currency ?? (scope === "KRW" ? "KRW" : "CAD");
-  const titlePrefix =
+  const scopeLabel =
     scope === "ALL"
-      ? "합산"
+      ? tCommon("combined")
       : scope === "CAD"
-        ? "캐나다"
-        : "한국";
+        ? tCommon("canada")
+        : tCommon("korea");
 
   const assetAccounts =
     netWorth?.accounts.filter((a) => !a.is_liability) ?? [];
   const liabilityAccounts =
     netWorth?.accounts.filter((a) => a.is_liability) ?? [];
+  const cardBalancesLabel =
+    tDashboard("cardBalances") ||
+    translateCategory(TRANSFER_CATEGORY, tCategories);
 
   return (
     <div className="space-y-4">
@@ -197,7 +210,7 @@ export default function DashboardView({ month, version, scope }: Props) {
       <section className="card-inset p-5">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            총 순자산
+            {tDashboard("netWorth")}
           </p>
           {showCombinedToggle && (
             <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
@@ -231,7 +244,7 @@ export default function DashboardView({ month, version, scope }: Props) {
         </p>
         <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
-            <p className="text-gray-400">통장 / 자산</p>
+            <p className="text-gray-400">{tDashboard("assets")}</p>
             <p className="mt-0.5 font-semibold text-blue-500">
               {netWorth
                 ? formatAmount(netWorth.total_assets, heroCurrency)
@@ -239,7 +252,7 @@ export default function DashboardView({ month, version, scope }: Props) {
             </p>
           </div>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
-            <p className="text-gray-400">총 부채</p>
+            <p className="text-gray-400">{tDashboard("totalLiabilities")}</p>
             {(() => {
               const liabilities = netWorth?.total_liabilities ?? 0;
               const overpaid = liabilities < 0;
@@ -267,7 +280,10 @@ export default function DashboardView({ month, version, scope }: Props) {
       <section className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white shadow-sm">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-blue-100">
-            {monthLabel(month)} {titlePrefix} 순흐름
+            {tDashboard("monthlyFlow", {
+              month: monthLabel(month, locale),
+              scope: scopeLabel,
+            })}
           </p>
           {showCombinedToggle && (
             <div className="flex rounded-lg bg-white/20 p-0.5">
@@ -292,12 +308,13 @@ export default function DashboardView({ month, version, scope }: Props) {
         {rate && scope === "ALL" && (
           <p className="mt-2 flex items-center gap-1.5 text-xs text-blue-100">
             <RefreshCw className="h-3 w-3" />
-            1 CAD ={" "}
-            {rate.cad_krw.toLocaleString("ko-KR", {
-              maximumFractionDigits: 2,
+            {tDashboard("exchangeRate", {
+              rate: rate.cad_krw.toLocaleString(locale, {
+                maximumFractionDigits: 2,
+              }),
             })}{" "}
-            KRW · {rate.date ?? "-"} 기준
-            {rate.stale && " (캐시)"}
+            · {tCommon("asOf", { date: rate.date ?? "-" })}
+            {rate.stale && ` ${tCommon("cached")}`}
             {rate.source && rate.source !== "fallback"
               ? ` · ${rate.source}`
               : ""}
@@ -306,11 +323,11 @@ export default function DashboardView({ month, version, scope }: Props) {
         {rate && scope !== "ALL" && (
           <p className="mt-2 flex items-center gap-1.5 text-xs text-blue-100/80">
             <RefreshCw className="h-3 w-3" />
-            참고 환율 1 CAD ={" "}
-            {rate.cad_krw.toLocaleString("ko-KR", {
-              maximumFractionDigits: 2,
-            })}{" "}
-            KRW
+            {tDashboard("exchangeRateReference", {
+              rate: rate.cad_krw.toLocaleString(locale, {
+                maximumFractionDigits: 2,
+              }),
+            })}
           </p>
         )}
       </section>
@@ -318,15 +335,15 @@ export default function DashboardView({ month, version, scope }: Props) {
       {flow && (
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <MetricCard
-            label="지출"
+            label={tDashboard("expense")}
             value={formatAmount(flow.expense, flow.currency)}
           />
           <MetricCard
-            label="소득"
+            label={tDashboard("income")}
             value={formatAmount(flow.income, flow.currency)}
           />
           <MetricCard
-            label="투자/저축"
+            label={tDashboard("investmentSavings")}
             value={formatAmount(flow.investmentSavings, flow.currency)}
           />
         </section>
@@ -335,7 +352,7 @@ export default function DashboardView({ month, version, scope }: Props) {
       {liabilityAccounts.length > 0 && (
         <section className="card-inset p-4">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-            카드값
+            {cardBalancesLabel}
           </p>
           <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {liabilityAccounts.map((acc) => {
@@ -375,9 +392,10 @@ export default function DashboardView({ month, version, scope }: Props) {
 
       {assetAccounts.length > 0 && (
         <AccountGroup
-          title="통장 / 자산"
+          title={tDashboard("assets")}
           accounts={assetAccounts}
           scope={scope}
+          kindLabel={(kind) => tAccountKinds(ACCOUNT_KIND_KEYS[kind])}
         />
       )}
 
@@ -385,16 +403,22 @@ export default function DashboardView({ month, version, scope }: Props) {
         <div className="grid grid-cols-2 gap-3">
           {cadStats && (
             <LedgerStatsCard
-              title="캐나다 가계부"
+              title={tLedger("canadaLedgerShort")}
               currency="CAD"
               stats={cadStats}
+              expenseLabel={tDashboard("expense")}
+              incomeLabel={tDashboard("income")}
+              investmentSavingsLabel={tDashboard("investmentSavings")}
             />
           )}
           {krwStats && (
             <LedgerStatsCard
-              title="한국 가계부"
+              title={tLedger("koreaLedgerShort")}
               currency="KRW"
               stats={krwStats}
+              expenseLabel={tDashboard("expense")}
+              incomeLabel={tDashboard("income")}
+              investmentSavingsLabel={tDashboard("investmentSavings")}
             />
           )}
         </div>
@@ -407,10 +431,12 @@ function AccountGroup({
   title,
   accounts,
   scope,
+  kindLabel,
 }: {
   title: string;
   accounts: AccountBalance[];
   scope: LedgerScope;
+  kindLabel: (kind: FinancialAccountKind) => string;
 }) {
   return (
     <div className="card-inset overflow-hidden">
@@ -435,7 +461,7 @@ function AccountGroup({
                   {label}
                 </p>
                 <p className="text-[11px] text-gray-400 truncate">
-                  {ACCOUNT_KIND_LABEL[acc.kind]}
+                  {kindLabel(acc.kind)}
                 </p>
               </div>
               <p className="text-sm font-semibold tabular-nums whitespace-nowrap text-gray-900 dark:text-white">
@@ -462,10 +488,16 @@ function LedgerStatsCard({
   title,
   currency,
   stats,
+  expenseLabel,
+  incomeLabel,
+  investmentSavingsLabel,
 }: {
   title: string;
   currency: Currency;
   stats: StatsSummary;
+  expenseLabel: string;
+  incomeLabel: string;
+  investmentSavingsLabel: string;
 }) {
   return (
     <div className="card-inset p-5">
@@ -481,19 +513,19 @@ function LedgerStatsCard({
       </p>
       <div className="mt-3 space-y-1 text-xs">
         <div className="flex justify-between">
-          <span className="text-gray-400">소득</span>
+          <span className="text-gray-400">{incomeLabel}</span>
           <span className="text-blue-500">
             +{formatAmount(stats.total_income, currency)}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-400">지출</span>
+          <span className="text-gray-400">{expenseLabel}</span>
           <span className="text-gray-600 dark:text-gray-300">
             -{formatAmount(stats.adjusted_expense, currency)}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-400">투자/저축</span>
+          <span className="text-gray-400">{investmentSavingsLabel}</span>
           <span className="text-gray-600 dark:text-gray-300">
             {formatAmount(stats.investment_savings_total, currency)}
           </span>

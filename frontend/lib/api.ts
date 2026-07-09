@@ -1,3 +1,5 @@
+import { ApiError } from "@/lib/errors";
+
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -131,6 +133,15 @@ export interface NewFinancialAccount {
   account_number?: string | null;
 }
 
+export const ACCOUNT_KIND_KEYS: Record<FinancialAccountKind, string> = {
+  checking: "checking",
+  savings: "savings",
+  credit_card: "credit_card",
+  investment: "investment",
+  cash: "cash",
+};
+
+/** @deprecated Use accountKinds i18n namespace with ACCOUNT_KIND_KEYS */
 export const ACCOUNT_KIND_LABEL: Record<FinancialAccountKind, string> = {
   checking: "입출금",
   savings: "저축",
@@ -238,7 +249,7 @@ export async function fetchTransactions(
     `${API_BASE_URL}/api/transactions?${params.toString()}`,
     { headers: authHeaders() }
   );
-  if (!res.ok) throw new Error("거래 내역을 불러오지 못했습니다.");
+  if (!res.ok) throw new ApiError("fetchTransactions");
   return (await res.json()) as Transaction[];
 }
 
@@ -273,7 +284,7 @@ export async function fetchCategoryPresets(): Promise<CategoryPresets> {
   const res = await fetch(`${API_BASE_URL}/api/categories`, {
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("카테고리를 불러오지 못했습니다.");
+  if (!res.ok) throw new ApiError("fetchCategories");
   return (await res.json()) as CategoryPresets;
 }
 
@@ -286,7 +297,7 @@ export async function addCustomCategory(
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ type, category }),
   });
-  if (!res.ok) throw new Error("대분류를 추가하지 못했습니다.");
+  if (!res.ok) throw new ApiError("addCategory");
   return (await res.json()) as CategoryPresets;
 }
 
@@ -300,7 +311,7 @@ export async function addCustomSubCategory(
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ type, category, sub_category }),
   });
-  if (!res.ok) throw new Error("중분류를 추가하지 못했습니다.");
+  if (!res.ok) throw new ApiError("addSubCategory");
   return (await res.json()) as CategoryPresets;
 }
 
@@ -310,7 +321,7 @@ export async function addInstitution(name: string): Promise<string[]> {
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ name }),
   });
-  if (!res.ok) throw new Error("금융기관을 추가하지 못했습니다.");
+  if (!res.ok) throw new ApiError("addInstitution");
   const data = await res.json();
   return data.institutions as string[];
 }
@@ -410,7 +421,7 @@ export async function fetchStatsSummary(
     `${API_BASE_URL}/api/stats/summary?${params.toString()}`,
     { headers: authHeaders() }
   );
-  if (!res.ok) throw new Error("통계를 불러오지 못했습니다.");
+  if (!res.ok) throw new ApiError("fetchStats");
   return (await res.json()) as StatsSummary;
 }
 
@@ -426,7 +437,7 @@ export async function fetchExchangeRate(): Promise<ExchangeRate> {
   const res = await fetch(`${API_BASE_URL}/api/exchange-rate`, {
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("환율을 불러오지 못했습니다.");
+  if (!res.ok) throw new ApiError("fetchExchangeRate");
   return (await res.json()) as ExchangeRate;
 }
 
@@ -463,13 +474,16 @@ export async function fetchNetWorth(filters: {
     `${API_BASE_URL}/api/accounts/net-worth?${params.toString()}`,
     { headers: authHeaders() }
   );
-  if (!res.ok) throw new Error("총자산을 불러오지 못했습니다.");
+  if (!res.ok) throw new ApiError("fetchNetWorth");
   return (await res.json()) as NetWorthSummary;
 }
 
-async function readApiError(res: Response, fallback: string): Promise<string> {
+async function readApiError(res: Response, fallbackCode: string): Promise<never> {
   const body = await res.json().catch(() => null);
-  return body && typeof body.detail === "string" ? body.detail : fallback;
+  if (body && typeof body.detail === "string") {
+    throw new Error(body.detail);
+  }
+  throw new ApiError(fallbackCode);
 }
 
 export async function createTransaction(
@@ -481,7 +495,7 @@ export async function createTransaction(
     body: JSON.stringify(tx),
   });
   if (!res.ok) {
-    throw new Error(await readApiError(res, "거래를 저장하지 못했습니다."));
+    throw await readApiError(res, "saveTransaction");
   }
   return (await res.json()) as Transaction;
 }
@@ -496,7 +510,7 @@ export async function updateTransaction(
     body: JSON.stringify(tx),
   });
   if (!res.ok) {
-    throw new Error(await readApiError(res, "거래를 수정하지 못했습니다."));
+    throw await readApiError(res, "updateTransaction");
   }
   return (await res.json()) as Transaction;
 }
@@ -507,7 +521,7 @@ export async function deleteTransaction(id: string): Promise<void> {
     headers: authHeaders(),
   });
   if (!res.ok) {
-    throw new Error(await readApiError(res, "거래를 삭제하지 못했습니다."));
+    throw await readApiError(res, "deleteTransaction");
   }
 }
 
@@ -525,7 +539,7 @@ export async function fetchAccounts(filters: {
     `${API_BASE_URL}/api/accounts?${params.toString()}`,
     { headers: authHeaders() }
   );
-  if (!res.ok) throw new Error("계좌 목록을 불러오지 못했습니다.");
+  if (!res.ok) throw new ApiError("fetchAccounts");
   return (await res.json()) as FinancialAccount[];
 }
 
@@ -543,11 +557,10 @@ export async function createAccount(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    const detail =
-      body && typeof body.detail === "string"
-        ? body.detail
-        : "계좌를 등록하지 못했습니다.";
-    throw new Error(detail);
+    if (body && typeof body.detail === "string") {
+      throw new Error(body.detail);
+    }
+    throw new ApiError("createAccount");
   }
   return (await res.json()) as FinancialAccount;
 }
@@ -572,7 +585,7 @@ export async function updateAccount(
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error("계좌를 수정하지 못했습니다.");
+  if (!res.ok) throw new ApiError("updateAccount");
   return (await res.json()) as FinancialAccount;
 }
 

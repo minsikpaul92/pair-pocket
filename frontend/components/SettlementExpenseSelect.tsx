@@ -1,9 +1,11 @@
 "use client";
 
 import { CalendarDays, Check, ChevronDown, Receipt, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Currency, SettleableExpense, formatAmount } from "@/lib/api";
+import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, formatDayLabel, isoDayKey } from "@/lib/date";
 
 interface Props {
@@ -14,11 +16,19 @@ interface Props {
   disabled?: boolean;
 }
 
-function formatOptionLabel(exp: SettleableExpense, currency: Currency): string {
-  const d = new Date(exp.date);
-  const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+function formatOptionLabel(
+  exp: SettleableExpense,
+  currency: Currency,
+  locale: string,
+  tCommon: (key: string, values?: Record<string, string | number>) => string
+): string {
+  const dateStr = new Intl.DateTimeFormat(locale, {
+    month: "numeric",
+    day: "numeric",
+  }).format(new Date(exp.date));
   const remaining = formatAmount(exp.remaining_amount, currency);
-  return `${dateStr} · ${exp.merchant} · ${remaining} 남음`;
+  const merchant = exp.merchant || tCommon("unspecified");
+  return `${dateStr} · ${merchant} · ${tCommon("remaining", { amount: remaining })}`;
 }
 
 export default function SettlementExpenseSelect({
@@ -28,6 +38,13 @@ export default function SettlementExpenseSelect({
   currency,
   disabled = false,
 }: Props) {
+  const locale = useLocale();
+  const tCommon = useTranslations("common");
+  const tSettlement = useTranslations("settlement");
+  const tTx = useTranslations("transaction");
+  const tCategories = useTranslations("categories");
+  const tSubCategories = useTranslations("subCategories");
+
   const [open, setOpen] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [filterDate, setFilterDate] = useState<string | null>(null);
@@ -91,11 +108,11 @@ export default function SettlementExpenseSelect({
             <>
               <Receipt className="h-5 w-5 text-gray-500 dark:text-gray-400 shrink-0" />
               <span className="truncate">
-                {formatOptionLabel(selected, currency)}
+                {formatOptionLabel(selected, currency, locale, tCommon)}
               </span>
             </>
           ) : (
-            <span className="text-gray-400">정산 대상 지출 선택</span>
+            <span className="text-gray-400">{tTx("selectSettlementExpense")}</span>
           )}
         </span>
         <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
@@ -115,7 +132,7 @@ export default function SettlementExpenseSelect({
               }`}
             >
               <CalendarDays className="h-4 w-4" />
-              날짜
+              {tCommon("date")}
             </button>
             {filterDate && (
               <button
@@ -123,12 +140,12 @@ export default function SettlementExpenseSelect({
                 onClick={clearDateFilter}
                 className="flex items-center gap-1 rounded-lg bg-blue-50 dark:bg-blue-500/10 px-2.5 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400"
               >
-                {formatDayLabel(new Date(`${filterDate}T00:00:00`))}
+                {formatDayLabel(new Date(`${filterDate}T00:00:00`), locale)}
                 <X className="h-3 w-3" />
               </button>
             )}
             <span className="ml-auto text-[11px] text-gray-400">
-              최신순 · {filteredOptions.length}건
+              {tCommon("latestFirst")} · {tCommon("count", { count: filteredOptions.length })}
             </span>
           </div>
 
@@ -149,8 +166,8 @@ export default function SettlementExpenseSelect({
             {filteredOptions.length === 0 ? (
               <p className="px-4 py-3 text-sm text-gray-400">
                 {filterDate
-                  ? "선택한 날짜에 정산 가능한 지출이 없습니다."
-                  : "정산 가능한 지출이 없습니다."}
+                  ? tSettlement("noExpensesOnDate")
+                  : tSettlement("noExpenses")}
               </p>
             ) : (
               <ul className="py-1">
@@ -168,17 +185,19 @@ export default function SettlementExpenseSelect({
                       <Receipt className="h-5 w-5 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
-                          {exp.merchant}
+                          {exp.merchant || tCommon("unspecified")}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {formatDayLabel(new Date(exp.date))} · {exp.category}{" "}
-                          › {exp.sub_category} · 원래{" "}
+                          {formatDayLabel(new Date(exp.date), locale)} ·{" "}
+                          {translateCategory(exp.category, tCategories)} ›{" "}
+                          {translateSubCategory(exp.sub_category, tSubCategories)} ·{" "}
+                          {tCommon("original")}{" "}
                           {formatAmount(exp.amount, currency)}
                           {exp.settled_amount > 0 &&
-                            ` · 정산됨 ${formatAmount(exp.settled_amount, currency)}`}
+                            ` · ${tCommon("settled")} ${formatAmount(exp.settled_amount, currency)}`}
                         </p>
                         <p className="text-xs font-semibold text-red-500">
-                          남은 금액{" "}
+                          {tCommon("remainingAmount")}{" "}
                           {formatAmount(exp.remaining_amount, currency)}
                         </p>
                       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo } from "react";
 
 import {
@@ -25,7 +26,7 @@ interface Props {
   onDayClick: (date: Date) => void;
 }
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 interface SingleDayTotals {
   income: number;
@@ -47,7 +48,6 @@ function accumulate(
   tx: Transaction,
   scope: LedgerScope
 ) {
-  // Transfers / N빵 settlements offset balances or expenses — not income/expense flow.
   if (isNonCashflowTransaction(tx)) {
     const existing = map.get(key);
     if (scope === "ALL") {
@@ -111,6 +111,13 @@ export default function CalendarView({
   transactions,
   onDayClick,
 }: Props) {
+  const t = useTranslations("calendar");
+  const tCommon = useTranslations("common");
+  const weekdays = useMemo(
+    () => WEEKDAY_KEYS.map((key) => t(`weekdays.${key}`)),
+    [t]
+  );
+
   const cells = useMemo(() => buildCalendarGrid(month), [month]);
   const today = new Date();
   const displayCurrency = scope === "ALL" ? "CAD" : scope;
@@ -126,9 +133,9 @@ export default function CalendarView({
   return (
     <section className="card-inset p-4 sm:p-5">
       <div className="grid grid-cols-7 gap-px mb-2">
-        {WEEKDAYS.map((w, i) => (
+        {weekdays.map((w, i) => (
           <div
-            key={w}
+            key={WEEKDAY_KEYS[i]}
             className={`py-2 text-center text-xs font-semibold ${
               i === 0
                 ? "text-red-400"
@@ -174,7 +181,7 @@ export default function CalendarView({
               {hasTx && totals && (
                 <>
                   <span className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
-                    {totals.count}건
+                    {tCommon("count", { count: totals.count })}
                   </span>
                   <div className="mt-auto flex w-full flex-col items-center gap-0.5 px-0.5">
                     {scope === "ALL" ? (

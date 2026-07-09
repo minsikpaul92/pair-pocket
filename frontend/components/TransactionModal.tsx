@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarDays, Trash2, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
@@ -45,7 +46,9 @@ import {
   subCategoriesFor,
   updateTransaction,
 } from "@/lib/api";
+import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, formatDayLabel } from "@/lib/date";
+import { translateError } from "@/lib/errors";
 
 interface Props {
   currency: Currency;
@@ -62,11 +65,6 @@ interface Props {
   onPresetsChange: (presets: CategoryPresets) => void;
 }
 
-const LEDGER_LABEL: Record<Currency, string> = {
-  CAD: "캐나다 가계부",
-  KRW: "한국 가계부",
-};
-
 export default function TransactionModal({
   currency,
   allowCurrencyPick = false,
@@ -81,6 +79,14 @@ export default function TransactionModal({
   onSelectTransaction,
   onPresetsChange,
 }: Props) {
+  const locale = useLocale();
+  const tTx = useTranslations("transaction");
+  const tLedger = useTranslations("ledger");
+  const tCommon = useTranslations("common");
+  const tErrors = useTranslations("errors");
+  const tCategories = useTranslations("categories");
+  const tSubCategories = useTranslations("subCategories");
+
   const isEditing = Boolean(editingTransaction);
 
   const [type, setType] = useState<TransactionType>("expense");
@@ -365,36 +371,36 @@ export default function TransactionModal({
 
     const numericAmount = Number(amount);
     if (!numericAmount || numericAmount <= 0) {
-      setError("금액을 올바르게 입력해 주세요.");
+      setError(tErrors("invalidAmount"));
       return;
     }
     if (!category) {
-      setError("대분류를 선택해 주세요.");
+      setError(tErrors("categoryRequired"));
       return;
     }
     if (!subCategory) {
-      setError("중분류를 선택해 주세요.");
+      setError(tErrors("subCategoryRequired"));
       return;
     }
     if (isInvestment && !institution.trim()) {
-      setError("[투자/저축]은 금융기관/계좌명 선택이 필요합니다.");
+      setError(tErrors("institutionRequired"));
       return;
     }
     if (isSettlement && !settlesExpenseId) {
-      setError("정산 대상 지출을 선택해 주세요.");
+      setError(tErrors("settlementExpenseRequired"));
       return;
     }
     if (isTransfer) {
       if (!accountId) {
-        setError("출금 계좌를 선택해 주세요.");
+        setError(tErrors("fromAccountRequired"));
         return;
       }
       if (!counterAccountId) {
-        setError("입금 계좌를 선택해 주세요.");
+        setError(tErrors("toAccountRequired"));
         return;
       }
       if (accountId === counterAccountId) {
-        setError("출금 계좌와 입금 계좌는 서로 달라야 합니다.");
+        setError(tErrors("accountsMustDiffer"));
         return;
       }
     }
@@ -404,17 +410,23 @@ export default function TransactionModal({
       numericAmount > selectedSettleable.remaining_amount + 0.001
     ) {
       setError(
-        `정산 금액이 남은 지출(${formatAmount(selectedSettleable.remaining_amount, currency)})을 초과합니다.`
+        tErrors("settlementExceedsRemaining", {
+          amount: formatAmount(selectedSettleable.remaining_amount, currency),
+        })
       );
       return;
     }
 
     const fromLabel = accounts.find((a) => a.id === accountId);
     const toLabel = accounts.find((a) => a.id === counterAccountId);
+    const transferFallbackMerchant = translateCategory(
+      TRANSFER_CATEGORY,
+      tCategories
+    );
     const transferMerchant =
       fromLabel && toLabel
         ? `${accountLabel(fromLabel)} → ${accountLabel(toLabel)}`
-        : "자산 이동/카드";
+        : transferFallbackMerchant;
 
     const payload: NewTransaction = {
       date: `${dateStr}T00:00:00`,
@@ -426,7 +438,7 @@ export default function TransactionModal({
       sub_category: subCategory,
       merchant: isTransfer
         ? transferMerchant
-        : merchant.trim() || "미지정",
+        : merchant.trim() || tCommon("unspecified"),
       institution: isInvestment ? institution.trim() : null,
       settles_expense_id: isSettlement ? settlesExpenseId : null,
       account_id: accountId || null,
@@ -444,7 +456,11 @@ export default function TransactionModal({
       onSaved();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "저장 중 오류가 발생했습니다."
+        translateError(
+          err,
+          tErrors,
+          editingTransaction ? "updateTransaction" : "saveTransaction"
+        )
       );
     } finally {
       setSubmitting(false);
@@ -453,7 +469,7 @@ export default function TransactionModal({
 
   async function handleDelete() {
     if (!editingTransaction) return;
-    const ok = window.confirm("이 거래를 삭제할까요?");
+    const ok = window.confirm(tTx("deleteConfirm"));
     if (!ok) return;
 
     setDeleting(true);
@@ -462,9 +478,7 @@ export default function TransactionModal({
       await deleteTransaction(editingTransaction.id);
       onSaved();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "삭제 중 오류가 발생했습니다."
-      );
+      setError(translateError(err, tErrors, "deleteTransaction"));
     } finally {
       setDeleting(false);
     }
@@ -476,7 +490,7 @@ export default function TransactionModal({
   const settlementField = isSettlement && (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-        정산 대상 지출
+        {tTx("settlementExpense")}
       </label>
       <SettlementExpenseSelect
         options={settleableExpenses}
@@ -484,9 +498,11 @@ export default function TransactionModal({
         onChange={setSettlesExpenseId}
         currency={currency}
       />
-          {selectedSettleable && (
+      {selectedSettleable && (
         <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-          {selectedSettleable.merchant} 실지출 → 정산 후{" "}
+          {tTx("settlementAfter", {
+            merchant: selectedSettleable.merchant || tCommon("unspecified"),
+          })}{" "}
           <span className="font-semibold text-red-500">
             {formatAmount(
               Math.max(
@@ -504,19 +520,19 @@ export default function TransactionModal({
   const merchantField = isSettlement ? (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-        정산 상대 (누구에게 받았나요)
+        {tTx("settlementCounterparty")}
       </label>
       <input
         value={merchant}
         onChange={(e) => setMerchant(e.target.value)}
-        placeholder="예: Lucy"
+        placeholder={tTx("settlementCounterpartyPlaceholder")}
         className="input-field"
       />
     </div>
   ) : (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-        사용처
+        {tTx("merchant")}
       </label>
       <MerchantSelect
         options={merchantHints}
@@ -525,9 +541,9 @@ export default function TransactionModal({
         onAdd={handleAddMerchant}
         disabled={!subCategory}
         placeholder={
-          subCategory ? "사용처 선택" : "먼저 중분류를 선택하세요"
+          subCategory ? tTx("selectMerchant") : tTx("selectSubCategoryForMerchant")
         }
-        addLabel="새 사용처 추가"
+        addLabel={tTx("addMerchant")}
       />
     </div>
   );
@@ -535,7 +551,7 @@ export default function TransactionModal({
   const institutionField = isInvestment && (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-        금융기관 / 계좌명
+        {tTx("institution")}
       </label>
       <InstitutionSelect
         options={institutionOptions}
@@ -551,7 +567,7 @@ export default function TransactionModal({
     <div className="space-y-3">
       <div>
         <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-          출금 계좌
+          {tTx("fromAccount")}
         </label>
         <AccountSelect
           accounts={accounts}
@@ -563,14 +579,14 @@ export default function TransactionModal({
           }}
           disabled={accountsLoading || !subCategory}
           allowNone={false}
-          placeholder="출금 계좌 선택"
+          placeholder={tTx("selectFromAccount")}
           variant="field"
           filterAccounts={fromAccountFilter}
         />
       </div>
       <div>
         <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-          {isCardRepayment ? "상환할 카드" : "입금 계좌"}
+          {isCardRepayment ? tTx("repayCard") : tTx("toAccount")}
         </label>
         <AccountSelect
           accounts={accounts}
@@ -582,13 +598,13 @@ export default function TransactionModal({
           }}
           disabled={accountsLoading || !subCategory}
           allowNone={false}
-          placeholder={isCardRepayment ? "카드 선택" : "입금 계좌 선택"}
+          placeholder={isCardRepayment ? tTx("selectCard") : tTx("selectToAccount")}
           variant="field"
           filterAccounts={toAccountFilter}
         />
       </div>
       <p className="text-xs text-gray-400">
-        자산 이동/카드는 지출/수입 합계에 포함되지 않고, 계좌 잔액만 이동합니다.
+        {tTx("transferNote")}
       </p>
     </div>
   );
@@ -628,10 +644,13 @@ export default function TransactionModal({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-xl font-bold tracking-tight">
-              {isEditing ? "거래 수정" : "새 거래"}
+              {isEditing ? tTx("edit") : tTx("new")}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-              {LEDGER_LABEL[currency]} · {currency}
+              {currency === "CAD"
+                ? tLedger("canadaLedgerShort")
+                : tLedger("koreaLedgerShort")}{" "}
+              · {currency}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -668,7 +687,7 @@ export default function TransactionModal({
             <button
               type="button"
               onClick={onClose}
-              aria-label="닫기"
+              aria-label={tCommon("close")}
               className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
@@ -690,10 +709,10 @@ export default function TransactionModal({
             <CalendarDays className="h-5 w-5 text-blue-500 shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                {formatDayLabel(defaultDate)}
+                {formatDayLabel(defaultDate, locale)}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                달력 아이콘을 눌러 날짜를 변경할 수 있어요
+                {tTx("dateHint")}
               </p>
             </div>
           </button>
@@ -708,7 +727,7 @@ export default function TransactionModal({
             }}
             className="sr-only"
             tabIndex={-1}
-            aria-label="거래 날짜"
+            aria-label={tTx("transactionDate")}
           />
         </div>
 
@@ -735,7 +754,11 @@ export default function TransactionModal({
                   >
                     <span className="text-sm truncate">
                       {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"}{" "}
-                      {tx.category} › {tx.sub_category || "—"} · {tx.merchant}
+                      {translateCategory(tx.category, tCategories)} ›{" "}
+                      {tx.sub_category
+                        ? translateSubCategory(tx.sub_category, tSubCategories)
+                        : tCommon("none")}{" "}
+                      · {tx.merchant || tCommon("unspecified")}
                     </span>
                     <span
                       className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
@@ -782,7 +805,7 @@ export default function TransactionModal({
                   : "text-gray-500 dark:text-gray-400"
               }`}
             >
-              지출
+              {tCommon("expense")}
             </button>
             <button
               type="button"
@@ -793,13 +816,13 @@ export default function TransactionModal({
                   : "text-gray-500 dark:text-gray-400"
               }`}
             >
-              수입
+              {tCommon("income")}
             </button>
           </div>
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              대분류
+              {tTx("category")}
             </label>
             <CategorySelect
               categories={categoryOptions}
@@ -811,7 +834,7 @@ export default function TransactionModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              중분류
+              {tTx("subCategory")}
             </label>
             <SubCategorySelect
               options={subCategoryOptions}
@@ -819,7 +842,9 @@ export default function TransactionModal({
               onChange={handleSubCategoryChange}
               onAdd={handleAddSubCategory}
               disabled={!category}
-              placeholder={category ? "중분류 선택" : "먼저 대분류를 선택하세요"}
+              placeholder={
+                category ? tTx("selectSubCategory") : tTx("selectSubCategoryFirst")
+              }
             />
           </div>
 
@@ -827,7 +852,7 @@ export default function TransactionModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              금액
+              {tCommon("amount")}
             </label>
             <div className="relative">
               <input
@@ -854,7 +879,7 @@ export default function TransactionModal({
                 className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-semibold text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" />
-                {deleting ? "삭제 중..." : "삭제"}
+                {deleting ? tCommon("deleting") : tCommon("delete")}
               </button>
             )}
             <button
@@ -863,10 +888,10 @@ export default function TransactionModal({
               className="flex-1 btn-primary disabled:opacity-50"
             >
               {submitting
-                ? "저장 중..."
+                ? tCommon("saving")
                 : isEditing
-                  ? "수정 저장"
-                  : "저장"}
+                  ? tTx("editSave")
+                  : tCommon("save")}
             </button>
           </div>
         </form>

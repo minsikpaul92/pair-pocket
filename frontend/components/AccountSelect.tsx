@@ -1,11 +1,12 @@
 "use client";
 
 import { Check, ChevronDown, Plus, Wallet } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import {
+  ACCOUNT_KIND_KEYS,
   FinancialAccount,
-  accountDetail,
   accountLabel,
 } from "@/lib/api";
 
@@ -18,13 +19,9 @@ interface Props {
   onChange: (accountId: string) => void;
   onRegister: () => void;
   disabled?: boolean;
-  /** When false, hide the "없음/현금" option (required for transfers). */
   allowNone?: boolean;
-  /** Optional label shown when nothing is selected and allowNone is false. */
   placeholder?: string;
-  /** Compact header trigger vs full-width form field. */
   variant?: "compact" | "field";
-  /** Restrict which accounts appear in the list. */
   filterAccounts?: (account: FinancialAccount) => boolean;
 }
 
@@ -35,14 +32,18 @@ export default function AccountSelect({
   onRegister,
   disabled = false,
   allowNone = true,
-  placeholder = "계좌 선택",
+  placeholder,
   variant = "compact",
   filterAccounts,
 }: Props) {
+  const t = useTranslations("account");
+  const tKinds = useTranslations("accountKinds");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const visible = filterAccounts ? accounts.filter(filterAccounts) : accounts;
-  const selected = visible.find((a) => a.id === value) ?? accounts.find((a) => a.id === value);
+  const selected =
+    visible.find((a) => a.id === value) ??
+    accounts.find((a) => a.id === value);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -54,11 +55,24 @@ export default function AccountSelect({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  function formatAccountDetail(account: FinancialAccount): string {
+    const parts = [
+      tKinds(ACCOUNT_KIND_KEYS[account.kind]),
+      account.kind === "credit_card" && account.last_four
+        ? `···${account.last_four}`
+        : null,
+      account.kind !== "credit_card" && account.account_number
+        ? account.account_number
+        : null,
+    ].filter(Boolean);
+    return parts.join(" · ");
+  }
+
   const triggerLabel = selected
     ? accountLabel(selected)
     : value === ACCOUNT_NONE && allowNone
-      ? "없음/현금"
-      : placeholder;
+      ? t("noneCash")
+      : (placeholder ?? t("select"));
 
   const triggerClass =
     variant === "field"
@@ -96,7 +110,7 @@ export default function AccountSelect({
                   className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
-                  <span className="flex-1">없음 / 현금</span>
+                  <span className="flex-1">{t("noneCashLong")}</span>
                   {value === ACCOUNT_NONE && (
                     <Check className="h-4 w-4 text-blue-500 shrink-0" />
                   )}
@@ -118,7 +132,7 @@ export default function AccountSelect({
                       {accountLabel(acc)}
                     </p>
                     <p className="text-[11px] text-gray-400 truncate">
-                      {accountDetail(acc)}
+                      {formatAccountDetail(acc)}
                     </p>
                   </div>
                   {value === acc.id && (
@@ -129,7 +143,7 @@ export default function AccountSelect({
             ))}
             {visible.length === 0 && (
               <li className="px-3 py-2 text-sm text-gray-400">
-                선택 가능한 계좌가 없습니다
+                {t("noAccounts")}
               </li>
             )}
           </ul>
@@ -143,7 +157,7 @@ export default function AccountSelect({
               className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
             >
               <Plus className="h-4 w-4" />
-              카드/은행 추가
+              {t("addCardBank")}
             </button>
           </div>
         </div>

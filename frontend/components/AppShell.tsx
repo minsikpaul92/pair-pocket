@@ -13,6 +13,7 @@ import {
   UserPlus,
   Wallet,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import CalendarView from "@/components/CalendarView";
@@ -34,22 +35,22 @@ import { addMonths, dayKey, monthKey, monthLabel } from "@/lib/date";
 
 type View = "calendar" | "list" | "dashboard";
 
-const NAV: { id: View; label: string; icon: typeof CalendarDays }[] = [
-  { id: "calendar", label: "달력", icon: CalendarDays },
-  { id: "list", label: "목록", icon: ListOrdered },
-  { id: "dashboard", label: "대시보드", icon: LayoutDashboard },
+const NAV: { id: View; labelKey: "calendar" | "list" | "dashboard"; icon: typeof CalendarDays }[] = [
+  { id: "calendar", labelKey: "calendar", icon: CalendarDays },
+  { id: "list", labelKey: "list", icon: ListOrdered },
+  { id: "dashboard", labelKey: "dashboard", icon: LayoutDashboard },
 ];
 
-const LEDGERS: { scope: LedgerScope; label: string; flag?: string }[] = [
-  { scope: "ALL", label: "전체" },
-  { scope: "CAD", label: "캐나다", flag: "🇨🇦" },
-  { scope: "KRW", label: "한국", flag: "🇰🇷" },
+const LEDGERS: { scope: LedgerScope; labelKey: "all" | "canada" | "korea"; flag?: string }[] = [
+  { scope: "ALL", labelKey: "all" },
+  { scope: "CAD", labelKey: "canada", flag: "🇨🇦" },
+  { scope: "KRW", labelKey: "korea", flag: "🇰🇷" },
 ];
 
-const SCOPE_LABEL: Record<LedgerScope, string> = {
-  ALL: "전체 가계부",
-  CAD: "🇨🇦 캐나다 가계부",
-  KRW: "🇰🇷 한국 가계부",
+const SCOPE_LABEL_KEY: Record<LedgerScope, "allLedger" | "canadaLedger" | "koreaLedger"> = {
+  ALL: "allLedger",
+  CAD: "canadaLedger",
+  KRW: "koreaLedger",
 };
 
 const NAV_COLLAPSED_KEY = "pairpocket_nav_collapsed";
@@ -60,6 +61,12 @@ interface Props {
 }
 
 export default function AppShell({ user, onLogout }: Props) {
+  const tNav = useTranslations("nav");
+  const tLedger = useTranslations("ledger");
+  const tCommon = useTranslations("common");
+  const tInvite = useTranslations("invite");
+  const locale = useLocale();
+
   const [view, setView] = useState<View>("calendar");
   const [scope, setScope] = useState<LedgerScope>("CAD");
   const [navCollapsed, setNavCollapsed] = useState(false);
@@ -77,6 +84,8 @@ export default function AppShell({ user, onLogout }: Props) {
   const [modalCurrency, setModalCurrency] = useState<Currency>("CAD");
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
+
+  const scopeLabel = tLedger(SCOPE_LABEL_KEY[scope]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -118,7 +127,7 @@ export default function AppShell({ user, onLogout }: Props) {
   }
 
   function handleInvite() {
-    alert("파트너 초대 기능은 곧 제공될 예정입니다. 지금은 개인 가계부를 사용할 수 있어요.");
+    alert(tInvite("comingSoon"));
   }
 
   function handleSaved() {
@@ -155,7 +164,6 @@ export default function AppShell({ user, onLogout }: Props) {
 
   return (
     <div className="min-h-dvh bg-gray-50 dark:bg-black">
-      {/* Sidebar (tablet & desktop) */}
       <aside
         className={`hidden md:flex fixed inset-y-0 left-0 ${sidebarWidth} flex-col border-r glass-bar bg-white/60 dark:bg-gray-900/40 backdrop-blur-xl px-3 py-6 transition-all duration-200`}
       >
@@ -165,13 +173,15 @@ export default function AppShell({ user, onLogout }: Props) {
           <Wallet className="h-6 w-6 text-blue-500 shrink-0" />
           {!navCollapsed && (
             <span className="text-lg font-semibold tracking-tight truncate flex-1">
-              PairPocket
+              {tCommon("appName")}
             </span>
           )}
           <button
             type="button"
             onClick={toggleNavCollapsed}
-            aria-label={navCollapsed ? "사이드바 펼치기" : "사이드바 접기"}
+            aria-label={
+              navCollapsed ? tNav("expandSidebar") : tNav("collapseSidebar")
+            }
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-white transition-colors shrink-0"
           >
             {navCollapsed ? (
@@ -183,37 +193,40 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
 
         <nav className="mt-8 space-y-1">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setView(item.id)}
-              title={navCollapsed ? item.label : undefined}
-              className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors ${
-                navCollapsed ? "justify-center px-2" : "px-3"
-              } ${
-                view === item.id
-                  ? "bg-blue-500 text-white"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              }`}
-            >
-              <item.icon className="h-5 w-5 shrink-0" />
-              {!navCollapsed && item.label}
-            </button>
-          ))}
+          {NAV.map((item) => {
+            const label = tNav(item.labelKey);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setView(item.id)}
+                title={navCollapsed ? label : undefined}
+                className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors ${
+                  navCollapsed ? "justify-center px-2" : "px-3"
+                } ${
+                  view === item.id
+                    ? "bg-blue-500 text-white"
+                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                {!navCollapsed && label}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="mt-auto space-y-1">
           <button
             type="button"
             onClick={handleInvite}
-            title={navCollapsed ? "초대하기" : undefined}
+            title={navCollapsed ? tNav("invite") : undefined}
             className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
               navCollapsed ? "justify-center px-2" : "px-3"
             }`}
           >
             <UserPlus className="h-5 w-5 shrink-0" />
-            {!navCollapsed && "초대하기"}
+            {!navCollapsed && tNav("invite")}
           </button>
           {!navCollapsed && (
             <div className="flex items-center gap-2 rounded-xl px-3 py-2">
@@ -229,7 +242,7 @@ export default function AppShell({ user, onLogout }: Props) {
               <button
                 type="button"
                 onClick={handleLogout}
-                aria-label="로그아웃"
+                aria-label={tNav("logout")}
                 className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
               >
                 <LogOut className="h-5 w-5" />
@@ -239,9 +252,7 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
       </aside>
 
-      {/* Main column */}
       <div className={`${mainPad} transition-all duration-200`}>
-        {/* Header */}
         <header className="sticky top-0 z-40 glass-bar border-b">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
             <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
@@ -257,7 +268,7 @@ export default function AppShell({ user, onLogout }: Props) {
                   }`}
                 >
                   {l.flag && <span className="mr-1">{l.flag}</span>}
-                  {l.label}
+                  {tLedger(l.labelKey)}
                 </button>
               ))}
             </div>
@@ -266,7 +277,7 @@ export default function AppShell({ user, onLogout }: Props) {
               <button
                 type="button"
                 onClick={handleInvite}
-                aria-label="초대하기"
+                aria-label={tNav("invite")}
                 className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
               >
                 <UserPlus className="h-5 w-5" />
@@ -282,7 +293,7 @@ export default function AppShell({ user, onLogout }: Props) {
               <button
                 type="button"
                 onClick={handleLogout}
-                aria-label="로그아웃"
+                aria-label={tNav("logout")}
                 className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
               >
                 <LogOut className="h-5 w-5" />
@@ -292,21 +303,20 @@ export default function AppShell({ user, onLogout }: Props) {
         </header>
 
         <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-28 md:pb-10">
-          {/* Month navigation */}
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                {monthLabel(month)}
+                {monthLabel(month, locale)}
               </h1>
               <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                {SCOPE_LABEL[scope]}
+                {scopeLabel}
               </p>
             </div>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setMonth((m) => addMonths(m, -1))}
-                aria-label="이전 달"
+                aria-label={tCommon("previousMonth")}
                 className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 <ChevronLeft className="h-5 w-5" />
@@ -321,12 +331,12 @@ export default function AppShell({ user, onLogout }: Props) {
                 }
                 className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
-                이번달
+                {tCommon("thisMonth")}
               </button>
               <button
                 type="button"
                 onClick={() => setMonth((m) => addMonths(m, 1))}
-                aria-label="다음 달"
+                aria-label={tCommon("nextMonth")}
                 className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 <ChevronRight className="h-5 w-5" />
@@ -356,17 +366,15 @@ export default function AppShell({ user, onLogout }: Props) {
         </main>
       </div>
 
-      {/* Floating add button */}
       <button
         type="button"
         onClick={() => openModal(new Date())}
-        aria-label="거래 추가"
+        aria-label={tNav("addTransaction")}
         className="fixed bottom-24 md:bottom-8 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:bg-blue-700 transition-colors"
       >
         <Plus className="h-6 w-6" />
       </button>
 
-      {/* Bottom tab bar (mobile) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 glass-bar border-t">
         <div className="flex">
           {NAV.map((item) => (
@@ -381,7 +389,7 @@ export default function AppShell({ user, onLogout }: Props) {
               }`}
             >
               <item.icon className="h-5 w-5" />
-              {item.label}
+              {tNav(item.labelKey)}
             </button>
           ))}
         </div>

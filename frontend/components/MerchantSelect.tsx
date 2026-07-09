@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import AddableSelect from "@/components/AddableSelect";
 
 interface Props {
@@ -17,19 +19,21 @@ export default function MerchantSelect({
   value,
   onChange,
   onAdd,
-  placeholder = "사용처 선택",
+  placeholder,
   disabled = false,
-  addLabel = "새 사용처 추가",
+  addLabel,
 }: Props) {
+  const t = useTranslations("transaction");
+
   return (
     <AddableSelect
       options={options}
       value={value}
       onChange={onChange}
       onAdd={onAdd}
-      placeholder={placeholder}
+      placeholder={placeholder ?? t("selectMerchant")}
       disabled={disabled}
-      addLabel={addLabel}
+      addLabel={addLabel ?? t("addMerchant")}
     />
   );
 }

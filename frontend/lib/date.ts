@@ -16,8 +16,11 @@ export function isoDayKey(iso: string): string {
   return dayKey(new Date(iso));
 }
 
-export function monthLabel(date: Date): string {
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+export function monthLabel(date: Date, locale = "ko"): string {
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "long",
+  }).format(date);
 }
 
 export function addMonths(date: Date, delta: number): Date {
@@ -50,8 +53,8 @@ export function isSameMonth(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
 
-export function formatDayLabel(date: Date): string {
-  return date.toLocaleDateString("ko-KR", {
+export function formatDayLabel(date: Date, locale = "ko"): string {
+  return date.toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",

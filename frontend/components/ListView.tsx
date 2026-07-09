@@ -1,12 +1,14 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import {
   CategoryPresets,
   Currency,
   EXPENSE_CATEGORY_INVESTMENT,
+  INCOME_CATEGORY_SETTLEMENT,
   LedgerScope,
   Transaction,
   TransactionType,
@@ -17,6 +19,7 @@ import {
   isNonCashflowTransaction,
   subCategoriesFor,
 } from "@/lib/api";
+import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 
 interface Props {
   scope: LedgerScope;
@@ -53,6 +56,12 @@ export default function ListView({
   transactions,
   onEditTransaction,
 }: Props) {
+  const locale = useLocale();
+  const tList = useTranslations("list");
+  const tCommon = useTranslations("common");
+  const tCategories = useTranslations("categories");
+  const tSubCategories = useTranslations("subCategories");
+
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [subCategoryFilter, setSubCategoryFilter] = useState<string>("all");
@@ -74,7 +83,12 @@ export default function ListView({
   const subCategoryOptions = useMemo(() => {
     if (categoryFilter === "all") {
       const set = new Set(transactions.map((t) => t.sub_category).filter(Boolean));
-      return [...set].sort((a, b) => a.localeCompare(b, "ko"));
+      return [...set].sort((a, b) =>
+        translateSubCategory(a, tSubCategories).localeCompare(
+          translateSubCategory(b, tSubCategories),
+          locale
+        )
+      );
     }
     const set = new Set(
       transactions
@@ -89,8 +103,13 @@ export default function ListView({
         if (set.has(s) || categoryFilter !== "all") set.add(s);
       }
     }
-    return [...set].sort((a, b) => a.localeCompare(b, "ko"));
-  }, [transactions, categoryFilter, presets]);
+    return [...set].sort((a, b) =>
+      translateSubCategory(a, tSubCategories).localeCompare(
+        translateSubCategory(b, tSubCategories),
+        locale
+      )
+    );
+  }, [transactions, categoryFilter, presets, locale, tSubCategories]);
 
   const filtered = useMemo(() => {
     const q = merchantQuery.trim().toLowerCase();
@@ -119,22 +138,39 @@ export default function ListView({
           cmp = displayAmount(a) - displayAmount(b);
           break;
         case "category":
-          cmp = a.category.localeCompare(b.category, "ko");
+          cmp = translateCategory(a.category, tCategories).localeCompare(
+            translateCategory(b.category, tCategories),
+            locale
+          );
           break;
         case "sub_category":
-          cmp = (a.sub_category || "").localeCompare(b.sub_category || "", "ko");
+          cmp = translateSubCategory(
+            a.sub_category || "",
+            tSubCategories
+          ).localeCompare(
+            translateSubCategory(b.sub_category || "", tSubCategories),
+            locale
+          );
           break;
         case "merchant":
-          cmp = a.merchant.localeCompare(b.merchant, "ko");
+          cmp = a.merchant.localeCompare(b.merchant, locale);
           break;
         case "type":
-          cmp = a.type.localeCompare(b.type);
+          cmp = tCommon(a.type).localeCompare(tCommon(b.type), locale);
           break;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [filtered, sortKey, sortDir]);
+  }, [
+    filtered,
+    sortKey,
+    sortDir,
+    locale,
+    tCategories,
+    tSubCategories,
+    tCommon,
+  ]);
 
   const totals = useMemo(() => {
     const byCurrency: Record<
@@ -196,7 +232,7 @@ export default function ListView({
                   : "text-gray-500 dark:text-gray-400"
               }`}
             >
-              {t === "all" ? "전체" : t === "expense" ? "지출" : "수입"}
+              {tCommon(t)}
             </button>
           ))}
         </div>
@@ -209,10 +245,10 @@ export default function ListView({
           }}
           className="input-field w-auto py-2 text-sm"
         >
-          <option value="all">전체 대분류</option>
+          <option value="all">{tList("allCategories")}</option>
           {allCategories.map((c) => (
             <option key={c} value={c}>
-              {c}
+              {translateCategory(c, tCategories)}
             </option>
           ))}
         </select>
@@ -223,10 +259,10 @@ export default function ListView({
           className="input-field w-auto py-2 text-sm"
           disabled={categoryFilter === "all" && subCategoryOptions.length === 0}
         >
-          <option value="all">전체 중분류</option>
+          <option value="all">{tList("allSubCategories")}</option>
           {subCategoryOptions.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {translateSubCategory(s, tSubCategories)}
             </option>
           ))}
         </select>
@@ -236,7 +272,7 @@ export default function ListView({
           <input
             value={merchantQuery}
             onChange={(e) => setMerchantQuery(e.target.value)}
-            placeholder="사용처 검색"
+            placeholder={tList("searchMerchant")}
             className="input-field pl-9 py-2 text-sm"
           />
         </div>
@@ -248,30 +284,30 @@ export default function ListView({
             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/95 backdrop-blur-sm">
               <tr className="border-b border-gray-200 dark:border-gray-700">
                 <th className={thClass} onClick={() => toggleSort("date")}>
-                  날짜 <SortIcon col="date" />
+                  {tCommon("date")} <SortIcon col="date" />
                 </th>
                 {showCurrencyCol && (
                   <th className={thClass} onClick={() => toggleSort("currency")}>
-                    통화 <SortIcon col="currency" />
+                    {tCommon("currency")} <SortIcon col="currency" />
                   </th>
                 )}
                 <th className={thClass} onClick={() => toggleSort("category")}>
-                  대분류 <SortIcon col="category" />
+                  {tList("category")} <SortIcon col="category" />
                 </th>
                 <th className={thClass} onClick={() => toggleSort("sub_category")}>
-                  중분류 <SortIcon col="sub_category" />
+                  {tList("subCategory")} <SortIcon col="sub_category" />
                 </th>
                 <th className={thClass} onClick={() => toggleSort("merchant")}>
-                  사용처 <SortIcon col="merchant" />
+                  {tList("merchant")} <SortIcon col="merchant" />
                 </th>
                 <th className={thClass} onClick={() => toggleSort("type")}>
-                  구분 <SortIcon col="type" />
+                  {tList("type")} <SortIcon col="type" />
                 </th>
                 <th
                   className={`${thClass} text-right`}
                   onClick={() => toggleSort("amount")}
                 >
-                  금액 <SortIcon col="amount" />
+                  {tCommon("amount")} <SortIcon col="amount" />
                 </th>
               </tr>
             </thead>
@@ -282,7 +318,7 @@ export default function ListView({
                     colSpan={colSpan}
                     className="px-4 py-12 text-center text-gray-400"
                   >
-                    해당 조건의 거래가 없습니다.
+                    {tList("noTransactions")}
                   </td>
                 </tr>
               ) : (
@@ -311,10 +347,12 @@ export default function ListView({
                         </td>
                       )}
                       <td className="px-3 py-2.5 whitespace-nowrap">
-                        {tx.category}
+                        {translateCategory(tx.category, tCategories)}
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap max-w-[7rem] truncate">
-                        {tx.sub_category || "—"}
+                        {tx.sub_category
+                          ? translateSubCategory(tx.sub_category, tSubCategories)
+                          : tCommon("none")}
                       </td>
                       <td className="px-3 py-2.5 max-w-[8rem] truncate">
                         {tx.merchant}
@@ -336,12 +374,12 @@ export default function ListView({
                           }`}
                         >
                           {transfer
-                            ? tx.category === "정산"
-                              ? "정산"
-                              : "이동"
+                            ? tx.category === INCOME_CATEGORY_SETTLEMENT
+                              ? tCommon("settlement")
+                              : tCommon("transfer")
                             : tx.type === "income"
-                              ? "수입"
-                              : "지출"}
+                              ? tCommon("income")
+                              : tCommon("expense")}
                         </span>
                       </td>
                       <td
@@ -389,7 +427,7 @@ export default function ListView({
                         colSpan={showCurrencyCol ? 5 : 4}
                         className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400"
                       >
-                        합계 ({t.count}건)
+                        {tCommon("totalCount", { count: t.count })}
                         {showCurrencyCol && (
                           <span className="ml-1">
                             {cur === "CAD" ? "🇨🇦" : "🇰🇷"} {cur}
