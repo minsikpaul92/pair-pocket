@@ -1,6 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import AddableSelect from "@/components/AddableSelect";
+import { translateSubCategory } from "@/lib/category-i18n";
 
 interface Props {
   options: string[];
@@ -16,18 +19,22 @@ export default function SubCategorySelect({
   value,
   onChange,
   onAdd,
-  placeholder = "중분류 선택",
+  placeholder,
   disabled = false,
 }: Props) {
+  const t = useTranslations("subCategories");
+  const tTx = useTranslations("transaction");
+
   return (
     <AddableSelect
       options={options}
       value={value}
       onChange={onChange}
       onAdd={onAdd}
-      placeholder={placeholder}
+      placeholder={placeholder ?? tTx("selectSubCategory")}
       disabled={disabled}
-      addLabel="새 중분류 추가"
+      addLabel={tTx("addSubCategory")}
+      formatOption={(sub) => translateSubCategory(sub, t)}
     />
   );
 }

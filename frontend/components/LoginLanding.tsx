@@ -1,4 +1,7 @@
+"use client";
+
 import { Wallet } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { loginUrl } from "@/lib/api";
 
@@ -26,23 +29,26 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 export default function LoginLanding() {
+  const t = useTranslations("auth");
+  const tCommon = useTranslations("common");
+
   return (
     <main className="min-h-dvh bg-gray-50 dark:bg-black">
       <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0 z-50">
         <div className="mx-auto max-w-2xl px-5 py-4 flex items-center gap-2">
           <Wallet className="h-6 w-6 text-blue-500" />
           <span className="text-lg font-semibold tracking-tight">
-            PairPocket
+            {tCommon("appName")}
           </span>
         </div>
       </header>
 
       <div className="mx-auto max-w-2xl px-5 py-8">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-          함께 쓰는 가계부
+          {t("tagline")}
         </h1>
         <p className="mt-2 text-base text-gray-700 dark:text-gray-300">
-          듀얼 통화(KRW/CAD) 공용·개인 가계부. Google 계정으로 시작하세요.
+          {t("description")}
         </p>
 
         <a
@@ -50,7 +56,7 @@ export default function LoginLanding() {
           className="mt-8 w-full flex items-center justify-center gap-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#131314] px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-900 active:bg-gray-100 dark:active:bg-gray-800"
         >
           <GoogleIcon className="h-5 w-5" />
-          Google 계정으로 로그인
+          {t("loginWithGoogle")}
         </a>
       </div>
     </main>
