@@ -1,10 +1,11 @@
 "use client";
 
 import { Check, ChevronDown, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import {
-  ACCOUNT_KIND_LABEL,
+  ACCOUNT_KIND_KEYS,
   Currency,
   FinancialAccount,
   FinancialAccountKind,
@@ -15,6 +16,7 @@ import {
   parseAmountInput,
 } from "@/lib/api";
 import { BANK_OPTIONS, bankLogoUrl } from "@/lib/banks";
+import { translateError } from "@/lib/errors";
 
 interface Props {
   currency: Currency;
@@ -74,6 +76,11 @@ export default function AccountRegisterModal({
   onClose,
   onCreated,
 }: Props) {
+  const t = useTranslations("account");
+  const tKinds = useTranslations("accountKinds");
+  const tCommon = useTranslations("common");
+  const tErrors = useTranslations("errors");
+
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [kind, setKind] = useState<FinancialAccountKind>(
@@ -108,13 +115,13 @@ export default function AccountRegisterModal({
 
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("계좌/카드 이름을 입력해 주세요.");
+      setError(tErrors("accountNameRequired"));
       return;
     }
 
     const balance = parseAmountInput(openingBalance);
     if (Number.isNaN(balance)) {
-      setError("잔액을 올바르게 입력해 주세요.");
+      setError(tErrors("invalidBalance"));
       return;
     }
 
@@ -137,9 +144,7 @@ export default function AccountRegisterModal({
       const created = await createAccount(payload);
       onCreated(created);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "등록 중 오류가 발생했습니다."
-      );
+      setError(translateError(err, tErrors, "registerFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -158,16 +163,21 @@ export default function AccountRegisterModal({
       >
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold tracking-tight">카드/은행 등록</h3>
+            <h3 className="text-lg font-bold tracking-tight">
+              {t("registerTitle")}
+            </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {currency} ·{" "}
-              {preferredType === "expense" ? "지출용" : "수입용"} 기본 설정 가능
+              {preferredType === "expense"
+                ? t("defaultForExpense")
+                : t("defaultForIncome")}{" "}
+              {t("defaultSettingHint")}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="닫기"
+            aria-label={tCommon("close")}
             className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
@@ -177,15 +187,15 @@ export default function AccountRegisterModal({
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              이름
+              {tCommon("name")}
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={
                 preferredType === "expense"
-                  ? "예: TD Visa, 신한카드"
-                  : "예: TD Chequing, 국민은행"
+                  ? t("namePlaceholderExpense")
+                  : t("namePlaceholderIncome")
               }
               className="input-field"
               autoFocus
@@ -194,22 +204,22 @@ export default function AccountRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              닉네임
+              {t("nickname")}
             </label>
             <input
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder="예: 코스트코카드, 생활비통장"
+              placeholder={t("nicknamePlaceholder")}
               className="input-field"
             />
             <p className="mt-1 text-[10px] text-gray-400">
-              거래 입력 시 이 닉네임이 표시됩니다
+              {t("nicknameHint")}
             </p>
           </div>
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              유형
+              {t("type")}
             </label>
             <div className="grid grid-cols-2 gap-2">
               {KINDS.map((k) => (
@@ -223,7 +233,7 @@ export default function AccountRegisterModal({
                       : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
                   }`}
                 >
-                  {ACCOUNT_KIND_LABEL[k]}
+                  {tKinds(ACCOUNT_KIND_KEYS[k])}
                 </button>
               ))}
             </div>
@@ -232,7 +242,7 @@ export default function AccountRegisterModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                현재 잔액
+                {t("currentBalance")}
               </label>
               <input
                 inputMode="decimal"
@@ -243,12 +253,12 @@ export default function AccountRegisterModal({
                 className="input-field"
               />
               <p className="mt-1 text-[10px] text-gray-400">
-                {isCreditCard ? "남은 카드 빚" : "통장 잔액"}
+                {isCreditCard ? t("cardDebt") : t("accountBalance")}
               </p>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {isCreditCard ? "끝 4자리" : "계좌번호"}
+                {isCreditCard ? t("lastFour") : t("accountNumber")}
               </label>
               {isCreditCard ? (
                 <input
@@ -264,10 +274,12 @@ export default function AccountRegisterModal({
                   <input
                     value={accountNumber}
                     onChange={(e) => setAccountNumber(e.target.value)}
-                    placeholder="선택 입력"
+                    placeholder={tCommon("optionalInput")}
                     className="input-field"
                   />
-                  <p className="mt-1 text-[10px] text-gray-400">선택 사항</p>
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    {tCommon("optional")}
+                  </p>
                 </>
               )}
             </div>
@@ -275,7 +287,7 @@ export default function AccountRegisterModal({
 
           <div ref={bankRef} className="relative">
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              금융기관
+              {t("institution")}
             </label>
             <button
               type="button"
@@ -293,7 +305,7 @@ export default function AccountRegisterModal({
                     <span className="truncate">{selectedBank.name}</span>
                   </>
                 ) : (
-                  <span className="text-gray-400">은행 선택</span>
+                  <span className="text-gray-400">{t("selectBank")}</span>
                 )}
               </span>
               <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
@@ -336,8 +348,9 @@ export default function AccountRegisterModal({
               className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
             />
             <span className="text-sm">
-              {preferredType === "expense" ? "지출" : "수입"} 기본{" "}
-              {preferredType === "expense" ? "카드/계좌" : "입금 계좌"}로 설정
+              {preferredType === "expense"
+                ? t("defaultExpenseAccount")
+                : t("defaultIncomeAccount")}
             </span>
           </label>
 
@@ -352,7 +365,7 @@ export default function AccountRegisterModal({
             disabled={submitting}
             className="btn-primary w-full disabled:opacity-50"
           >
-            {submitting ? "등록 중…" : "등록"}
+            {submitting ? t("registering") : t("register")}
           </button>
         </form>
       </div>

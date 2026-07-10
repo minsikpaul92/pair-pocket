@@ -1,7 +1,10 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import CategoryIcon from "@/components/CategoryIcon";
 import AddableSelect from "@/components/AddableSelect";
+import { translateCategory } from "@/lib/category-i18n";
 
 interface Props {
   categories: string[];
@@ -17,18 +20,22 @@ export default function CategorySelect({
   value,
   onChange,
   onAdd,
-  placeholder = "대분류 선택",
+  placeholder,
   disabled = false,
 }: Props) {
+  const t = useTranslations("categories");
+  const tTx = useTranslations("transaction");
+
   return (
     <AddableSelect
       options={categories}
       value={value}
       onChange={onChange}
       onAdd={onAdd}
-      placeholder={placeholder}
+      placeholder={placeholder ?? tTx("selectCategory")}
       disabled={disabled}
-      addLabel="새 대분류 추가"
+      addLabel={tTx("addCategory")}
+      formatOption={(cat) => translateCategory(cat, t)}
       renderLeading={(cat) => (
         <CategoryIcon
           category={cat}
