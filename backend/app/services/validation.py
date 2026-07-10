@@ -26,7 +26,8 @@ async def _load_owned_account(
     db: AsyncIOMotorDatabase,
     *,
     account_id: str,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     label: str,
 ) -> dict:
     if not ObjectId.is_valid(account_id):
@@ -34,10 +35,19 @@ async def _load_owned_account(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"유효하지 않은 {label} ID입니다.",
         )
+    ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
+    if not ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"선택한 {label}을(를) 찾을 수 없습니다.",
+        )
+    owner_clause: dict = (
+        {"owner_id": ids[0]} if len(ids) == 1 else {"owner_id": {"$in": ids}}
+    )
     account = await db[ACCOUNTS_COL].find_one(
         {
             "_id": ObjectId(account_id),
-            "owner_id": owner_id,
+            **owner_clause,
             "is_active": True,
         }
     )
@@ -69,10 +79,12 @@ async def validate_transaction_payload(
     db: AsyncIOMotorDatabase,
     owner_id: str,
     *,
+    owner_ids: list[str] | None = None,
     exclude_settlement_id: str | None = None,
 ) -> None:
     doc = await _get_or_create(db, owner_id)
     custom = _parse_custom(doc)
+    account_owner_ids = owner_ids if owner_ids is not None else [owner_id]
 
     # Normalize legacy "자산 이동" → "자산 이동/카드" before validation.
     normalized_category = normalize_transfer_category(payload.category)
@@ -121,6 +133,7 @@ async def validate_transaction_payload(
             db,
             owner_id,
             payload.settles_expense_id,
+            owner_ids=account_owner_ids,
             exclude_settlement_id=exclude_settlement_id,
         )
         if remaining is None:
@@ -160,12 +173,15 @@ async def validate_transaction_payload(
             )
 
         from_account = await _load_owned_account(
-            db, account_id=payload.account_id, owner_id=owner_id, label="출금 계좌"
+            db,
+            account_id=payload.account_id,
+            owner_ids=account_owner_ids,
+            label="출금 계좌",
         )
         to_account = await _load_owned_account(
             db,
             account_id=payload.counter_account_id,
-            owner_id=owner_id,
+            owner_ids=account_owner_ids,
             label="입금 계좌",
         )
         _assert_account_matches_payload(from_account, payload, "출금 계좌")
@@ -214,6 +230,9 @@ async def validate_transaction_payload(
 
     if payload.account_id:
         account = await _load_owned_account(
-            db, account_id=payload.account_id, owner_id=owner_id, label="계좌"
+            db,
+            account_id=payload.account_id,
+            owner_ids=account_owner_ids,
+            label="계좌",
         )
         _assert_account_matches_payload(account, payload, "계좌")

@@ -28,7 +28,8 @@ def _month_range(month: str) -> tuple[datetime, datetime]:
 
 def build_transaction_filter(
     *,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     account_type: AccountType,
     currency: Currency | None = None,
     month: str | None = None,
@@ -39,8 +40,15 @@ def build_transaction_filter(
     institution: str | None = None,
 ) -> dict:
     """Shared MongoDB match filter for list + stats queries."""
+    ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
+    if not ids:
+        owner_clause: dict = {"owner_id": {"$in": []}}
+    elif len(ids) == 1:
+        owner_clause = {"owner_id": ids[0]}
+    else:
+        owner_clause = {"owner_id": {"$in": ids}}
     query: dict = {
-        "owner_id": owner_id,
+        **owner_clause,
         "account_type": account_type.value,
     }
     if currency is not None:
@@ -64,7 +72,8 @@ def build_transaction_filter(
 async def compute_stats(
     db: AsyncIOMotorDatabase,
     *,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     account_type: AccountType,
     currency: Currency | None = None,
     month: str | None = None,
@@ -78,8 +87,9 @@ async def compute_stats(
     - adjusted_expense: total_expense − N빵 정산/환급 (actual out-of-pocket spend)
     - pure_consumption: total_expense − 투자/저축 (spending charts, excludes transfers)
     """
+    ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
     base_filter = build_transaction_filter(
-        owner_id=owner_id,
+        owner_ids=ids,
         account_type=account_type,
         currency=currency,
         month=month,
@@ -147,7 +157,7 @@ async def compute_stats(
     pure_consumption = max(total_expense - investment_savings_total, 0)
 
     # Per-expense effective spending after linked N빵 settlements
-    settled_map = await get_settled_amounts(db, owner_id)
+    settled_map = await get_settled_amounts(db, owner_ids=ids)
     expense_docs = await db[COLLECTION].find(
         {
             **base_filter,

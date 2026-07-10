@@ -1,0 +1,26 @@
+# Global Rules for PairPocket Project
+
+## 1. Context & Documentation (Crucial)
+* ALWAYS read and strictly follow `PRD.md` and `design.md` before writing any code or proposing architectural changes.
+* Follow the development phases outlined in `PRD.md`. Do not jump ahead to future phases unless explicitly instructed.
+* If my prompt conflicts with `PRD.md` or `design.md`, alert me to the conflict before generating the code.
+
+## 2. Styling & UI (Strictly Tailwind CSS)
+* NEVER use inline styles or hardcoded CSS strings (e.g., `style={{ color: 'red' }}`).
+* ALWAYS use Tailwind CSS utility classes for all styling.
+* Strictly adhere to the Apple HIG principles, spacing, and typography defined in `design.md`.
+* Every UI component must perfectly support both light and dark modes using the `dark:` variant in Tailwind.
+* Ensure text overflow is managed properly using `whitespace-nowrap` and `truncate` as defined in the design guide.
+
+## 3. Internationalization (i18n — Mandatory)
+* ALL user-facing copy (labels, buttons, errors, empty states, emails shown in UI) MUST go through `next-intl` message files: `frontend/messages/ko.json` and `frontend/messages/en.json`.
+* NEVER hardcode Korean or English UI strings in components. Add a key to both language packs, then use `useTranslations(...)`.
+* When changing wording, update the message files — do not patch display text only in JSX.
+* Keep `ko.json` and `en.json` keys in sync (same key structure).
+
+## 4. Code Quality & Architecture
+* Write clean, modular, and DRY (Don't Repeat Yourself) code.
+* Frontend (Next.js): Use functional components, modern React hooks, and App Router conventions.
+* Backend (FastAPI): Use Pydantic models for strict data validation and keep routing clean.
+* Database (MongoDB): Never modify the core schema structure without my explicit approval. Use dynamic fields within documents for new categories.
+* Security: NEVER hardcode sensitive information like API keys, database URIs, or secrets. Always use environment variables (`.env`).

@@ -6,6 +6,7 @@ from app.core.security import get_current_user
 from app.database import get_database
 from app.models.transaction import AccountType, Currency
 from app.models.user import UserOut
+from app.services.access import resolve_owner_ids
 from app.services.stats import compute_stats
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
@@ -68,9 +69,10 @@ async def stats_summary(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     """Dashboard stats with investment exclusion and N빵 settlement netting."""
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     return await compute_stats(
         db,
-        owner_id=current_user.id,
+        owner_ids=owner_ids,
         account_type=account_type,
         currency=currency,
         month=month,

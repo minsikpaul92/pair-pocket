@@ -11,6 +11,7 @@ import {
   PanelLeftOpen,
   Plus,
   Repeat,
+  UserCheck,
   UserPlus,
   Wallet,
 } from "lucide-react";
@@ -19,21 +20,26 @@ import { useCallback, useEffect, useState } from "react";
 
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
+import InviteModal from "@/components/InviteModal";
 import ListView from "@/components/ListView";
 import LocaleToggle from "@/components/LocaleToggle";
 import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
 import {
+  AccountType,
   CategoryPresets,
   Currency,
   CurrentUser,
   LedgerScope,
+  PartnerSummary,
   SubscriptionOccurrence,
   Transaction,
   clearToken,
   fetchAllPendingOccurrences,
   fetchAllTransactions,
   fetchCategoryPresets,
+  fetchCurrentUser,
+  fetchInvitationMe,
   fetchPendingOccurrences,
   fetchTransactions,
   skipSubscriptionOccurrence,
@@ -89,12 +95,17 @@ export default function AppShell({ user, onLogout }: Props) {
   const tLedger = useTranslations("ledger");
   const tCommon = useTranslations("common");
   const tInvite = useTranslations("invite");
+  const tAccountType = useTranslations("accountType");
   const tSub = useTranslations("subscriptions");
   const tErrors = useTranslations("errors");
   const locale = useLocale();
 
   const [view, setView] = useState<View>("calendar");
   const [scope, setScope] = useState<LedgerScope>("CAD");
+  const [accountType, setAccountType] = useState<AccountType>("personal");
+  const [currentUser, setCurrentUser] = useState(user);
+  const [partner, setPartner] = useState<PartnerSummary | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [month, setMonth] = useState<Date>(() => {
     const now = new Date();
@@ -129,6 +140,14 @@ export default function AppShell({ user, onLogout }: Props) {
   }, []);
 
   useEffect(() => {
+    fetchInvitationMe()
+      .then((status) => {
+        setPartner(status.partner);
+      })
+      .catch(() => setPartner(null));
+  }, []);
+
+  useEffect(() => {
     fetchCategoryPresets()
       .then(setPresets)
       .catch(() => setPresets(null));
@@ -155,16 +174,18 @@ export default function AppShell({ user, onLogout }: Props) {
     let active = true;
     setLoading(true);
     const monthStr = monthKey(month);
+    const txFilters = { month: monthStr, accountType };
+    const pendingFilters = { month: monthStr, accountType };
     const txLoader =
       scope === "ALL"
-        ? fetchAllTransactions({ month: monthStr })
-        : fetchTransactions({ currency: scope, month: monthStr });
+        ? fetchAllTransactions(txFilters)
+        : fetchTransactions({ ...txFilters, currency: scope });
     const pendingLoader =
       scope === "ALL"
-        ? fetchAllPendingOccurrences({ month: monthStr })
-        : fetchPendingOccurrences({ month: monthStr, currency: scope });
+        ? fetchAllPendingOccurrences(pendingFilters)
+        : fetchPendingOccurrences({ ...pendingFilters, currency: scope });
 
-    syncSubscriptions()
+    syncSubscriptions(accountType)
       .then(() => {
         if (!active) return null;
         return Promise.all([txLoader, pendingLoader]);
@@ -186,7 +207,7 @@ export default function AppShell({ user, onLogout }: Props) {
     return () => {
       active = false;
     };
-  }, [scope, month, version]);
+  }, [scope, accountType, month, version]);
 
   function toggleNavCollapsed() {
     setNavCollapsed((v) => {
@@ -202,7 +223,25 @@ export default function AppShell({ user, onLogout }: Props) {
   }
 
   function handleInvite() {
-    alert(tInvite("comingSoon"));
+    setInviteOpen(true);
+  }
+
+  function handleInviteLinked() {
+    fetchCurrentUser().then((u) => {
+      if (u) setCurrentUser(u);
+    });
+    fetchInvitationMe().then((status) => {
+      setPartner(status.partner);
+    });
+  }
+
+  function handleInviteUnlinked() {
+    setPartner(null);
+    setCurrentUser((prev) => ({ ...prev, shared_group_id: null }));
+    if (accountType === "shared") {
+      setAccountType("personal");
+    }
+    bumpVersion();
   }
 
   function handleSaved() {
@@ -331,28 +370,57 @@ export default function AppShell({ user, onLogout }: Props) {
         </nav>
 
         <div className="mt-auto space-y-1">
-          <button
-            type="button"
-            onClick={handleInvite}
-            title={navCollapsed ? tNav("invite") : undefined}
-            className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
-              navCollapsed ? "justify-center px-2" : "px-3"
-            }`}
-          >
-            <UserPlus className="h-5 w-5 shrink-0" />
-            {!navCollapsed && tNav("invite")}
-          </button>
-          {!navCollapsed && (
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2">
-              {user.picture && (
+          {partner ? (
+            <button
+              type="button"
+              onClick={handleInvite}
+              title={navCollapsed ? partner.name : undefined}
+              className={`w-full flex items-center gap-2 rounded-xl py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                navCollapsed ? "justify-center px-2" : "px-3"
+              }`}
+            >
+              {partner.picture ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={user.picture}
-                  alt={user.name}
+                  src={partner.picture}
+                  alt={partner.name}
+                  className="h-8 w-8 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 shrink-0">
+                  <UserCheck className="h-4 w-4 text-green-500" />
+                </span>
+              )}
+              {!navCollapsed && (
+                <span className="flex-1 truncate text-left text-sm">
+                  {partner.name}
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleInvite}
+              title={navCollapsed ? tNav("invite") : undefined}
+              className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                navCollapsed ? "justify-center px-2" : "px-3"
+              }`}
+            >
+              <UserPlus className="h-5 w-5 shrink-0" />
+              {!navCollapsed && tNav("invite")}
+            </button>
+          )}
+          {!navCollapsed && (
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2">
+              {currentUser.picture && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={currentUser.picture}
+                  alt={currentUser.name}
                   className="h-8 w-8 rounded-full"
                 />
               )}
-              <span className="flex-1 truncate text-sm">{user.name}</span>
+              <span className="flex-1 truncate text-sm">{currentUser.name}</span>
               <button
                 type="button"
                 onClick={handleLogout}
@@ -368,23 +436,41 @@ export default function AppShell({ user, onLogout }: Props) {
 
       <div className={`${mainPad} transition-all duration-200`}>
         <header className="sticky top-0 z-40 glass-bar border-b">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-            <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
-              {LEDGERS.map((l) => (
-                <button
-                  key={l.scope}
-                  type="button"
-                  onClick={() => setScope(l.scope)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    scope === l.scope
-                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {l.flag && <span className="mr-1">{l.flag}</span>}
-                  {ledgerTabLabel(l.labelKey, tLedger, tCommon)}
-                </button>
-              ))}
+          <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+                {(["personal", "shared"] as AccountType[]).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setAccountType(type)}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                      accountType === type
+                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    {tAccountType(type)}
+                  </button>
+                ))}
+              </div>
+              <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+                {LEDGERS.map((l) => (
+                  <button
+                    key={l.scope}
+                    type="button"
+                    onClick={() => setScope(l.scope)}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                      scope === l.scope
+                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    {l.flag && <span className="mr-1">{l.flag}</span>}
+                    {ledgerTabLabel(l.labelKey, tLedger, tCommon)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
@@ -398,11 +484,11 @@ export default function AppShell({ user, onLogout }: Props) {
               >
                 <UserPlus className="h-5 w-5" />
               </button>
-              {user.picture && (
+              {currentUser.picture && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={user.picture}
-                  alt={user.name}
+                  src={currentUser.picture}
+                  alt={currentUser.name}
                   className="h-8 w-8 rounded-full"
                 />
               )}
@@ -461,7 +547,20 @@ export default function AppShell({ user, onLogout }: Props) {
             </div>
           </div>
 
-          {loading && view !== "dashboard" && view !== "subscriptions" ? (
+          {accountType === "shared" && !currentUser.shared_group_id ? (
+            <div className="card-inset p-6 text-center space-y-4">
+              <p className="text-base text-gray-700 dark:text-gray-300">
+                {tInvite("sharedEmpty")}
+              </p>
+              <button
+                type="button"
+                onClick={handleInvite}
+                className="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-xl px-4 py-3 transition-colors"
+              >
+                {tInvite("sharedEmptyCta")}
+              </button>
+            </div>
+          ) : loading && view !== "dashboard" && view !== "subscriptions" ? (
             <div className="h-64 w-full animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ) : view === "calendar" ? (
             <CalendarView
@@ -482,10 +581,11 @@ export default function AppShell({ user, onLogout }: Props) {
           ) : view === "subscriptions" ? (
             <SubscriptionsView
               scope={scope}
+              accountType={accountType}
               month={month}
               version={version}
               presets={presets}
-              userEmail={user.email}
+              userEmail={currentUser.email}
               focusSubscriptionId={subscriptionFocusId}
               focusCancelAction={subscriptionCancelAction}
               onFocusHandled={() => {
@@ -500,6 +600,7 @@ export default function AppShell({ user, onLogout }: Props) {
               month={month}
               version={version}
               scope={scope}
+              accountType={accountType}
               onChanged={bumpVersion}
             />
           )}
@@ -538,6 +639,7 @@ export default function AppShell({ user, onLogout }: Props) {
       {modalDate && presets && (
         <TransactionModal
           currency={modalCurrency}
+          accountType={accountType}
           allowCurrencyPick={scope === "ALL" && !editingTransaction}
           onCurrencyChange={setModalCurrency}
           presets={presets}
@@ -552,6 +654,14 @@ export default function AppShell({ user, onLogout }: Props) {
           onSelectPendingOccurrence={openSubscriptionFromPending}
           onSkipPendingOccurrence={handleSkipPendingOccurrence}
           onPresetsChange={setPresets}
+        />
+      )}
+
+      {inviteOpen && (
+        <InviteModal
+          onClose={() => setInviteOpen(false)}
+          onLinked={handleInviteLinked}
+          onUnlinked={handleInviteUnlinked}
         />
       )}
     </div>

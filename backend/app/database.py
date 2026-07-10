@@ -27,7 +27,12 @@ async def _ensure_indexes() -> None:
     assert db.database is not None
     await db.database["users"].create_index("google_id", unique=True)
     await db.database["users"].create_index("email", unique=True)
+    await db.database["users"].create_index("shared_group_id", sparse=True)
     await db.database["user_settings"].create_index("owner_id", unique=True)
+    await db.database["invitations"].create_index("token", unique=True)
+    await db.database["invitations"].create_index(
+        [("inviter_id", 1), ("status", 1)]
+    )
     await db.database["transactions"].create_index(
         [("owner_id", 1), ("date", -1)]
     )

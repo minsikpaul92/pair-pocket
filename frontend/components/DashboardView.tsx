@@ -14,6 +14,7 @@ import AccountRegisterModal from "@/components/AccountRegisterModal";
 import {
   ACCOUNT_KIND_KEYS,
   AccountBalance,
+  AccountType,
   Currency,
   ExchangeRate,
   FinancialAccount,
@@ -35,6 +36,7 @@ interface Props {
   month: Date;
   version: number;
   scope: LedgerScope;
+  accountType?: AccountType;
   onChanged?: () => void;
 }
 
@@ -48,7 +50,13 @@ function KindIcon({ kind }: { kind: FinancialAccountKind }) {
   return <Landmark className="h-4 w-4 text-gray-400 shrink-0" />;
 }
 
-export default function DashboardView({ month, version, scope, onChanged }: Props) {
+export default function DashboardView({
+  month,
+  version,
+  scope,
+  accountType = "personal",
+  onChanged,
+}: Props) {
   const locale = useLocale();
   const tDashboard = useTranslations("dashboard");
   const tLedger = useTranslations("ledger");
@@ -79,9 +87,15 @@ export default function DashboardView({ month, version, scope, onChanged }: Prop
 
     if (scope === "CAD" || scope === "ALL") {
       statsJobs.push(
-        fetchStatsSummary({ currency: "CAD", month: monthStr }).catch(() => null)
+        fetchStatsSummary({
+          currency: "CAD",
+          month: monthStr,
+          accountType,
+        }).catch(() => null)
       );
-      worthJobs.push(fetchNetWorth({ currency: "CAD" }).catch(() => null));
+      worthJobs.push(
+        fetchNetWorth({ currency: "CAD", accountType }).catch(() => null)
+      );
     } else {
       statsJobs.push(Promise.resolve(null));
       worthJobs.push(Promise.resolve(null));
@@ -89,9 +103,15 @@ export default function DashboardView({ month, version, scope, onChanged }: Prop
 
     if (scope === "KRW" || scope === "ALL") {
       statsJobs.push(
-        fetchStatsSummary({ currency: "KRW", month: monthStr }).catch(() => null)
+        fetchStatsSummary({
+          currency: "KRW",
+          month: monthStr,
+          accountType,
+        }).catch(() => null)
       );
-      worthJobs.push(fetchNetWorth({ currency: "KRW" }).catch(() => null));
+      worthJobs.push(
+        fetchNetWorth({ currency: "KRW", accountType }).catch(() => null)
+      );
     } else {
       statsJobs.push(Promise.resolve(null));
       worthJobs.push(Promise.resolve(null));
@@ -99,10 +119,14 @@ export default function DashboardView({ month, version, scope, onChanged }: Prop
 
     const accountJobs: Promise<FinancialAccount[]>[] = [];
     if (scope === "CAD" || scope === "ALL") {
-      accountJobs.push(fetchAccounts({ currency: "CAD" }).catch(() => []));
+      accountJobs.push(
+        fetchAccounts({ currency: "CAD", accountType }).catch(() => [])
+      );
     }
     if (scope === "KRW" || scope === "ALL") {
-      accountJobs.push(fetchAccounts({ currency: "KRW" }).catch(() => []));
+      accountJobs.push(
+        fetchAccounts({ currency: "KRW", accountType }).catch(() => [])
+      );
     }
 
     Promise.all([
@@ -122,7 +146,7 @@ export default function DashboardView({ month, version, scope, onChanged }: Prop
         else if (scope === "KRW") setDisplay("KRW");
       })
       .finally(() => setLoading(false));
-  }, [monthStr, version, scope]);
+  }, [monthStr, version, scope, accountType]);
 
   const accountById = useMemo(
     () => new Map(accounts.map((a) => [a.id, a])),
@@ -466,6 +490,7 @@ export default function DashboardView({ month, version, scope, onChanged }: Prop
       {editingAccount && (
         <AccountRegisterModal
           currency={editingAccount.currency}
+          accountType={accountType}
           preferredType={
             editingAccount.is_default_income ? "income" : "expense"
           }

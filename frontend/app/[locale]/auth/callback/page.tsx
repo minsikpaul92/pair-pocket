@@ -25,6 +25,14 @@ function CallbackHandler() {
 
     if (token) {
       setToken(token);
+      const pendingInvite =
+        typeof window !== "undefined"
+          ? window.sessionStorage.getItem("pairpocket_pending_invite")
+          : null;
+      if (pendingInvite) {
+        router.replace(`/invite/${pendingInvite}`);
+        return;
+      }
       router.replace("/");
       return;
     }

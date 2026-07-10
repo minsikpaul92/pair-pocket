@@ -19,6 +19,27 @@ OCC_COL = "subscription_occurrences"
 TX_COL = "transactions"
 
 
+def _owner_clause(
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
+) -> dict:
+    ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
+    if not ids:
+        return {"owner_id": {"$in": []}}
+    if len(ids) == 1:
+        return {"owner_id": ids[0]}
+    return {"owner_id": {"$in": ids}}
+
+
+def _resolve_ids(
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
+) -> list[str]:
+    if owner_ids is not None:
+        return owner_ids
+    return [owner_id] if owner_id else []
+
+
 def _add_months(dt: datetime, months: int) -> datetime:
     month = dt.month - 1 + months
     year = dt.year + month // 12
@@ -202,13 +223,14 @@ def subscription_visible_in_month(
 async def finalize_expired_cancellations(
     db: AsyncIOMotorDatabase,
     *,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     account_type: str,
 ) -> int:
     today = _calendar_day(datetime.utcnow())
     result = await db[SUBS_COL].update_many(
         {
-            "owner_id": owner_id,
+            **_owner_clause(owner_id, owner_ids),
             "account_type": account_type,
             "status": SubscriptionStatus.CANCEL_SCHEDULED.value,
             "cancel_effective_date": {"$lte": today},
@@ -418,12 +440,16 @@ async def get_subscription_history(
     db: AsyncIOMotorDatabase,
     *,
     subscription_id: str,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
 ) -> dict | None:
     if not ObjectId.is_valid(subscription_id):
         return None
     sub = await db[SUBS_COL].find_one(
-        {"_id": ObjectId(subscription_id), "owner_id": owner_id}
+        {
+            "_id": ObjectId(subscription_id),
+            **_owner_clause(owner_id, owner_ids),
+        }
     )
     if not sub:
         return None
@@ -494,7 +520,8 @@ async def get_subscription_history(
 async def monthly_subscription_summary(
     db: AsyncIOMotorDatabase,
     *,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     account_type: str,
     month: str,
     currency: str | None = None,
@@ -504,7 +531,7 @@ async def monthly_subscription_summary(
     inst_totals: dict[str, float] = {}
 
     pending_query: dict = {
-        "owner_id": owner_id,
+        **_owner_clause(owner_id, owner_ids),
         "account_type": account_type,
         "status": OccurrenceStatus.PENDING.value,
         "due_date": {"$gte": start, "$lt": end},
@@ -520,7 +547,7 @@ async def monthly_subscription_summary(
         bucket[cur] = bucket.get(cur, 0.0) + float(occ["amount"])
 
     tx_query: dict = {
-        "owner_id": owner_id,
+        **_owner_clause(owner_id, owner_ids),
         "account_type": account_type,
         "subscription_occurrence_id": {"$exists": True, "$ne": None},
         "date": {"$gte": start, "$lt": end},
@@ -545,12 +572,13 @@ async def monthly_subscription_summary(
 async def prune_all_invalid_pending(
     db: AsyncIOMotorDatabase,
     *,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     account_type: str,
 ) -> int:
     removed = 0
     subs = await db[SUBS_COL].find(
-        {"owner_id": owner_id, "account_type": account_type}
+        {**_owner_clause(owner_id, owner_ids), "account_type": account_type}
     ).to_list(length=200)
     for sub in subs:
         removed += await prune_occurrences_before_start(db, subscription=sub)
@@ -664,7 +692,8 @@ async def dedupe_subscription_transactions(db: AsyncIOMotorDatabase) -> int:
 async def materialize_due_occurrences(
     db: AsyncIOMotorDatabase,
     *,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     account_type: str,
     as_of: str | None = None,
 ) -> int:
@@ -673,16 +702,21 @@ async def materialize_due_occurrences(
     Call on app load. Returns materialized count.
     """
     today = _parse_as_of(as_of)
+    ids = _resolve_ids(owner_id, owner_ids)
+    if not ids:
+        return 0
 
-    await prune_all_invalid_pending(db, owner_id=owner_id, account_type=account_type)
+    await prune_all_invalid_pending(
+        db, owner_ids=ids, account_type=account_type
+    )
     await dedupe_subscription_transactions(db)
     await finalize_expired_cancellations(
-        db, owner_id=owner_id, account_type=account_type
+        db, owner_ids=ids, account_type=account_type
     )
 
     pending = await db[OCC_COL].find(
         {
-            "owner_id": owner_id,
+            **_owner_clause(owner_ids=ids),
             "account_type": account_type,
             "status": OccurrenceStatus.PENDING.value,
         }
@@ -732,6 +766,7 @@ async def materialize_due_occurrences(
         if not sub or sub.get("status") not in allowed_statuses:
             continue
 
+        tx_owner = claimed.get("owner_id") or sub.get("owner_id") or ids[0]
         tx_doc = {
             "date": claimed["due_date"],
             "amount": claimed["amount"],
@@ -746,7 +781,7 @@ async def materialize_due_occurrences(
             "account_id": sub["account_id"],
             "counter_account_id": None,
             "kind": TransactionKind.NORMAL.value,
-            "owner_id": owner_id,
+            "owner_id": tx_owner,
             "subscription_occurrence_id": str(claimed["_id"]),
             "subscription_id": str(sub["_id"]),
             "subscription_billing_cycle": sub["cycle"],
@@ -789,7 +824,8 @@ async def materialize_due_occurrences(
 async def list_pending_occurrences(
     db: AsyncIOMotorDatabase,
     *,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     account_type: str,
     month: str | None = None,
     currency: str | None = None,
@@ -799,7 +835,7 @@ async def list_pending_occurrences(
     today = _parse_as_of(as_of)
 
     query: dict = {
-        "owner_id": owner_id,
+        **_owner_clause(owner_id, owner_ids),
         "account_type": account_type,
         "status": OccurrenceStatus.PENDING.value,
     }
@@ -823,7 +859,8 @@ async def skip_occurrence(
     db: AsyncIOMotorDatabase,
     *,
     occurrence_id: str,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
 ) -> dict | None:
     """Skip a pending charge without creating a transaction."""
     if not ObjectId.is_valid(occurrence_id):
@@ -832,7 +869,7 @@ async def skip_occurrence(
     claimed = await db[OCC_COL].find_one_and_update(
         {
             "_id": ObjectId(occurrence_id),
-            "owner_id": owner_id,
+            **_owner_clause(owner_id, owner_ids),
             "status": OccurrenceStatus.PENDING.value,
         },
         {"$set": {"status": OccurrenceStatus.SKIPPED.value}},
@@ -845,7 +882,9 @@ async def skip_occurrence(
     if not sub_oid:
         return claimed
 
-    sub = await db[SUBS_COL].find_one({"_id": sub_oid, "owner_id": owner_id})
+    sub = await db[SUBS_COL].find_one(
+        {"_id": sub_oid, **_owner_clause(owner_id, owner_ids)}
+    )
     if not sub:
         return claimed
 

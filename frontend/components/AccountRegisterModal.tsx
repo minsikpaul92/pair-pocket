@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   ACCOUNT_KIND_KEYS,
+  AccountType,
   Currency,
   FinancialAccount,
   FinancialAccountKind,
@@ -21,6 +22,7 @@ import { translateError } from "@/lib/errors";
 
 interface Props {
   currency: Currency;
+  accountType?: AccountType;
   preferredType: TransactionType;
   account?: FinancialAccount | null;
   onClose: () => void;
@@ -75,6 +77,7 @@ function BankIcon({
 
 export default function AccountRegisterModal({
   currency,
+  accountType = "personal",
   preferredType,
   account = null,
   onClose,
@@ -173,6 +176,7 @@ export default function AccountRegisterModal({
         nickname: nick || null,
         kind,
         currency,
+        account_type: accountType,
         opening_balance: balance,
         institution: institution || null,
         last_four: isCreditCard ? lastFour.trim() || null : null,
