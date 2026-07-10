@@ -15,7 +15,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
@@ -67,6 +67,15 @@ const SCOPE_LABEL_KEY: Record<LedgerScope, "allLedger" | "canadaLedger" | "korea
 
 const NAV_COLLAPSED_KEY = "pairpocket_nav_collapsed";
 
+function ledgerTabLabel(
+  labelKey: "all" | "canada" | "korea",
+  tLedger: (key: string) => string,
+  tCommon: (key: string) => string
+): string {
+  if (labelKey === "all") return tLedger("all");
+  return tCommon(labelKey);
+}
+
 interface Props {
   user: CurrentUser;
   onLogout: () => void;
@@ -99,6 +108,7 @@ export default function AppShell({ user, onLogout }: Props) {
   const [presets, setPresets] = useState<CategoryPresets | null>(null);
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
+  const bumpVersion = useCallback(() => setVersion((v) => v + 1), []);
 
   const [modalDate, setModalDate] = useState<Date | null>(null);
   const [modalCurrency, setModalCurrency] = useState<Currency>("CAD");
@@ -193,7 +203,7 @@ export default function AppShell({ user, onLogout }: Props) {
   function handleSaved() {
     setModalDate(null);
     setEditingTransaction(null);
-    setVersion((v) => v + 1);
+    bumpVersion();
   }
 
   function closeModal() {
@@ -302,11 +312,6 @@ export default function AppShell({ user, onLogout }: Props) {
         </nav>
 
         <div className="mt-auto space-y-1">
-          {!navCollapsed && (
-            <div className="px-1 pb-1">
-              <LocaleToggle className="w-full justify-center" />
-            </div>
-          )}
           <button
             type="button"
             onClick={handleInvite}
@@ -358,7 +363,7 @@ export default function AppShell({ user, onLogout }: Props) {
                   }`}
                 >
                   {l.flag && <span className="mr-1">{l.flag}</span>}
-                  {tLedger(l.labelKey)}
+                  {ledgerTabLabel(l.labelKey, tLedger, tCommon)}
                 </button>
               ))}
             </div>
@@ -468,7 +473,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 setSubscriptionFocusId(null);
                 setSubscriptionCancelAction(false);
               }}
-              onChanged={() => setVersion((v) => v + 1)}
+              onChanged={bumpVersion}
               onPresetsChange={setPresets}
             />
           ) : (

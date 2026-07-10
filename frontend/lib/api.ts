@@ -605,7 +605,7 @@ export async function fetchSubscriptions(filters: {
     `${API_BASE_URL}/api/subscriptions?${params.toString()}`,
     { headers: authHeaders() }
   );
-  if (!res.ok) throw new Error("구독 목록을 불러오지 못했습니다.");
+  if (!res.ok) throw new ApiError("fetchSubscriptions");
   return (await res.json()) as Subscription[];
 }
 
@@ -664,9 +664,7 @@ export async function createSubscription(
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "구독을 저장하지 못했습니다."));
-  }
+  if (!res.ok) throw await readApiError(res, "saveSubscription");
   return (await res.json()) as Subscription;
 }
 
@@ -696,9 +694,7 @@ export async function updateSubscription(
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "구독을 수정하지 못했습니다."));
-  }
+  if (!res.ok) throw await readApiError(res, "updateSubscription");
   return (await res.json()) as Subscription;
 }
 
@@ -709,9 +705,7 @@ export async function scheduleSubscriptionCancel(
     `${API_BASE_URL}/api/subscriptions/${id}/schedule-cancel`,
     { method: "POST", headers: authHeaders() }
   );
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "해지 예정 처리에 실패했습니다."));
-  }
+  if (!res.ok) throw await readApiError(res, "scheduleSubscriptionCancel");
   return (await res.json()) as Subscription;
 }
 
@@ -720,9 +714,7 @@ export async function deleteSubscription(id: string): Promise<void> {
     method: "DELETE",
     headers: authHeaders(),
   });
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "구독을 삭제하지 못했습니다."));
-  }
+  if (!res.ok) throw await readApiError(res, "deleteSubscription");
 }
 
 export async function fetchPendingOccurrences(filters: {

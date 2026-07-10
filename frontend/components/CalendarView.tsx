@@ -120,6 +120,7 @@ export default function CalendarView({
 }: Props) {
   const t = useTranslations("calendar");
   const tCommon = useTranslations("common");
+  const tSub = useTranslations("subscriptions");
   const weekdays = useMemo(
     () => WEEKDAY_KEYS.map((key) => t(`weekdays.${key}`)),
     [t]
@@ -177,7 +178,7 @@ export default function CalendarView({
           const dayPending = pendingByDay.get(key) ?? [];
           const pendingItems = dayPending.map((occ) => ({
             currency: occ.currency,
-            name: occ.subscription_name?.trim() || "구독",
+            name: occ.subscription_name?.trim() || tSub("defaultName"),
           }));
           const pendingLines = formatPendingDayLabels(pendingItems, scope);
           const hasPending = pendingLines.length > 0;

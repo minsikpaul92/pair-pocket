@@ -1,16 +1,15 @@
 "use client";
 
 import { CalendarX2, Plus, Repeat, Undo2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import SubscriptionRegisterModal from "@/components/SubscriptionRegisterModal";
 import {
-  BILLING_CYCLE_LABEL,
   CategoryPresets,
   Currency,
   LedgerScope,
   MonthlySubscriptionSummary,
-  SUBSCRIPTION_STATUS_LABEL,
   Subscription,
   SubscriptionOccurrence,
   accountLabel,
@@ -25,10 +24,16 @@ import {
   scheduleSubscriptionCancel,
   subscriptionDisplayAmount,
   subscriptionScheduleAmountClass,
-  subscriptionSourceLabel,
-  subscriptionTrackingLabel,
 } from "@/lib/api";
 import { monthKey } from "@/lib/date";
+import {
+  formatSubscriptionDate,
+  translateBillingCycle,
+  translateSubscriptionSource,
+  translateSubscriptionStatus,
+  translateSubscriptionTracking,
+} from "@/lib/subscription-i18n";
+import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 
 interface Props {
   scope: LedgerScope;
@@ -46,9 +51,11 @@ interface Props {
 function MonthlyTotalsSection({
   scope,
   summary,
+  t,
 }: {
   scope: LedgerScope;
   summary: MonthlySubscriptionSummary;
+  t: ReturnType<typeof useTranslations<"subscriptions">>;
 }) {
   const currencies: Currency[] =
     scope === "KRW" ? ["KRW"] : scope === "CAD" ? ["CAD"] : ["CAD", "KRW"];
@@ -57,7 +64,7 @@ function MonthlyTotalsSection({
     <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div className="card-inset p-4">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          이번 달 총 구독
+          {t("monthlySubscriptionTotal")}
         </p>
         <div className="mt-2 space-y-1">
           {currencies.map((c) => (
@@ -73,7 +80,7 @@ function MonthlyTotalsSection({
       </div>
       <div className="card-inset p-4">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          이번 달 총 할부
+          {t("monthlyInstallmentTotal")}
         </p>
         <div className="mt-2 space-y-1">
           {currencies.map((c) => (
@@ -96,11 +103,17 @@ function PendingSection({
   pending,
   subscriptions,
   onSelectOccurrence,
+  t,
+  tCommon,
+  locale,
 }: {
   scope: LedgerScope;
   pending: SubscriptionOccurrence[];
   subscriptions: Subscription[];
   onSelectOccurrence: (occ: SubscriptionOccurrence) => void;
+  t: ReturnType<typeof useTranslations<"subscriptions">>;
+  tCommon: ReturnType<typeof useTranslations<"common">>;
+  locale: string;
 }) {
   if (pending.length === 0) return null;
 
@@ -122,16 +135,16 @@ function PendingSection({
           >
             <div className="min-w-0">
               <p className={`text-sm font-medium truncate ${tone}`}>
-                {occ.subscription_name || "구독"}
-                {subscriptionSourceLabel(cycle) && (
+                {occ.subscription_name || t("defaultName")}
+                {translateSubscriptionSource(cycle, t) && (
                   <span className="text-[10px] text-gray-400 font-normal">
                     {" "}
-                    {subscriptionSourceLabel(cycle)}
+                    {translateSubscriptionSource(cycle, t)}
                   </span>
                 )}
               </p>
               <p className="text-[11px] text-gray-400">
-                {new Date(occ.due_date).toLocaleDateString("ko-KR")}
+                {formatSubscriptionDate(occ.due_date, locale)}
               </p>
             </div>
             <p className={`text-sm font-semibold tabular-nums whitespace-nowrap ${tone}`}>
@@ -147,7 +160,7 @@ function PendingSection({
     <section className="card-inset overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
         <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-          이번 달 예정
+          {t("pendingThisMonth")}
         </p>
       </div>
       <ul className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -156,7 +169,7 @@ function PendingSection({
             {cad.length > 0 && (
               <>
                 <li className="px-4 py-2 text-[11px] font-semibold text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
-                  🇨🇦 캐나다
+                  🇨🇦 {tCommon("canada")}
                 </li>
                 {renderList(cad)}
               </>
@@ -164,7 +177,7 @@ function PendingSection({
             {krw.length > 0 && (
               <>
                 <li className="px-4 py-2 text-[11px] font-semibold text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
-                  🇰🇷 한국
+                  🇰🇷 {tCommon("korea")}
                 </li>
                 {renderList(krw)}
               </>
@@ -196,6 +209,12 @@ export default function SubscriptionsView({
   onChanged,
   onPresetsChange,
 }: Props) {
+  const t = useTranslations("subscriptions");
+  const tCommon = useTranslations("common");
+  const tCategories = useTranslations("categories");
+  const tSubCategories = useTranslations("subCategories");
+  const locale = useLocale();
+
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [pending, setPending] = useState<SubscriptionOccurrence[]>([]);
   const [summary, setSummary] = useState<MonthlySubscriptionSummary>(
@@ -300,26 +319,12 @@ export default function SubscriptionsView({
 
     openEdit(sub);
     onFocusHandled?.();
-  }, [focusSubscriptionId, focusCancelAction, subscriptions, onFocusHandled]);
-
-  function closeModal() {
-    setShowRegister(false);
-    setEditing(null);
-  }
-
-  if (loading) {
-    return (
-      <div className="h-40 w-full animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
-    );
-  }
-
-  const cadSubs = subscriptions.filter((s) => s.currency === "CAD");
-  const krwSubs = subscriptions.filter((s) => s.currency === "KRW");
+  }, [focusSubscriptionId, focusCancelAction, subscriptions, onFocusHandled, onChanged]);
 
   function renderSubscription(sub: Subscription, showFlag: boolean) {
     const displayAmount = subscriptionDisplayAmount(sub);
     const promoOn = isPromoActive(sub);
-    const sourceLabel = subscriptionSourceLabel(sub.cycle);
+    const sourceLabel = translateSubscriptionSource(sub.cycle, t);
 
     return (
       <li
@@ -346,16 +351,17 @@ export default function SubscriptionsView({
                 </span>
               )}
               <span className="shrink-0 rounded-md bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
-                {SUBSCRIPTION_STATUS_LABEL[sub.status]}
+                {translateSubscriptionStatus(sub.status, t)}
               </span>
             </div>
             <p className="mt-0.5 text-[11px] text-blue-500 font-medium">
-              {subscriptionTrackingLabel(sub)}
+              {translateSubscriptionTracking(sub, t, locale)}
             </p>
             <p className="mt-0.5 text-[11px] text-gray-400 truncate">
-              {BILLING_CYCLE_LABEL[sub.cycle]}
+              {translateBillingCycle(sub.cycle, t)}
               {" · "}
-              {sub.category} › {sub.sub_category}
+              {translateCategory(sub.category, tCategories)} ›{" "}
+              {translateSubCategory(sub.sub_category, tSubCategories)}
               {accountNames[sub.account_id]
                 ? ` · ${accountNames[sub.account_id]}`
                 : ""}
@@ -364,23 +370,21 @@ export default function SubscriptionsView({
               (sub.status === "active" ||
                 sub.status === "cancel_scheduled") && (
                 <p className="mt-0.5 text-[11px] text-gray-400">
-                  다음 결제{" "}
-                  {new Date(sub.next_due_date).toLocaleDateString("ko-KR")}
+                  {t("nextPayment")}{" "}
+                  {formatSubscriptionDate(sub.next_due_date, locale)}
                 </p>
               )}
             {sub.status === "cancel_scheduled" &&
               sub.cancel_effective_date && (
                 <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
-                  {new Date(sub.cancel_effective_date).toLocaleDateString(
-                    "ko-KR"
-                  )}{" "}
-                  이후 숨김
+                  {formatSubscriptionDate(sub.cancel_effective_date, locale)}{" "}
+                  {t("hiddenAfter")}
                 </p>
               )}
             {promoOn && sub.promo_end_date && (
               <p className="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400">
-                프로모션 ~{" "}
-                {new Date(sub.promo_end_date).toLocaleDateString("ko-KR")}
+                {t("promoUntil")} ~{" "}
+                {formatSubscriptionDate(sub.promo_end_date, locale)}
               </p>
             )}
           </div>
@@ -403,11 +407,11 @@ export default function SubscriptionsView({
           >
             {sub.status === "cancel_scheduled" ? (
               <>
-                <Undo2 className="h-3 w-3" /> 해지 취소
+                <Undo2 className="h-3 w-3" /> {t("undoCancel")}
               </>
             ) : (
               <>
-                <CalendarX2 className="h-3 w-3" /> 해지하기
+                <CalendarX2 className="h-3 w-3" /> {t("cancel")}
               </>
             )}
           </button>
@@ -416,13 +420,27 @@ export default function SubscriptionsView({
     );
   }
 
+  function closeModal() {
+    setShowRegister(false);
+    setEditing(null);
+  }
+
+  if (loading) {
+    return (
+      <div className="h-40 w-full animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
+    );
+  }
+
+  const cadSubs = subscriptions.filter((s) => s.currency === "CAD");
+  const krwSubs = subscriptions.filter((s) => s.currency === "KRW");
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold tracking-tight">구독 / 할부</h2>
+          <h2 className="text-lg font-bold tracking-tight">{t("title")}</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            결제일이 되면 자동 지출로 기록됩니다 · 항목을 눌러 수정/삭제
+            {t("subtitle")}
           </p>
         </div>
         <button
@@ -431,28 +449,31 @@ export default function SubscriptionsView({
           className="flex items-center gap-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 text-sm font-semibold transition-colors"
         >
           <Plus className="h-4 w-4" />
-          추가
+          {t("add")}
         </button>
       </div>
 
-      <MonthlyTotalsSection scope={scope} summary={summary} />
+      <MonthlyTotalsSection scope={scope} summary={summary} t={t} />
 
       <PendingSection
         scope={scope}
         pending={pending}
         subscriptions={subscriptions}
         onSelectOccurrence={openFromOccurrence}
+        t={t}
+        tCommon={tCommon}
+        locale={locale}
       />
 
       <section className="card-inset overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-            등록된 구독
+            {t("registered")}
           </p>
         </div>
         {subscriptions.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-gray-400">
-            등록된 구독/할부가 없습니다
+            {t("empty")}
           </div>
         ) : (
           <ul className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -461,7 +482,7 @@ export default function SubscriptionsView({
                 {cadSubs.length > 0 && (
                   <>
                     <li className="px-4 py-2 text-[11px] font-semibold text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
-                      🇨🇦 캐나다
+                      🇨🇦 {tCommon("canada")}
                     </li>
                     {cadSubs.map((sub) => renderSubscription(sub, false))}
                   </>
@@ -469,7 +490,7 @@ export default function SubscriptionsView({
                 {krwSubs.length > 0 && (
                   <>
                     <li className="px-4 py-2 text-[11px] font-semibold text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
-                      🇰🇷 한국
+                      🇰🇷 {tCommon("korea")}
                     </li>
                     {krwSubs.map((sub) => renderSubscription(sub, false))}
                   </>

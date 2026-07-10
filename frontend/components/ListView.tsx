@@ -19,9 +19,9 @@ import {
   isNonCashflowTransaction,
   isSubscriptionTransaction,
   subCategoriesFor,
-  subscriptionSourceLabel,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
 interface Props {
   scope: LedgerScope;
@@ -63,6 +63,7 @@ export default function ListView({
   const tCommon = useTranslations("common");
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
+  const tSub = useTranslations("subscriptions");
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -359,9 +360,9 @@ export default function ListView({
                       </td>
                       <td className="px-3 py-2.5 max-w-[8rem] truncate">
                         {tx.merchant}
-                        {subscriptionSourceLabel(tx.subscription_billing_cycle) && (
+                        {translateSubscriptionSource(tx.subscription_billing_cycle, tSub) && (
                           <span className="ml-1 text-[10px] text-gray-400 font-normal">
-                            {subscriptionSourceLabel(tx.subscription_billing_cycle)}
+                            {translateSubscriptionSource(tx.subscription_billing_cycle, tSub)}
                           </span>
                         )}
                         {tx.category === EXPENSE_CATEGORY_INVESTMENT &&

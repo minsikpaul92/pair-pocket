@@ -1,6 +1,7 @@
 "use client";
 
 import { Trash2, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
@@ -8,7 +9,6 @@ import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import CategorySelect from "@/components/CategorySelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import {
-  BILLING_CYCLE_LABEL,
   BillingCycle,
   CategoryPresets,
   Currency,
@@ -33,6 +33,11 @@ import {
   updateSubscription,
 } from "@/lib/api";
 import { dayKey } from "@/lib/date";
+import { translateError } from "@/lib/errors";
+import {
+  formatSubscriptionDate,
+  translateBillingCycle,
+} from "@/lib/subscription-i18n";
 
 interface Props {
   currency: Currency;
@@ -60,6 +65,12 @@ export default function SubscriptionRegisterModal({
   onSaved,
   onPresetsChange,
 }: Props) {
+  const t = useTranslations("subscriptions");
+  const tCommon = useTranslations("common");
+  const tTx = useTranslations("transaction");
+  const tErrors = useTranslations("errors");
+  const locale = useLocale();
+
   const isEditing = Boolean(editing);
 
   const [name, setName] = useState("");
@@ -186,38 +197,38 @@ export default function SubscriptionRegisterModal({
 
     const numericAmount = parseAmountInput(amount);
     if (!name.trim()) {
-      setError("이름을 입력해 주세요.");
+      setError(tErrors("nameRequired"));
       return;
     }
     if (numericAmount < 0 || !Number.isFinite(numericAmount)) {
-      setError("금액을 올바르게 입력해 주세요.");
+      setError(tErrors("invalidAmount"));
       return;
     }
     if (!accountId) {
-      setError("결제 계좌를 선택해 주세요.");
+      setError(tErrors("accountRequired"));
       return;
     }
     if (!category || !subCategory) {
-      setError("대분류와 중분류를 선택해 주세요.");
+      setError(tErrors("categoriesRequired"));
       return;
     }
     const installments =
       cycle === "installment" ? Number(totalInstallments) : null;
     if (cycle === "installment" && (!installments || installments < 1)) {
-      setError("할부 총 회차를 입력해 주세요.");
+      setError(tErrors("totalInstallmentsRequired"));
       return;
     }
     if (cycle === "installment" && !installmentStartDate) {
-      setError("첫 할부 시작일을 입력해 주세요.");
+      setError(tErrors("installmentStartRequired"));
       return;
     }
     if (cycle !== "installment" && showEndDate) {
       if (!endDate) {
-        setError("종료일을 입력해 주세요.");
+        setError(tErrors("endDateRequired"));
         return;
       }
       if (endDate < startDate) {
-        setError("종료일은 시작일 이후여야 합니다.");
+        setError(tErrors("endDateAfterStart"));
         return;
       }
     }
@@ -227,19 +238,19 @@ export default function SubscriptionRegisterModal({
     if (showPromo) {
       const promoNumeric = parseAmountInput(promoAmount);
       if (promoNumeric < 0 || !Number.isFinite(promoNumeric)) {
-        setError("프로모션 금액을 올바르게 입력해 주세요.");
+        setError(tErrors("promoAmountInvalid"));
         return;
       }
       if (!promoEndDate) {
-        setError("프로모션 종료일을 입력해 주세요.");
+        setError(tErrors("promoEndRequired"));
         return;
       }
       if (promoEndDate < startDate) {
-        setError("프로모션 종료일은 시작일 이후여야 합니다.");
+        setError(tErrors("promoEndAfterStart"));
         return;
       }
       if (numericAmount > 0 && promoNumeric >= numericAmount) {
-        setError("프로모션 금액은 정상 금액보다 작아야 합니다.");
+        setError(tErrors("promoAmountLessThanRegular"));
         return;
       }
       resolvedPromoAmount = promoNumeric;
@@ -259,7 +270,7 @@ export default function SubscriptionRegisterModal({
       installments != null &&
       resolvedCompleted >= installments
     ) {
-      setError("이미 납부 회차는 총 회차보다 작아야 합니다.");
+      setError(tErrors("completedLessThanTotal"));
       return;
     }
 
@@ -305,9 +316,7 @@ export default function SubscriptionRegisterModal({
       }
       onSaved();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "저장 중 오류가 발생했습니다."
-      );
+      setError(translateError(err, tErrors, editing ? "updateSubscription" : "saveSubscription"));
     } finally {
       setSubmitting(false);
     }
@@ -315,16 +324,14 @@ export default function SubscriptionRegisterModal({
 
   async function handleDelete() {
     if (!editing) return;
-    if (!window.confirm(`"${editing.name}" 구독을 삭제할까요?`)) return;
+    if (!window.confirm(t("deleteConfirm", { name: editing.name }))) return;
     setDeleting(true);
     setError(null);
     try {
       await deleteSubscription(editing.id);
       onSaved();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "삭제 중 오류가 발생했습니다."
-      );
+      setError(translateError(err, tErrors, "deleteSubscription"));
     } finally {
       setDeleting(false);
     }
@@ -344,16 +351,16 @@ export default function SubscriptionRegisterModal({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold tracking-tight">
-              {isEditing ? "구독 / 할부 수정" : "구독 / 할부 등록"}
+              {isEditing ? t("editTitle") : t("registerTitle")}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {currency} · 결제일이 되면 자동으로 지출이 기록됩니다
+              {t("registerSubtitle", { currency })}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="닫기"
+            aria-label={tCommon("close")}
             className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
@@ -363,31 +370,38 @@ export default function SubscriptionRegisterModal({
         {isEditing && history && (
           <div className="mt-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-4 space-y-2 text-sm">
             <p className="font-semibold text-gray-800 dark:text-gray-100">
-              구독 이력
+              {t("history")}
             </p>
             <p className="text-gray-600 dark:text-gray-300">
-              {new Date(history.start_date).toLocaleDateString("ko-KR")}
+              {formatSubscriptionDate(history.start_date, locale)}
               {" ~ "}
               {history.end_date
-                ? new Date(history.end_date).toLocaleDateString("ko-KR")
-                : "현재"}
+                ? formatSubscriptionDate(history.end_date, locale)
+                : t("present")}
               {" · "}
-              {history.months_active}개월
+              {t("monthsActive", { count: history.months_active })}
             </p>
             {history.payment_count > 0 && (
               <p className="text-gray-600 dark:text-gray-300">
-                총 결제: {formatAmount(history.total_paid, history.currency)}
+                {t("totalPaid", {
+                  amount: formatAmount(history.total_paid, history.currency),
+                })}
               </p>
             )}
             {history.total_saved > 0 && (
               <>
                 <p className="text-emerald-600 dark:text-emerald-400">
-                  프로모션 절약 (월평균):{" "}
-                  {formatAmount(history.avg_saved_per_month, history.currency)}
+                  {t("promoSavedMonthly", {
+                    amount: formatAmount(
+                      history.avg_saved_per_month,
+                      history.currency
+                    ),
+                  })}
                 </p>
                 <p className="text-emerald-600 dark:text-emerald-400">
-                  프로모션 절약 (총):{" "}
-                  {formatAmount(history.total_saved, history.currency)}
+                  {t("promoSavedTotal", {
+                    amount: formatAmount(history.total_saved, history.currency),
+                  })}
                 </p>
               </>
             )}
@@ -397,19 +411,19 @@ export default function SubscriptionRegisterModal({
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              이름
+              {t("name")}
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="예: Netflix, iPhone 할부"
+              placeholder={t("namePlaceholder")}
               className="input-field"
             />
           </div>
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              주기
+              {t("cycleLabel")}
             </label>
             <div className="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
               {CYCLES.map((c) => (
@@ -423,7 +437,7 @@ export default function SubscriptionRegisterModal({
                       : "text-gray-500"
                   }`}
                 >
-                  {BILLING_CYCLE_LABEL[c]}
+                  {translateBillingCycle(c, t)}
                 </button>
               ))}
             </div>
@@ -433,7 +447,7 @@ export default function SubscriptionRegisterModal({
             <>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  첫 할부 시작일
+                  {t("installmentStartDate")}
                 </label>
                 <input
                   type="date"
@@ -442,12 +456,12 @@ export default function SubscriptionRegisterModal({
                   className="input-field"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
-                  중간부터 추적할 때 실제 첫 결제일을 입력하세요
+                  {t("installmentStartHint")}
                 </p>
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  총 회차
+                  {t("totalInstallments")}
                 </label>
                 <input
                   inputMode="numeric"
@@ -460,19 +474,22 @@ export default function SubscriptionRegisterModal({
                 />
                 {computedInstallmentEnd && (
                   <p className="mt-1 text-[11px] text-blue-500 font-medium">
-                    종료 예정:{" "}
+                    {t("installmentEndPreview")}{" "}
                     {(() => {
                       const [y, m, d] = computedInstallmentEnd
                         .split("-")
                         .map(Number);
-                      return new Date(y, m - 1, d).toLocaleDateString("ko-KR");
+                      return formatSubscriptionDate(
+                        new Date(y, m - 1, d).toISOString(),
+                        locale
+                      );
                     })()}
                   </p>
                 )}
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  이미 납부 회차
+                  {t("completedInstallments")}
                 </label>
                 <input
                   inputMode="numeric"
@@ -484,7 +501,7 @@ export default function SubscriptionRegisterModal({
                   className="input-field"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
-                  비우면 시작일 기준 자동 계산 ({autoCompletedInstallments}회)
+                  {t("completedAutoHint", { count: autoCompletedInstallments })}
                 </p>
               </div>
             </>
@@ -492,7 +509,7 @@ export default function SubscriptionRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {cycle === "installment" ? "다음 결제일" : "시작 / 다음 결제일"}
+              {cycle === "installment" ? t("nextPaymentDate") : t("startNextPaymentDate")}
             </label>
             <div className="flex gap-2">
               {cycle !== "installment" && (
@@ -512,7 +529,7 @@ export default function SubscriptionRegisterModal({
                       ? "bg-blue-500 text-white"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700"
                   }`}
-                  aria-label={showEndDate ? "종료일 제거" : "종료일 추가"}
+                  aria-label={showEndDate ? t("removeEndDate") : t("addEndDate")}
                 >
                   {showEndDate ? "−" : "+"}
                 </button>
@@ -530,7 +547,7 @@ export default function SubscriptionRegisterModal({
             <div className="space-y-3">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  종료일
+                  {t("endDate")}
                 </label>
                 <input
                   type="date"
@@ -543,11 +560,11 @@ export default function SubscriptionRegisterModal({
               <label className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5 cursor-pointer">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                    종료 1주일 전 이메일 알림
+                    {t("endReminder")}
                   </p>
                   {userEmail && (
                     <p className="text-[11px] text-gray-400 truncate">
-                      {userEmail} 으로 발송
+                      {t("emailTo", { email: userEmail })}
                     </p>
                   )}
                 </div>
@@ -563,7 +580,7 @@ export default function SubscriptionRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {showPromo ? "정상 금액 (프로모션 종료 후)" : "금액"}
+              {showPromo ? t("regularAmountPromo") : t("regularAmount")}
             </label>
             <div className="relative">
               <input
@@ -600,7 +617,7 @@ export default function SubscriptionRegisterModal({
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
               }`}
             >
-              {showPromo ? "프로모션 적용 중" : "+ 프로모션 (선택)"}
+              {showPromo ? t("promoActive") : t("promoAdd")}
             </button>
           </div>
 
@@ -608,7 +625,7 @@ export default function SubscriptionRegisterModal({
             <>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  프로모션 금액
+                  {t("promoAmount")}
                 </label>
                 <div className="relative">
                   <input
@@ -629,7 +646,7 @@ export default function SubscriptionRegisterModal({
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  프로모션 종료일
+                  {t("promoEndDate")}
                 </label>
                 <input
                   type="date"
@@ -639,17 +656,17 @@ export default function SubscriptionRegisterModal({
                   className="input-field"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
-                  종료일 이후에는 정상 금액이 자동 적용됩니다
+                  {t("promoEndHint")}
                 </p>
               </div>
               <label className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-500/10 px-3 py-2.5 cursor-pointer">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                    프로모션 종료 1주일 전 이메일 알림
+                    {t("promoReminder")}
                   </p>
                   {userEmail && (
                     <p className="text-[11px] text-emerald-700/70 dark:text-emerald-300/70 truncate">
-                      {userEmail} 으로 발송
+                      {t("emailTo", { email: userEmail })}
                     </p>
                   )}
                 </div>
@@ -665,7 +682,7 @@ export default function SubscriptionRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              결제 계좌
+              {t("paymentAccount")}
             </label>
             <AccountSelect
               accounts={accounts}
@@ -673,14 +690,14 @@ export default function SubscriptionRegisterModal({
               onChange={setAccountId}
               onRegister={() => setShowAccountRegister(true)}
               allowNone={false}
-              placeholder="결제 계좌 선택"
+              placeholder={t("selectPaymentAccount")}
               variant="field"
             />
           </div>
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              대분류
+              {tTx("category")}
             </label>
             <CategorySelect
               categories={categoryOptions}
@@ -695,7 +712,7 @@ export default function SubscriptionRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              중분류
+              {tTx("subCategory")}
             </label>
             <SubCategorySelect
               options={subCategoryOptions}
@@ -703,7 +720,9 @@ export default function SubscriptionRegisterModal({
               onChange={setSubCategory}
               onAdd={handleAddSubCategory}
               disabled={!category}
-              placeholder={category ? "중분류 선택" : "먼저 대분류를 선택하세요"}
+              placeholder={
+                category ? tTx("selectSubCategory") : tTx("selectSubCategoryFirst")
+              }
             />
           </div>
 
@@ -718,7 +737,7 @@ export default function SubscriptionRegisterModal({
                 className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-semibold text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" />
-                {deleting ? "삭제 중..." : "삭제"}
+                {deleting ? tCommon("deleting") : tCommon("delete")}
               </button>
             )}
             <button
@@ -726,7 +745,11 @@ export default function SubscriptionRegisterModal({
               disabled={submitting || deleting}
               className="flex-1 btn-primary disabled:opacity-50"
             >
-              {submitting ? "저장 중..." : isEditing ? "저장" : "등록"}
+              {submitting
+                ? tCommon("saving")
+                : isEditing
+                  ? tCommon("save")
+                  : t("add")}
             </button>
           </div>
         </form>

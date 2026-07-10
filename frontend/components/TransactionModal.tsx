@@ -49,12 +49,12 @@ import {
   normalizeTransferCategory,
   subCategoriesFor,
   subscriptionScheduleAmountClass,
-  subscriptionSourceLabel,
   updateTransaction,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, formatDayLabel } from "@/lib/date";
 import { translateError } from "@/lib/errors";
+import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
 interface Props {
   currency: Currency;
@@ -96,6 +96,7 @@ export default function TransactionModal({
   const tErrors = useTranslations("errors");
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
+  const tSub = useTranslations("subscriptions");
 
   const isEditing = Boolean(editingTransaction);
 
@@ -753,11 +754,11 @@ export default function TransactionModal({
                   className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors"
                 >
                   <span className={`text-sm truncate ${tone}`}>
-                    {occ.subscription_name || "구독"}
-                    {subscriptionSourceLabel(occ.subscription_billing_cycle) && (
+                    {occ.subscription_name || tSub("defaultName")}
+                    {translateSubscriptionSource(occ.subscription_billing_cycle, tSub) && (
                       <span className="text-[10px] text-gray-400 font-normal">
                         {" "}
-                        {subscriptionSourceLabel(occ.subscription_billing_cycle)}
+                        {translateSubscriptionSource(occ.subscription_billing_cycle, tSub)}
                       </span>
                     )}
                   </span>
@@ -825,10 +826,10 @@ export default function TransactionModal({
                         ? translateSubCategory(tx.sub_category, tSubCategories)
                         : tCommon("none")}{" "}
                       · {tx.merchant || tCommon("unspecified")}
-                      {subscriptionSourceLabel(tx.subscription_billing_cycle) && (
+                      {translateSubscriptionSource(tx.subscription_billing_cycle, tSub) && (
                         <span className="text-[10px] text-gray-400 font-normal">
                           {" "}
-                          {subscriptionSourceLabel(tx.subscription_billing_cycle)}
+                          {translateSubscriptionSource(tx.subscription_billing_cycle, tSub)}
                         </span>
                       )}
                     </span>
