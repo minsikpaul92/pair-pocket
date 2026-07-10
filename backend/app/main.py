@@ -10,6 +10,7 @@ from app.routers import (
     accounts,
     auth,
     categories,
+    email as email_router,
     exchange,
     settings as settings_router,
     stats,
@@ -42,6 +43,7 @@ app.add_middleware(
 
 app.include_router(accounts.router)
 app.include_router(subscriptions.router)
+app.include_router(email_router.router)
 app.include_router(auth.router)
 app.include_router(categories.router)
 app.include_router(transactions.router)

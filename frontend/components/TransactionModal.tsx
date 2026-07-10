@@ -22,6 +22,7 @@ import {
   TRANSFER_SUB_INVESTMENT_FUNDING,
   SettleableExpense,
   NewTransaction,
+  SubscriptionOccurrence,
   Transaction,
   TransactionType,
   addCustomCategory,
@@ -38,11 +39,16 @@ import {
   fetchSettleableExpenses,
   effectiveExpenseAmount,
   formatAmount,
+  formatAmountInput,
+  amountToInput,
+  parseAmountInput,
   hasSettlement,
   isNonCashflowTransaction,
   isTransferTransaction,
   normalizeTransferCategory,
   subCategoriesFor,
+  subscriptionScheduleAmountClass,
+  subscriptionSourceLabel,
   updateTransaction,
 } from "@/lib/api";
 import { dayKey, formatDayLabel } from "@/lib/date";
@@ -55,10 +61,12 @@ interface Props {
   defaultDate: Date;
   onDateChange: (date: Date) => void;
   dayTransactions: Transaction[];
+  dayPendingOccurrences?: SubscriptionOccurrence[];
   editingTransaction?: Transaction | null;
   onClose: () => void;
   onSaved: () => void;
   onSelectTransaction?: (tx: Transaction) => void;
+  onSelectPendingOccurrence?: (occ: SubscriptionOccurrence) => void;
   onPresetsChange: (presets: CategoryPresets) => void;
 }
 
@@ -75,10 +83,12 @@ export default function TransactionModal({
   defaultDate,
   onDateChange,
   dayTransactions,
+  dayPendingOccurrences = [],
   editingTransaction = null,
   onClose,
   onSaved,
   onSelectTransaction,
+  onSelectPendingOccurrence,
   onPresetsChange,
 }: Props) {
   const isEditing = Boolean(editingTransaction);
@@ -196,7 +206,7 @@ export default function TransactionModal({
 
     const tx = editingTransaction;
     setType(tx.type);
-    setAmount(String(tx.amount));
+    setAmount(amountToInput(tx.amount, tx.currency));
     setCategory(normalizeTransferCategory(tx.category));
     setSubCategory(tx.sub_category || "");
     setSettlesExpenseId(tx.settles_expense_id || "");
@@ -363,7 +373,7 @@ export default function TransactionModal({
     e.preventDefault();
     setError(null);
 
-    const numericAmount = Number(amount);
+    const numericAmount = parseAmountInput(amount);
     if (!numericAmount || numericAmount <= 0) {
       setError("금액을 올바르게 입력해 주세요.");
       return;
@@ -490,7 +500,7 @@ export default function TransactionModal({
           <span className="font-semibold text-red-500">
             {formatAmount(
               Math.max(
-                selectedSettleable.remaining_amount - (Number(amount) || 0),
+                selectedSettleable.remaining_amount - (parseAmountInput(amount) || 0),
                 0
               ),
               currency
@@ -712,11 +722,44 @@ export default function TransactionModal({
           />
         </div>
 
+        {dayPendingOccurrences.length > 0 && (
+          <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-28 overflow-auto">
+            {dayPendingOccurrences.map((occ) => {
+              const tone = subscriptionScheduleAmountClass(occ.due_date);
+              return (
+              <li key={occ.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelectPendingOccurrence?.(occ)}
+                  className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors"
+                >
+                  <span className={`text-sm truncate ${tone}`}>
+                    {occ.subscription_name || "구독"}
+                    {subscriptionSourceLabel(occ.subscription_billing_cycle) && (
+                      <span className="text-[10px] text-gray-400 font-normal">
+                        {" "}
+                        {subscriptionSourceLabel(occ.subscription_billing_cycle)}
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className={`shrink-0 text-sm font-semibold whitespace-nowrap ${tone}`}
+                  >
+                    {formatAmount(occ.amount, occ.currency)}
+                  </span>
+                </button>
+              </li>
+            );
+            })}
+          </ul>
+        )}
+
         {dayTransactions.length > 0 && (
           <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-32 overflow-auto">
             {dayTransactions.map((tx) => {
               const settled = hasSettlement(tx);
               const nonCashflow = isNonCashflowTransaction(tx);
+              const isSubscription = Boolean(tx.subscription_id);
               const displayAmt =
                 tx.type === "expense"
                   ? effectiveExpenseAmount(tx)
@@ -726,24 +769,55 @@ export default function TransactionModal({
                 <li key={tx.id}>
                   <button
                     type="button"
-                    onClick={() => onSelectTransaction?.(tx)}
+                    onClick={() => {
+                      if (tx.subscription_id && onSelectPendingOccurrence) {
+                        onSelectPendingOccurrence({
+                          id: tx.id,
+                          subscription_id: tx.subscription_id,
+                          due_date: tx.date,
+                          amount: tx.amount,
+                          currency: tx.currency,
+                          status: "completed",
+                          transaction_id: tx.id,
+                          subscription_name: tx.merchant,
+                          subscription_billing_cycle:
+                            tx.subscription_billing_cycle,
+                        });
+                        return;
+                      }
+                      onSelectTransaction?.(tx);
+                    }}
                     className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors ${
                       isActive
                         ? "bg-blue-50 dark:bg-blue-500/10"
                         : "hover:bg-gray-50 dark:hover:bg-gray-800/80"
                     }`}
                   >
-                    <span className="text-sm truncate">
+                    <span
+                      className={`text-sm truncate ${
+                      isSubscription
+                        ? "text-red-500"
+                        : ""
+                    }`}
+                    >
                       {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"}{" "}
                       {tx.category} › {tx.sub_category || "—"} · {tx.merchant}
+                      {subscriptionSourceLabel(tx.subscription_billing_cycle) && (
+                        <span className="text-[10px] text-gray-400 font-normal">
+                          {" "}
+                          {subscriptionSourceLabel(tx.subscription_billing_cycle)}
+                        </span>
+                      )}
                     </span>
                     <span
                       className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
-                        nonCashflow
-                          ? "text-gray-500 dark:text-gray-400"
-                          : tx.type === "income"
-                            ? "text-blue-500"
-                            : "text-red-500"
+                        isSubscription
+                          ? "text-red-500"
+                          : nonCashflow
+                            ? "text-gray-500 dark:text-gray-400"
+                            : tx.type === "income"
+                              ? "text-blue-500"
+                              : "text-red-500"
                       }`}
                     >
                       {settled ? (
@@ -833,7 +907,9 @@ export default function TransactionModal({
               <input
                 inputMode="decimal"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) =>
+                  setAmount(formatAmountInput(e.target.value, currency))
+                }
                 placeholder="0"
                 className="input-field pr-14 text-lg font-semibold"
               />

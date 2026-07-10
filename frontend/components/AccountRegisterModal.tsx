@@ -11,6 +11,8 @@ import {
   NewFinancialAccount,
   TransactionType,
   createAccount,
+  formatAmountInput,
+  parseAmountInput,
 } from "@/lib/api";
 import { BANK_OPTIONS, bankLogoUrl } from "@/lib/banks";
 
@@ -110,7 +112,7 @@ export default function AccountRegisterModal({
       return;
     }
 
-    const balance = Number(openingBalance);
+    const balance = parseAmountInput(openingBalance);
     if (Number.isNaN(balance)) {
       setError("잔액을 올바르게 입력해 주세요.");
       return;
@@ -233,10 +235,11 @@ export default function AccountRegisterModal({
                 현재 잔액
               </label>
               <input
-                type="number"
                 inputMode="decimal"
                 value={openingBalance}
-                onChange={(e) => setOpeningBalance(e.target.value)}
+                onChange={(e) =>
+                  setOpeningBalance(formatAmountInput(e.target.value, currency))
+                }
                 className="input-field"
               />
               <p className="mt-1 text-[10px] text-gray-400">

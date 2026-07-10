@@ -15,7 +15,9 @@ import {
   formatAmount,
   hasSettlement,
   isNonCashflowTransaction,
+  isSubscriptionTransaction,
   subCategoriesFor,
+  subscriptionSourceLabel,
 } from "@/lib/api";
 
 interface Props {
@@ -289,6 +291,7 @@ export default function ListView({
                 sorted.map((tx, i) => {
                   const settled = hasSettlement(tx);
                   const transfer = isNonCashflowTransaction(tx);
+                  const subscription = isSubscriptionTransaction(tx);
                   const effective = displayAmount(tx);
                   return (
                     <tr
@@ -318,6 +321,11 @@ export default function ListView({
                       </td>
                       <td className="px-3 py-2.5 max-w-[8rem] truncate">
                         {tx.merchant}
+                        {subscriptionSourceLabel(tx.subscription_billing_cycle) && (
+                          <span className="ml-1 text-[10px] text-gray-400 font-normal">
+                            {subscriptionSourceLabel(tx.subscription_billing_cycle)}
+                          </span>
+                        )}
                         {tx.category === EXPENSE_CATEGORY_INVESTMENT &&
                           tx.institution && (
                             <span className="block text-xs text-gray-400 truncate">
@@ -350,7 +358,9 @@ export default function ListView({
                             ? "text-gray-500 dark:text-gray-400 font-semibold"
                             : tx.type === "income"
                               ? "text-blue-500 font-semibold"
-                              : "text-gray-900 dark:text-white font-semibold"
+                              : subscription
+                                ? "text-red-500 font-semibold"
+                                : "text-gray-900 dark:text-white font-semibold"
                         }`}
                       >
                         {settled ? (

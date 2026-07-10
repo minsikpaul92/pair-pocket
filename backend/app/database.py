@@ -1,6 +1,8 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo.errors import DuplicateKeyError
 
 from app.config import get_settings
+from app.services.subscriptions import dedupe_subscription_transactions
 
 
 class MongoDB:
@@ -40,6 +42,22 @@ async def _ensure_indexes() -> None:
         [("owner_id", 1), ("settles_expense_id", 1)],
         sparse=True,
     )
+
+    # Clean up legacy duplicate auto-generated expenses before unique index.
+    await dedupe_subscription_transactions(db.database)
+    try:
+        await db.database["transactions"].create_index(
+            "subscription_occurrence_id",
+            unique=True,
+            sparse=True,
+        )
+    except DuplicateKeyError:
+        await dedupe_subscription_transactions(db.database)
+        await db.database["transactions"].create_index(
+            "subscription_occurrence_id",
+            unique=True,
+            sparse=True,
+        )
 
 
 async def close_mongo_connection() -> None:

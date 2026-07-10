@@ -53,6 +53,8 @@ def _serialize(document: dict) -> dict:
         "counter_account_id": document.get("counter_account_id"),
         "kind": document.get("kind", TransactionKind.NORMAL.value),
         "owner_id": document["owner_id"],
+        "subscription_billing_cycle": document.get("subscription_billing_cycle"),
+        "subscription_id": document.get("subscription_id"),
     }
 
 

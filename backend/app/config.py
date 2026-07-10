@@ -1,5 +1,3 @@
-from functools import lru_cache
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +26,20 @@ class Settings(BaseSettings):
     # Where the backend sends the user back to after a successful login.
     frontend_url: str = "http://localhost:3000"
 
+    # --- Email (Resend API — recommended) ---
+    # Sign up at https://resend.com → API Keys → paste below.
+    # Users receive mail at their Google login address; no per-user setup.
+    resend_api_key: str = ""
+    email_from: str = "PairPocket <onboarding@resend.dev>"
+
+    # --- Legacy SMTP (optional fallback) ---
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_use_tls: bool = True
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property
@@ -35,6 +47,5 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
-@lru_cache
 def get_settings() -> Settings:
     return Settings()

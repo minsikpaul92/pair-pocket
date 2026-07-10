@@ -5,10 +5,13 @@ import { useMemo } from "react";
 import {
   Currency,
   LedgerScope,
+  SubscriptionOccurrence,
   Transaction,
   effectiveExpenseAmount,
   formatAmount,
+  formatPendingDayLabels,
   isNonCashflowTransaction,
+  isSubscriptionDueOrPast,
 } from "@/lib/api";
 import {
   buildCalendarGrid,
@@ -22,7 +25,9 @@ interface Props {
   month: Date;
   scope: LedgerScope;
   transactions: Transaction[];
+  pendingOccurrences?: SubscriptionOccurrence[];
   onDayClick: (date: Date) => void;
+  onPendingClick?: (occ: SubscriptionOccurrence) => void;
 }
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -109,7 +114,9 @@ export default function CalendarView({
   month,
   scope,
   transactions,
+  pendingOccurrences = [],
   onDayClick,
+  onPendingClick,
 }: Props) {
   const cells = useMemo(() => buildCalendarGrid(month), [month]);
   const today = new Date();
@@ -122,6 +129,17 @@ export default function CalendarView({
     }
     return map;
   }, [transactions, scope]);
+
+  const pendingByDay = useMemo(() => {
+    const map = new Map<string, SubscriptionOccurrence[]>();
+    for (const occ of pendingOccurrences) {
+      const key = isoDayKey(occ.due_date);
+      const list = map.get(key) ?? [];
+      list.push(occ);
+      map.set(key, list);
+    }
+    return map;
+  }, [pendingOccurrences]);
 
   return (
     <section className="card-inset p-4 sm:p-5">
@@ -149,6 +167,18 @@ export default function CalendarView({
           const isToday = isSameDay(cell, today);
           const totals = perDay.get(key);
           const hasTx = totals !== undefined && totals.count > 0;
+          const dayPending = pendingByDay.get(key) ?? [];
+          const pendingItems = dayPending.map((occ) => ({
+            currency: occ.currency,
+            name: occ.subscription_name?.trim() || "구독",
+          }));
+          const pendingLines = formatPendingDayLabels(pendingItems, scope);
+          const hasPending = pendingLines.length > 0;
+          const pendingDueClass = dayPending.some((occ) =>
+            isSubscriptionDueOrPast(occ.due_date)
+          )
+            ? "text-red-500"
+            : "text-amber-500";
 
           return (
             <button
@@ -159,7 +189,7 @@ export default function CalendarView({
                 inMonth
                   ? "border-transparent hover:border-gray-200 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   : "border-transparent opacity-35"
-              } ${hasTx ? "bg-gray-50/80 dark:bg-gray-900/40" : ""}`}
+              } ${hasTx || hasPending ? "bg-gray-50/80 dark:bg-gray-900/40" : ""}`}
             >
               <span
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
@@ -171,13 +201,59 @@ export default function CalendarView({
                 {cell.getDate()}
               </span>
 
-              {hasTx && totals && (
+              {(hasTx || hasPending) && (
                 <>
                   <span className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
-                    {totals.count}건
+                    {hasTx ? `${totals!.count}건` : ""}
+                    {hasTx && hasPending ? " · " : ""}
+                    {hasPending ? (
+                      <span className="flex flex-col items-center gap-0 max-w-full">
+                        {pendingLines.map((line, idx) => (
+                          <span
+                            key={`${key}-${idx}-${line}`}
+                            role={onPendingClick ? "button" : undefined}
+                            tabIndex={onPendingClick ? 0 : undefined}
+                            onClick={
+                              onPendingClick
+                                ? (e) => {
+                                    e.stopPropagation();
+                                    if (dayPending.length === 1) {
+                                      onPendingClick(dayPending[0]);
+                                    } else {
+                                      onDayClick(cell);
+                                    }
+                                  }
+                                : undefined
+                            }
+                            onKeyDown={
+                              onPendingClick
+                                ? (e) => {
+                                    if (e.key !== "Enter" && e.key !== " ")
+                                      return;
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (dayPending.length === 1) {
+                                      onPendingClick(dayPending[0]);
+                                    } else {
+                                      onDayClick(cell);
+                                    }
+                                  }
+                                : undefined
+                            }
+                            className={`${pendingDueClass} truncate max-w-full ${
+                              onPendingClick
+                                ? "cursor-pointer hover:underline"
+                                : ""
+                            }`}
+                          >
+                            {line}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
                   </span>
                   <div className="mt-auto flex w-full flex-col items-center gap-0.5 px-0.5">
-                    {scope === "ALL" ? (
+                    {hasTx && totals && scope === "ALL" ? (
                       <>
                         {(totals as AllDayTotals).cadIncome > 0 && (
                           <span className="max-w-full truncate text-[9px] sm:text-[10px] font-semibold whitespace-nowrap text-blue-500">
@@ -200,7 +276,7 @@ export default function CalendarView({
                           </span>
                         )}
                       </>
-                    ) : (
+                    ) : hasTx && totals ? (
                       <>
                         {(totals as SingleDayTotals).income > 0 && (
                           <span className="max-w-full truncate text-[10px] sm:text-[11px] font-semibold whitespace-nowrap text-blue-500">
@@ -213,7 +289,7 @@ export default function CalendarView({
                           </span>
                         )}
                       </>
-                    )}
+                    ) : null}
                   </div>
                 </>
               )}

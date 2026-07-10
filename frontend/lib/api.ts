@@ -1,3 +1,5 @@
+import { dayKey } from "./date";
+
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -157,6 +159,8 @@ export interface Transaction {
   owner_id: string;
   settled_amount?: number;
   effective_amount?: number;
+  subscription_billing_cycle?: BillingCycle | null;
+  subscription_id?: string | null;
 }
 
 export interface NewTransaction {
@@ -472,6 +476,297 @@ async function readApiError(res: Response, fallback: string): Promise<string> {
   return body && typeof body.detail === "string" ? body.detail : fallback;
 }
 
+export type BillingCycle = "monthly" | "yearly" | "installment";
+export type SubscriptionStatus =
+  | "active"
+  | "paused"
+  | "cancel_scheduled"
+  | "completed"
+  | "cancelled";
+export type OccurrenceStatus = "pending" | "completed" | "skipped";
+
+export interface Subscription {
+  id: string;
+  owner_id: string;
+  name: string;
+  amount: number;
+  currency: Currency;
+  account_type: AccountType;
+  cycle: BillingCycle;
+  start_date: string;
+  end_date: string | null;
+  installment_start_date: string | null;
+  total_installments: number | null;
+  promo_amount: number | null;
+  promo_end_date: string | null;
+  promo_reminder_enabled: boolean;
+  end_reminder_enabled: boolean;
+  account_id: string;
+  category: string;
+  sub_category: string;
+  merchant: string;
+  status: SubscriptionStatus;
+  next_due_date: string | null;
+  completed_installments: number;
+  cancel_effective_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewSubscription {
+  name: string;
+  amount: number;
+  currency: Currency;
+  account_type?: AccountType;
+  cycle: BillingCycle;
+  start_date: string;
+  end_date?: string | null;
+  installment_start_date?: string | null;
+  total_installments?: number | null;
+  completed_installments?: number | null;
+  promo_amount?: number | null;
+  promo_end_date?: string | null;
+  promo_reminder_enabled?: boolean;
+  end_reminder_enabled?: boolean;
+  account_id: string;
+  category: string;
+  sub_category: string;
+  merchant?: string;
+}
+
+export interface SubscriptionHistory {
+  subscription_id: string;
+  start_date: string;
+  end_date: string | null;
+  months_active: number;
+  payment_count: number;
+  total_paid: number;
+  currency: Currency;
+  regular_total: number;
+  total_saved: number;
+  avg_saved_per_month: number;
+}
+
+export interface MonthlySubscriptionSummary {
+  month: string;
+  subscription_total: Partial<Record<Currency, number>>;
+  installment_total: Partial<Record<Currency, number>>;
+}
+
+export interface SubscriptionOccurrence {
+  id: string;
+  subscription_id: string;
+  due_date: string;
+  amount: number;
+  currency: Currency;
+  status: OccurrenceStatus;
+  transaction_id: string | null;
+  subscription_name: string | null;
+  subscription_billing_cycle?: BillingCycle | null;
+}
+
+export const BILLING_CYCLE_LABEL: Record<BillingCycle, string> = {
+  monthly: "매월",
+  yearly: "매년",
+  installment: "할부",
+};
+
+export const SUBSCRIPTION_STATUS_LABEL: Record<SubscriptionStatus, string> = {
+  active: "진행중",
+  paused: "일시정지",
+  cancel_scheduled: "해지 예정",
+  completed: "완료",
+  cancelled: "해지",
+};
+
+export async function fetchSubscriptions(filters: {
+  currency?: Currency;
+  accountType?: AccountType;
+  month?: string;
+} = {}): Promise<Subscription[]> {
+  const params = new URLSearchParams();
+  params.set("account_type", filters.accountType ?? "personal");
+  if (filters.currency) params.set("currency", filters.currency);
+  if (filters.month) params.set("month", filters.month);
+  const res = await fetch(
+    `${API_BASE_URL}/api/subscriptions?${params.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error("구독 목록을 불러오지 못했습니다.");
+  return (await res.json()) as Subscription[];
+}
+
+export async function fetchSubscriptionMonthlySummary(filters: {
+  month: string;
+  currency?: Currency;
+  accountType?: AccountType;
+}): Promise<MonthlySubscriptionSummary> {
+  const params = new URLSearchParams();
+  params.set("account_type", filters.accountType ?? "personal");
+  params.set("month", filters.month);
+  if (filters.currency) params.set("currency", filters.currency);
+  const res = await fetch(
+    `${API_BASE_URL}/api/subscriptions/summary?${params.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) {
+    return { month: filters.month, subscription_total: {}, installment_total: {} };
+  }
+  return (await res.json()) as MonthlySubscriptionSummary;
+}
+
+export async function fetchAllSubscriptionMonthlySummary(
+  month: string
+): Promise<MonthlySubscriptionSummary> {
+  const [cad, krw] = await Promise.all([
+    fetchSubscriptionMonthlySummary({ month, currency: "CAD" }),
+    fetchSubscriptionMonthlySummary({ month, currency: "KRW" }),
+  ]);
+  const subscription_total: Partial<Record<Currency, number>> = {
+    CAD: cad.subscription_total.CAD ?? 0,
+    KRW: krw.subscription_total.KRW ?? 0,
+  };
+  const installment_total: Partial<Record<Currency, number>> = {
+    CAD: cad.installment_total.CAD ?? 0,
+    KRW: krw.installment_total.KRW ?? 0,
+  };
+  return { month, subscription_total, installment_total };
+}
+
+export async function fetchSubscriptionHistory(
+  id: string
+): Promise<SubscriptionHistory | null> {
+  const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}/history`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as SubscriptionHistory;
+}
+
+export async function createSubscription(
+  payload: NewSubscription
+): Promise<Subscription> {
+  const res = await fetch(`${API_BASE_URL}/api/subscriptions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "구독을 저장하지 못했습니다."));
+  }
+  return (await res.json()) as Subscription;
+}
+
+export async function updateSubscription(
+  id: string,
+  payload: Partial<{
+    name: string;
+    amount: number;
+    status: SubscriptionStatus;
+    end_date: string | null;
+    account_id: string;
+    category: string;
+    sub_category: string;
+    start_date: string;
+    installment_start_date: string | null;
+    total_installments: number | null;
+    completed_installments: number | null;
+    cycle: BillingCycle;
+    promo_amount: number | null;
+    promo_end_date: string | null;
+    promo_reminder_enabled?: boolean;
+    end_reminder_enabled?: boolean;
+  }>
+): Promise<Subscription> {
+  const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "구독을 수정하지 못했습니다."));
+  }
+  return (await res.json()) as Subscription;
+}
+
+export async function scheduleSubscriptionCancel(
+  id: string
+): Promise<Subscription> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/subscriptions/${id}/schedule-cancel`,
+    { method: "POST", headers: authHeaders() }
+  );
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "해지 예정 처리에 실패했습니다."));
+  }
+  return (await res.json()) as Subscription;
+}
+
+export async function deleteSubscription(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "구독을 삭제하지 못했습니다."));
+  }
+}
+
+export async function fetchPendingOccurrences(filters: {
+  month?: string;
+  currency?: Currency;
+  accountType?: AccountType;
+} = {}): Promise<SubscriptionOccurrence[]> {
+  const params = pendingQueryParams(filters);
+  const res = await fetch(
+    `${API_BASE_URL}/api/subscriptions/pending?${params.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as SubscriptionOccurrence[];
+}
+
+export async function syncSubscriptions(
+  accountType: AccountType = "personal"
+): Promise<number> {
+  const params = new URLSearchParams({
+    account_type: accountType,
+    as_of: dayKey(new Date()),
+  });
+  const res = await fetch(
+    `${API_BASE_URL}/api/subscriptions/sync?${params.toString()}`,
+    { method: "POST", headers: authHeaders() }
+  );
+  if (!res.ok) return 0;
+  const body = (await res.json()) as { materialized?: number };
+  return body.materialized ?? 0;
+}
+
+function pendingQueryParams(filters: {
+  month?: string;
+  currency?: Currency;
+  accountType?: AccountType;
+}): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set("account_type", filters.accountType ?? "personal");
+  params.set("as_of", dayKey(new Date()));
+  if (filters.month) params.set("month", filters.month);
+  if (filters.currency) params.set("currency", filters.currency);
+  return params;
+}
+
+export async function fetchAllPendingOccurrences(filters: {
+  month?: string;
+} = {}): Promise<SubscriptionOccurrence[]> {
+  const [cad, krw] = await Promise.all([
+    fetchPendingOccurrences({ ...filters, currency: "CAD" }),
+    fetchPendingOccurrences({ ...filters, currency: "KRW" }),
+  ]);
+  return [...cad, ...krw].sort(
+    (a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+  );
+}
+
 export async function createTransaction(
   tx: NewTransaction
 ): Promise<Transaction> {
@@ -610,6 +905,173 @@ export function formatAmount(amount: number, currency: Currency): string {
     currency,
     maximumFractionDigits: currency === "KRW" ? 0 : 2,
   }).format(amount);
+}
+
+/** Format a typed amount string with thousands separators (e.g. 12,900). */
+export function formatAmountInput(value: string, currency: Currency): string {
+  if (currency === "KRW") {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "";
+    return Number(digits).toLocaleString("en-US");
+  }
+  const cleaned = value.replace(/[^\d.]/g, "");
+  if (!cleaned) return "";
+  const hasDot = cleaned.includes(".");
+  const [intRaw, ...rest] = cleaned.split(".");
+  const decimals = rest.join("").slice(0, 2);
+  const intFormatted = intRaw
+    ? Number(intRaw).toLocaleString("en-US")
+    : "0";
+  return hasDot ? `${intFormatted}.${decimals}` : intFormatted;
+}
+
+export function parseAmountInput(value: string): number {
+  const n = Number(String(value).replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function amountToInput(amount: number, currency: Currency): string {
+  if (currency === "KRW") {
+    return Math.round(amount).toLocaleString("en-US");
+  }
+  const fixed = amount.toFixed(2);
+  const [intPart, dec] = fixed.split(".");
+  const intFormatted = Number(intPart).toLocaleString("en-US");
+  return dec === "00" ? intFormatted : `${intFormatted}.${dec}`;
+}
+
+/** Compact calendar label for pending subscription names on a day. */
+export function formatPendingLabel(names: string[]): string {
+  const cleaned = names.map((n) => n.trim()).filter(Boolean);
+  if (cleaned.length === 0) return "";
+  if (cleaned.length === 1) return cleaned[0];
+  return `${cleaned[0]}...+${cleaned.length - 1}`;
+}
+
+export function formatPendingDayLabels(
+  items: { currency: Currency; name: string }[],
+  scope: LedgerScope
+): string[] {
+  if (items.length === 0) return [];
+  if (scope === "ALL") {
+    const cad = items
+      .filter((i) => i.currency === "CAD")
+      .map((i) => i.name);
+    const krw = items
+      .filter((i) => i.currency === "KRW")
+      .map((i) => i.name);
+    const lines: string[] = [];
+    const cadLabel = formatPendingLabel(cad);
+    const krwLabel = formatPendingLabel(krw);
+    if (cadLabel) lines.push(cadLabel);
+    if (krwLabel) lines.push(krwLabel);
+    return lines;
+  }
+  return [formatPendingLabel(items.map((i) => i.name))];
+}
+
+export function monthsBetweenDates(start: Date, end: Date): number {
+  return Math.max(
+    0,
+    (end.getFullYear() - start.getFullYear()) * 12 +
+      (end.getMonth() - start.getMonth())
+  );
+}
+
+export function addMonthsToDateKey(dateKey: string, months: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date = new Date(y, m - 1 + months, d);
+  const ny = date.getFullYear();
+  const nm = String(date.getMonth() + 1).padStart(2, "0");
+  const nd = String(date.getDate()).padStart(2, "0");
+  return `${ny}-${nm}-${nd}`;
+}
+
+export function subscriptionSourceLabel(
+  cycle: BillingCycle | null | undefined
+): string | null {
+  if (!cycle) return null;
+  return cycle === "installment" ? "할부" : "구독";
+}
+
+export function subscriptionDisplayAmount(sub: Subscription): number {
+  const regular = sub.amount;
+  if (sub.promo_amount == null || !sub.promo_end_date) return regular;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const promoEnd = new Date(sub.promo_end_date);
+  promoEnd.setHours(0, 0, 0, 0);
+  if (today <= promoEnd) return sub.promo_amount;
+  return regular;
+}
+
+export function isPromoActive(sub: Subscription): boolean {
+  if (sub.promo_amount == null || !sub.promo_end_date) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const promoEnd = new Date(sub.promo_end_date);
+  promoEnd.setHours(0, 0, 0, 0);
+  return today <= promoEnd;
+}
+
+/** True when subscription charge is due today or already past (show red). */
+export function isSubscriptionDueOrPast(
+  dueDate: string,
+  asOf: Date = new Date()
+): boolean {
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const today = new Date(asOf);
+  today.setHours(0, 0, 0, 0);
+  return due.getTime() <= today.getTime();
+}
+
+export function subscriptionScheduleAmountClass(
+  dueDate: string,
+  asOf: Date = new Date()
+): string {
+  return isSubscriptionDueOrPast(dueDate, asOf)
+    ? "text-red-500"
+    : "text-amber-600 dark:text-amber-400";
+}
+
+export function isSubscriptionTransaction(tx: Transaction): boolean {
+  return Boolean(tx.subscription_id || tx.subscription_billing_cycle);
+}
+
+export interface PendingMonthlyTotals {
+  subscription: Partial<Record<Currency, number>>;
+  installment: Partial<Record<Currency, number>>;
+}
+
+export function pendingMonthlyTotals(
+  pending: SubscriptionOccurrence[]
+): PendingMonthlyTotals {
+  const subscription: Partial<Record<Currency, number>> = {};
+  const installment: Partial<Record<Currency, number>> = {};
+  for (const occ of pending) {
+    const bucket =
+      occ.subscription_billing_cycle === "installment" ? installment : subscription;
+    bucket[occ.currency] = (bucket[occ.currency] ?? 0) + occ.amount;
+  }
+  return { subscription, installment };
+}
+
+export function subscriptionTrackingLabel(sub: Subscription): string {
+  if (sub.cycle === "installment" && sub.total_installments != null) {
+    const remaining = Math.max(
+      sub.total_installments - sub.completed_installments,
+      0
+    );
+    const end = sub.end_date
+      ? new Date(sub.end_date).toLocaleDateString("ko-KR")
+      : "—";
+    return `${sub.completed_installments}/${sub.total_installments}회 · ${remaining}회 남음 · 종료 ${end}`;
+  }
+  const start = new Date(sub.installment_start_date || sub.start_date);
+  const months = monthsBetweenDates(start, new Date());
+  if (months < 1) return "첫 달";
+  return `${months}개월째 구독`;
 }
 
 export function categoriesForType(

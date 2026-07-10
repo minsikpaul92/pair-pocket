@@ -57,6 +57,10 @@ class TransactionBase(BaseModel):
     effective_amount: float | None = None
     settled_amount: float | None = None
 
+    # Set when expense is auto-generated from a subscription/installment schedule.
+    subscription_billing_cycle: str | None = None
+    subscription_id: str | None = None
+
     @field_validator(
         "category", "sub_category", "merchant", "institution", mode="before"
     )
