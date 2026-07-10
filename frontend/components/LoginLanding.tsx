@@ -3,6 +3,7 @@
 import { Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import LocaleToggle from "@/components/LocaleToggle";
 import { loginUrl } from "@/lib/api";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -40,6 +41,9 @@ export default function LoginLanding() {
           <span className="text-lg font-semibold tracking-tight">
             {tCommon("appName")}
           </span>
+          <div className="ml-auto">
+            <LocaleToggle />
+          </div>
         </div>
       </header>
 

@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
 import ListView from "@/components/ListView";
+import LocaleToggle from "@/components/LocaleToggle";
 import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
 import {
@@ -301,6 +302,11 @@ export default function AppShell({ user, onLogout }: Props) {
         </nav>
 
         <div className="mt-auto space-y-1">
+          {!navCollapsed && (
+            <div className="px-1 pb-1">
+              <LocaleToggle className="w-full justify-center" />
+            </div>
+          )}
           <button
             type="button"
             onClick={handleInvite}
@@ -357,7 +363,9 @@ export default function AppShell({ user, onLogout }: Props) {
               ))}
             </div>
 
-            <div className="flex items-center gap-3 md:hidden">
+            <div className="flex items-center gap-2 shrink-0">
+              <LocaleToggle />
+              <div className="flex items-center gap-3 md:hidden">
               <button
                 type="button"
                 onClick={handleInvite}
@@ -382,6 +390,7 @@ export default function AppShell({ user, onLogout }: Props) {
               >
                 <LogOut className="h-5 w-5" />
               </button>
+            </div>
             </div>
           </div>
         </header>
