@@ -1204,3 +1204,18 @@ export async function revokePendingInvitation(): Promise<void> {
     throw new ApiError("revokePendingInvitation");
   }
 }
+
+export async function unlinkPartnership(): Promise<InvitationMe> {
+  const res = await fetch(`${API_BASE_URL}/api/invitations/partnership`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body.detail === "string") {
+      throw new Error(body.detail);
+    }
+    throw new ApiError("unlinkPartnership");
+  }
+  return (await res.json()) as InvitationMe;
+}

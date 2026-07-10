@@ -9,15 +9,17 @@ import {
   createInvitation,
   fetchInvitationMe,
   revokePendingInvitation,
+  unlinkPartnership,
 } from "@/lib/api";
 import { translateError } from "@/lib/errors";
 
 interface Props {
   onClose: () => void;
   onLinked?: () => void;
+  onUnlinked?: () => void;
 }
 
-export default function InviteModal({ onClose, onLinked }: Props) {
+export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
   const t = useTranslations("invite");
   const tErrors = useTranslations("errors");
   const [status, setStatus] = useState<InvitationMe | null>(null);
@@ -91,6 +93,28 @@ export default function InviteModal({ onClose, onLinked }: Props) {
     }
   }
 
+  async function handleUnlink() {
+    if (!window.confirm(t("unlinkConfirm"))) return;
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await unlinkPartnership();
+      setSuccess(t("unlinked"));
+      setManualUrl(null);
+      setStatus({
+        shared_group_id: null,
+        partner: null,
+        pending_invite: null,
+      });
+      onUnlinked?.();
+    } catch (err) {
+      setError(translateError(err, tErrors, "unlinkPartnership"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleCopy() {
     if (!manualUrl) return;
     try {
@@ -126,21 +150,25 @@ export default function InviteModal({ onClose, onLinked }: Props) {
         {loading ? (
           <div className="h-24 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
         ) : status?.partner ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <p className="text-sm text-gray-600 dark:text-gray-300">
               {t("linked")}
             </p>
             <div className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-800/80 px-4 py-3">
-              {status.partner.picture && (
+              {status.partner.picture ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={status.partner.picture}
                   alt={status.partner.name}
-                  className="h-10 w-10 rounded-full"
+                  className="h-8 w-8 rounded-full object-cover shrink-0"
                 />
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 shrink-0 text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {status.partner.name.slice(0, 1)}
+                </span>
               )}
-              <div className="min-w-0">
-                <p className="font-medium text-gray-900 dark:text-white truncate">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {status.partner.name}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
@@ -148,6 +176,14 @@ export default function InviteModal({ onClose, onLinked }: Props) {
                 </p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={handleUnlink}
+              disabled={submitting}
+              className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60 disabled:opacity-50 transition-colors"
+            >
+              {t("unlink")}
+            </button>
           </div>
         ) : (
           <div className="space-y-4">

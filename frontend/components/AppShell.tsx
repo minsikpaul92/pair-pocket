@@ -11,6 +11,7 @@ import {
   PanelLeftOpen,
   Plus,
   Repeat,
+  UserCheck,
   UserPlus,
   Wallet,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import {
   Currency,
   CurrentUser,
   LedgerScope,
+  PartnerSummary,
   SubscriptionOccurrence,
   Transaction,
   clearToken,
@@ -37,6 +39,7 @@ import {
   fetchAllTransactions,
   fetchCategoryPresets,
   fetchCurrentUser,
+  fetchInvitationMe,
   fetchPendingOccurrences,
   fetchTransactions,
   skipSubscriptionOccurrence,
@@ -101,6 +104,7 @@ export default function AppShell({ user, onLogout }: Props) {
   const [scope, setScope] = useState<LedgerScope>("CAD");
   const [accountType, setAccountType] = useState<AccountType>("personal");
   const [currentUser, setCurrentUser] = useState(user);
+  const [partner, setPartner] = useState<PartnerSummary | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [month, setMonth] = useState<Date>(() => {
@@ -133,6 +137,14 @@ export default function AppShell({ user, onLogout }: Props) {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(NAV_COLLAPSED_KEY);
     if (stored === "true") setNavCollapsed(true);
+  }, []);
+
+  useEffect(() => {
+    fetchInvitationMe()
+      .then((status) => {
+        setPartner(status.partner);
+      })
+      .catch(() => setPartner(null));
   }, []);
 
   useEffect(() => {
@@ -218,6 +230,18 @@ export default function AppShell({ user, onLogout }: Props) {
     fetchCurrentUser().then((u) => {
       if (u) setCurrentUser(u);
     });
+    fetchInvitationMe().then((status) => {
+      setPartner(status.partner);
+    });
+  }
+
+  function handleInviteUnlinked() {
+    setPartner(null);
+    setCurrentUser((prev) => ({ ...prev, shared_group_id: null }));
+    if (accountType === "shared") {
+      setAccountType("personal");
+    }
+    bumpVersion();
   }
 
   function handleSaved() {
@@ -346,17 +370,46 @@ export default function AppShell({ user, onLogout }: Props) {
         </nav>
 
         <div className="mt-auto space-y-1">
-          <button
-            type="button"
-            onClick={handleInvite}
-            title={navCollapsed ? tNav("invite") : undefined}
-            className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
-              navCollapsed ? "justify-center px-2" : "px-3"
-            }`}
-          >
-            <UserPlus className="h-5 w-5 shrink-0" />
-            {!navCollapsed && tNav("invite")}
-          </button>
+          {partner ? (
+            <button
+              type="button"
+              onClick={handleInvite}
+              title={navCollapsed ? partner.name : undefined}
+              className={`w-full flex items-center gap-2 rounded-xl py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                navCollapsed ? "justify-center px-2" : "px-3"
+              }`}
+            >
+              {partner.picture ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={partner.picture}
+                  alt={partner.name}
+                  className="h-8 w-8 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 shrink-0">
+                  <UserCheck className="h-4 w-4 text-green-500" />
+                </span>
+              )}
+              {!navCollapsed && (
+                <span className="flex-1 truncate text-left text-sm">
+                  {partner.name}
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleInvite}
+              title={navCollapsed ? tNav("invite") : undefined}
+              className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+                navCollapsed ? "justify-center px-2" : "px-3"
+              }`}
+            >
+              <UserPlus className="h-5 w-5 shrink-0" />
+              {!navCollapsed && tNav("invite")}
+            </button>
+          )}
           {!navCollapsed && (
             <div className="flex items-center gap-2 rounded-xl px-3 py-2">
               {currentUser.picture && (
@@ -608,6 +661,7 @@ export default function AppShell({ user, onLogout }: Props) {
         <InviteModal
           onClose={() => setInviteOpen(false)}
           onLinked={handleInviteLinked}
+          onUnlinked={handleInviteUnlinked}
         />
       )}
     </div>

@@ -292,3 +292,27 @@ async def revoke_pending_invitation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="취소할 대기 중 초대가 없습니다.",
         )
+
+
+@router.delete("/partnership", response_model=InvitationMeOut)
+async def unlink_partnership(
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Clear shared_group_id for both partners. Shared ledger data is kept but becomes inaccessible until re-linked to the same group (new invites create a new group)."""
+    if not current_user.shared_group_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="연결된 파트너가 없습니다.",
+        )
+
+    group_id = current_user.shared_group_id
+    await db[USERS_COL].update_many(
+        {"shared_group_id": group_id},
+        {"$set": {"shared_group_id": None}},
+    )
+    return {
+        "shared_group_id": None,
+        "partner": None,
+        "pending_invite": None,
+    }
