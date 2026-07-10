@@ -12,6 +12,8 @@ import {
   NewFinancialAccount,
   TransactionType,
   createAccount,
+  formatAmountInput,
+  parseAmountInput,
 } from "@/lib/api";
 import { BANK_OPTIONS, bankLogoUrl } from "@/lib/banks";
 import { translateError } from "@/lib/errors";
@@ -117,7 +119,7 @@ export default function AccountRegisterModal({
       return;
     }
 
-    const balance = Number(openingBalance);
+    const balance = parseAmountInput(openingBalance);
     if (Number.isNaN(balance)) {
       setError(tErrors("invalidBalance"));
       return;
@@ -243,10 +245,11 @@ export default function AccountRegisterModal({
                 {t("currentBalance")}
               </label>
               <input
-                type="number"
                 inputMode="decimal"
                 value={openingBalance}
-                onChange={(e) => setOpeningBalance(e.target.value)}
+                onChange={(e) =>
+                  setOpeningBalance(formatAmountInput(e.target.value, currency))
+                }
                 className="input-field"
               />
               <p className="mt-1 text-[10px] text-gray-400">

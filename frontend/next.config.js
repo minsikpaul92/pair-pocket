@@ -15,6 +15,13 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 
 const nextConfig = {
   reactStrictMode: true,
+  webpack: (config, { dev }) => {
+    // Avoid corrupted on-disk webpack cache when disk space is low (ENOSPC).
+    if (dev) {
+      config.cache = { type: "memory" };
+    }
+    return config;
+  },
 };
 
 module.exports = withNextIntl(withPWA(nextConfig));

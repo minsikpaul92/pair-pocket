@@ -20,7 +20,8 @@ class BillingCycle(str, Enum):
 
 class SubscriptionStatus(str, Enum):
     ACTIVE = "active"
-    PAUSED = "paused"
+    PAUSED = "paused"  # legacy
+    CANCEL_SCHEDULED = "cancel_scheduled"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
@@ -33,7 +34,7 @@ class OccurrenceStatus(str, Enum):
 
 class SubscriptionBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    amount: float = Field(gt=0)
+    amount: float = Field(ge=0)
     currency: Currency
     account_type: AccountType = AccountType.PERSONAL
 
@@ -41,13 +42,16 @@ class SubscriptionBase(BaseModel):
     start_date: datetime
     end_date: datetime | None = None
 
-    # Installment-only: total number of payments (e.g. 24-month phone plan).
+    installment_start_date: datetime | None = None
     total_installments: int | None = Field(default=None, gt=0)
 
-    # Charged from this financial account (card or bank).
-    account_id: str
+    # Optional promotional pricing (amount = regular price after promo ends).
+    promo_amount: float | None = Field(default=None, ge=0)
+    promo_end_date: datetime | None = None
+    promo_reminder_enabled: bool = False
+    end_reminder_enabled: bool = False
 
-    # Fields copied into auto-generated expense transactions.
+    account_id: str
     category: str
     sub_category: str
     merchant: str = "미지정"
@@ -61,15 +65,26 @@ class SubscriptionBase(BaseModel):
 
 
 class SubscriptionCreate(SubscriptionBase):
-    pass
+    completed_installments: int | None = Field(default=None, ge=0)
 
 
 class SubscriptionUpdate(BaseModel):
     name: str | None = None
-    amount: float | None = Field(default=None, gt=0)
+    amount: float | None = Field(default=None, ge=0)
     status: SubscriptionStatus | None = None
     end_date: datetime | None = None
     account_id: str | None = None
+    category: str | None = None
+    sub_category: str | None = None
+    start_date: datetime | None = None
+    installment_start_date: datetime | None = None
+    total_installments: int | None = Field(default=None, gt=0)
+    completed_installments: int | None = Field(default=None, ge=0)
+    cycle: BillingCycle | None = None
+    promo_amount: float | None = Field(default=None, ge=0)
+    promo_end_date: datetime | None = None
+    promo_reminder_enabled: bool | None = None
+    end_reminder_enabled: bool | None = None
 
 
 class SubscriptionOut(SubscriptionBase):
@@ -78,13 +93,12 @@ class SubscriptionOut(SubscriptionBase):
     status: SubscriptionStatus
     next_due_date: datetime | None = None
     completed_installments: int = 0
+    cancel_effective_date: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class SubscriptionOccurrenceOut(BaseModel):
-    """A single scheduled charge — pending until materialized."""
-
     id: str
     subscription_id: str
     due_date: datetime
@@ -93,3 +107,23 @@ class SubscriptionOccurrenceOut(BaseModel):
     status: OccurrenceStatus
     transaction_id: str | None = None
     subscription_name: str | None = None
+    subscription_billing_cycle: BillingCycle | None = None
+
+
+class SubscriptionHistoryOut(BaseModel):
+    subscription_id: str
+    start_date: datetime
+    end_date: datetime | None
+    months_active: int
+    payment_count: int
+    total_paid: float
+    currency: Currency
+    regular_total: float
+    total_saved: float
+    avg_saved_per_month: float
+
+
+class MonthlySubscriptionSummaryOut(BaseModel):
+    month: str
+    subscription_total: dict[str, float]
+    installment_total: dict[str, float]

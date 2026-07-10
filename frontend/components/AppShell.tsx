@@ -10,36 +10,47 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Repeat,
   UserPlus,
   Wallet,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
 import ListView from "@/components/ListView";
 import LocaleToggle from "@/components/LocaleToggle";
+import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
 import {
   CategoryPresets,
   Currency,
   CurrentUser,
   LedgerScope,
+  SubscriptionOccurrence,
   Transaction,
   clearToken,
+  fetchAllPendingOccurrences,
   fetchAllTransactions,
   fetchCategoryPresets,
+  fetchPendingOccurrences,
   fetchTransactions,
+  syncSubscriptions,
 } from "@/lib/api";
-import { addMonths, dayKey, monthKey, monthLabel } from "@/lib/date";
+import { addMonths, dayKey, isoDayKey, monthKey, monthLabel } from "@/lib/date";
 
-type View = "calendar" | "list" | "dashboard";
+type View = "calendar" | "list" | "dashboard" | "subscriptions";
 
-const NAV: { id: View; labelKey: "calendar" | "list" | "dashboard"; icon: typeof CalendarDays }[] = [
+const NAV: {
+  id: View;
+  labelKey: "calendar" | "list" | "dashboard" | "subscriptions";
+  icon: typeof CalendarDays;
+}[] = [
   { id: "calendar", labelKey: "calendar", icon: CalendarDays },
   { id: "list", labelKey: "list", icon: ListOrdered },
   { id: "dashboard", labelKey: "dashboard", icon: LayoutDashboard },
+  { id: "subscriptions", labelKey: "subscriptions", icon: Repeat },
 ];
 
 const LEDGERS: { scope: LedgerScope; labelKey: "all" | "canada" | "korea"; flag?: string }[] = [
@@ -55,6 +66,15 @@ const SCOPE_LABEL_KEY: Record<LedgerScope, "allLedger" | "canadaLedger" | "korea
 };
 
 const NAV_COLLAPSED_KEY = "pairpocket_nav_collapsed";
+
+function ledgerTabLabel(
+  labelKey: "all" | "canada" | "korea",
+  tLedger: (key: string) => string,
+  tCommon: (key: string) => string
+): string {
+  if (labelKey === "all") return tLedger("all");
+  return tCommon(labelKey);
+}
 
 interface Props {
   user: CurrentUser;
@@ -76,10 +96,19 @@ export default function AppShell({ user, onLogout }: Props) {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
+  const [subscriptionFocusId, setSubscriptionFocusId] = useState<string | null>(
+    null
+  );
+  const [subscriptionCancelAction, setSubscriptionCancelAction] =
+    useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [pendingOccurrences, setPendingOccurrences] = useState<
+    SubscriptionOccurrence[]
+  >([]);
   const [presets, setPresets] = useState<CategoryPresets | null>(null);
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
+  const bumpVersion = useCallback(() => setVersion((v) => v + 1), []);
 
   const [modalDate, setModalDate] = useState<Date | null>(null);
   const [modalCurrency, setModalCurrency] = useState<Currency>("CAD");
@@ -101,17 +130,57 @@ export default function AppShell({ user, onLogout }: Props) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get("view");
+    const subId = params.get("subscription");
+    const action = params.get("action");
+    if (viewParam === "subscriptions") setView("subscriptions");
+    if (subId) {
+      setSubscriptionFocusId(subId);
+      if (action === "cancel") setSubscriptionCancelAction(true);
+    }
+    if (viewParam || subId) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  // Materialize due subscriptions, then load ledger data.
+  useEffect(() => {
+    let active = true;
     setLoading(true);
     const monthStr = monthKey(month);
-    const loader =
+    const txLoader =
       scope === "ALL"
         ? fetchAllTransactions({ month: monthStr })
         : fetchTransactions({ currency: scope, month: monthStr });
+    const pendingLoader =
+      scope === "ALL"
+        ? fetchAllPendingOccurrences({ month: monthStr })
+        : fetchPendingOccurrences({ month: monthStr, currency: scope });
 
-    loader
-      .then(setTransactions)
-      .catch(() => setTransactions([]))
-      .finally(() => setLoading(false));
+    syncSubscriptions()
+      .then(() => {
+        if (!active) return null;
+        return Promise.all([txLoader, pendingLoader]);
+      })
+      .then((result) => {
+        if (!active || !result) return;
+        const [txs, pending] = result;
+        setTransactions(txs);
+        setPendingOccurrences(pending);
+      })
+      .catch(() => {
+        if (!active) return;
+        setTransactions([]);
+        setPendingOccurrences([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [scope, month, version]);
 
   function toggleNavCollapsed() {
@@ -134,7 +203,7 @@ export default function AppShell({ user, onLogout }: Props) {
   function handleSaved() {
     setModalDate(null);
     setEditingTransaction(null);
-    setVersion((v) => v + 1);
+    bumpVersion();
   }
 
   function closeModal() {
@@ -148,15 +217,40 @@ export default function AppShell({ user, onLogout }: Props) {
     if (scope !== "ALL") setModalCurrency(scope);
   }
 
+  function openSubscriptionById(subscriptionId: string, currency?: Currency) {
+    setModalDate(null);
+    setEditingTransaction(null);
+    setSubscriptionFocusId(subscriptionId);
+    setSubscriptionCancelAction(false);
+    if (currency && scope !== "ALL") {
+      setScope(currency);
+    }
+    setView("subscriptions");
+  }
+
   function openEdit(tx: Transaction) {
+    if (tx.subscription_id) {
+      openSubscriptionById(tx.subscription_id, tx.currency);
+      return;
+    }
     setEditingTransaction(tx);
     setModalCurrency(tx.currency);
     setModalDate(new Date(tx.date));
   }
 
+  function openSubscriptionFromPending(occ: SubscriptionOccurrence) {
+    openSubscriptionById(occ.subscription_id, occ.currency);
+  }
+
   const modalDayTransactions = modalDate
     ? transactions.filter(
         (tx) => dayKey(new Date(tx.date)) === dayKey(modalDate)
+      )
+    : [];
+
+  const modalDayPending = modalDate
+    ? pendingOccurrences.filter(
+        (occ) => isoDayKey(occ.due_date) === dayKey(modalDate)
       )
     : [];
 
@@ -218,11 +312,6 @@ export default function AppShell({ user, onLogout }: Props) {
         </nav>
 
         <div className="mt-auto space-y-1">
-          {!navCollapsed && (
-            <div className="px-1 pb-1">
-              <LocaleToggle className="w-full justify-center" />
-            </div>
-          )}
           <button
             type="button"
             onClick={handleInvite}
@@ -274,7 +363,7 @@ export default function AppShell({ user, onLogout }: Props) {
                   }`}
                 >
                   {l.flag && <span className="mr-1">{l.flag}</span>}
-                  {tLedger(l.labelKey)}
+                  {ledgerTabLabel(l.labelKey, tLedger, tCommon)}
                 </button>
               ))}
             </div>
@@ -353,14 +442,16 @@ export default function AppShell({ user, onLogout }: Props) {
             </div>
           </div>
 
-          {loading && view !== "dashboard" ? (
+          {loading && view !== "dashboard" && view !== "subscriptions" ? (
             <div className="h-64 w-full animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ) : view === "calendar" ? (
             <CalendarView
               month={month}
               scope={scope}
               transactions={transactions}
+              pendingOccurrences={pendingOccurrences}
               onDayClick={openModal}
+              onPendingClick={openSubscriptionFromPending}
             />
           ) : view === "list" ? (
             <ListView
@@ -368,6 +459,22 @@ export default function AppShell({ user, onLogout }: Props) {
               presets={presets}
               transactions={transactions}
               onEditTransaction={openEdit}
+            />
+          ) : view === "subscriptions" ? (
+            <SubscriptionsView
+              scope={scope}
+              month={month}
+              version={version}
+              presets={presets}
+              userEmail={user.email}
+              focusSubscriptionId={subscriptionFocusId}
+              focusCancelAction={subscriptionCancelAction}
+              onFocusHandled={() => {
+                setSubscriptionFocusId(null);
+                setSubscriptionCancelAction(false);
+              }}
+              onChanged={bumpVersion}
+              onPresetsChange={setPresets}
             />
           ) : (
             <DashboardView month={month} version={version} scope={scope} />
@@ -413,10 +520,12 @@ export default function AppShell({ user, onLogout }: Props) {
           defaultDate={modalDate}
           onDateChange={setModalDate}
           dayTransactions={modalDayTransactions}
+          dayPendingOccurrences={modalDayPending}
           editingTransaction={editingTransaction}
           onClose={closeModal}
           onSaved={handleSaved}
           onSelectTransaction={openEdit}
+          onSelectPendingOccurrence={openSubscriptionFromPending}
           onPresetsChange={setPresets}
         />
       )}
