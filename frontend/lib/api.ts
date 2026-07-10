@@ -1074,16 +1074,23 @@ export function pendingMonthlyTotals(
   return { subscription, installment };
 }
 
-export function subscriptionTrackingLabel(sub: Subscription): string {
+export function subscriptionTrackingLabel(
+  sub: Subscription,
+  viewMonth: Date = new Date()
+): string {
   if (sub.cycle === "installment" && sub.total_installments != null) {
-    const remaining = Math.max(
-      sub.total_installments - sub.completed_installments,
-      0
+    const start = new Date(sub.installment_start_date || sub.start_date);
+    const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+    const view = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
+    const schedulePaid = Math.min(
+      monthsBetweenDates(startMonth, view),
+      sub.total_installments
     );
+    const remaining = Math.max(sub.total_installments - schedulePaid, 0);
     const end = sub.end_date
       ? new Date(sub.end_date).toLocaleDateString("ko-KR")
       : "—";
-    return `${sub.completed_installments}/${sub.total_installments}회 · ${remaining}회 남음 · 종료 ${end}`;
+    return `${schedulePaid}/${sub.total_installments}회 · ${remaining}회 남음 · 종료 ${end}`;
   }
   const start = new Date(sub.installment_start_date || sub.start_date);
   const months = monthsBetweenDates(start, new Date());

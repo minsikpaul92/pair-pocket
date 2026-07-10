@@ -389,7 +389,7 @@ export default function SubscriptionsView({
               </span>
             </div>
             <p className="mt-0.5 text-[11px] text-blue-500 font-medium">
-              {translateSubscriptionTracking(sub, t, locale)}
+              {translateSubscriptionTracking(sub, t, locale, month)}
             </p>
             <p className="mt-0.5 text-[11px] text-gray-400 truncate">
               {translateBillingCycle(sub.cycle, t)}
