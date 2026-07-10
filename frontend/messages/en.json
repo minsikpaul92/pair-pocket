@@ -71,7 +71,32 @@
     "invalidAccess": "Invalid access."
   },
   "invite": {
-    "comingSoon": "Partner invites are coming soon. You can use a personal ledger for now."
+    "title": "Invite partner",
+    "close": "Close",
+    "description": "Enter your partner’s Google account email. After they accept, you can use a shared household ledger together.",
+    "emailLabel": "Partner email",
+    "emailPlaceholder": "partner@gmail.com",
+    "send": "Send invite",
+    "sending": "Sending…",
+    "sent": "Invitation email sent.",
+    "sentManual": "Could not send email. Share the link below with your partner.",
+    "copyLink": "Copy link",
+    "copied": "Copied",
+    "pending": "Invite to {email} is pending.",
+    "revoke": "Cancel invite",
+    "revokeConfirm": "Cancel the pending invite?",
+    "revoked": "Invite cancelled.",
+    "linked": "You are already linked with a partner.",
+    "acceptTitle": "Accept invite",
+    "accepting": "Checking invitation…",
+    "acceptSuccess": "You’re linked with your partner!",
+    "invalidToken": "This invite link is invalid.",
+    "sharedEmpty": "You’re not linked with a partner yet. Invite them to start a shared household ledger.",
+    "sharedEmptyCta": "Invite partner"
+  },
+  "accountType": {
+    "personal": "Personal",
+    "shared": "Shared"
   },
   "calendar": {
     "weekdays": {
@@ -335,6 +360,10 @@
     "fetchAccounts": "Could not load accounts.",
     "createAccount": "Could not register account.",
     "updateAccount": "Could not update account.",
+    "fetchInvitationMe": "Could not load invite status.",
+    "createInvitation": "Could not send invite.",
+    "acceptInvitation": "Could not accept invite.",
+    "revokePendingInvitation": "Could not cancel invite.",
     "invalidAmount": "Enter a valid amount.",
     "categoryRequired": "Select a category.",
     "subCategoryRequired": "Select a sub-category.",

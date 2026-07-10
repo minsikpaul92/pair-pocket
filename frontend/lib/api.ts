@@ -345,9 +345,14 @@ export async function fetchSubCategories(
 export async function fetchMerchantSuggestions(
   category: string,
   currency: Currency,
-  subCategory?: string
+  subCategory?: string,
+  accountType: AccountType = "personal"
 ): Promise<string[]> {
-  const params = new URLSearchParams({ category, currency });
+  const params = new URLSearchParams({
+    category,
+    currency,
+    account_type: accountType,
+  });
   if (subCategory) params.set("sub_category", subCategory);
   const res = await fetch(
     `${API_BASE_URL}/api/transactions/merchants?${params.toString()}`,
@@ -384,9 +389,13 @@ export interface SettleableExpense {
 
 export async function fetchSettleableExpenses(
   currency: Currency,
-  excludeSettlementId?: string
+  excludeSettlementId?: string,
+  accountType: AccountType = "personal"
 ): Promise<SettleableExpense[]> {
-  const params = new URLSearchParams({ currency });
+  const params = new URLSearchParams({
+    currency,
+    account_type: accountType,
+  });
   if (excludeSettlementId) {
     params.set("exclude_settlement_id", excludeSettlementId);
   }
@@ -629,11 +638,12 @@ export async function fetchSubscriptionMonthlySummary(filters: {
 }
 
 export async function fetchAllSubscriptionMonthlySummary(
-  month: string
+  month: string,
+  accountType: AccountType = "personal"
 ): Promise<MonthlySubscriptionSummary> {
   const [cad, krw] = await Promise.all([
-    fetchSubscriptionMonthlySummary({ month, currency: "CAD" }),
-    fetchSubscriptionMonthlySummary({ month, currency: "KRW" }),
+    fetchSubscriptionMonthlySummary({ month, currency: "CAD", accountType }),
+    fetchSubscriptionMonthlySummary({ month, currency: "KRW", accountType }),
   ]);
   const subscription_total: Partial<Record<Currency, number>> = {
     CAD: cad.subscription_total.CAD ?? 0,
@@ -773,6 +783,7 @@ function pendingQueryParams(filters: {
 
 export async function fetchAllPendingOccurrences(filters: {
   month?: string;
+  accountType?: AccountType;
 } = {}): Promise<SubscriptionOccurrence[]> {
   const [cad, krw] = await Promise.all([
     fetchPendingOccurrences({ ...filters, currency: "CAD" }),
@@ -847,8 +858,8 @@ export async function createAccount(
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
-      account_type: "personal",
       opening_balance: 0,
+      account_type: "personal",
       ...payload,
     }),
   });
@@ -1113,4 +1124,83 @@ export function subCategoriesFor(
 ): string[] {
   const groups = type === "expense" ? presets.expense : presets.income;
   return groups.find((g) => g.category === category)?.sub_categories ?? [];
+}
+
+export interface PartnerSummary {
+  id: string;
+  email: string;
+  name: string;
+  picture: string | null;
+}
+
+export interface InvitationOut {
+  id: string;
+  invitee_email: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  created_at: string;
+  expires_at: string;
+  email_sent?: boolean;
+  accept_url?: string | null;
+}
+
+export interface InvitationMe {
+  shared_group_id: string | null;
+  partner: PartnerSummary | null;
+  pending_invite: InvitationOut | null;
+}
+
+export async function fetchInvitationMe(): Promise<InvitationMe> {
+  const res = await fetch(`${API_BASE_URL}/api/invitations/me`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("fetchInvitationMe");
+  return (await res.json()) as InvitationMe;
+}
+
+export async function createInvitation(
+  inviteeEmail: string
+): Promise<InvitationOut> {
+  const res = await fetch(`${API_BASE_URL}/api/invitations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ invitee_email: inviteeEmail }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body.detail === "string") {
+      throw new Error(body.detail);
+    }
+    throw new ApiError("createInvitation");
+  }
+  return (await res.json()) as InvitationOut;
+}
+
+export async function acceptInvitation(token: string): Promise<InvitationMe> {
+  const res = await fetch(`${API_BASE_URL}/api/invitations/accept`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body.detail === "string") {
+      throw new Error(body.detail);
+    }
+    throw new ApiError("acceptInvitation");
+  }
+  return (await res.json()) as InvitationMe;
+}
+
+export async function revokePendingInvitation(): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/invitations/pending`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body.detail === "string") {
+      throw new Error(body.detail);
+    }
+    throw new ApiError("revokePendingInvitation");
+  }
 }

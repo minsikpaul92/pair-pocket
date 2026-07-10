@@ -71,7 +71,32 @@
     "invalidAccess": "잘못된 접근입니다."
   },
   "invite": {
-    "comingSoon": "파트너 초대 기능은 곧 제공될 예정입니다. 지금은 개인 가계부를 사용할 수 있어요."
+    "title": "파트너 초대",
+    "close": "닫기",
+    "description": "파트너의 Google 계정 이메일을 입력하면 초대 링크가 발송됩니다. 수락하면 공유 가계부를 함께 사용할 수 있어요.",
+    "emailLabel": "파트너 이메일",
+    "emailPlaceholder": "partner@gmail.com",
+    "send": "초대 보내기",
+    "sending": "보내는 중…",
+    "sent": "초대 이메일을 보냈습니다.",
+    "sentManual": "이메일을 보내지 못했습니다. 아래 링크를 파트너에게 직접 공유해 주세요.",
+    "copyLink": "링크 복사",
+    "copied": "복사됨",
+    "pending": "{email}님에게 보낸 초대가 대기 중입니다.",
+    "revoke": "초대 취소",
+    "revokeConfirm": "대기 중인 초대를 취소할까요?",
+    "revoked": "초대를 취소했습니다.",
+    "linked": "이미 파트너와 연결되어 있습니다.",
+    "acceptTitle": "초대 수락",
+    "accepting": "초대를 확인하는 중…",
+    "acceptSuccess": "파트너와 연결되었습니다!",
+    "invalidToken": "유효하지 않은 초대 링크입니다.",
+    "sharedEmpty": "아직 파트너와 연결되지 않았습니다. 초대해 공유 가계부를 시작하세요.",
+    "sharedEmptyCta": "파트너 초대"
+  },
+  "accountType": {
+    "personal": "개인",
+    "shared": "공유"
   },
   "calendar": {
     "weekdays": {
@@ -335,6 +360,10 @@
     "fetchAccounts": "계좌 목록을 불러오지 못했습니다.",
     "createAccount": "계좌를 등록하지 못했습니다.",
     "updateAccount": "계좌를 수정하지 못했습니다.",
+    "fetchInvitationMe": "초대 상태를 불러오지 못했습니다.",
+    "createInvitation": "초대를 보내지 못했습니다.",
+    "acceptInvitation": "초대를 수락하지 못했습니다.",
+    "revokePendingInvitation": "초대를 취소하지 못했습니다.",
     "invalidAmount": "금액을 올바르게 입력해 주세요.",
     "categoryRequired": "대분류를 선택해 주세요.",
     "subCategoryRequired": "중분류를 선택해 주세요.",

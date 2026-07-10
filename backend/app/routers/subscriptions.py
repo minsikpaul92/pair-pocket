@@ -21,6 +21,12 @@ from app.models.subscription import (
 )
 from app.models.transaction import AccountType, Currency
 from app.models.user import UserOut
+from app.services.access import (
+    assert_can_access_doc,
+    owner_match,
+    require_shared_group_for_write,
+    resolve_owner_ids,
+)
 from app.services.subscriptions import (
     amount_for_due_date,
     generate_occurrences,
@@ -82,7 +88,7 @@ async def _validate_account(
     db: AsyncIOMotorDatabase,
     *,
     account_id: str,
-    owner_id: str,
+    owner_ids: list[str],
     currency: str,
     account_type: str,
 ) -> None:
@@ -94,7 +100,7 @@ async def _validate_account(
     account = await db[ACCOUNTS_COL].find_one(
         {
             "_id": ObjectId(account_id),
-            "owner_id": owner_id,
+            **owner_match(owner_ids),
             "is_active": True,
         }
     )
@@ -123,8 +129,9 @@ async def list_subscriptions(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[dict]:
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     query: dict = {
-        "owner_id": current_user.id,
+        **owner_match(owner_ids),
         "account_type": account_type.value,
     }
     if currency is not None:
@@ -154,9 +161,10 @@ async def subscription_monthly_summary(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     return await monthly_subscription_summary(
         db,
-        owner_id=current_user.id,
+        owner_ids=owner_ids,
         account_type=account_type.value,
         month=month,
         currency=currency.value if currency else None,
@@ -172,9 +180,10 @@ async def pending_occurrences(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[dict]:
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     docs = await list_pending_occurrences(
         db,
-        owner_id=current_user.id,
+        owner_ids=owner_ids,
         account_type=account_type.value,
         month=month,
         currency=currency.value if currency else None,
@@ -212,10 +221,13 @@ async def skip_pending_occurrence(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
+    personal_ids = await resolve_owner_ids(db, current_user, AccountType.PERSONAL)
+    shared_ids = await resolve_owner_ids(db, current_user, AccountType.SHARED)
+    all_ids = list({*personal_ids, *shared_ids})
     skipped = await skip_occurrence(
         db,
         occurrence_id=occurrence_id,
-        owner_id=current_user.id,
+        owner_ids=all_ids,
     )
     if not skipped:
         raise HTTPException(
@@ -252,9 +264,10 @@ async def sync_due_subscriptions(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     count = await materialize_due_occurrences(
         db,
-        owner_id=current_user.id,
+        owner_ids=owner_ids,
         account_type=account_type.value,
         as_of=as_of,
     )
@@ -285,10 +298,13 @@ async def subscription_history(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
+    personal_ids = await resolve_owner_ids(db, current_user, AccountType.PERSONAL)
+    shared_ids = await resolve_owner_ids(db, current_user, AccountType.SHARED)
+    all_ids = list({*personal_ids, *shared_ids})
     result = await get_subscription_history(
         db,
         subscription_id=subscription_id,
-        owner_id=current_user.id,
+        owner_ids=all_ids,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Subscription not found.")
@@ -318,10 +334,12 @@ async def create_subscription(
             detail="total_installments는 할부(cycle=installment)에서만 사용할 수 있습니다.",
         )
 
+    require_shared_group_for_write(current_user, payload.account_type)
+    owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
     await _validate_account(
         db,
         account_id=payload.account_id,
-        owner_id=current_user.id,
+        owner_ids=owner_ids,
         currency=payload.currency.value,
         account_type=payload.account_type.value,
     )
@@ -376,11 +394,10 @@ async def update_subscription(
     if not ObjectId.is_valid(subscription_id):
         raise HTTPException(status_code=404, detail="Subscription not found.")
 
-    existing = await db[COLLECTION].find_one(
-        {"_id": ObjectId(subscription_id), "owner_id": current_user.id}
+    existing = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
+    await assert_can_access_doc(
+        db, current_user, existing, not_found_detail="Subscription not found."
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Subscription not found.")
 
     old_next_due = existing.get("next_due_date") or existing["start_date"]
     start_rescheduled = False
@@ -415,10 +432,13 @@ async def update_subscription(
             inst_start, total_installments=total
         )
     if "account_id" in updates and updates["account_id"]:
+        owner_ids = await resolve_owner_ids(
+            db, current_user, AccountType(existing["account_type"])
+        )
         await _validate_account(
             db,
             account_id=updates["account_id"],
-            owner_id=current_user.id,
+            owner_ids=owner_ids,
             currency=existing["currency"],
             account_type=existing["account_type"],
         )
@@ -496,11 +516,10 @@ async def schedule_cancel_subscription(
     if not ObjectId.is_valid(subscription_id):
         raise HTTPException(status_code=404, detail="Subscription not found.")
 
-    existing = await db[COLLECTION].find_one(
-        {"_id": ObjectId(subscription_id), "owner_id": current_user.id}
+    existing = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
+    await assert_can_access_doc(
+        db, current_user, existing, not_found_detail="Subscription not found."
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Subscription not found.")
 
     if existing.get("status") == SubscriptionStatus.CANCEL_SCHEDULED.value:
         await db[COLLECTION].update_one(
@@ -537,11 +556,10 @@ async def delete_subscription(
     if not ObjectId.is_valid(subscription_id):
         raise HTTPException(status_code=404, detail="Subscription not found.")
 
-    existing = await db[COLLECTION].find_one(
-        {"_id": ObjectId(subscription_id), "owner_id": current_user.id}
+    existing = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
+    await assert_can_access_doc(
+        db, current_user, existing, not_found_detail="Subscription not found."
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Subscription not found.")
 
     await db[OCC_COL].delete_many(
         {

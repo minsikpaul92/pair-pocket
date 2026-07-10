@@ -17,6 +17,12 @@ from app.models.account import (
 )
 from app.models.transaction import AccountType
 from app.models.user import UserOut
+from app.services.access import (
+    assert_can_access_doc,
+    owner_match,
+    require_shared_group_for_write,
+    resolve_owner_ids,
+)
 from app.services.accounts import _serialize_account, compute_net_worth
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
@@ -37,8 +43,9 @@ async def list_accounts(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[dict]:
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     query: dict = {
-        "owner_id": current_user.id,
+        **owner_match(owner_ids),
         "account_type": account_type.value,
     }
     if currency:
@@ -56,13 +63,15 @@ async def create_account(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
+    require_shared_group_for_write(current_user, payload.account_type)
     now = datetime.utcnow()
     is_liability = payload.is_liability or _infer_liability(payload.kind)
+    owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
 
     if payload.is_default_expense:
         await db[COLLECTION].update_many(
             {
-                "owner_id": current_user.id,
+                **owner_match(owner_ids),
                 "account_type": payload.account_type.value,
                 "currency": payload.currency.value,
             },
@@ -71,7 +80,7 @@ async def create_account(
     if payload.is_default_income:
         await db[COLLECTION].update_many(
             {
-                "owner_id": current_user.id,
+                **owner_match(owner_ids),
                 "account_type": payload.account_type.value,
                 "currency": payload.currency.value,
             },
@@ -103,9 +112,10 @@ async def net_worth(
     from app.models.transaction import Currency as Cur
 
     cur = Cur(currency) if currency else None
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     return await compute_net_worth(
         db,
-        owner_id=current_user.id,
+        owner_ids=owner_ids,
         account_type=account_type,
         currency=cur,
     )
@@ -121,20 +131,22 @@ async def update_account(
     if not ObjectId.is_valid(account_id):
         raise HTTPException(status_code=404, detail="Account not found.")
 
-    existing = await db[COLLECTION].find_one(
-        {"_id": ObjectId(account_id), "owner_id": current_user.id}
+    existing = await db[COLLECTION].find_one({"_id": ObjectId(account_id)})
+    await assert_can_access_doc(
+        db, current_user, existing, not_found_detail="Account not found."
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Account not found.")
 
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
     if not updates:
         return _serialize_account(existing)
 
+    owner_ids = await resolve_owner_ids(
+        db, current_user, AccountType(existing["account_type"])
+    )
     if updates.get("is_default_expense"):
         await db[COLLECTION].update_many(
             {
-                "owner_id": current_user.id,
+                **owner_match(owner_ids),
                 "account_type": existing["account_type"],
                 "currency": existing["currency"],
             },
@@ -143,7 +155,7 @@ async def update_account(
     if updates.get("is_default_income"):
         await db[COLLECTION].update_many(
             {
-                "owner_id": current_user.id,
+                **owner_match(owner_ids),
                 "account_type": existing["account_type"],
                 "currency": existing["currency"],
             },

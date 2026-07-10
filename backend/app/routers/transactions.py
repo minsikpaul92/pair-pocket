@@ -14,6 +14,12 @@ from app.models.transaction import (
     TransactionType,
 )
 from app.models.user import UserOut
+from app.services.access import (
+    assert_can_access_doc,
+    owner_match,
+    require_shared_group_for_write,
+    resolve_owner_ids,
+)
 from app.services.settlement import get_settled_amounts
 from app.services.validation import validate_transaction_payload
 
@@ -86,8 +92,9 @@ async def list_transactions(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[dict]:
     """Return transactions with multi-level category filtering."""
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     query: dict = {
-        "owner_id": current_user.id,
+        **owner_match(owner_ids),
         "account_type": account_type.value,
     }
     if currency is not None:
@@ -107,7 +114,7 @@ async def list_transactions(
         query["institution"] = institution
 
     documents = await db[COLLECTION].find(query).sort("date", -1).to_list(length=500)
-    settled_map = await get_settled_amounts(db, current_user.id)
+    settled_map = await get_settled_amounts(db, owner_ids=owner_ids)
 
     results: list[dict] = []
     for doc in documents:
@@ -126,12 +133,14 @@ async def merchant_suggestions(
     category: str,
     sub_category: str | None = None,
     currency: Currency | None = None,
+    account_type: AccountType = AccountType.PERSONAL,
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[str]:
     """Merchants used under this category/sub_category, most recently used first."""
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     match: dict = {
-        "owner_id": current_user.id,
+        **owner_match(owner_ids),
         "category": category,
         "merchant": {"$nin": [None, "", "미지정"]},
     }
@@ -159,6 +168,7 @@ async def merchant_suggestions(
 async def institution_suggestions(
     sub_category: str | None = None,
     currency: Currency | None = None,
+    account_type: AccountType = AccountType.PERSONAL,
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[str]:
@@ -168,8 +178,9 @@ async def institution_suggestions(
     doc = await _get_or_create(db, current_user.id)
     saved = doc.get("institutions", [])
 
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
     match: dict = {
-        "owner_id": current_user.id,
+        **owner_match(owner_ids),
         "category": "투자/저축",
         "institution": {"$exists": True, "$ne": None, "$ne": ""},
     }
@@ -213,14 +224,15 @@ async def list_settleable_expenses(
     from app.models.category_preset import is_transfer_expense
     from app.models.ledger import TransactionKind
 
-    settled_map = await get_settled_amounts(db, current_user.id)
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
+    settled_map = await get_settled_amounts(db, owner_ids=owner_ids)
     exclude_amount = 0.0
     exclude_expense_id: str | None = None
     if exclude_settlement_id and ObjectId.is_valid(exclude_settlement_id):
         existing = await db[COLLECTION].find_one(
             {
                 "_id": ObjectId(exclude_settlement_id),
-                "owner_id": current_user.id,
+                **owner_match(owner_ids),
             }
         )
         if existing and existing.get("settles_expense_id"):
@@ -228,7 +240,7 @@ async def list_settleable_expenses(
             exclude_amount = float(existing["amount"])
 
     query = {
-        "owner_id": current_user.id,
+        **owner_match(owner_ids),
         "account_type": account_type.value,
         "type": TransactionType.EXPENSE.value,
         "currency": currency.value,
@@ -295,7 +307,11 @@ async def create_transaction(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    await validate_transaction_payload(payload, db, current_user.id)
+    require_shared_group_for_write(current_user, payload.account_type)
+    owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
+    await validate_transaction_payload(
+        payload, db, current_user.id, owner_ids=owner_ids
+    )
     document = _document_from_payload(payload, owner_id=current_user.id)
     result = await db[COLLECTION].insert_one(document)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
@@ -314,19 +330,22 @@ async def update_transaction(
     if not ObjectId.is_valid(transaction_id):
         raise HTTPException(status_code=404, detail="Transaction not found.")
 
-    existing = await db[COLLECTION].find_one(
-        {"_id": ObjectId(transaction_id), "owner_id": current_user.id}
+    existing = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
+    await assert_can_access_doc(
+        db, current_user, existing, not_found_detail="Transaction not found."
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Transaction not found.")
+    require_shared_group_for_write(current_user, payload.account_type)
+    owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
 
     await validate_transaction_payload(
         payload,
         db,
         current_user.id,
+        owner_ids=owner_ids,
         exclude_settlement_id=transaction_id,
     )
-    document = _document_from_payload(payload, owner_id=current_user.id)
+    # Keep original owner so partner edits don't reassign ownership.
+    document = _document_from_payload(payload, owner_id=existing["owner_id"])
     await db[COLLECTION].update_one(
         {"_id": ObjectId(transaction_id)}, {"$set": document}
     )
@@ -345,17 +364,19 @@ async def delete_transaction(
     if not ObjectId.is_valid(transaction_id):
         raise HTTPException(status_code=404, detail="Transaction not found.")
 
-    existing = await db[COLLECTION].find_one(
-        {"_id": ObjectId(transaction_id), "owner_id": current_user.id}
+    existing = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
+    await assert_can_access_doc(
+        db, current_user, existing, not_found_detail="Transaction not found."
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Transaction not found.")
 
     # Block deleting an expense that still has linked N빵 settlements.
     if existing.get("type") == TransactionType.EXPENSE.value:
+        owner_ids = await resolve_owner_ids(
+            db, current_user, AccountType(existing["account_type"])
+        )
         linked = await db[COLLECTION].count_documents(
             {
-                "owner_id": current_user.id,
+                **owner_match(owner_ids),
                 "settles_expense_id": transaction_id,
             }
         )
@@ -365,8 +386,6 @@ async def delete_transaction(
                 detail="이 지출에 연결된 N빵 정산이 있어 삭제할 수 없습니다. 정산을 먼저 삭제해 주세요.",
             )
 
-    result = await db[COLLECTION].delete_one(
-        {"_id": ObjectId(transaction_id), "owner_id": current_user.id}
-    )
+    result = await db[COLLECTION].delete_one({"_id": ObjectId(transaction_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transaction not found.")

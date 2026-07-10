@@ -12,6 +12,7 @@ import MerchantSelect from "@/components/MerchantSelect";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import {
+  AccountType,
   CategoryPresets,
   Currency,
   EXPENSE_CATEGORY_INVESTMENT,
@@ -58,6 +59,7 @@ import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
 interface Props {
   currency: Currency;
+  accountType?: AccountType;
   allowCurrencyPick?: boolean;
   onCurrencyChange?: (currency: Currency) => void;
   presets: CategoryPresets;
@@ -76,6 +78,7 @@ interface Props {
 
 export default function TransactionModal({
   currency,
+  accountType = "personal",
   allowCurrencyPick = false,
   onCurrencyChange,
   presets,
@@ -176,7 +179,7 @@ export default function TransactionModal({
   useEffect(() => {
     let active = true;
     setAccountsLoading(true);
-    fetchAccounts({ currency })
+    fetchAccounts({ currency, accountType })
       .then((list) => {
         if (!active) return;
         setAccounts(list);
@@ -190,7 +193,7 @@ export default function TransactionModal({
     return () => {
       active = false;
     };
-  }, [currency]);
+  }, [currency, accountType]);
 
   // Hydrate form when opening an existing transaction for edit.
   // Reset to blank create form when editingTransaction is cleared.
@@ -274,13 +277,13 @@ export default function TransactionModal({
       return;
     }
     let active = true;
-    fetchMerchantSuggestions(category, currency, subCategory).then((list) => {
+    fetchMerchantSuggestions(category, currency, subCategory, accountType).then((list) => {
       if (active) setMerchantHints(list);
     });
     return () => {
       active = false;
     };
-  }, [category, subCategory, currency, isTransfer, isSettlement]);
+  }, [category, subCategory, currency, accountType, isTransfer, isSettlement]);
 
   useEffect(() => {
     if (!isInvestment) {
@@ -307,14 +310,15 @@ export default function TransactionModal({
     let active = true;
     fetchSettleableExpenses(
       currency,
-      editingTransaction?.id
+      editingTransaction?.id,
+      accountType
     ).then((list) => {
       if (active) setSettleableExpenses(list);
     });
     return () => {
       active = false;
     };
-  }, [isSettlement, currency, isEditing, editingTransaction?.id]);
+  }, [isSettlement, currency, accountType, isEditing, editingTransaction?.id]);
 
   function handleTypeChange(next: TransactionType) {
     setType(next);
@@ -446,7 +450,7 @@ export default function TransactionModal({
       amount: numericAmount,
       currency,
       type,
-      account_type: "personal",
+      account_type: accountType,
       category,
       sub_category: subCategory,
       merchant: isTransfer
@@ -990,6 +994,7 @@ export default function TransactionModal({
       {showAccountRegister && (
         <AccountRegisterModal
           currency={currency}
+          accountType={accountType}
           preferredType={type}
           onClose={() => setShowAccountRegister(false)}
           onCreated={(created) => {

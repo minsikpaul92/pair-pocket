@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import SubscriptionRegisterModal from "@/components/SubscriptionRegisterModal";
 import {
+  AccountType,
   CategoryPresets,
   Currency,
   LedgerScope,
@@ -39,6 +40,7 @@ import { translateError } from "@/lib/errors";
 
 interface Props {
   scope: LedgerScope;
+  accountType?: AccountType;
   month: Date;
   version: number;
   presets: CategoryPresets | null;
@@ -214,6 +216,7 @@ const EMPTY_SUMMARY: MonthlySubscriptionSummary = {
 
 export default function SubscriptionsView({
   scope,
+  accountType = "personal",
   month,
   version,
   presets,
@@ -253,28 +256,48 @@ export default function SubscriptionsView({
     const loadSubs =
       scope === "ALL"
         ? Promise.all([
-            fetchSubscriptions({ currency: "CAD", month: monthStr }),
-            fetchSubscriptions({ currency: "KRW", month: monthStr }),
+            fetchSubscriptions({
+              currency: "CAD",
+              month: monthStr,
+              accountType,
+            }),
+            fetchSubscriptions({
+              currency: "KRW",
+              month: monthStr,
+              accountType,
+            }),
           ]).then(([cad, krw]) => [...cad, ...krw])
-        : fetchSubscriptions({ currency: scope, month: monthStr });
+        : fetchSubscriptions({
+            currency: scope,
+            month: monthStr,
+            accountType,
+          });
 
     const loadPending =
       scope === "ALL"
-        ? fetchAllPendingOccurrences({ month: monthStr })
-        : fetchPendingOccurrences({ month: monthStr, currency: scope });
+        ? fetchAllPendingOccurrences({ month: monthStr, accountType })
+        : fetchPendingOccurrences({
+            month: monthStr,
+            currency: scope,
+            accountType,
+          });
 
     const loadSummary =
       scope === "ALL"
-        ? fetchAllSubscriptionMonthlySummary(monthStr)
-        : fetchSubscriptionMonthlySummary({ month: monthStr, currency: scope });
+        ? fetchAllSubscriptionMonthlySummary(monthStr, accountType)
+        : fetchSubscriptionMonthlySummary({
+            month: monthStr,
+            currency: scope,
+            accountType,
+          });
 
     const loadAccounts =
       scope === "ALL"
         ? Promise.all([
-            fetchAccounts({ currency: "CAD" }),
-            fetchAccounts({ currency: "KRW" }),
+            fetchAccounts({ currency: "CAD", accountType }),
+            fetchAccounts({ currency: "KRW", accountType }),
           ]).then(([cad, krw]) => [...cad, ...krw])
-        : fetchAccounts({ currency: scope });
+        : fetchAccounts({ currency: scope, accountType });
 
     Promise.all([loadSubs, loadPending, loadSummary, loadAccounts])
       .then(([subs, occs, monthlySummary, accounts]) => {
@@ -291,7 +314,7 @@ export default function SubscriptionsView({
         setSummary({ ...EMPTY_SUMMARY, month: monthStr });
       })
       .finally(() => setLoading(false));
-  }, [scope, monthStr, version]);
+  }, [scope, accountType, monthStr, version]);
 
   async function toggleCancelSchedule(sub: Subscription, e: React.MouseEvent) {
     e.stopPropagation();
@@ -541,6 +564,7 @@ export default function SubscriptionsView({
       {showRegister && presets && (
         <SubscriptionRegisterModal
           currency={registerCurrency}
+          accountType={accountType}
           presets={presets}
           editing={editing}
           userEmail={userEmail}

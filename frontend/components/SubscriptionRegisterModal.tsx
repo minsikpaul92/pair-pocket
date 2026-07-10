@@ -9,6 +9,7 @@ import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import CategorySelect from "@/components/CategorySelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import {
+  AccountType,
   BillingCycle,
   CategoryPresets,
   Currency,
@@ -41,6 +42,7 @@ import {
 
 interface Props {
   currency: Currency;
+  accountType?: AccountType;
   presets: CategoryPresets;
   editing?: Subscription | null;
   userEmail?: string | null;
@@ -58,6 +60,7 @@ function dateInputFromIso(iso: string | null | undefined): string {
 
 export default function SubscriptionRegisterModal({
   currency,
+  accountType = "personal",
   presets,
   editing = null,
   userEmail = null,
@@ -171,7 +174,7 @@ export default function SubscriptionRegisterModal({
   }, [editing]);
 
   useEffect(() => {
-    fetchAccounts({ currency })
+    fetchAccounts({ currency, accountType })
       .then((list) => {
         setAccounts(list);
         if (!editing) {
@@ -179,7 +182,7 @@ export default function SubscriptionRegisterModal({
         }
       })
       .catch(() => setAccounts([]));
-  }, [currency, editing]);
+  }, [currency, accountType, editing]);
 
   async function handleAddCategory(catName: string) {
     const updated = await addCustomCategory("expense", catName);
@@ -278,7 +281,7 @@ export default function SubscriptionRegisterModal({
       name: trimmedName,
       amount: numericAmount,
       currency,
-      account_type: "personal",
+      account_type: accountType,
       cycle,
       start_date: `${startDate}T00:00:00`,
       end_date:
@@ -758,6 +761,7 @@ export default function SubscriptionRegisterModal({
       {showAccountRegister && (
         <AccountRegisterModal
           currency={currency}
+          accountType={accountType}
           preferredType="expense"
           onClose={() => setShowAccountRegister(false)}
           onCreated={(created) => {

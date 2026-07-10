@@ -13,6 +13,7 @@ from app.routers import (
     email as email_router,
     exchange,
     internal,
+    invitations,
     settings as settings_router,
     stats,
     subscriptions,
@@ -44,6 +45,7 @@ app.add_middleware(
 
 app.include_router(accounts.router)
 app.include_router(subscriptions.router)
+app.include_router(invitations.router)
 app.include_router(internal.router)
 app.include_router(email_router.router)
 app.include_router(auth.router)

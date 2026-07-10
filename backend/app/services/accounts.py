@@ -37,7 +37,8 @@ async def compute_account_balance(
     db: AsyncIOMotorDatabase,
     *,
     account_doc: dict,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
 ) -> float:
     """Derive running balance for one financial account.
 
@@ -54,10 +55,16 @@ async def compute_account_balance(
     account_id = str(account_doc["_id"])
     is_liability = account_doc.get("is_liability", False)
     balance = float(account_doc.get("opening_balance", 0.0))
+    ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
+    if not ids:
+        return balance
+    owner_clause: dict = (
+        {"owner_id": ids[0]} if len(ids) == 1 else {"owner_id": {"$in": ids}}
+    )
 
     cursor = db[TX_COL].find(
         {
-            "owner_id": owner_id,
+            **owner_clause,
             "$or": [
                 {"account_id": account_id},
                 {"counter_account_id": account_id},
@@ -105,13 +112,27 @@ async def compute_account_balance(
 async def compute_net_worth(
     db: AsyncIOMotorDatabase,
     *,
-    owner_id: str,
+    owner_id: str | None = None,
+    owner_ids: list[str] | None = None,
     account_type: AccountType,
     currency: Currency | None = None,
 ) -> NetWorthSummary:
     """Aggregate per-account balances into net worth."""
+    ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
+    if not ids:
+        return NetWorthSummary(
+            account_type=account_type,
+            currency=currency,
+            total_assets=0.0,
+            total_liabilities=0.0,
+            net_worth=0.0,
+            accounts=[],
+        )
+    owner_clause: dict = (
+        {"owner_id": ids[0]} if len(ids) == 1 else {"owner_id": {"$in": ids}}
+    )
     query: dict = {
-        "owner_id": owner_id,
+        **owner_clause,
         "account_type": account_type.value,
         "is_active": True,
     }
@@ -126,7 +147,7 @@ async def compute_net_worth(
 
     for doc in docs:
         balance = await compute_account_balance(
-            db, account_doc=doc, owner_id=owner_id
+            db, account_doc=doc, owner_ids=ids
         )
         is_liability = doc.get("is_liability", False)
         contribution = -balance if is_liability else balance
