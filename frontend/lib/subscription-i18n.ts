@@ -1,4 +1,5 @@
 import type { BillingCycle, Subscription, SubscriptionStatus } from "@/lib/api";
+import { monthsBetweenDates } from "@/lib/api";
 
 type TranslateFn = (
   key: string,
@@ -33,22 +34,41 @@ export function translateSubscriptionSource(
   return cycle === "installment" ? t("sourceInstallment") : t("sourceSubscription");
 }
 
+/** Installment progress for the month being viewed (not only materialized payments). */
+export function installmentProgressAtMonth(
+  sub: Subscription,
+  viewMonth: Date
+): { paid: number; remaining: number; total: number } {
+  const total = sub.total_installments ?? 0;
+  if (total <= 0) return { paid: 0, remaining: 0, total: 0 };
+
+  const start = new Date(sub.installment_start_date || sub.start_date);
+  const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+  const view = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
+
+  const schedulePaid = Math.min(monthsBetweenDates(startMonth, view), total);
+  const remaining = Math.max(total - schedulePaid, 0);
+
+  return { paid: schedulePaid, remaining, total };
+}
+
 export function translateSubscriptionTracking(
   sub: Subscription,
   t: TranslateFn,
-  locale: string
+  locale: string,
+  viewMonth: Date = new Date()
 ): string {
   if (sub.cycle === "installment" && sub.total_installments != null) {
-    const remaining = Math.max(
-      sub.total_installments - sub.completed_installments,
-      0
+    const { paid, remaining, total } = installmentProgressAtMonth(
+      sub,
+      viewMonth
     );
     const end = sub.end_date
       ? formatSubscriptionDate(sub.end_date, locale)
       : "—";
     return t("trackingInstallment", {
-      paid: sub.completed_installments,
-      total: sub.total_installments,
+      paid,
+      total,
       remaining,
       end,
     });

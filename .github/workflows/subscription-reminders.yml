@@ -1,0 +1,24 @@
+name: Subscription reminder emails
+
+on:
+  schedule:
+    # Daily at 14:00 UTC (~09:00–10:00 Eastern)
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger subscription reminder cron
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$API_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "API_BASE_URL or CRON_SECRET not configured — skipping."
+            exit 0
+          fi
+          curl --fail-with-body -sS -X POST \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            "${API_BASE_URL%/}/api/internal/cron/subscription-reminders"

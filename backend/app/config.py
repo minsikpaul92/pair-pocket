@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_use_tls: bool = True
 
+    # --- Cron (subscription reminder jobs via GitHub Actions / external scheduler) ---
+    cron_secret: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property

@@ -3,22 +3,26 @@
 import {
   CreditCard,
   Landmark,
+  Pencil,
   RefreshCw,
   Wallet,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
+import AccountRegisterModal from "@/components/AccountRegisterModal";
 import {
   ACCOUNT_KIND_KEYS,
   AccountBalance,
   Currency,
   ExchangeRate,
+  FinancialAccount,
   FinancialAccountKind,
   LedgerScope,
   NetWorthSummary,
   StatsSummary,
   TRANSFER_CATEGORY,
+  fetchAccounts,
   fetchExchangeRate,
   fetchNetWorth,
   fetchStatsSummary,
@@ -31,6 +35,7 @@ interface Props {
   month: Date;
   version: number;
   scope: LedgerScope;
+  onChanged?: () => void;
 }
 
 function KindIcon({ kind }: { kind: FinancialAccountKind }) {
@@ -43,13 +48,14 @@ function KindIcon({ kind }: { kind: FinancialAccountKind }) {
   return <Landmark className="h-4 w-4 text-gray-400 shrink-0" />;
 }
 
-export default function DashboardView({ month, version, scope }: Props) {
+export default function DashboardView({ month, version, scope, onChanged }: Props) {
   const locale = useLocale();
   const tDashboard = useTranslations("dashboard");
   const tLedger = useTranslations("ledger");
   const tCommon = useTranslations("common");
   const tAccountKinds = useTranslations("accountKinds");
   const tCategories = useTranslations("categories");
+  const tAccount = useTranslations("account");
 
   const [cadStats, setCadStats] = useState<StatsSummary | null>(null);
   const [krwStats, setKrwStats] = useState<StatsSummary | null>(null);
@@ -58,6 +64,10 @@ export default function DashboardView({ month, version, scope }: Props) {
   const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [display, setDisplay] = useState<Currency>("CAD");
   const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(
+    null
+  );
 
   const monthStr = monthKey(month);
 
@@ -87,22 +97,42 @@ export default function DashboardView({ month, version, scope }: Props) {
       worthJobs.push(Promise.resolve(null));
     }
 
+    const accountJobs: Promise<FinancialAccount[]>[] = [];
+    if (scope === "CAD" || scope === "ALL") {
+      accountJobs.push(fetchAccounts({ currency: "CAD" }).catch(() => []));
+    }
+    if (scope === "KRW" || scope === "ALL") {
+      accountJobs.push(fetchAccounts({ currency: "KRW" }).catch(() => []));
+    }
+
     Promise.all([
       ...statsJobs,
       ...worthJobs,
       fetchExchangeRate().catch(() => null),
+      Promise.all(accountJobs).then((lists) => lists.flat()),
     ])
-      .then(([cadS, krwS, cadW, krwW, r]) => {
+      .then(([cadS, krwS, cadW, krwW, r, accountList]) => {
         setCadStats(cadS as StatsSummary | null);
         setKrwStats(krwS as StatsSummary | null);
         setCadWorth(cadW as NetWorthSummary | null);
         setKrwWorth(krwW as NetWorthSummary | null);
         setRate(r as ExchangeRate | null);
+        setAccounts(accountList as FinancialAccount[]);
         if (scope === "CAD") setDisplay("CAD");
         else if (scope === "KRW") setDisplay("KRW");
       })
       .finally(() => setLoading(false));
   }, [monthStr, version, scope]);
+
+  const accountById = useMemo(
+    () => new Map(accounts.map((a) => [a.id, a])),
+    [accounts]
+  );
+
+  function openAccountEdit(accountId: string) {
+    const account = accountById.get(accountId);
+    if (account) setEditingAccount(account);
+  }
 
   const flow = useMemo(() => {
     if (scope === "CAD") {
@@ -370,11 +400,19 @@ export default function DashboardView({ month, version, scope }: Props) {
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <KindIcon kind={acc.kind} />
-                    <p className="text-sm font-medium truncate">
+                    <p className="text-sm font-medium truncate flex-1">
                       {scope === "ALL" &&
                         (acc.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
                       {label}
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => openAccountEdit(acc.account_id)}
+                      className="shrink-0 rounded-lg p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                      aria-label={tAccount("editTitle")}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                   <p
                     className={`mt-1.5 text-base font-bold tabular-nums truncate ${
@@ -396,6 +434,8 @@ export default function DashboardView({ month, version, scope }: Props) {
           accounts={assetAccounts}
           scope={scope}
           kindLabel={(kind) => tAccountKinds(ACCOUNT_KIND_KEYS[kind])}
+          editLabel={tAccount("editTitle")}
+          onEdit={openAccountEdit}
         />
       )}
 
@@ -423,6 +463,24 @@ export default function DashboardView({ month, version, scope }: Props) {
           )}
         </div>
       )}
+      {editingAccount && (
+        <AccountRegisterModal
+          currency={editingAccount.currency}
+          preferredType={
+            editingAccount.is_default_income ? "income" : "expense"
+          }
+          account={editingAccount}
+          onClose={() => setEditingAccount(null)}
+          onCreated={() => {
+            setEditingAccount(null);
+            onChanged?.();
+          }}
+          onUpdated={() => {
+            setEditingAccount(null);
+            onChanged?.();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -432,11 +490,15 @@ function AccountGroup({
   accounts,
   scope,
   kindLabel,
+  editLabel,
+  onEdit,
 }: {
   title: string;
   accounts: AccountBalance[];
   scope: LedgerScope;
   kindLabel: (kind: FinancialAccountKind) => string;
+  editLabel: string;
+  onEdit: (accountId: string) => void;
 }) {
   return (
     <div className="card-inset overflow-hidden">
@@ -464,6 +526,14 @@ function AccountGroup({
                   {kindLabel(acc.kind)}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => onEdit(acc.account_id)}
+                className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                aria-label={editLabel}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
               <p className="text-sm font-semibold tabular-nums whitespace-nowrap text-gray-900 dark:text-white">
                 {formatAmount(acc.balance, acc.currency)}
               </p>

@@ -172,6 +172,9 @@
     "defaultAccount": "기본",
     "register": "등록",
     "registering": "등록 중…",
+    "editTitle": "카드/은행 수정",
+    "saveChanges": "변경 저장",
+    "deactivate": "비활성화 (목록에서 숨김)",
     "namePlaceholderExpense": "예: TD Visa, 신한카드",
     "namePlaceholderIncome": "예: TD Chequing, 국민은행"
   },
@@ -312,7 +315,9 @@
     },
     "trackingFirstMonth": "첫 달",
     "trackingMonths": "{months}개월째 구독",
-    "trackingInstallment": "{paid}/{total}회 · {remaining}회 남음 · 종료 {end}"
+    "trackingInstallment": "{paid}/{total}회 · {remaining}회 남음 · 종료 {end}",
+    "skipPayment": "건너뛰기",
+    "skipConfirm": "\"{name}\" {date} 결제를 건너뛸까요? 자동 지출이 기록되지 않습니다."
   },
   "errors": {
     "generic": "오류가 발생했습니다.",
@@ -345,6 +350,7 @@
     "invalidBalance": "잔액을 올바르게 입력해 주세요.",
     "registerFailed": "등록 중 오류가 발생했습니다.",
     "fetchSubscriptions": "구독 목록을 불러오지 못했습니다.",
+    "skipSubscriptionOccurrence": "예정 결제를 건너뛰지 못했습니다.",
     "saveSubscription": "구독을 저장하지 못했습니다.",
     "updateSubscription": "구독을 수정하지 못했습니다.",
     "scheduleSubscriptionCancel": "해지 예정 처리에 실패했습니다.",
