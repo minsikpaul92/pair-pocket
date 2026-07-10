@@ -817,3 +817,94 @@ async def list_pending_occurrences(
 
     docs = await db[OCC_COL].find(query).sort("due_date", 1).to_list(length=100)
     return docs
+
+
+async def skip_occurrence(
+    db: AsyncIOMotorDatabase,
+    *,
+    occurrence_id: str,
+    owner_id: str,
+) -> dict | None:
+    """Skip a pending charge without creating a transaction."""
+    if not ObjectId.is_valid(occurrence_id):
+        return None
+
+    claimed = await db[OCC_COL].find_one_and_update(
+        {
+            "_id": ObjectId(occurrence_id),
+            "owner_id": owner_id,
+            "status": OccurrenceStatus.PENDING.value,
+        },
+        {"$set": {"status": OccurrenceStatus.SKIPPED.value}},
+        return_document=ReturnDocument.BEFORE,
+    )
+    if not claimed:
+        return None
+
+    sub_oid = _as_object_id(claimed.get("subscription_id"))
+    if not sub_oid:
+        return claimed
+
+    sub = await db[SUBS_COL].find_one({"_id": sub_oid, "owner_id": owner_id})
+    if not sub:
+        return claimed
+
+    due = claimed.get("due_date")
+    if not isinstance(due, datetime):
+        return claimed
+
+    cycle = BillingCycle(sub["cycle"])
+    next_due = _next_due(due, cycle)
+    await db[SUBS_COL].update_one(
+        {"_id": sub_oid},
+        {
+            "$set": {
+                "next_due_date": next_due,
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+
+    refreshed = await db[SUBS_COL].find_one({"_id": sub_oid})
+    if refreshed and refreshed.get("status") in (
+        SubscriptionStatus.ACTIVE.value,
+        SubscriptionStatus.CANCEL_SCHEDULED.value,
+    ):
+        await generate_occurrences(db, subscription=refreshed)
+
+    return claimed
+
+
+async def run_all_reminder_jobs(
+    db: AsyncIOMotorDatabase,
+    *,
+    as_of: str | None = None,
+) -> dict:
+    """Send promo/end reminders for every user (cron entry point)."""
+    users = await db["users"].find({}).to_list(length=500)
+    promo_total = 0
+    end_total = 0
+    for user in users:
+        email = user.get("email")
+        if not email:
+            continue
+        owner_id = str(user["_id"])
+        for account_type in ("personal", "shared"):
+            promo_total += await send_promo_reminders(
+                db,
+                owner_id=owner_id,
+                account_type=account_type,
+                user_email=email,
+                as_of=as_of,
+            )
+            end_total += await send_end_reminders(
+                db,
+                owner_id=owner_id,
+                account_type=account_type,
+                user_email=email,
+                as_of=as_of,
+            )
+    return {
+        "promo_reminders_sent": promo_total,
+        "end_reminders_sent": end_total,
+    }

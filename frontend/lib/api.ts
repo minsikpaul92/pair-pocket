@@ -731,6 +731,17 @@ export async function fetchPendingOccurrences(filters: {
   return (await res.json()) as SubscriptionOccurrence[];
 }
 
+export async function skipSubscriptionOccurrence(
+  occurrenceId: string
+): Promise<SubscriptionOccurrence> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/subscriptions/occurrences/${occurrenceId}/skip`,
+    { method: "POST", headers: authHeaders() }
+  );
+  if (!res.ok) throw await readApiError(res, "skipSubscriptionOccurrence");
+  return (await res.json()) as SubscriptionOccurrence;
+}
+
 export async function syncSubscriptions(
   accountType: AccountType = "personal"
 ): Promise<number> {
@@ -857,12 +868,14 @@ export async function updateAccount(
     Pick<
       FinancialAccount,
       | "name"
+      | "nickname"
       | "opening_balance"
       | "is_default_expense"
       | "is_default_income"
       | "is_active"
       | "institution"
       | "last_four"
+      | "account_number"
     >
   >
 ): Promise<FinancialAccount> {

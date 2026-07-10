@@ -30,9 +30,11 @@ from app.services.subscriptions import (
     materialize_due_occurrences,
     monthly_subscription_summary,
     purge_subscription_on_reschedule,
+    run_all_reminder_jobs,
     schedule_subscription_cancel,
     send_end_reminders,
     send_promo_reminders,
+    skip_occurrence,
     subscription_visible_in_month,
     subscription_visible_now,
     _calendar_day,
@@ -202,6 +204,45 @@ async def pending_occurrences(
             }
         )
     return out
+
+
+@router.post("/occurrences/{occurrence_id}/skip", response_model=SubscriptionOccurrenceOut)
+async def skip_pending_occurrence(
+    occurrence_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    skipped = await skip_occurrence(
+        db,
+        occurrence_id=occurrence_id,
+        owner_id=current_user.id,
+    )
+    if not skipped:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="예정 결제를 찾을 수 없거나 이미 처리되었습니다.",
+        )
+
+    sub_oid = skipped.get("subscription_id")
+    sub = None
+    if isinstance(sub_oid, ObjectId):
+        sub = await db[COLLECTION].find_one({"_id": sub_oid})
+    elif isinstance(sub_oid, str) and ObjectId.is_valid(sub_oid):
+        sub = await db[COLLECTION].find_one({"_id": ObjectId(sub_oid)})
+
+    return {
+        "id": str(skipped["_id"]),
+        "subscription_id": str(skipped["subscription_id"]),
+        "due_date": skipped["due_date"],
+        "amount": skipped["amount"],
+        "currency": skipped["currency"],
+        "status": OccurrenceStatus.SKIPPED,
+        "transaction_id": skipped.get("transaction_id"),
+        "subscription_name": sub["name"] if sub else None,
+        "subscription_billing_cycle": (
+            BillingCycle(sub["cycle"]) if sub else None
+        ),
+    }
 
 
 @router.post("/sync", status_code=status.HTTP_200_OK)

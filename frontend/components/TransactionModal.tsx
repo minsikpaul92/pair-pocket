@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Trash2, X } from "lucide-react";
+import { CalendarDays, SkipForward, Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -70,6 +70,7 @@ interface Props {
   onSaved: () => void;
   onSelectTransaction?: (tx: Transaction) => void;
   onSelectPendingOccurrence?: (occ: SubscriptionOccurrence) => void;
+  onSkipPendingOccurrence?: (occ: SubscriptionOccurrence) => void;
   onPresetsChange: (presets: CategoryPresets) => void;
 }
 
@@ -87,6 +88,7 @@ export default function TransactionModal({
   onSaved,
   onSelectTransaction,
   onSelectPendingOccurrence,
+  onSkipPendingOccurrence,
   onPresetsChange,
 }: Props) {
   const locale = useLocale();
@@ -747,11 +749,11 @@ export default function TransactionModal({
             {dayPendingOccurrences.map((occ) => {
               const tone = subscriptionScheduleAmountClass(occ.due_date);
               return (
-              <li key={occ.id}>
+              <li key={occ.id} className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => onSelectPendingOccurrence?.(occ)}
-                  className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors"
+                  className="flex flex-1 items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors min-w-0"
                 >
                   <span className={`text-sm truncate ${tone}`}>
                     {occ.subscription_name || tSub("defaultName")}
@@ -768,6 +770,17 @@ export default function TransactionModal({
                     {formatAmount(occ.amount, occ.currency)}
                   </span>
                 </button>
+                {onSkipPendingOccurrence && occ.status === "pending" && (
+                  <button
+                    type="button"
+                    onClick={() => onSkipPendingOccurrence(occ)}
+                    title={tSub("skipPayment")}
+                    aria-label={tSub("skipPayment")}
+                    className="shrink-0 mr-2 rounded-lg p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                  >
+                    <SkipForward className="h-4 w-4" />
+                  </button>
+                )}
               </li>
             );
             })}

@@ -36,9 +36,12 @@ import {
   fetchCategoryPresets,
   fetchPendingOccurrences,
   fetchTransactions,
+  skipSubscriptionOccurrence,
   syncSubscriptions,
 } from "@/lib/api";
 import { addMonths, dayKey, isoDayKey, monthKey, monthLabel } from "@/lib/date";
+import { translateError } from "@/lib/errors";
+import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 
 type View = "calendar" | "list" | "dashboard" | "subscriptions";
 
@@ -86,6 +89,8 @@ export default function AppShell({ user, onLogout }: Props) {
   const tLedger = useTranslations("ledger");
   const tCommon = useTranslations("common");
   const tInvite = useTranslations("invite");
+  const tSub = useTranslations("subscriptions");
+  const tErrors = useTranslations("errors");
   const locale = useLocale();
 
   const [view, setView] = useState<View>("calendar");
@@ -240,6 +245,20 @@ export default function AppShell({ user, onLogout }: Props) {
 
   function openSubscriptionFromPending(occ: SubscriptionOccurrence) {
     openSubscriptionById(occ.subscription_id, occ.currency);
+  }
+
+  async function handleSkipPendingOccurrence(occ: SubscriptionOccurrence) {
+    const name = occ.subscription_name || tSub("defaultName");
+    const dateLabel = formatSubscriptionDate(occ.due_date, locale);
+    if (!window.confirm(tSub("skipConfirm", { name, date: dateLabel }))) {
+      return;
+    }
+    try {
+      await skipSubscriptionOccurrence(occ.id);
+      bumpVersion();
+    } catch (err) {
+      alert(translateError(err, tErrors, "skipSubscriptionOccurrence"));
+    }
   }
 
   const modalDayTransactions = modalDate
@@ -477,7 +496,12 @@ export default function AppShell({ user, onLogout }: Props) {
               onPresetsChange={setPresets}
             />
           ) : (
-            <DashboardView month={month} version={version} scope={scope} />
+            <DashboardView
+              month={month}
+              version={version}
+              scope={scope}
+              onChanged={bumpVersion}
+            />
           )}
         </main>
       </div>
@@ -526,6 +550,7 @@ export default function AppShell({ user, onLogout }: Props) {
           onSaved={handleSaved}
           onSelectTransaction={openEdit}
           onSelectPendingOccurrence={openSubscriptionFromPending}
+          onSkipPendingOccurrence={handleSkipPendingOccurrence}
           onPresetsChange={setPresets}
         />
       )}

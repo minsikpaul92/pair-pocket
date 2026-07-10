@@ -14,6 +14,7 @@ import {
   createAccount,
   formatAmountInput,
   parseAmountInput,
+  updateAccount,
 } from "@/lib/api";
 import { BANK_OPTIONS, bankLogoUrl } from "@/lib/banks";
 import { translateError } from "@/lib/errors";
@@ -21,8 +22,10 @@ import { translateError } from "@/lib/errors";
 interface Props {
   currency: Currency;
   preferredType: TransactionType;
+  account?: FinancialAccount | null;
   onClose: () => void;
   onCreated: (account: FinancialAccount) => void;
+  onUpdated?: (account: FinancialAccount) => void;
 }
 
 const KINDS: FinancialAccountKind[] = [
@@ -73,31 +76,49 @@ function BankIcon({
 export default function AccountRegisterModal({
   currency,
   preferredType,
+  account = null,
   onClose,
   onCreated,
+  onUpdated,
 }: Props) {
+  const isEdit = Boolean(account);
   const t = useTranslations("account");
   const tKinds = useTranslations("accountKinds");
   const tCommon = useTranslations("common");
   const tErrors = useTranslations("errors");
 
-  const [name, setName] = useState("");
-  const [nickname, setNickname] = useState("");
+  const [name, setName] = useState(account?.name ?? "");
+  const [nickname, setNickname] = useState(account?.nickname ?? "");
   const [kind, setKind] = useState<FinancialAccountKind>(
-    preferredType === "expense" ? "credit_card" : "checking"
+    account?.kind ??
+      (preferredType === "expense" ? "credit_card" : "checking")
   );
-  const [openingBalance, setOpeningBalance] = useState("0");
-  const [lastFour, setLastFour] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [institution, setInstitution] = useState("");
+  const [openingBalance, setOpeningBalance] = useState(
+    account
+      ? formatAmountInput(String(account.opening_balance), account.currency)
+      : "0"
+  );
+  const [lastFour, setLastFour] = useState(account?.last_four ?? "");
+  const [accountNumber, setAccountNumber] = useState(
+    account?.account_number ?? ""
+  );
+  const [institution, setInstitution] = useState(account?.institution ?? "");
   const [bankOpen, setBankOpen] = useState(false);
-  const [isDefault, setIsDefault] = useState(true);
+  const [isDefault, setIsDefault] = useState(
+    account
+      ? preferredType === "expense"
+        ? account.is_default_expense
+        : account.is_default_income
+      : true
+  );
+  const [isActive, setIsActive] = useState(account?.is_active ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bankRef = useRef<HTMLDivElement>(null);
 
   const selectedBank = BANK_OPTIONS.find((b) => b.id === institution);
   const isCreditCard = kind === "credit_card";
+  const displayCurrency = account?.currency ?? currency;
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -126,21 +147,40 @@ export default function AccountRegisterModal({
     }
 
     const nick = nickname.trim();
-    const payload: NewFinancialAccount = {
-      name: trimmed,
-      nickname: nick || null,
-      kind,
-      currency,
-      opening_balance: balance,
-      institution: institution || null,
-      last_four: isCreditCard ? lastFour.trim() || null : null,
-      account_number: isCreditCard ? null : accountNumber.trim() || null,
-      is_default_expense: preferredType === "expense" ? isDefault : false,
-      is_default_income: preferredType === "income" ? isDefault : false,
-    };
-
     setSubmitting(true);
     try {
+      if (isEdit && account) {
+        const updated = await updateAccount(account.id, {
+          name: trimmed,
+          nickname: nick || null,
+          opening_balance: balance,
+          institution: institution || null,
+          last_four: isCreditCard ? lastFour.trim() || null : null,
+          account_number: isCreditCard ? null : accountNumber.trim() || null,
+          is_default_expense:
+            preferredType === "expense" ? isDefault : account.is_default_expense,
+          is_default_income:
+            preferredType === "income" ? isDefault : account.is_default_income,
+          is_active: isActive,
+        });
+        onUpdated?.(updated);
+        onCreated(updated);
+        return;
+      }
+
+      const payload: NewFinancialAccount = {
+        name: trimmed,
+        nickname: nick || null,
+        kind,
+        currency,
+        opening_balance: balance,
+        institution: institution || null,
+        last_four: isCreditCard ? lastFour.trim() || null : null,
+        account_number: isCreditCard ? null : accountNumber.trim() || null,
+        is_default_expense: preferredType === "expense" ? isDefault : false,
+        is_default_income: preferredType === "income" ? isDefault : false,
+      };
+
       const created = await createAccount(payload);
       onCreated(created);
     } catch (err) {
@@ -164,10 +204,10 @@ export default function AccountRegisterModal({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold tracking-tight">
-              {t("registerTitle")}
+              {isEdit ? t("editTitle") : t("registerTitle")}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {currency} ·{" "}
+              {displayCurrency} ·{" "}
               {preferredType === "expense"
                 ? t("defaultForExpense")
                 : t("defaultForIncome")}{" "}
@@ -226,12 +266,13 @@ export default function AccountRegisterModal({
                 <button
                   key={k}
                   type="button"
+                  disabled={isEdit}
                   onClick={() => setKind(k)}
                   className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                     kind === k
                       ? "bg-blue-500 text-white"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
-                  }`}
+                  } ${isEdit ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   {tKinds(ACCOUNT_KIND_KEYS[k])}
                 </button>
@@ -248,7 +289,9 @@ export default function AccountRegisterModal({
                 inputMode="decimal"
                 value={openingBalance}
                 onChange={(e) =>
-                  setOpeningBalance(formatAmountInput(e.target.value, currency))
+                  setOpeningBalance(
+                    formatAmountInput(e.target.value, displayCurrency)
+                  )
                 }
                 className="input-field"
               />
@@ -354,6 +397,18 @@ export default function AccountRegisterModal({
             </span>
           </label>
 
+          {isEdit && (
+            <label className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 px-4 py-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!isActive}
+                onChange={(e) => setIsActive(!e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+              />
+              <span className="text-sm">{t("deactivate")}</span>
+            </label>
+          )}
+
           {error && (
             <p className="text-sm text-red-500" role="alert">
               {error}
@@ -365,7 +420,11 @@ export default function AccountRegisterModal({
             disabled={submitting}
             className="btn-primary w-full disabled:opacity-50"
           >
-            {submitting ? t("registering") : t("register")}
+            {submitting
+              ? t("registering")
+              : isEdit
+                ? t("saveChanges")
+                : t("register")}
           </button>
         </form>
       </div>

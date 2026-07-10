@@ -172,6 +172,9 @@
     "defaultAccount": "Default",
     "register": "Register",
     "registering": "Registering…",
+    "editTitle": "Edit account",
+    "saveChanges": "Save changes",
+    "deactivate": "Deactivate (hide from lists)",
     "namePlaceholderExpense": "e.g. TD Visa, Shinhan Card",
     "namePlaceholderIncome": "e.g. TD Chequing, KB Bank"
   },
@@ -312,7 +315,9 @@
     },
     "trackingFirstMonth": "First month",
     "trackingMonths": "{months} months subscribed",
-    "trackingInstallment": "{paid}/{total} paid · {remaining} left · ends {end}"
+    "trackingInstallment": "{paid}/{total} paid · {remaining} left · ends {end}",
+    "skipPayment": "Skip",
+    "skipConfirm": "Skip \"{name}\" on {date}? No expense will be recorded."
   },
   "errors": {
     "generic": "Something went wrong.",
@@ -345,6 +350,7 @@
     "invalidBalance": "Enter a valid balance.",
     "registerFailed": "Registration failed.",
     "fetchSubscriptions": "Could not load subscriptions.",
+    "skipSubscriptionOccurrence": "Could not skip the scheduled payment.",
     "saveSubscription": "Could not save subscription.",
     "updateSubscription": "Could not update subscription.",
     "scheduleSubscriptionCancel": "Could not schedule cancellation.",

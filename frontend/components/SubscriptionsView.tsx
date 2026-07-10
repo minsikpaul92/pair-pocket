@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarX2, Plus, Repeat, Undo2 } from "lucide-react";
+import { CalendarX2, Plus, Repeat, SkipForward, Undo2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
@@ -22,6 +22,7 @@ import {
   formatAmount,
   isPromoActive,
   scheduleSubscriptionCancel,
+  skipSubscriptionOccurrence,
   subscriptionDisplayAmount,
   subscriptionScheduleAmountClass,
 } from "@/lib/api";
@@ -34,6 +35,7 @@ import {
   translateSubscriptionTracking,
 } from "@/lib/subscription-i18n";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import { translateError } from "@/lib/errors";
 
 interface Props {
   scope: LedgerScope;
@@ -103,6 +105,7 @@ function PendingSection({
   pending,
   subscriptions,
   onSelectOccurrence,
+  onSkipOccurrence,
   t,
   tCommon,
   locale,
@@ -111,6 +114,7 @@ function PendingSection({
   pending: SubscriptionOccurrence[];
   subscriptions: Subscription[];
   onSelectOccurrence: (occ: SubscriptionOccurrence) => void;
+  onSkipOccurrence: (occ: SubscriptionOccurrence) => void;
   t: ReturnType<typeof useTranslations<"subscriptions">>;
   tCommon: ReturnType<typeof useTranslations<"common">>;
   locale: string;
@@ -128,29 +132,40 @@ function PendingSection({
       const tone = subscriptionScheduleAmountClass(occ.due_date);
       return (
         <li key={occ.id}>
-          <button
-            type="button"
-            onClick={() => onSelectOccurrence(occ)}
-            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
-          >
-            <div className="min-w-0">
-              <p className={`text-sm font-medium truncate ${tone}`}>
-                {occ.subscription_name || t("defaultName")}
-                {translateSubscriptionSource(cycle, t) && (
-                  <span className="text-[10px] text-gray-400 font-normal">
-                    {" "}
-                    {translateSubscriptionSource(cycle, t)}
-                  </span>
-                )}
+          <div className="flex items-center gap-1 px-2 py-1">
+            <button
+              type="button"
+              onClick={() => onSelectOccurrence(occ)}
+              className="flex flex-1 items-center justify-between gap-3 px-2 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors rounded-lg min-w-0"
+            >
+              <div className="min-w-0">
+                <p className={`text-sm font-medium truncate ${tone}`}>
+                  {occ.subscription_name || t("defaultName")}
+                  {translateSubscriptionSource(cycle, t) && (
+                    <span className="text-[10px] text-gray-400 font-normal">
+                      {" "}
+                      {translateSubscriptionSource(cycle, t)}
+                    </span>
+                  )}
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  {formatSubscriptionDate(occ.due_date, locale)}
+                </p>
+              </div>
+              <p className={`text-sm font-semibold tabular-nums whitespace-nowrap ${tone}`}>
+                {formatAmount(occ.amount, occ.currency)}
               </p>
-              <p className="text-[11px] text-gray-400">
-                {formatSubscriptionDate(occ.due_date, locale)}
-              </p>
-            </div>
-            <p className={`text-sm font-semibold tabular-nums whitespace-nowrap ${tone}`}>
-              {formatAmount(occ.amount, occ.currency)}
-            </p>
-          </button>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSkipOccurrence(occ)}
+              title={t("skipPayment")}
+              aria-label={t("skipPayment")}
+              className="shrink-0 rounded-lg p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+            >
+              <SkipForward className="h-4 w-4" />
+            </button>
+          </div>
         </li>
       );
     });
@@ -213,6 +228,7 @@ export default function SubscriptionsView({
   const tCommon = useTranslations("common");
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
+  const tErrors = useTranslations("errors");
   const locale = useLocale();
 
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -302,6 +318,24 @@ export default function SubscriptionsView({
   function openFromOccurrence(occ: SubscriptionOccurrence) {
     const sub = subscriptions.find((s) => s.id === occ.subscription_id);
     if (sub) openEdit(sub);
+  }
+
+  async function handleSkipOccurrence(occ: SubscriptionOccurrence) {
+    const name = occ.subscription_name || t("defaultName");
+    const dateLabel = formatSubscriptionDate(occ.due_date, locale);
+    if (
+      !window.confirm(
+        t("skipConfirm", { name, date: dateLabel })
+      )
+    ) {
+      return;
+    }
+    try {
+      await skipSubscriptionOccurrence(occ.id);
+      onChanged();
+    } catch (err) {
+      alert(translateError(err, tErrors, "skipSubscriptionOccurrence"));
+    }
   }
 
   useEffect(() => {
@@ -460,6 +494,7 @@ export default function SubscriptionsView({
         pending={pending}
         subscriptions={subscriptions}
         onSelectOccurrence={openFromOccurrence}
+        onSkipOccurrence={handleSkipOccurrence}
         t={t}
         tCommon={tCommon}
         locale={locale}
