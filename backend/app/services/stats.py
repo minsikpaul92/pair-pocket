@@ -125,6 +125,7 @@ async def compute_stats(
     investment_savings_total = 0.0
     settlement_refund_total = 0.0
     by_category: dict[str, float] = {}
+    expense_by_category: dict[str, float] = {}
     by_sub_category: dict[str, float] = {}
 
     for g in groups:
@@ -148,6 +149,9 @@ async def compute_stats(
             total_expense += amount
             if is_investment_expense(cat):
                 investment_savings_total += amount
+            else:
+                # Pure consumption categories for pie / expense ratio charts.
+                expense_by_category[cat] = expense_by_category.get(cat, 0) + amount
             by_category[cat] = by_category.get(cat, 0) + amount
             by_sub_category[f"{cat} › {sub}"] = (
                 by_sub_category.get(f"{cat} › {sub}", 0) + amount
@@ -166,14 +170,20 @@ async def compute_stats(
         }
     ).to_list(length=1000)
 
+    effective_by_category: dict[str, float] = {}
     effective_by_merchant: dict[str, float] = {}
     settlement_details: list[dict] = []
     for doc in expense_docs:
-        if is_transfer_expense(doc.get("category", "")):
+        cat = doc.get("category", "")
+        if is_transfer_expense(cat):
             continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)
         effective = max(doc["amount"] - settled, 0.0)
+
+        if not is_investment_expense(cat):
+            effective_by_category[cat] = effective_by_category.get(cat, 0.0) + effective
+
         merchant = doc.get("merchant", "미지정")
         effective_by_merchant[merchant] = (
             effective_by_merchant.get(merchant, 0.0) + effective
@@ -201,6 +211,10 @@ async def compute_stats(
         "breakdown_by_category": [
             {"category": k, "amount": v}
             for k, v in sorted(by_category.items(), key=lambda x: -x[1])
+        ],
+        "expense_breakdown_by_category": [
+            {"category": k, "amount": v}
+            for k, v in sorted(effective_by_category.items(), key=lambda x: -x[1])
         ],
         "breakdown_by_sub_category": [
             {"label": k, "amount": v}

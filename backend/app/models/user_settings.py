@@ -12,6 +12,7 @@ class UserSettingsBase(BaseModel):
     merchants: list[str] = Field(default_factory=list)
     institutions: list[str] = Field(default_factory=list)
     custom_categories: CustomCategoryMap = Field(default_factory=CustomCategoryMap)
+    category_colors: dict[str, str] = Field(default_factory=dict)
     default_expense_account_id: str | None = None
     default_income_account_id: str | None = None
 
@@ -26,3 +27,8 @@ class UserSettingsOut(UserSettingsBase):
 
 class AddInstitutionBody(BaseModel):
     name: str
+
+
+class SetCategoryColorBody(BaseModel):
+    category: str
+    color: str = Field(min_length=4, max_length=9)

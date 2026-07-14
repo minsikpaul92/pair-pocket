@@ -52,6 +52,10 @@ class StatsSummary(BaseModel):
     )
     net_cashflow: float
     breakdown_by_category: list[CategoryBreakdown]
+    expense_breakdown_by_category: list[CategoryBreakdown] = Field(
+        default_factory=list,
+        description="Expense categories only (excludes 투자/저축) for pie charts.",
+    )
     breakdown_by_sub_category: list[SubCategoryBreakdown]
     filters_applied: FiltersApplied
 

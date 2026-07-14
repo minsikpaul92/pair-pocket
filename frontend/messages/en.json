@@ -122,7 +122,18 @@
     "cardBalances": "Card balances",
     "expense": "Expenses",
     "income": "Income",
-    "investmentSavings": "Invest / save"
+    "investmentSavings": "Invest / save",
+    "expenseRatio": "Expense mix",
+    "categoryBreakdown": "Spending by category",
+    "trendTitle": "Income & expense trend",
+    "trendRange": "{months} mo",
+    "periodMonth": "This month",
+    "periodQuarter": "Quarter",
+    "periodHalf": "Half year",
+    "periodYear": "1 year",
+    "pickColor": "Change category color",
+    "noExpenseData": "No expense data for the selected period.",
+    "noTrendData": "No data for the selected period."
   },
   "list": {
     "allCategories": "All categories",

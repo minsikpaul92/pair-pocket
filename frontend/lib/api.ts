@@ -208,6 +208,7 @@ export interface StatsSummary {
   pure_consumption: number;
   net_cashflow: number;
   breakdown_by_category: { category: string; amount: number }[];
+  expense_breakdown_by_category?: { category: string; amount: number }[];
   breakdown_by_sub_category: { label: string; amount: number }[];
   breakdown_by_merchant_effective?: { merchant: string; amount: number }[];
   settlement_details?: {
@@ -327,6 +328,49 @@ export async function addInstitution(name: string): Promise<string[]> {
   if (!res.ok) throw new ApiError("addInstitution");
   const data = await res.json();
   return data.institutions as string[];
+}
+
+export interface UserSettings {
+  merchants: string[];
+  institutions: string[];
+  custom_categories: {
+    expense: Record<string, string[]>;
+    income: Record<string, string[]>;
+  };
+  category_colors: Record<string, string>;
+}
+
+export async function fetchUserSettings(): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("fetchUserSettings");
+  const data = (await res.json()) as UserSettings;
+  return {
+    ...data,
+    category_colors: data.category_colors ?? {},
+  };
+}
+
+export async function setCategoryColor(
+  category: string,
+  color: string
+): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/category-colors`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ category, color }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body.detail === "string") throw new Error(body.detail);
+    throw new ApiError("setCategoryColor");
+  }
+  const data = (await res.json()) as UserSettings;
+  return {
+    ...data,
+    category_colors: data.category_colors ?? {},
+  };
 }
 
 export async function fetchSubCategories(

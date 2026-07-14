@@ -61,7 +61,7 @@ export default async function LocaleLayout({ children, params }: Props) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var m=window.matchMedia('(prefers-color-scheme: dark)');function a(e){document.documentElement.classList.toggle('dark', e.matches);}a(m);m.addEventListener('change',a);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('pairpocket_theme');var isDark=false;if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){isDark=true;}document.documentElement.classList.toggle('dark',isDark);}catch(e){}})();`,
           }}
         />
       </head>
