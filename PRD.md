@@ -86,15 +86,16 @@
 | Batch receipt image upload (single Gemini batch request) | Not started |
 | CSV bulk upload | Not started |
 
-### Phase 4: Dashboard & Stocks — ~30% complete
+### Phase 4: Dashboard & Stocks — ~70% complete
 | Item | Status |
 |------|--------|
 | Exchange-rate conversion for ALL view (Frankfurter API + cache) | Done |
 | Net worth summary widget (account balances) | Done |
-| Stats API (`/api/stats/summary` — monthly flow, category breakdown) | Done (backend only) |
-| Recharts Pie / Bar / Line charts | Not started — `recharts` not installed |
-| yfinance + daily stock price scheduler | Not started |
-| Full "Cash + Stocks" net worth | Not started — cash/account balances only |
+| Stats API (`/api/stats/summary` — monthly flow, category breakdown) | Done |
+| Recharts Pie / Bar charts on Dashboard | Done — expense mix pie + 3/6/12 month income·expense trend |
+| Category breakdown UI | Done — list beside pie from `expense_breakdown_by_category` |
+| yfinance + daily stock price scheduler | Deferred — separate Stocks tab / PR |
+| Full "Cash + Stocks" net worth | Deferred — with Stocks tab |
 
 ### Phase 2.5: Subscriptions & Installments — ~85% complete (not in original PRD)
 | Item | Status |
@@ -126,9 +127,9 @@ Navigation: sidebar (desktop) + bottom tab bar (mobile). Header filters: **Share
 3. Shared data access (group-scoped queries) — Done
 
 ### P1 — Analytics (Phase 4)
-4. **Recharts integration** — monthly expense Pie chart, quarterly/annual Bar/Line trends using existing stats API
-5. **Category breakdown UI** — surface `breakdown_by_category` from `/api/stats/summary` on Dashboard
-6. **yfinance stock prices** — daily scheduler, investment account valuation in net worth
+4. **Recharts integration** — Done (Dashboard pie + trend bar; stocks deferred)
+5. **Category breakdown UI** — Done
+6. **yfinance stock prices** — Deferred to a separate Stocks tab / PR
 
 ### P2 — AI input (Phase 3)
 7. **PDF statement parsing** — Groq + pdfplumber endpoint
@@ -142,4 +143,4 @@ Navigation: sidebar (desktop) + bottom tab bar (mobile). Header filters: **Share
 13. **Leave shared group / unlink partners** — not in P0
 
 ## 8. Suggested Next Task
-Start **P1** (Recharts + category breakdown on Dashboard), or polish invite/email production config if deploying soon.
+Add a **Stocks** tab (yfinance + net worth) as its own PR, or start **P2** AI/CSV input.

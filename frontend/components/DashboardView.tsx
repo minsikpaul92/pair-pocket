@@ -11,6 +11,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
+import DashboardAnalytics from "@/components/DashboardAnalytics";
 import {
   ACCOUNT_KIND_KEYS,
   AccountBalance,
@@ -402,6 +403,17 @@ export default function DashboardView({
           />
         </section>
       )}
+
+      <DashboardAnalytics
+        month={month}
+        version={version}
+        scope={scope}
+        accountType={accountType}
+        displayCurrency={heroCurrency}
+        rate={rate}
+        cadStats={cadStats}
+        krwStats={krwStats}
+      />
 
       {liabilityAccounts.length > 0 && (
         <section className="card-inset p-4">

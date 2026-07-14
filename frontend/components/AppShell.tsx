@@ -23,6 +23,7 @@ import DashboardView from "@/components/DashboardView";
 import InviteModal from "@/components/InviteModal";
 import ListView from "@/components/ListView";
 import LocaleToggle from "@/components/LocaleToggle";
+import ThemeToggle from "@/components/ThemeToggle";
 import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
 import {
@@ -475,6 +476,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
             <div className="flex items-center gap-2 shrink-0">
               <LocaleToggle />
+              <ThemeToggle />
               <div className="flex items-center gap-3 md:hidden">
               <button
                 type="button"

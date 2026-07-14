@@ -122,7 +122,18 @@
     "cardBalances": "카드값",
     "expense": "지출",
     "income": "소득",
-    "investmentSavings": "투자/저축"
+    "investmentSavings": "투자/저축",
+    "expenseRatio": "지출 비율",
+    "categoryBreakdown": "카테고리별 지출",
+    "trendTitle": "수입·지출 추이",
+    "trendRange": "{months}개월",
+    "periodMonth": "이번 달",
+    "periodQuarter": "분기",
+    "periodHalf": "반기",
+    "periodYear": "1년",
+    "pickColor": "카테고리 색상 변경",
+    "noExpenseData": "선택한 기간의 지출 데이터가 없습니다.",
+    "noTrendData": "선택한 기간의 데이터가 없습니다."
   },
   "list": {
     "allCategories": "전체 대분류",

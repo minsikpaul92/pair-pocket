@@ -84,6 +84,7 @@ async def callback(request: Request, db: AsyncIOMotorDatabase = Depends(get_data
                 "merchants": [],
                 "institutions": [],
                 "custom_categories": {"expense": {}, "income": {}},
+                "category_colors": {},
             }
         },
         upsert=True,
