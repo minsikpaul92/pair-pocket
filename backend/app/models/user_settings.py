@@ -15,6 +15,7 @@ class UserSettingsBase(BaseModel):
     category_colors: dict[str, str] = Field(default_factory=dict)
     default_expense_account_id: str | None = None
     default_income_account_id: str | None = None
+    gemini_api_key: str | None = None
 
 
 class UserSettingsInDB(UserSettingsBase):
@@ -22,7 +23,8 @@ class UserSettingsInDB(UserSettingsBase):
 
 
 class UserSettingsOut(UserSettingsBase):
-    pass
+    gemini_api_key: str | None = Field(default=None, exclude=True)
+    has_gemini_key: bool = False
 
 
 class AddInstitutionBody(BaseModel):

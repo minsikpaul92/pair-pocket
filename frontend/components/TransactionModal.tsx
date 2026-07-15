@@ -57,6 +57,7 @@ import {
   fetchStockHoldings,
   StockHolding,
   ExchangeRate,
+  ParsedTransaction,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, formatDayLabel } from "@/lib/date";
@@ -67,6 +68,7 @@ interface Props {
   currency: Currency;
   ledgerScope?: LedgerScope;
   accountType?: AccountType;
+  parsedTransaction?: ParsedTransaction | null;
   allowCurrencyPick?: boolean;
   onCurrencyChange?: (currency: Currency) => void;
   presets: CategoryPresets;
@@ -114,6 +116,7 @@ export default function TransactionModal({
   currency,
   ledgerScope = "ALL",
   accountType = "personal",
+  parsedTransaction = null,
   allowCurrencyPick = false,
   onCurrencyChange,
   presets,
@@ -361,6 +364,18 @@ export default function TransactionModal({
     setError(null);
     setHydratedEditId(tx.id);
   }, [editingTransaction, hydratedEditId, currency]);
+
+  useEffect(() => {
+    if (!parsedTransaction) return;
+    setAmount(amountToInput(parsedTransaction.amount, parsedTransaction.currency));
+    setMerchant(parsedTransaction.merchant || "");
+    setTxCurrency(parsedTransaction.currency);
+    setCategory(parsedTransaction.category || "");
+    setSubCategory(parsedTransaction.sub_category || "");
+    if (parsedTransaction.date) {
+      onDateChange(new Date(parsedTransaction.date));
+    }
+  }, [parsedTransaction, currency, onDateChange]);
 
   useEffect(() => {
     if (isEditing || isTransfer) return;

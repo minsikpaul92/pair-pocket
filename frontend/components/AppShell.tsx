@@ -11,12 +11,15 @@ import {
   PanelLeftOpen,
   Plus,
   Repeat,
+  Settings,
+  Camera,
+  Loader2,
   UserCheck,
   UserPlus,
   Wallet,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
@@ -27,6 +30,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
 import StocksView from "@/components/StocksView";
+import SettingsView from "@/components/SettingsView";
 import { LineChart } from "lucide-react";
 import {
   AccountType,
@@ -47,16 +51,17 @@ import {
   fetchTransactions,
   skipSubscriptionOccurrence,
   syncSubscriptions,
+  parseReceiptsOrStatements,
 } from "@/lib/api";
 import { addMonths, dayKey, isoDayKey, monthKey, monthLabel } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 
-type View = "calendar" | "list" | "dashboard" | "subscriptions" | "stocks";
+type View = "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings";
 
 const NAV: {
   id: View;
-  labelKey: "calendar" | "list" | "dashboard" | "subscriptions" | "stocks";
+  labelKey: "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings";
   icon: any;
 }[] = [
   { id: "calendar", labelKey: "calendar", icon: CalendarDays },
@@ -64,6 +69,7 @@ const NAV: {
   { id: "dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { id: "subscriptions", labelKey: "subscriptions", icon: Repeat },
   { id: "stocks", labelKey: "stocks", icon: LineChart },
+  { id: "settings", labelKey: "settings", icon: Settings },
 ];
 
 const LEDGERS: { scope: LedgerScope; labelKey: "all" | "canada" | "korea"; flag?: string }[] = [
@@ -135,6 +141,41 @@ export default function AppShell({ user, onLogout }: Props) {
   const [modalCurrency, setModalCurrency] = useState<Currency>("CAD");
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
+
+  const [scanMenuOpen, setScanMenuOpen] = useState(false);
+  const [aiParsing, setAiParsing] = useState(false);
+  const [parsedData, setParsedData] = useState<any>(null);
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    try {
+      setAiParsing(true);
+      const results = await parseReceiptsOrStatements(files);
+      if (results && results.length > 0) {
+        const parsed = results[0];
+        setParsedData(parsed);
+        const txDate = parsed.date ? new Date(parsed.date) : new Date();
+        setModalDate(txDate);
+        setModalCurrency(parsed.currency);
+      } else {
+        alert("AI 분석 결과가 올바르지 않습니다.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "AI 분석 중 오류가 발생했습니다.");
+    } finally {
+      setAiParsing(false);
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
+      if (photoInputRef.current) photoInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   const scopeLabel = tLedger(SCOPE_LABEL_KEY[scope]);
 
@@ -252,12 +293,14 @@ export default function AppShell({ user, onLogout }: Props) {
   function handleSaved() {
     setModalDate(null);
     setEditingTransaction(null);
+    setParsedData(null);
     bumpVersion();
   }
 
   function closeModal() {
     setModalDate(null);
     setEditingTransaction(null);
+    setParsedData(null);
   }
 
   function openModal(date: Date) {
@@ -608,6 +651,8 @@ export default function AppShell({ user, onLogout }: Props) {
               version={version}
               onChanged={bumpVersion}
             />
+          ) : view === "settings" ? (
+            <SettingsView onChanged={bumpVersion} />
           ) : (
             <DashboardView
               month={month}
@@ -620,14 +665,113 @@ export default function AppShell({ user, onLogout }: Props) {
         </main>
       </div>
 
-      <button
-        type="button"
-        onClick={() => openModal(new Date())}
-        aria-label={tNav("addTransaction")}
-        className="fixed bottom-24 md:bottom-8 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:bg-blue-700 transition-colors"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      {/* Hidden File Inputs for Scanning */}
+      <input
+        type="file"
+        ref={cameraInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept="image/*"
+        capture="environment"
+      />
+      <input
+        type="file"
+        ref={photoInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept="image/*"
+        multiple
+      />
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept="image/*,application/pdf"
+      />
+
+      {/* Backdrop to close scan menu */}
+      {scanMenuOpen && (
+        <div
+          className="fixed inset-0 z-30"
+          onClick={() => setScanMenuOpen(false)}
+        />
+      )}
+
+      {/* Scan Options Popover */}
+      {scanMenuOpen && (
+        <div className="fixed bottom-56 md:bottom-40 right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <button
+            type="button"
+            onClick={() => {
+              setScanMenuOpen(false);
+              cameraInputRef.current?.click();
+            }}
+            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+          >
+            <Camera className="h-4.5 w-4.5 text-blue-500" />
+            사진 촬영 (Take Photo)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setScanMenuOpen(false);
+              photoInputRef.current?.click();
+            }}
+            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+          >
+            <Plus className="h-4.5 w-4.5 text-green-500" />
+            사진 올리기 (갤러리)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setScanMenuOpen(false);
+              fileInputRef.current?.click();
+            }}
+            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+          >
+            <Repeat className="h-4.5 w-4.5 text-indigo-500" />
+            파일 올리기 (PDF/이미지)
+          </button>
+        </div>
+      )}
+
+      {/* Floating Buttons Group */}
+      <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col gap-3">
+        {/* Floating Camera Button (Scan) */}
+        <button
+          type="button"
+          onClick={() => setScanMenuOpen((o) => !o)}
+          aria-label="스캔 및 영수증 분석"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 active:bg-indigo-700 transition-colors"
+        >
+          <Camera className="h-6 w-6" />
+        </button>
+
+        {/* Floating Plus Button (Manual Add) */}
+        <button
+          type="button"
+          onClick={() => openModal(new Date())}
+          aria-label={tNav("addTransaction")}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* AI Parsing Loading Overlay */}
+      {aiParsing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center space-y-4 max-w-xs text-center border border-gray-100 dark:border-gray-700">
+            <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+            <div>
+              <p className="text-sm font-bold text-gray-900 dark:text-white">AI 영수증 분석 중...</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Gemini가 항목을 판별하고 있습니다. 잠시만 기다려 주세요.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 glass-bar border-t">
         <div className="flex">
@@ -654,6 +798,7 @@ export default function AppShell({ user, onLogout }: Props) {
           currency={modalCurrency}
           ledgerScope={scope}
           accountType={accountType}
+          parsedTransaction={parsedData}
           allowCurrencyPick={scope === "ALL" && !editingTransaction}
           onCurrencyChange={setModalCurrency}
           presets={presets}
