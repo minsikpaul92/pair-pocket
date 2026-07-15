@@ -18,10 +18,6 @@ async def parse_receipt_or_statement(db: AsyncIOMotorDatabase, owner_id: str, fi
 
     base64_data = base64.b64encode(file_bytes).decode("utf-8")
 
-    # Use gemini-3.5-flash as the default model
-    model = "gemini-3.5-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-
     prompt = (
         "You are an expert expense parser for PairPocket. Analyze the provided receipt image or financial statement PDF. "
         "Extract the transaction details and return them in JSON format. "
@@ -61,21 +57,29 @@ async def parse_receipt_or_statement(db: AsyncIOMotorDatabase, owner_id: str, fi
         }
     }
 
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        resp = await client.post(url, json=payload)
-        if resp.status_code != 200:
-            error_text = resp.text
-            try:
-                err_json = resp.json()
-                if "error" in err_json:
-                    error_text = err_json["error"].get("message", error_text)
-            except Exception:
-                pass
-            raise Exception(f"Gemini API Error: {error_text}")
+    # Define fallback models in case gemini-3.5-flash has high demand/quota limits
+    models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+    last_error = None
 
-        data = resp.json()
-        try:
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-            return json.loads(text)
-        except (KeyError, IndexError, ValueError) as e:
-            raise Exception(f"AI 응답 결과 분석 실패: {str(e)}")
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        for model in models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            try:
+                resp = await client.post(url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return json.loads(text)
+                else:
+                    error_text = resp.text
+                    try:
+                        err_json = resp.json()
+                        if "error" in err_json:
+                            error_text = err_json["error"].get("message", error_text)
+                    except Exception:
+                        pass
+                    last_error = error_text
+            except Exception as e:
+                last_error = str(e)
+
+        raise Exception(f"Gemini API Error: {last_error}")
