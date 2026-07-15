@@ -12,9 +12,10 @@
 * **Frontend:** Next.js (App Router), React, Tailwind CSS, Lucide React (Icons), next-intl (i18n), @ducanh2912/next-pwa
 * **Backend:** FastAPI (Python), Motor (async MongoDB)
 * **Database:** MongoDB (Atlas)
-* **AI & Data Analysis (planned):**
-  * Text & PDF Analysis: Groq API (Gemma model) + pdfplumber
-  * Image OCR (Receipts): Google Gemini 1.5 Flash API (Optimized for batch processing)
+* **AI & Data Analysis:**
+  * Gemini API: Custom user API Key (stored in `user_settings`), utilizing `gemini-3.5-flash` or `gemini-3.1-flash-lite`
+  * Text & PDF Analysis: pdfplumber + Gemini API
+  * Image OCR (Receipts): Gemini API
   * Stock Data: Yahoo Finance API (httpx, 2-hour cache in MongoDB)
 * **Infrastructure:** Vercel (Frontend), Heroku (Backend), PWA (Progressive Web App), GitHub Actions (subscription reminder cron)
 
@@ -50,6 +51,25 @@
 * **Performance Cards:** Per-account and all-accounts-combined profit/loss summary cards with color-coded yield indicators (red = profit, blue = loss). Clicking a card filters the holdings list below.
 * **Ledger Scope Filtering:** Stock tab filters match the global navigation scope (CAD/KRW/ALL).
 * **Sell via Owned Holdings Dropdown:** When recording a stock sale (income tab → 주식 판매수익), users select from their currently owned holdings — with auto-populated ticker, account, and currency — plus a guide badge showing owned shares and average cost.
+
+### E. AI Receipt & Statement Parser
+* **Camera Floating Quick Action:** A floating camera button above the '+' button on the main view.
+* **Scan Options:** Clicking the camera button triggers a sheet or popover with:
+  * **Take Photo (사진촬영)**: Access native camera to capture receipt images.
+  * **Upload Photos (사진올리기)**: Select multiple receipt images from device photo gallery.
+  * **Upload File (파일올리기)**: Select PDF bank statements or raw files.
+* **Gemini Parsing Engine:**
+  * Uses the user's custom Gemini API key (e.g., `gemini-3.5-flash` or `gemini-3.1-flash-lite`).
+  * Supports bulk image OCR/parsing in a single prompt or parallel API calls.
+  * Extracts transaction date, total amount, currency (CAD/KRW), merchant, category, and lists individual items.
+  * Opens the `TransactionModal` pre-populated with these values for confirmation before saving.
+
+### F. Dynamic Translation & Custom AI Settings
+* **User-Provided API Key:** Users can input and save their Gemini API Key in the settings page. It is stored securely in `user_settings`.
+* **AI-Driven Localization:** When a user selects a language not pre-loaded (e.g., Chinese, Japanese, Vietnamese, French), the app uses the Gemini API to dynamically translate the core localization packs (based on `ko.json` or `en.json`) and generate/cache them on the fly.
+
+### G. Development & Test Data Reset
+* **Data Reset Endpoint:** A dedicated settings option/endpoint to purge test data (transactions, holdings, subscriptions) while preserving user accounts and configuration for quick iterative testing.
 
 ## 4. Database Schema Guidelines (MongoDB)
 * `users`: User information, OAuth tokens, and associated `shared_group_id`.
