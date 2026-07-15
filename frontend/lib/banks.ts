@@ -27,6 +27,12 @@ export const BANK_OPTIONS = [
     color: "#FF7900",
   },
   { id: "EQ Bank", name: "EQ Bank", domain: "eqbank.ca", color: "#6C2BD9" },
+  {
+    id: "Wealthsimple",
+    name: "Wealthsimple",
+    domain: "wealthsimple.com",
+    color: "#09171e",
+  },
   { id: "Amex", name: "Amex", domain: "americanexpress.com", color: "#006FCF" },
   { id: "Costco", name: "Costco", domain: "costco.com", color: "#E31837" },
   { id: "신한", name: "신한", domain: "shinhan.com", color: "#0046FF" },

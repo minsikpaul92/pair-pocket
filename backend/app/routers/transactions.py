@@ -61,6 +61,12 @@ def _serialize(document: dict) -> dict:
         "owner_id": document["owner_id"],
         "subscription_billing_cycle": document.get("subscription_billing_cycle"),
         "subscription_id": document.get("subscription_id"),
+        "is_stock_trade": document.get("is_stock_trade", False),
+        "trade_type": document.get("trade_type"),
+        "ticker": document.get("ticker"),
+        "shares": document.get("shares"),
+        "price": document.get("price"),
+        "fee": document.get("fee"),
     }
 
 
@@ -315,6 +321,16 @@ async def create_transaction(
     document = _document_from_payload(payload, owner_id=current_user.id)
     result = await db[COLLECTION].insert_one(document)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
+
+    if created.get("is_stock_trade") and created.get("account_id") and created.get("ticker"):
+        from app.services.stocks import sync_holding_from_transactions
+        await sync_holding_from_transactions(
+            db,
+            owner_id=created["owner_id"],
+            account_id=created["account_id"],
+            ticker=created["ticker"]
+        )
+
     return _serialize(created)
 
 
@@ -350,6 +366,24 @@ async def update_transaction(
         {"_id": ObjectId(transaction_id)}, {"$set": document}
     )
     updated = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
+
+    # Trigger stock sync for old state and new state
+    from app.services.stocks import sync_holding_from_transactions
+    if existing.get("is_stock_trade") and existing.get("account_id") and existing.get("ticker"):
+        await sync_holding_from_transactions(
+            db,
+            owner_id=existing["owner_id"],
+            account_id=existing["account_id"],
+            ticker=existing["ticker"]
+        )
+    if updated.get("is_stock_trade") and updated.get("account_id") and updated.get("ticker"):
+        await sync_holding_from_transactions(
+            db,
+            owner_id=updated["owner_id"],
+            account_id=updated["account_id"],
+            ticker=updated["ticker"]
+        )
+
     return _serialize(updated)
 
 
@@ -389,3 +423,12 @@ async def delete_transaction(
     result = await db[COLLECTION].delete_one({"_id": ObjectId(transaction_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    if existing.get("is_stock_trade") and existing.get("account_id") and existing.get("ticker"):
+        from app.services.stocks import sync_holding_from_transactions
+        await sync_holding_from_transactions(
+            db,
+            owner_id=existing["owner_id"],
+            account_id=existing["account_id"],
+            ticker=existing["ticker"]
+        )

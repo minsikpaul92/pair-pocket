@@ -92,6 +92,7 @@ export default function AccountRegisterModal({
 
   const [name, setName] = useState(account?.name ?? "");
   const [nickname, setNickname] = useState(account?.nickname ?? "");
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(account?.currency ?? currency);
   const [kind, setKind] = useState<FinancialAccountKind>(
     account?.kind ??
       (preferredType === "expense" ? "credit_card" : "checking")
@@ -105,7 +106,9 @@ export default function AccountRegisterModal({
   const [accountNumber, setAccountNumber] = useState(
     account?.account_number ?? ""
   );
-  const [institution, setInstitution] = useState(account?.institution ?? "");
+  const [institution, setInstitution] = useState<string>(
+    account?.institution ?? ""
+  );
   const [bankOpen, setBankOpen] = useState(false);
   const [isDefault, setIsDefault] = useState(
     account
@@ -121,7 +124,7 @@ export default function AccountRegisterModal({
 
   const selectedBank = BANK_OPTIONS.find((b) => b.id === institution);
   const isCreditCard = kind === "credit_card";
-  const displayCurrency = account?.currency ?? currency;
+  const displayCurrency = account?.currency ?? selectedCurrency;
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -175,7 +178,7 @@ export default function AccountRegisterModal({
         name: trimmed,
         nickname: nick || null,
         kind,
-        currency,
+        currency: selectedCurrency,
         account_type: accountType,
         opening_balance: balance,
         institution: institution || null,
@@ -260,6 +263,23 @@ export default function AccountRegisterModal({
               {t("nicknameHint")}
             </p>
           </div>
+
+          {!isEdit && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                통화 (Currency)
+              </label>
+              <select
+                value={selectedCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value as Currency)}
+                className="input-field bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
+              >
+                <option value="KRW">KRW (₩)</option>
+                <option value="CAD">CAD (C$)</option>
+                <option value="USD">USD ($)</option>
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">

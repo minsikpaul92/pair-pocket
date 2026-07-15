@@ -48,6 +48,7 @@
     "list": "List",
     "dashboard": "Dashboard",
     "subscriptions": "Subscriptions",
+    "stocks": "Stock",
     "invite": "Invite",
     "logout": "Log out",
     "expandSidebar": "Expand sidebar",
@@ -411,5 +412,30 @@
     "promoEndAfterStart": "Promo end date must be after the start date.",
     "promoAmountLessThanRegular": "Promo amount must be less than the regular amount.",
     "completedLessThanTotal": "Paid installments must be less than total installments."
+  },
+  "stocks": {
+    "tabName": "Stocks",
+    "baseAccount": "Brokerages",
+    "myInvestment": "Investments",
+    "totalInvested": "Total Invested",
+    "totalValuation": "Total Valuation",
+    "totalProfit": "Total Returns",
+    "yield": "Yield",
+    "sortYield": "Highest Yield",
+    "sortValuation": "Highest Valuation",
+    "sortShares": "Most Shares",
+    "currentPrice": "Current Price",
+    "evaluatedAmount": "Valuation",
+    "won": "₩",
+    "dollar": "$",
+    "addHolding": "Add Stock Holding",
+    "editHolding": "Edit Stock Holding",
+    "holdingShares": "Shares",
+    "holdingAvgPrice": "Avg. Price",
+    "holdingTicker": "Ticker",
+    "holdingName": "Stock Name",
+    "brokerageAccount": "Brokerage Account",
+    "noHoldings": "No stock holdings found.",
+    "addFirstHolding": "Add your first stock holding!"
   }
 }

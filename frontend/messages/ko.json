@@ -48,6 +48,7 @@
     "list": "목록",
     "dashboard": "대시보드",
     "subscriptions": "구독",
+    "stocks": "주식",
     "invite": "초대하기",
     "logout": "로그아웃",
     "expandSidebar": "사이드바 펼치기",
@@ -411,5 +412,30 @@
     "promoEndAfterStart": "프로모션 종료일은 시작일 이후여야 합니다.",
     "promoAmountLessThanRegular": "프로모션 금액은 정상 금액보다 작아야 합니다.",
     "completedLessThanTotal": "이미 납부 회차는 총 회차보다 작아야 합니다."
+  },
+  "stocks": {
+    "tabName": "증권",
+    "baseAccount": "기본계좌",
+    "myInvestment": "내 투자",
+    "totalInvested": "총 투자 금액",
+    "totalValuation": "총 평가금액",
+    "totalProfit": "총 수익금액",
+    "yield": "수익률",
+    "sortYield": "수익률 높은 순",
+    "sortValuation": "평가금 높은 순",
+    "sortShares": "보유 수량 많은 순",
+    "currentPrice": "현재가",
+    "evaluatedAmount": "평가금",
+    "won": "원",
+    "dollar": "$",
+    "addHolding": "보유 주식 추가",
+    "editHolding": "보유 주식 수정",
+    "holdingShares": "보유 주수",
+    "holdingAvgPrice": "평균 매수가",
+    "holdingTicker": "티커",
+    "holdingName": "종목명",
+    "brokerageAccount": "증권사 계좌",
+    "noHoldings": "보유 중인 주식이 없습니다.",
+    "addFirstHolding": "첫 주식을 추가해 보세요!"
   }
 }

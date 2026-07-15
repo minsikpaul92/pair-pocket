@@ -8,7 +8,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import DashboardAnalytics from "@/components/DashboardAnalytics";
@@ -28,6 +28,8 @@ import {
   fetchExchangeRate,
   fetchNetWorth,
   fetchStatsSummary,
+  fetchStockHoldings,
+  StockHolding,
   formatAmount,
 } from "@/lib/api";
 import { translateCategory } from "@/lib/category-i18n";
@@ -74,6 +76,7 @@ export default function DashboardView({
   const [display, setDisplay] = useState<Currency>("CAD");
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [holdings, setHoldings] = useState<StockHolding[]>([]);
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(
     null
   );
@@ -135,14 +138,16 @@ export default function DashboardView({
       ...worthJobs,
       fetchExchangeRate().catch(() => null),
       Promise.all(accountJobs).then((lists) => lists.flat()),
+      fetchStockHoldings(accountType).catch(() => []),
     ])
-      .then(([cadS, krwS, cadW, krwW, r, accountList]) => {
+      .then(([cadS, krwS, cadW, krwW, r, accountList, holdingsList]) => {
         setCadStats(cadS as StatsSummary | null);
         setKrwStats(krwS as StatsSummary | null);
         setCadWorth(cadW as NetWorthSummary | null);
         setKrwWorth(krwW as NetWorthSummary | null);
         setRate(r as ExchangeRate | null);
         setAccounts(accountList as FinancialAccount[]);
+        setHoldings(holdingsList as StockHolding[]);
         if (scope === "CAD") setDisplay("CAD");
         else if (scope === "KRW") setDisplay("KRW");
       })
@@ -236,6 +241,70 @@ export default function DashboardView({
     } satisfies NetWorthSummary;
   }, [scope, cadWorth, krwWorth, rate, display]);
 
+  // Group holdings by account
+  const accountHoldingsMap = useMemo(() => {
+    const map: Record<string, StockHolding[]> = {};
+    holdings.forEach((h) => {
+      if (!map[h.account_id]) map[h.account_id] = [];
+      map[h.account_id].push(h);
+    });
+    return map;
+  }, [holdings]);
+
+  // Helper to convert native stock valuation to a target currency
+  const convertNative = useCallback((amount: number, from: string, to: Currency): number => {
+    if (!rate) return amount;
+    if (from === to) return amount;
+    
+    if (to === "CAD") {
+      if (from === "USD") return amount * (rate.usd_cad || 1.37);
+      if (from === "KRW") return amount * (rate.krw_cad || 0.001);
+    } else if (to === "KRW") {
+      if (from === "USD") return amount * (rate.usd_krw || 1350);
+      if (from === "CAD") return amount * (rate.cad_krw || 980);
+    }
+    return amount;
+  }, [rate]);
+
+  // Calculate stock account stats
+  const stockAccountsStats = useMemo(() => {
+    const invAccounts = netWorth?.accounts.filter(
+      (a) => a.kind === "investment" && !a.account_id.startsWith("virtual_stocks") && (scope === "ALL" || a.currency === scope)
+    ) ?? [];
+
+    const list = invAccounts.map((acc) => {
+      const cash = acc.balance;
+      const accHoldings = accountHoldingsMap[acc.account_id] || [];
+      
+      const stockValuation = accHoldings.reduce((sum, h) => {
+        const converted = convertNative(h.valuation, h.currency, acc.currency as Currency);
+        return sum + converted;
+      }, 0);
+
+      const total = cash + stockValuation;
+
+      return {
+        account: acc,
+        cash,
+        stockValuation,
+        total,
+      };
+    });
+
+    const displayCurr = scope === "ALL" ? display : (scope as Currency);
+    
+    const totalValuation = list.reduce((sum, item) => {
+      const converted = convertNative(item.total, item.account.currency, displayCurr);
+      return sum + converted;
+    }, 0);
+
+    return {
+      accounts: list,
+      totalValuation,
+      currency: displayCurr,
+    };
+  }, [netWorth, accountHoldingsMap, scope, display, convertNative]);
+
   if (loading) {
     return (
       <div className="h-40 w-full animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
@@ -252,13 +321,14 @@ export default function DashboardView({
         : tCommon("korea");
 
   const assetAccounts =
-    netWorth?.accounts.filter((a) => !a.is_liability) ?? [];
+    netWorth?.accounts.filter((a) => !a.is_liability && a.kind !== "investment") ?? [];
   const liabilityAccounts =
     netWorth?.accounts.filter((a) => a.is_liability) ?? [];
   const cardBalancesLabel =
     tDashboard("cardBalances") ||
     translateCategory(TRANSFER_CATEGORY, tCategories);
 
+  // Removed old duplicate position of hooks
   return (
     <div className="space-y-4">
       {/* Net worth */}
@@ -457,6 +527,51 @@ export default function DashboardView({
                   >
                     {overpaid ? `+${display}` : display}
                   </p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {stockAccountsStats.accounts.length > 0 && (
+        <section className="card-inset p-4">
+          <div className="flex items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-2.5">
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              주식 계좌 현황
+            </p>
+            <div className="text-sm font-black text-blue-600 dark:text-blue-400">
+              총액: {formatAmount(stockAccountsStats.totalValuation, stockAccountsStats.currency)}
+            </div>
+          </div>
+          <ul className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {stockAccountsStats.accounts.map(({ account, cash, stockValuation, total }) => {
+              const fullAcc = accountById.get(account.account_id);
+              const inst = fullAcc?.institution;
+              const label = fullAcc?.nickname?.trim() || account.nickname?.trim() || account.name;
+              return (
+                <li
+                  key={account.account_id}
+                  className="rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 hover:shadow-sm transition-shadow border border-gray-100 dark:border-gray-800/80"
+                >
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate">
+                      {inst ? `[${inst}] ` : ""}{label}
+                    </span>
+                    <span className="text-[9px] bg-gray-200 dark:bg-gray-850 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                      {account.currency}
+                    </span>
+                  </div>
+                  <div className="mt-2.5 flex items-baseline justify-between">
+                    <span className="text-[10px] text-gray-400">평가금 + 예수금</span>
+                    <span className="text-base font-black text-gray-900 dark:text-white tabular-nums">
+                      {formatAmount(total, account.currency as Currency)}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
+                    <span>주식: {formatAmount(stockValuation, account.currency as Currency)}</span>
+                    <span>예수금: {formatAmount(cash, account.currency as Currency)}</span>
+                  </div>
                 </li>
               );
             })}

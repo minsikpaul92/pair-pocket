@@ -88,7 +88,7 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
 
 export const loginUrl = `${API_BASE_URL}/api/auth/login`;
 
-export type Currency = "KRW" | "CAD";
+export type Currency = "KRW" | "CAD" | "USD";
 export type LedgerScope = Currency | "ALL";
 export type TransactionType = "income" | "expense";
 export type AccountType = "shared" | "personal";
@@ -171,6 +171,12 @@ export interface Transaction {
   effective_amount?: number;
   subscription_billing_cycle?: BillingCycle | null;
   subscription_id?: string | null;
+  is_stock_trade?: boolean;
+  trade_type?: "buy" | "sell";
+  ticker?: string;
+  shares?: number;
+  price?: number;
+  fee?: number;
 }
 
 export interface NewTransaction {
@@ -187,6 +193,12 @@ export interface NewTransaction {
   account_id?: string | null;
   counter_account_id?: string | null;
   kind?: TransactionKind;
+  is_stock_trade?: boolean;
+  trade_type?: "buy" | "sell";
+  ticker?: string;
+  shares?: number;
+  price?: number;
+  fee?: number;
 }
 
 export interface CategoryGroup {
@@ -484,6 +496,10 @@ export async function fetchStatsSummary(
 export interface ExchangeRate {
   cad_krw: number;
   krw_cad: number;
+  usd_krw?: number;
+  krw_usd?: number;
+  usd_cad?: number;
+  cad_usd?: number;
   date: string | null;
   stale: boolean;
   source?: string;
@@ -1262,4 +1278,130 @@ export async function unlinkPartnership(): Promise<InvitationMe> {
     throw new ApiError("unlinkPartnership");
   }
   return (await res.json()) as InvitationMe;
+}
+
+// STOCKS PORTFOLIO API IMPLEMENTATION
+
+export interface StockHolding {
+  id: string;
+  account_id: string;
+  account_name: string;
+  institution: string;
+  ticker: string;
+  name: string;
+  shares: number;
+  avg_price: number;
+  price: number;
+  prev_close: number;
+  currency: string;
+  invested: number;
+  valuation: number;
+  profit: number;
+  yield: number;
+  daily_change: number;
+  daily_change_percent: number;
+  updated_at: string;
+}
+
+export interface StockHoldingCreate {
+  account_id: string;
+  ticker: string;
+  name: string;
+  avg_price: number;
+  shares: number;
+  currency: Currency;
+}
+
+export interface StockHoldingUpdate {
+  avg_price?: number;
+  shares?: number;
+}
+
+export interface StockSummary {
+  display_currency: Currency;
+  total_invested: number;
+  total_valuation: number;
+  total_profit: number;
+  total_yield: number;
+  cash_balances: {
+    account_id: string;
+    name: string;
+    institution: string;
+    balance: number;
+    currency: Currency;
+  }[];
+}
+
+export interface StockSearchResult {
+  ticker: string;
+  name: string;
+  exchange: string;
+  quote_type: string;
+}
+
+export async function searchStocks(query: string): Promise<StockSearchResult[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/stocks/search?q=${encodeURIComponent(query)}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as StockSearchResult[];
+}
+
+export async function fetchStockHoldings(
+  accountType: AccountType = "personal"
+): Promise<StockHolding[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/stocks/holdings?account_type=${accountType}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new ApiError("fetchStockHoldings");
+  return (await res.json()) as StockHolding[];
+}
+
+export async function createStockHolding(
+  payload: StockHoldingCreate
+): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/api/stocks/holdings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await readApiError(res, "createStockHolding");
+  return await res.json();
+}
+
+export async function updateStockHolding(
+  id: string,
+  payload: StockHoldingUpdate
+): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/api/stocks/holdings/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await readApiError(res, "updateStockHolding");
+  return await res.json();
+}
+
+export async function deleteStockHolding(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/stocks/holdings/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw await readApiError(res, "deleteStockHolding");
+}
+
+export async function fetchStockSummary(
+  accountType: AccountType = "personal",
+  displayCurrency: Currency = "CAD",
+  accountId?: string
+): Promise<StockSummary> {
+  let url = `${API_BASE_URL}/api/stocks/summary?account_type=${accountType}&display_currency=${displayCurrency}`;
+  if (accountId) {
+    url += `&account_id=${accountId}`;
+  }
+  const res = await fetch(url, { headers: authHeaders() });
+  if (!res.ok) throw new ApiError("fetchStockSummary");
+  return (await res.json()) as StockSummary;
 }

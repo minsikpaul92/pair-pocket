@@ -18,6 +18,7 @@ from app.routers import (
     stats,
     subscriptions,
     transactions,
+    stocks,
 )
 
 
@@ -54,6 +55,7 @@ app.include_router(transactions.router)
 app.include_router(stats.router)
 app.include_router(settings_router.router)
 app.include_router(exchange.router)
+app.include_router(stocks.router)
 
 
 @app.get("/", tags=["health"])
