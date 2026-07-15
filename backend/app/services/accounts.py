@@ -171,6 +171,69 @@ async def compute_net_worth(
             )
         )
 
+    # Calculate stock holdings valuation
+    holdings_cursor = db.holdings.find({
+        "owner_id": {"$in": ids},
+        "account_type": account_type.value
+    })
+    holdings_docs = await holdings_cursor.to_list(length=None)
+
+    if holdings_docs:
+        from app.services.exchange import get_cad_krw_rate
+        from app.services.stocks import get_or_update_stock_price
+        
+        rates_info = await get_cad_krw_rate()
+        cad_krw = rates_info["cad_krw"]
+        krw_cad = rates_info["krw_cad"]
+        usd_krw = rates_info["usd_krw"]
+        usd_cad = rates_info["usd_cad"]
+
+        target_currency = currency if currency else Currency.CAD
+        stocks_valuation_total = 0.0
+
+        for h in holdings_docs:
+            price_info = await get_or_update_stock_price(db, h["ticker"])
+            price = price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
+            stock_curr = price_info.get("currency", h["currency"]) if price_info else h["currency"]
+            shares = h["shares"]
+            valuation_native = shares * price
+
+            val_converted = valuation_native
+            if stock_curr != target_currency.value:
+                if target_currency == Currency.KRW:
+                    if stock_curr == "CAD":
+                        val_converted = valuation_native * cad_krw
+                    elif stock_curr == "USD":
+                        val_converted = valuation_native * usd_krw
+                elif target_currency == Currency.CAD:
+                    if stock_curr == "KRW":
+                        val_converted = valuation_native * krw_cad
+                    elif stock_curr == "USD":
+                        val_converted = valuation_native * usd_cad
+                elif target_currency == Currency.USD:
+                    if stock_curr == "KRW":
+                        val_converted = valuation_native * krw_cad * usd_cad
+                    elif stock_curr == "CAD":
+                        val_converted = valuation_native / usd_cad
+
+            stocks_valuation_total += val_converted
+
+        if stocks_valuation_total > 0:
+            total_assets += stocks_valuation_total
+            accounts.append(
+                AccountBalanceOut(
+                    account_id=f"virtual_stocks_{target_currency.value.lower()}",
+                    name="주식 자산",
+                    nickname="보유 주식 평가금",
+                    kind=FinancialAccountKind.INVESTMENT,
+                    currency=target_currency,
+                    account_type=account_type,
+                    is_liability=False,
+                    balance=stocks_valuation_total,
+                    net_worth_contribution=stocks_valuation_total,
+                )
+            )
+
     return NetWorthSummary(
         account_type=account_type,
         currency=currency,

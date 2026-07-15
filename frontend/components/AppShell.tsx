@@ -26,6 +26,8 @@ import LocaleToggle from "@/components/LocaleToggle";
 import ThemeToggle from "@/components/ThemeToggle";
 import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
+import StocksView from "@/components/StocksView";
+import { LineChart } from "lucide-react";
 import {
   AccountType,
   CategoryPresets,
@@ -50,17 +52,18 @@ import { addMonths, dayKey, isoDayKey, monthKey, monthLabel } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 
-type View = "calendar" | "list" | "dashboard" | "subscriptions";
+type View = "calendar" | "list" | "dashboard" | "subscriptions" | "stocks";
 
 const NAV: {
   id: View;
-  labelKey: "calendar" | "list" | "dashboard" | "subscriptions";
-  icon: typeof CalendarDays;
+  labelKey: "calendar" | "list" | "dashboard" | "subscriptions" | "stocks";
+  icon: any;
 }[] = [
   { id: "calendar", labelKey: "calendar", icon: CalendarDays },
   { id: "list", labelKey: "list", icon: ListOrdered },
   { id: "dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { id: "subscriptions", labelKey: "subscriptions", icon: Repeat },
+  { id: "stocks", labelKey: "stocks", icon: LineChart },
 ];
 
 const LEDGERS: { scope: LedgerScope; labelKey: "all" | "canada" | "korea"; flag?: string }[] = [
@@ -73,6 +76,7 @@ const SCOPE_LABEL_KEY: Record<LedgerScope, "allLedger" | "canadaLedger" | "korea
   ALL: "allLedger",
   CAD: "canadaLedger",
   KRW: "koreaLedger",
+  USD: "canadaLedger",
 };
 
 const NAV_COLLAPSED_KEY = "pairpocket_nav_collapsed";
@@ -597,6 +601,13 @@ export default function AppShell({ user, onLogout }: Props) {
               onChanged={bumpVersion}
               onPresetsChange={setPresets}
             />
+          ) : view === "stocks" ? (
+            <StocksView
+              accountType={accountType}
+              ledgerScope={scope}
+              version={version}
+              onChanged={bumpVersion}
+            />
           ) : (
             <DashboardView
               month={month}
@@ -641,6 +652,7 @@ export default function AppShell({ user, onLogout }: Props) {
       {modalDate && presets && (
         <TransactionModal
           currency={modalCurrency}
+          ledgerScope={scope}
           accountType={accountType}
           allowCurrencyPick={scope === "ALL" && !editingTransaction}
           onCurrencyChange={setModalCurrency}

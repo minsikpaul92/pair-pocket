@@ -9,6 +9,7 @@ from app.models.ledger import TransactionKind
 class Currency(str, Enum):
     KRW = "KRW"
     CAD = "CAD"
+    USD = "USD"
 
 
 class TransactionType(str, Enum):
@@ -61,8 +62,16 @@ class TransactionBase(BaseModel):
     subscription_billing_cycle: str | None = None
     subscription_id: str | None = None
 
+    # Stock trading metadata
+    is_stock_trade: bool = False
+    trade_type: str | None = None  # "buy" | "sell"
+    ticker: str | None = None
+    shares: float | None = None
+    price: float | None = None
+    fee: float | None = None
+
     @field_validator(
-        "category", "sub_category", "merchant", "institution", mode="before"
+        "category", "sub_category", "merchant", "institution", "ticker", mode="before"
     )
     @classmethod
     def strip_strings(cls, v):

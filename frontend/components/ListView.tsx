@@ -182,6 +182,7 @@ export default function ListView({
     > = {
       CAD: { income: 0, expense: 0, count: 0 },
       KRW: { income: 0, expense: 0, count: 0 },
+      USD: { income: 0, expense: 0, count: 0 },
     };
     for (const tx of sorted) {
       const bucket = byCurrency[tx.currency];

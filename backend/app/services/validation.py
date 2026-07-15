@@ -117,10 +117,10 @@ async def validate_transaction_payload(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="[투자/저축] 카테고리는 금융기관(institution) 입력이 필요합니다.",
             )
-    elif payload.institution:
+    elif payload.institution and not payload.is_stock_trade:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="institution 필드는 [투자/저축] 카테고리에서만 사용할 수 있습니다.",
+            detail="institution 필드는 [투자/저축] 카테고리 혹은 주식 거래에서만 사용할 수 있습니다.",
         )
 
     if requires_settlement_link(payload.type, payload.category, payload.sub_category):

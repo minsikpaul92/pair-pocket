@@ -9,3 +9,4 @@ authlib
 httpx
 itsdangerous
 pyjwt
+yfinance
