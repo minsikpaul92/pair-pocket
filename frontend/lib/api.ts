@@ -177,6 +177,16 @@ export interface Transaction {
   shares?: number;
   price?: number;
   fee?: number;
+  items?: TransactionItem[];
+}
+
+export interface TransactionItem {
+  name: string;
+  standardized_name?: string | null;
+  quantity: number;
+  unit?: string | null;
+  unit_price: number;
+  total_price: number;
 }
 
 export interface NewTransaction {
@@ -199,6 +209,7 @@ export interface NewTransaction {
   shares?: number;
   price?: number;
   fee?: number;
+  items?: TransactionItem[];
 }
 
 export interface CategoryGroup {
@@ -1410,11 +1421,12 @@ export async function fetchStockSummary(
 export interface ParsedTransaction {
   date: string;
   amount: number;
-  currency: "CAD" | "KRW";
+  currency: "CAD" | "KRW" | "USD";
   merchant: string;
   category: string;
   sub_category: string;
   file_name: string;
+  items?: TransactionItem[];
 }
 
 export async function parseReceiptsOrStatements(files: File[]): Promise<ParsedTransaction[]> {
@@ -1458,3 +1470,40 @@ export async function resetUserData(): Promise<void> {
     throw new Error(err?.detail || "데이터 초기화에 실패했습니다.");
   }
 }
+
+export interface OCRLog {
+  id: string;
+  timestamp: string;
+  file_name: string;
+  model_used: string | null;
+  parsed_data: any;
+  feedback: "thumbs_up" | "thumbs_down" | null;
+  status: "success" | "failed";
+  error_message: string | null;
+  owner_id: string;
+}
+
+export async function fetchOCRLogs(): Promise<OCRLog[]> {
+  const res = await fetch(`${API_BASE_URL}/api/ai/logs`, {
+    method: "GET",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "OCR 로그 조회에 실패했습니다.");
+  }
+  return (await res.json()) as OCRLog[];
+}
+
+export async function updateOCRLogFeedback(logId: string, feedback: "thumbs_up" | "thumbs_down" | null): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/ai/logs/${logId}/feedback`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ feedback }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "피드백 업데이트에 실패했습니다.");
+  }
+}
+

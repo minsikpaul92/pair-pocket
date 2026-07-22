@@ -31,7 +31,8 @@ import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
 import StocksView from "@/components/StocksView";
 import SettingsView from "@/components/SettingsView";
-import { LineChart } from "lucide-react";
+import ImportView from "@/components/ImportView";
+import { LineChart, Sparkles } from "lucide-react";
 import {
   AccountType,
   CategoryPresets,
@@ -57,11 +58,11 @@ import { addMonths, dayKey, isoDayKey, monthKey, monthLabel } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 
-type View = "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings";
+type View = "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings" | "import";
 
 const NAV: {
   id: View;
-  labelKey: "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings";
+  labelKey: "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings" | "import";
   icon: any;
 }[] = [
   { id: "calendar", labelKey: "calendar", icon: CalendarDays },
@@ -69,6 +70,7 @@ const NAV: {
   { id: "dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { id: "subscriptions", labelKey: "subscriptions", icon: Repeat },
   { id: "stocks", labelKey: "stocks", icon: LineChart },
+  { id: "import", labelKey: "import", icon: Sparkles },
   { id: "settings", labelKey: "settings", icon: Settings },
 ];
 
@@ -649,6 +651,13 @@ export default function AppShell({ user, onLogout }: Props) {
               accountType={accountType}
               ledgerScope={scope}
               version={version}
+              onChanged={bumpVersion}
+            />
+          ) : view === "import" ? (
+            <ImportView
+              scope={scope}
+              accountType={accountType}
+              presets={presets}
               onChanged={bumpVersion}
             />
           ) : view === "settings" ? (

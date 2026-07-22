@@ -22,6 +22,15 @@ class AccountType(str, Enum):
     PERSONAL = "personal"
 
 
+class TransactionItem(BaseModel):
+    name: str
+    standardized_name: str | None = None
+    quantity: float = Field(default=1.0)
+    unit: str | None = None
+    unit_price: float = Field(default=0.0)
+    total_price: float = Field(default=0.0)
+
+
 class TransactionBase(BaseModel):
     """3-level hierarchy: category → sub_category → merchant.
 
@@ -69,6 +78,9 @@ class TransactionBase(BaseModel):
     shares: float | None = None
     price: float | None = None
     fee: float | None = None
+
+    # Sub-items (line items) for detailed itemization
+    items: list[TransactionItem] | None = None
 
     @field_validator(
         "category", "sub_category", "merchant", "institution", "ticker", mode="before"

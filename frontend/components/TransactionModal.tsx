@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, SkipForward, Trash2, X } from "lucide-react";
+import { CalendarDays, SkipForward, Trash2, X, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -58,6 +58,7 @@ import {
   StockHolding,
   ExchangeRate,
   ParsedTransaction,
+  TransactionItem,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, formatDayLabel } from "@/lib/date";
@@ -184,6 +185,8 @@ export default function TransactionModal({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hydratedEditId, setHydratedEditId] = useState<string | null>(null);
+  const [items, setItems] = useState<TransactionItem[]>([]);
+  const [showItems, setShowItems] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const dateStr = dayKey(defaultDate);
@@ -336,6 +339,8 @@ export default function TransactionModal({
         setFee("");
         setStockName("");
         setTxCurrency(currency);
+        setItems([]);
+        setShowItems(false);
         setError(null);
         setHydratedEditId(null);
       }
@@ -361,6 +366,8 @@ export default function TransactionModal({
     setPrice(tx.price ? tx.price.toString() : "");
     setFee(tx.fee ? tx.fee.toString() : "");
     setTxCurrency(tx.currency);
+    setItems(tx.items || []);
+    setShowItems((tx.items || []).length > 0);
     setError(null);
     setHydratedEditId(tx.id);
   }, [editingTransaction, hydratedEditId, currency]);
@@ -372,6 +379,8 @@ export default function TransactionModal({
     setTxCurrency(parsedTransaction.currency);
     setCategory(parsedTransaction.category || "");
     setSubCategory(parsedTransaction.sub_category || "");
+    setItems(parsedTransaction.items || []);
+    setShowItems((parsedTransaction.items || []).length > 0);
     if (parsedTransaction.date) {
       onDateChange(new Date(parsedTransaction.date));
     }
@@ -667,6 +676,7 @@ export default function TransactionModal({
       shares: isStock ? parseFloat(shares) : undefined,
       price: isStock ? parseFloat(price) : undefined,
       fee: undefined,
+      items: showItems ? items : undefined,
     };
 
     setSubmitting(true);
@@ -1387,6 +1397,153 @@ export default function TransactionModal({
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Sub-items (소분류 세부항목) Expandable Section */}
+          <div className="border-t border-gray-100 dark:border-gray-800/80 pt-4 mt-2">
+            {!showItems ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowItems(true);
+                  if (items.length === 0) {
+                    setItems([{ name: "", standardized_name: "", quantity: 1, unit: "개", unit_price: 0, total_price: 0 }]);
+                  }
+                }}
+                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                소분류 세부 항목 추가하기
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                    소분류 세부 품목 내역 (단가/총액 자동 연동 계산)
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setItems([...items, { name: "", standardized_name: "", quantity: 1, unit: "개", unit_price: 0, total_price: 0 }]);
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-0.5"
+                    >
+                      <Plus className="h-3 w-3" />
+                      추가
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowItems(false);
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700 font-semibold"
+                    >
+                      숨기기
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                  {items.map((item, itemIdx) => {
+                    const updateItem = (field: keyof TransactionItem, val: any) => {
+                      const newItems = [...items];
+                      const updatedItem = { ...newItems[itemIdx], [field]: val };
+
+                      // Auto calculation logic
+                      if (field === "quantity" || field === "unit_price") {
+                        updatedItem.total_price = Number((updatedItem.quantity * updatedItem.unit_price).toFixed(2));
+                      } else if (field === "total_price") {
+                        if (updatedItem.quantity > 0) {
+                          updatedItem.unit_price = Number((updatedItem.total_price / updatedItem.quantity).toFixed(4));
+                        }
+                      }
+
+                      newItems[itemIdx] = updatedItem;
+                      setItems(newItems);
+
+                      // Update overall transaction amount based on sum of items
+                      const sumTotal = newItems.reduce((acc, it) => acc + it.total_price, 0);
+                      if (sumTotal > 0) {
+                        setAmount(amountToInput(sumTotal, transactionCurrency));
+                      }
+                    };
+
+                    return (
+                      <div key={itemIdx} className="flex flex-col sm:flex-row gap-2 items-center border border-gray-100 dark:border-gray-800 p-2.5 rounded-xl bg-gray-50/50 dark:bg-gray-800/10">
+                        <div className="grid grid-cols-2 gap-2 w-full sm:flex-1">
+                          <input
+                            type="text"
+                            placeholder="품목명 (예: 수박)"
+                            value={item.name}
+                            onChange={(e) => updateItem("name", e.target.value)}
+                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="표준품목명"
+                            value={item.standardized_name || ""}
+                            onChange={(e) => updateItem("standardized_name", e.target.value)}
+                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 gap-1 w-full sm:w-[240px]">
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="수량"
+                            value={item.quantity || ""}
+                            onChange={(e) => updateItem("quantity", parseFloat(e.target.value) || 0)}
+                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full text-right focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="단위"
+                            value={item.unit || ""}
+                            onChange={(e) => updateItem("unit", e.target.value)}
+                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
+                          />
+                          <input
+                            type="number"
+                            step="0.0001"
+                            placeholder="단가"
+                            value={item.unit_price || ""}
+                            onChange={(e) => updateItem("unit_price", parseFloat(e.target.value) || 0)}
+                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full text-right focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
+                            required
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="합계"
+                            value={item.total_price || ""}
+                            onChange={(e) => updateItem("total_price", parseFloat(e.target.value) || 0)}
+                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full text-right font-semibold focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
+                            required
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newItems = items.filter((_, idx) => idx !== itemIdx);
+                            setItems(newItems);
+                            const sumTotal = newItems.reduce((acc, it) => acc + it.total_price, 0);
+                            if (sumTotal > 0) {
+                              setAmount(amountToInput(sumTotal, transactionCurrency));
+                            }
+                          }}
+                          className="text-red-500 hover:text-red-600 p-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
