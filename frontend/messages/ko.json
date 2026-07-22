@@ -49,6 +49,8 @@
     "dashboard": "대시보드",
     "subscriptions": "구독",
     "stocks": "주식",
+    "settings": "설정",
+    "import": "스마트 가져오기",
     "invite": "초대하기",
     "logout": "로그아웃",
     "expandSidebar": "사이드바 펼치기",
