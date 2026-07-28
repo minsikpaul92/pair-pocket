@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
+from app.core.crypto import encrypt_secret, is_encrypted
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.user import UserOut
@@ -50,7 +51,8 @@ def _settings_out(doc: dict) -> dict:
     if not isinstance(colors, dict):
         colors = {}
     api_key = doc.get("gemini_api_key")
-    has_gemini_key = bool(api_key and api_key.strip())
+    # Ciphertext or legacy plaintext both count as "configured".
+    has_gemini_key = bool(api_key and str(api_key).strip())
     return {
         "merchants": doc.get("merchants", []),
         "institutions": doc.get("institutions", []),
@@ -130,10 +132,24 @@ async def save_ai_key(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     key = payload.api_key.strip()
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="API 키가 비어 있습니다.",
+        )
+
     await _get_or_create(db, current_user.id)
+    try:
+        stored = key if is_encrypted(key) else encrypt_secret(key)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+
     await db[COLLECTION].update_one(
         {"owner_id": current_user.id},
-        {"$set": {"gemini_api_key": key}},
+        {"$set": {"gemini_api_key": stored}},
     )
     doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
     return _settings_out(doc)

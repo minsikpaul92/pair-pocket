@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # --- Cron (subscription reminder jobs via GitHub Actions / external scheduler) ---
     cron_secret: str = ""
 
+    # --- At-rest encryption for user secrets (e.g. Gemini API key) ---
+    # Prefer a dedicated Fernet key in production:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # If empty, a key is derived from SECRET_KEY (fine for local/dev).
+    settings_encryption_key: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property
