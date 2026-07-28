@@ -60,9 +60,25 @@ import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 
 type View = "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings" | "import";
 
+const ACTIVE_VIEW_KEY = "pairpocket.activeView";
+
+const VALID_VIEWS: View[] = [
+  "calendar",
+  "list",
+  "dashboard",
+  "subscriptions",
+  "stocks",
+  "settings",
+  "import",
+];
+
+function isView(value: string | null): value is View {
+  return Boolean(value && VALID_VIEWS.includes(value as View));
+}
+
 const NAV: {
   id: View;
-  labelKey: "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings" | "import";
+  labelKey: "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings" | "smartImport";
   icon: any;
 }[] = [
   { id: "calendar", labelKey: "calendar", icon: CalendarDays },
@@ -70,7 +86,7 @@ const NAV: {
   { id: "dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { id: "subscriptions", labelKey: "subscriptions", icon: Repeat },
   { id: "stocks", labelKey: "stocks", icon: LineChart },
-  { id: "import", labelKey: "import", icon: Sparkles },
+  { id: "import", labelKey: "smartImport", icon: Sparkles },
   { id: "settings", labelKey: "settings", icon: Settings },
 ];
 
@@ -113,7 +129,11 @@ export default function AppShell({ user, onLogout }: Props) {
   const tErrors = useTranslations("errors");
   const locale = useLocale();
 
-  const [view, setView] = useState<View>("calendar");
+  const [view, setView] = useState<View>(() => {
+    if (typeof window === "undefined") return "calendar";
+    const stored = window.sessionStorage.getItem(ACTIVE_VIEW_KEY);
+    return isView(stored) ? stored : "calendar";
+  });
   const [scope, setScope] = useState<LedgerScope>("CAD");
   const [accountType, setAccountType] = useState<AccountType>("personal");
   const [currentUser, setCurrentUser] = useState(user);
@@ -207,7 +227,7 @@ export default function AppShell({ user, onLogout }: Props) {
     const viewParam = params.get("view");
     const subId = params.get("subscription");
     const action = params.get("action");
-    if (viewParam === "subscriptions") setView("subscriptions");
+    if (isView(viewParam)) setView(viewParam);
     if (subId) {
       setSubscriptionFocusId(subId);
       if (action === "cancel") setSubscriptionCancelAction(true);
@@ -216,6 +236,11 @@ export default function AppShell({ user, onLogout }: Props) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(ACTIVE_VIEW_KEY, view);
+  }, [view]);
 
   // Materialize due subscriptions, then load ledger data.
   useEffect(() => {

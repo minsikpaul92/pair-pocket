@@ -83,6 +83,98 @@ interface CategorySlice {
   color: string;
 }
 
+/** Recharts tooltip that matches card-inset (light + dark). */
+function ChartTooltipBox({
+  active,
+  label,
+  rows,
+}: {
+  active?: boolean;
+  label?: string;
+  rows: { name: string; value: string; color?: string }[];
+}) {
+  if (!active || rows.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 shadow-lg min-w-[9rem]">
+      {label ? (
+        <p className="mb-1.5 text-xs font-semibold text-gray-900 dark:text-white">
+          {label}
+        </p>
+      ) : null}
+      <ul className="space-y-1">
+        {rows.map((row) => (
+          <li
+            key={row.name}
+            className="flex items-center justify-between gap-3 text-xs text-gray-700 dark:text-gray-200"
+          >
+            <span className="flex items-center gap-1.5 min-w-0">
+              {row.color ? (
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: row.color }}
+                />
+              ) : null}
+              <span className="truncate">{row.name}</span>
+            </span>
+            <span className="shrink-0 tabular-nums font-medium text-gray-900 dark:text-white">
+              {row.value}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PieExpenseTooltip({
+  active,
+  payload,
+  totalExpense,
+  displayCurrency,
+  shareLabel,
+  ofTotalLabel,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: CategorySlice; color?: string }>;
+  totalExpense: number;
+  displayCurrency: Currency;
+  shareLabel: (percent: string) => string;
+  ofTotalLabel: (amount: string, total: string) => string;
+}) {
+  if (!active || !payload?.length) return null;
+  const slice = payload[0]?.payload;
+  if (!slice) return null;
+
+  const amountText = formatAmount(slice.amount, displayCurrency);
+  const totalText = formatAmount(totalExpense, displayCurrency);
+  const percentText = slice.percent.toFixed(0);
+  const swatch =
+    typeof payload[0]?.color === "string" ? payload[0].color : slice.color;
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 shadow-lg min-w-[11rem]">
+      <div className="flex items-center gap-2 min-w-0">
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: swatch }}
+        />
+        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+          {slice.name}
+        </p>
+      </div>
+      <p className="mt-1.5 text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+        {amountText}
+      </p>
+      <p className="mt-0.5 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+        {ofTotalLabel(amountText, totalText)}
+      </p>
+      <p className="mt-0.5 text-[11px] font-medium text-gray-600 dark:text-gray-300">
+        {shareLabel(percentText)}
+      </p>
+    </div>
+  );
+}
+
 interface Props {
   month: Date;
   version: number;
@@ -272,6 +364,10 @@ export default function DashboardAnalytics({
 
   const displaySlices = expenseRange === 1 ? monthSlices : expenseSlices;
   const pieData = useMemo(() => displaySlices.slice(0, 8), [displaySlices]);
+  const pieTotalExpense = useMemo(
+    () => displaySlices.reduce((sum, row) => sum + row.amount, 0),
+    [displaySlices]
+  );
 
   useEffect(() => {
     fetchUserSettings()
@@ -516,9 +612,25 @@ export default function DashboardAnalytics({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) =>
-                      formatAmount(value, displayCurrency)
-                    }
+                    content={({ active, payload }) => (
+                      <PieExpenseTooltip
+                        active={active}
+                        payload={
+                          payload as Array<{
+                            payload?: CategorySlice;
+                            color?: string;
+                          }>
+                        }
+                        totalExpense={pieTotalExpense}
+                        displayCurrency={displayCurrency}
+                        shareLabel={(percent) =>
+                          t("pieTooltipShare", { percent })
+                        }
+                        ofTotalLabel={(amount, total) =>
+                          t("pieTooltipOfTotal", { amount, total })
+                        }
+                      />
+                    )}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -666,10 +778,22 @@ export default function DashboardAnalytics({
                   }
                 />
                 <Tooltip
-                  formatter={(value: number, name: string) => [
-                    formatAmount(value, displayCurrency),
-                    name === "income" ? t("income") : t("expense"),
-                  ]}
+                  content={({ active, payload, label }) => (
+                    <ChartTooltipBox
+                      active={active}
+                      label={typeof label === "string" ? label : undefined}
+                      rows={(payload ?? []).map((p) => ({
+                        name:
+                          p.dataKey === "income" ? t("income") : t("expense"),
+                        value: formatAmount(
+                          Number(p.value ?? 0),
+                          displayCurrency
+                        ),
+                        color:
+                          typeof p.color === "string" ? p.color : undefined,
+                      }))}
+                    />
+                  )}
                 />
                 <Legend
                   formatter={(value) =>
@@ -678,12 +802,14 @@ export default function DashboardAnalytics({
                 />
                 <Bar
                   dataKey="income"
+                  name="income"
                   fill="#22C55E"
                   radius={[6, 6, 0, 0]}
                   maxBarSize={28}
                 />
                 <Bar
                   dataKey="expense"
+                  name="expense"
                   fill="#3B82F6"
                   radius={[6, 6, 0, 0]}
                   maxBarSize={28}

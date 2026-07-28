@@ -1,17 +1,31 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Key, RotateCcw, ShieldAlert, CheckCircle2, Loader2, Sparkles, Languages } from "lucide-react";
-import { fetchUserSettings, saveGeminiApiKey, resetUserData, UserSettings } from "@/lib/api";
+import {
+  Key,
+  RotateCcw,
+  ShieldAlert,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  Languages,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
+
+import {
+  fetchUserSettings,
+  saveGeminiApiKey,
+  resetUserData,
+  UserSettings,
+} from "@/lib/api";
 
 interface Props {
   onChanged: () => void;
 }
 
 export default function SettingsView({ onChanged }: Props) {
-  const tCommon = useTranslations("common");
-  
+  const t = useTranslations("settingsPage");
+
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(true);
@@ -32,7 +46,7 @@ export default function SettingsView({ onChanged }: Props) {
       setErrorMsg(null);
     } catch (err) {
       console.error(err);
-      setErrorMsg("설정을 불러오는 데 실패했습니다.");
+      setErrorMsg(t("loadError"));
     } finally {
       setLoading(false);
     }
@@ -48,31 +62,30 @@ export default function SettingsView({ onChanged }: Props) {
       const updated = await saveGeminiApiKey(apiKey.trim());
       setSettings(updated);
       setApiKey("");
-      setSuccessMsg("Gemini API Key가 성공적으로 저장되었습니다!");
+      setSuccessMsg(t("saveSuccess"));
       onChanged();
-    } catch (err: any) {
-      setErrorMsg(err.message || "API Key 저장 중 오류가 발생했습니다.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t("saveError");
+      setErrorMsg(message || t("saveError"));
     } finally {
       setSavingKey(false);
     }
   }
 
   async function handleResetData() {
-    const confirmMessage = 
-      "⚠️ 경고: 정말 모든 거래 내역, 주식 보유 현황, 금융 계좌 및 구독 목록을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며 모든 데이터가 초기화됩니다.";
-    if (!window.confirm(confirmMessage)) return;
+    if (!window.confirm(t("resetConfirm"))) return;
 
     try {
       setResetting(true);
       setErrorMsg(null);
       setSuccessMsg(null);
       await resetUserData();
-      setSuccessMsg("모든 데이터가 성공적으로 초기화되었습니다.");
+      setSuccessMsg(t("resetSuccess"));
       onChanged();
-      // Reload settings to reflect reset states if any
       await loadSettings();
-    } catch (err: any) {
-      setErrorMsg(err.message || "데이터 초기화 중 오류가 발생했습니다.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t("resetError");
+      setErrorMsg(message || t("resetError"));
     } finally {
       setResetting(false);
     }
@@ -88,7 +101,6 @@ export default function SettingsView({ onChanged }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Alert Banner */}
       {successMsg && (
         <div className="flex items-center gap-2 rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50 p-4 text-sm text-green-700 dark:text-green-400">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
@@ -103,34 +115,33 @@ export default function SettingsView({ onChanged }: Props) {
         </div>
       )}
 
-      {/* Gemini AI Settings Card */}
       <section className="card-inset p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-500" />
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-              Gemini AI 설정
+              {t("geminiTitle")}
             </h2>
           </div>
           {settings?.has_gemini_key ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400 border border-green-200/50 dark:border-green-800/50">
-              <CheckCircle2 className="h-3.5 w-3.5" /> 연동됨
+              <CheckCircle2 className="h-3.5 w-3.5" /> {t("connected")}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 dark:bg-yellow-900/30 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 dark:text-yellow-400 border border-yellow-200/50 dark:border-yellow-800/50">
-              미연동
+              {t("notConnected")}
             </span>
           )}
         </div>
 
         <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          개인 발급받은 Google Gemini API Key를 연동하여 영수증 이미지 OCR 자동 파싱 및 PDF 명세서 분석 기능, 그리고 다국어 AI 번역 기능을 비용 걱정 없이 무료로 사용할 수 있습니다.
+          {t("geminiDescription")}
         </p>
 
         <form onSubmit={handleSaveKey} className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              Gemini API Key
+              {t("apiKeyLabel")}
             </label>
             <div className="relative">
               <Key className="absolute left-3 top-2.5 h-4.5 w-4.5 text-gray-400" />
@@ -138,7 +149,11 @@ export default function SettingsView({ onChanged }: Props) {
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={settings?.has_gemini_key ? "••••••••••••••••••••••••••••" : "AI API Key 입력"}
+                placeholder={
+                  settings?.has_gemini_key
+                    ? "••••••••••••••••••••••••••••"
+                    : t("apiKeyPlaceholder")
+                }
                 className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 pl-10 pr-3.5 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
                 required
               />
@@ -152,39 +167,37 @@ export default function SettingsView({ onChanged }: Props) {
             {savingKey ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                저장 중...
+                {t("saving")}
               </>
             ) : (
-              "API Key 저장"
+              t("saveKey")
             )}
           </button>
         </form>
       </section>
 
-      {/* Dynamic Languages AI Translation Info Card */}
       <section className="card-inset p-5 space-y-3">
         <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
           <Languages className="h-5 w-5 text-indigo-500" />
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            AI 다국어 자동 번역 지원
+            {t("i18nTitle")}
           </h2>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          Gemini API Key가 연동되어 있으면 기본 한글/영어 이외에 **중국어, 일본어, 베트남어, 프랑스어** 등 원하는 언어를 선택할 때 기존 언어팩을 기반으로 Gemini가 전체 번역본을 자동 생성하여 브라우저에 바로 캐싱해 줍니다.
+          {t("i18nDescription")}
         </p>
       </section>
 
-      {/* Data Reset Card */}
       <section className="card-inset p-5 space-y-4 border border-red-200/50 dark:border-red-950/30">
         <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
           <RotateCcw className="h-5 w-5 text-red-500" />
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            테스트 데이터 초기화
+            {t("resetTitle")}
           </h2>
         </div>
-        
+
         <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          모든 거래 내역, 주식 보유 정보, 추가된 금융 계좌 및 정기 구독 정보가 데이터베이스에서 영구히 삭제됩니다. 로그인 계정 상태와 사용자 정의 카테고리/API Key 설정은 보존되어 편리하게 처음부터 다시 테스트를 시작할 수 있습니다.
+          {t("resetDescription")}
         </p>
 
         <button
@@ -196,10 +209,10 @@ export default function SettingsView({ onChanged }: Props) {
           {resetting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin text-red-500" />
-              데이터 초기화 중...
+              {t("resetting")}
             </>
           ) : (
-            "모든 가계부 데이터 초기화"
+            t("resetButton")
           )}
         </button>
       </section>

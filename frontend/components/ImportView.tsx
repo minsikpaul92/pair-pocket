@@ -69,6 +69,7 @@ interface EditableTransaction {
 }
 
 export default function ImportView({ scope, accountType, presets, onChanged }: Props) {
+  const t = useTranslations("importPage");
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
 
@@ -119,7 +120,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       setLogs(l);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg("로그를 가져오는 도중 에러가 발생했습니다.");
+      setErrorMsg(t("errLoadLogs"));
     } finally {
       setLoadingLogs(false);
     }
@@ -147,7 +148,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
     const token = localStorage.getItem("pairpocket_token") || "";
 
     try {
-      setScanningStatus(`${file.name} 분석 대기 중...`);
+      setScanningStatus(t("statusQueued", { name: file.name }));
       // Start streaming SSE connection via POST
       const response = await fetch(`${API_BASE_URL}/api/ai/parse-stream`, {
         method: "POST",
@@ -159,12 +160,12 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => null);
-        throw new Error(errJson?.detail || "AI 서버와 연결에 실패했습니다.");
+        throw new Error(errJson?.detail || t("errConnect"));
       }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      if (!reader) throw new Error("스트리밍 리더를 사용할 수 없습니다.");
+      if (!reader) throw new Error(t("errStream"));
 
       let buffer = "";
       while (true) {
@@ -187,7 +188,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "파일 분석 도중 예기치 못한 에러가 발생했습니다.");
+      setErrorMsg(err.message || t("errAnalyze"));
       setScanningStatus(null);
       setLoading(false);
     }
@@ -195,19 +196,22 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
 
   function handleSSEEvent(statusObj: SSEStatus) {
     if (statusObj.event === "trying") {
-      const msg = `⚡ ${statusObj.model}로 분석 중입니다...`;
+      const msg = `⚡ ${t("statusTrying", { model: statusObj.model! })}`;
       setScanningStatus(msg);
       setScanningHistory((prev) => [...prev, msg]);
     } else if (statusObj.event === "failed") {
-      const msg = `❌ ${statusObj.model} 분석 실패: ${statusObj.error || "사용량 초과 또는 권한 문제"}`;
+      const msg = `❌ ${t("statusModelFailed", {
+        model: statusObj.model!,
+        error: statusObj.error || t("errQuotaOrAuth"),
+      })}`;
       setScanningHistory((prev) => [...prev, msg]);
     } else if (statusObj.event === "error") {
-      setErrorMsg(statusObj.error || "모든 AI 모델 분석이 실패했습니다.");
+      setErrorMsg(statusObj.error || t("errAllModels"));
       setScanningStatus(null);
       setLoading(false);
       if (statusObj.log_id) setCurrentLogId(statusObj.log_id);
     } else if (statusObj.event === "success") {
-      setSuccessMsg("AI 영수증 분석 성공!");
+      setSuccessMsg(t("scanSuccess"));
       setScanningStatus(null);
       setLoading(false);
       if (statusObj.log_id) setCurrentLogId(statusObj.log_id);
@@ -219,7 +223,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
           date: tx.date || new Date().toISOString().split("T")[0],
           amount: tx.amount || 0,
           currency: tx.currency || "CAD",
-          merchant: tx.merchant || "미지정",
+          merchant: tx.merchant || t("unspecified"),
           category: tx.category || "식비",
           sub_category: tx.sub_category || "기타",
           items: (tx.items || []).map((item: any) => ({
@@ -243,10 +247,10 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
     try {
       await updateOCRLogFeedback(currentLogId, fb);
       setRating(fb);
-      setSuccessMsg("피드백을 남겨주셔서 감사합니다!");
+      setSuccessMsg(t("feedbackThanks"));
     } catch (err: any) {
       console.error(err);
-      setErrorMsg("피드백 기록에 실패했습니다.");
+      setErrorMsg(t("errFeedback"));
     }
   }
 
@@ -325,7 +329,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
   async function saveSelectedTransactions() {
     const toSave = parsedTransactions.filter((tx) => tx.selected);
     if (toSave.length === 0) {
-      setErrorMsg("선택된 내역이 없습니다.");
+      setErrorMsg(t("errNoneSelected"));
       return;
     }
 
@@ -357,12 +361,12 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
         await createTransaction(payload);
         count++;
       }
-      setSuccessMsg(`성공적으로 ${count}건의 거래 내역을 저장했습니다!`);
+      setSuccessMsg(t("saveSuccess", { count }));
       setParsedTransactions([]);
       onChanged();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "거래 저장 도중 오류가 발생했습니다.");
+      setErrorMsg(err.message || t("errSave"));
     } finally {
       setLoading(false);
     }
@@ -407,7 +411,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
         const date = cols[0] || new Date().toISOString().split("T")[0];
         const amount = parseFloat(cols[1]) || 0;
         const currency = (cols[2] || "CAD").toUpperCase() as any;
-        const merchant = cols[3] || "미지정";
+        const merchant = cols[3] || t("unspecified");
         const category = cols[4] || "생활/쇼핑";
         const sub_category = cols[5] || "기타";
 
@@ -431,7 +435,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
   async function saveCSVTransactions() {
     const toSave = csvPreview.filter((tx) => tx.selected);
     if (toSave.length === 0) {
-      setErrorMsg("선택된 CSV 내역이 없습니다.");
+      setErrorMsg(t("errCsvNoneSelected"));
       return;
     }
 
@@ -456,13 +460,13 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
         await createTransaction(payload);
         count++;
       }
-      setSuccessMsg(`성공적으로 CSV 내역 ${count}건을 가계부에 등록했습니다!`);
+      setSuccessMsg(t("csvSaveSuccess", { count }));
       setCsvPreview([]);
       setCsvFile(null);
       onChanged();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "CSV 가져오기 도중 오류가 발생했습니다.");
+      setErrorMsg(err.message || t("errCsvImport"));
     } finally {
       setLoading(false);
     }
@@ -482,7 +486,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       }
 
       if (txs.length === 0) {
-        setErrorMsg("출력할 거래 내역이 존재하지 않습니다.");
+        setErrorMsg(t("errCsvEmptyExport"));
         return;
       }
 
@@ -506,10 +510,10 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      setSuccessMsg("가계부 데이터를 CSV로 성공적으로 내보냈습니다!");
+      setSuccessMsg(t("csvExportSuccess"));
     } catch (err: any) {
       console.error(err);
-      setErrorMsg("CSV 내보내기 도중 오류가 발생했습니다.");
+      setErrorMsg(t("errCsvExport"));
     } finally {
       setLoading(false);
     }
@@ -518,47 +522,52 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-20">
       {/* Title & Tabs */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-150 dark:border-gray-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-indigo-500 animate-pulse" />
-            스마트 가져오기 & 파일 관리
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-150 dark:border-gray-800 pb-4 min-w-0">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2 min-w-0">
+            <Sparkles className="h-6 w-6 shrink-0 text-indigo-500 animate-pulse" />
+            <span className="truncate" title={t("title")}>
+              {t("title")}
+            </span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            영수증 사진, 청구서 PDF, CSV 내역을 AI로 스마트하게 가계부에 일괄 등록합니다.
+          <p
+            className="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate"
+            title={t("subtitle")}
+          >
+            {t("subtitle")}
           </p>
         </div>
 
-        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800/60 p-1 self-start sm:self-auto">
+        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800/60 p-1 self-start sm:self-auto overflow-x-auto max-w-full">
           <button
             onClick={() => setActiveSubTab("ai")}
-            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeSubTab === "ai"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
-            AI 파일 스캐너
+            {t("tabAi")}
           </button>
           <button
             onClick={() => setActiveSubTab("csv")}
-            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeSubTab === "csv"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
-            CSV 연동
+            {t("tabCsv")}
           </button>
           <button
             onClick={() => setActiveSubTab("logs")}
-            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeSubTab === "logs"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
-            AI 분석 로그
+            {t("tabLogs")}
           </button>
         </div>
       </div>
@@ -583,16 +592,22 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
         <div className="space-y-6">
           {/* Dropzone */}
           <div className="grid gap-6 md:grid-cols-3">
-            <div className="md:col-span-1 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-indigo-500 dark:hover:border-indigo-500 p-8 text-center transition-all flex flex-col items-center justify-center min-h-[220px]">
-              <UploadCloud className="h-12 w-12 text-gray-400 mb-3" />
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                영수증 사진 & 청구서 PDF 업로드
+            <div className="md:col-span-1 card-inset border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-500 dark:hover:border-indigo-500 p-6 sm:p-8 text-center transition-all flex flex-col items-center justify-center min-h-[220px] min-w-0">
+              <UploadCloud className="h-12 w-12 text-gray-400 mb-3 shrink-0" />
+              <p
+                className="w-full max-w-[16rem] text-sm font-semibold text-gray-800 dark:text-gray-100 truncate"
+                title={t("uploadTitle")}
+              >
+                {t("uploadTitle")}
               </p>
-              <p className="text-xs text-gray-400 mt-1 max-w-[180px]">
-                HEIC, PNG, JPEG 이미지 파일 및 PDF 지원
+              <p
+                className="w-full max-w-[16rem] text-xs text-gray-500 dark:text-gray-400 mt-1 truncate"
+                title={t("uploadHint")}
+              >
+                {t("uploadHint")}
               </p>
-              <label className="mt-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 cursor-pointer shadow-sm">
-                파일 선택하기
+              <label className="mt-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 cursor-pointer shadow-sm whitespace-nowrap">
+                {t("selectFile")}
                 <input
                   type="file"
                   accept="image/*,application/pdf"
@@ -604,23 +619,33 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
             </div>
 
             {/* SSE streaming history logs */}
-            <div className="md:col-span-2 rounded-2xl bg-gray-50 dark:bg-gray-800/30 border border-gray-150 dark:border-gray-800 p-6 flex flex-col justify-between min-h-[220px]">
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">AI 실시간 스캔 정보</h3>
+            <div className="md:col-span-2 card-inset p-6 flex flex-col justify-between min-h-[220px] min-w-0">
+              <div className="space-y-2 min-w-0">
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                  {t("scanLiveTitle")}
+                </h3>
                 <div className="max-h-[120px] overflow-y-auto space-y-1.5 pr-2">
                   {scanningHistory.map((h, i) => (
-                    <div key={i} className="text-xs text-gray-500 font-mono">
+                    <div
+                      key={i}
+                      className="text-xs text-gray-600 dark:text-gray-300 font-mono truncate"
+                      title={h}
+                    >
                       {h}
                     </div>
                   ))}
                   {scanningStatus && (
-                    <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 font-semibold font-mono animate-pulse">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      {scanningStatus}
+                    <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-300 font-semibold font-mono animate-pulse min-w-0">
+                      <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                      <span className="truncate" title={scanningStatus}>
+                        {scanningStatus}
+                      </span>
                     </div>
                   )}
                   {scanningHistory.length === 0 && !scanningStatus && (
-                    <div className="text-xs text-gray-400 italic">파일을 업로드하면 모델 호출 상태가 여기에 기록됩니다.</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                      {t("scanLiveEmpty")}
+                    </div>
                   )}
                 </div>
               </div>
@@ -628,9 +653,9 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
               {/* FeedBack 👍/👎 Option */}
               {currentLogId && (
                 <div className="flex items-center justify-between border-t border-gray-150 dark:border-gray-800/80 pt-4 mt-2">
-                  <span className="text-xs font-semibold text-gray-500 flex items-center gap-1">
-                    <HelpCircle className="h-4 w-4" />
-                    AI의 스캔 품질이 만족스럽나요?
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-300 flex items-center gap-1 min-w-0">
+                    <HelpCircle className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{t("feedbackPrompt")}</span>
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -642,7 +667,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                       }`}
                     >
                       <ThumbsUp className="h-3.5 w-3.5" />
-                      최고예요
+                      {t("feedbackGood")}
                     </button>
                     <button
                       onClick={() => handleFeedback("thumbs_down")}
@@ -653,7 +678,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                       }`}
                     >
                       <ThumbsDown className="h-3.5 w-3.5" />
-                      별로예요
+                      {t("feedbackBad")}
                     </button>
                   </div>
                 </div>
@@ -665,9 +690,9 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
           {parsedTransactions.length > 0 && (
             <div className="rounded-2xl border border-gray-150 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
-                <h2 className="text-base font-bold text-gray-800 dark:text-white">분석 완료 거래 검토</h2>
+                <h2 className="text-base font-bold text-gray-800 dark:text-white">{t("reviewTitle")}</h2>
                 <div className="text-xs text-gray-500">
-                  저장할 거래를 체크하고 세부 품목은 <span className="font-semibold text-indigo-600">+</span> 버튼을 눌러 확인 및 편집하세요.
+                  {t("reviewHint")}
                 </div>
               </div>
 
@@ -687,13 +712,13 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                           className="rounded text-indigo-600"
                         />
                       </th>
-                      <th className="p-3">날짜</th>
-                      <th className="p-3">가게명</th>
-                      <th className="p-3">금액</th>
-                      <th className="p-3">통화</th>
-                      <th className="p-3">카테고리</th>
-                      <th className="p-3">중분류</th>
-                      <th className="p-3">세부품목</th>
+                      <th className="p-3">{t("colDate")}</th>
+                      <th className="p-3">{t("colMerchant")}</th>
+                      <th className="p-3">{t("colAmount")}</th>
+                      <th className="p-3">{t("colCurrency")}</th>
+                      <th className="p-3">{t("colCategory")}</th>
+                      <th className="p-3">{t("colSubCategory")}</th>
+                      <th className="p-3">{t("colItems")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-150 dark:divide-gray-800/80">
@@ -771,7 +796,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                               className="flex items-center gap-1 rounded-lg bg-gray-100 hover:bg-gray-250 dark:bg-gray-800 px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-semibold"
                             >
                               <Plus className="h-3 w-3" />
-                              품목 ({tx.items.length})
+                              {t("itemsCount", { count: tx.items.length })}
                             </button>
                           </td>
                         </tr>
@@ -783,30 +808,30 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                               <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-3">
                                 <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-2">
                                   <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                                    영수증 소분류 품목 내역 (단가/총액 연동 계산기)
+                                    {t("itemsPanelTitle")}
                                   </span>
                                   <button
                                     onClick={() => addSubItem(tx.id)}
                                     className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
                                   >
                                     <Plus className="h-3 w-3" />
-                                    품목 추가
+                                    {t("addItem")}
                                   </button>
                                 </div>
 
                                 {tx.items.length === 0 ? (
                                   <div className="text-xs text-gray-400 py-2 italic text-center">
-                                    등록된 품목이 없습니다. 우측 품목 추가를 눌러 가격 계산에 맞춰 등록하세요.
+                                    {t("itemsEmpty")}
                                   </div>
                                 ) : (
                                   <div className="space-y-2">
                                     <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-500 px-2">
-                                      <div className="col-span-3">품목명 (영수증 표기)</div>
-                                      <div className="col-span-3">비교용 표준품목명 (한국어 권장)</div>
-                                      <div className="col-span-1">수량</div>
-                                      <div className="col-span-1">단위</div>
-                                      <div className="col-span-2">단가 (Unit Price)</div>
-                                      <div className="col-span-1">합계</div>
+                                      <div className="col-span-3">{t("itemName")}</div>
+                                      <div className="col-span-3">{t("itemStandardName")}</div>
+                                      <div className="col-span-1">{t("itemQty")}</div>
+                                      <div className="col-span-1">{t("itemUnit")}</div>
+                                      <div className="col-span-2">{t("itemUnitPrice")}</div>
+                                      <div className="col-span-1">{t("itemTotal")}</div>
                                       <div className="col-span-1"></div>
                                     </div>
 
@@ -823,7 +848,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                                           type="text"
                                           value={item.standardized_name}
                                           onChange={(e) => updateItemField(tx.id, itemIdx, "standardized_name", e.target.value)}
-                                          placeholder="예: 수박"
+                                          placeholder={t("itemPlaceholder")}
                                           className="col-span-3 bg-gray-50 dark:bg-gray-800 border-none rounded-lg p-2 text-xs"
                                         />
                                         <input
@@ -837,7 +862,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                                           type="text"
                                           value={item.unit}
                                           onChange={(e) => updateItemField(tx.id, itemIdx, "unit", e.target.value)}
-                                          placeholder="lb / 개"
+                                          placeholder="lb / ea"
                                           className="col-span-1 bg-gray-50 dark:bg-gray-800 border-none rounded-lg p-2 text-xs"
                                         />
                                         <input
@@ -880,7 +905,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                   className="rounded-xl border border-gray-250 hover:bg-gray-50 text-gray-700 text-xs font-semibold px-4 py-2.5 transition-all"
                   disabled={loading}
                 >
-                  초기화
+                  {t("reset")}
                 </button>
                 <button
                   onClick={saveSelectedTransactions}
@@ -888,7 +913,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                   disabled={loading}
                 >
                   {loading && <Loader2 className="h-3 w-3 animate-spin" />}
-                  선택한 {parsedTransactions.filter((t) => t.selected).length}건 가계부에 등록
+                  {t("saveSelected", { count: parsedTransactions.filter((tx) => tx.selected).length })}
                 </button>
               </div>
             </div>
@@ -904,10 +929,10 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
             <div>
               <h2 className="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
                 <FileSpreadsheet className="h-5 w-5 text-indigo-500" />
-                CSV 가계부 가져오기 (파일 업로드)
+                {t("csvImportTitle")}
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                CSV 형식(`날짜, 금액, 통화, 거래처, 대분류, 중분류`)의 파일을 가계부에 일괄 등록합니다.
+                {t("csvImportHint")}
               </p>
             </div>
 
@@ -918,10 +943,10 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
             >
               <UploadCloud className="h-8 w-8 text-gray-400 mb-2" />
               <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-                {csvFile ? csvFile.name : "이곳에 CSV 파일을 끌어놓으세요"}
+                {csvFile ? csvFile.name : t("csvDrop")}
               </span>
               <label className="mt-3 rounded-lg bg-gray-150 hover:bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-xs font-semibold px-3.5 py-2 cursor-pointer transition-all">
-                파일 선택
+                {t("csvChoose")}
                 <input
                   type="file"
                   accept=".csv"
@@ -939,10 +964,10 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                     <thead className="bg-gray-50 dark:bg-gray-800/40 text-gray-600 dark:text-gray-300 border-b border-gray-150 dark:border-gray-800">
                       <tr>
                         <th className="p-2 w-8"></th>
-                        <th className="p-2">날짜</th>
-                        <th className="p-2">거래처</th>
-                        <th className="p-2">금액</th>
-                        <th className="p-2">카테고리</th>
+                        <th className="p-2">{t("colDate")}</th>
+                        <th className="p-2">{t("colMerchant")}</th>
+                        <th className="p-2">{t("colAmount")}</th>
+                        <th className="p-2">{t("colCategory")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-150 dark:divide-gray-800/50">
@@ -980,14 +1005,14 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                     }}
                     className="rounded-lg border border-gray-250 hover:bg-gray-50 text-gray-700 text-xs font-semibold px-3.5 py-2"
                   >
-                    취소
+                    {t("cancel")}
                   </button>
                   <button
                     onClick={saveCSVTransactions}
                     className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 transition-all flex items-center gap-1"
                   >
                     {loading && <Loader2 className="h-3 w-3 animate-spin" />}
-                    가계부에 일괄 등록
+                    {t("csvBulkSave")}
                   </button>
                 </div>
               </div>
@@ -999,16 +1024,16 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
             <div>
               <h2 className="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
                 <Download className="h-5 w-5 text-indigo-500" />
-                CSV 가계부 내보내기 (다운로드)
+                {t("csvExportTitle")}
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                현재 가계부에 등록된 거래 내역 데이터를 CSV 파일로 다운로드합니다. 백업이나 외부 사용에 적합합니다.
+                {t("csvExportHint")}
               </p>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">내보낼 장부 구분</label>
+                <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">{t("exportAccountType")}</label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setExportAccountType("personal")}
@@ -1018,7 +1043,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                         : "bg-white dark:bg-gray-800 border-gray-250 dark:border-gray-700 text-gray-600 hover:bg-gray-50"
                     }`}
                   >
-                    개인 장부 (Personal)
+                    {t("exportPersonal")}
                   </button>
                   <button
                     onClick={() => setExportAccountType("shared")}
@@ -1028,13 +1053,13 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                         : "bg-white dark:bg-gray-800 border-gray-250 dark:border-gray-700 text-gray-600 hover:bg-gray-50"
                     }`}
                   >
-                    공용 장부 (Shared)
+                    {t("exportShared")}
                   </button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">장부 통화 필터</label>
+                <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">{t("exportCurrency")}</label>
                 <div className="flex gap-2">
                   {(["ALL", "CAD", "KRW"] as const).map((curr) => (
                     <button
@@ -1046,7 +1071,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                           : "bg-white dark:bg-gray-800 border-gray-250 dark:border-gray-700 text-gray-600 hover:bg-gray-50"
                       }`}
                     >
-                      {curr === "ALL" ? "전체 (ALL)" : curr}
+                      {curr === "ALL" ? t("exportAll") : curr}
                     </button>
                   ))}
                 </div>
@@ -1063,7 +1088,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
               ) : (
                 <Download className="h-4 w-4" />
               )}
-              CSV 다운로드하기
+              {t("csvDownload")}
             </button>
           </div>
         </div>
@@ -1073,13 +1098,13 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       {activeSubTab === "logs" && (
         <div className="rounded-2xl border border-gray-150 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-4">
           <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
-            <h2 className="text-base font-bold text-gray-800 dark:text-white">AI 스캔 이력 & 피드백 조회</h2>
+            <h2 className="text-base font-bold text-gray-800 dark:text-white">{t("logsTitle")}</h2>
             <button
               onClick={loadLogs}
               className="rounded-lg border border-gray-250 hover:bg-gray-50 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-semibold"
               disabled={loadingLogs}
             >
-              새로고침
+              {t("refresh")}
             </button>
           </div>
 
@@ -1089,18 +1114,18 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
             </div>
           ) : logs.length === 0 ? (
             <div className="text-sm text-gray-400 py-12 text-center italic">
-              아직 처리된 AI 스캔 데이터 로그가 존재하지 않습니다.
+              {t("logsEmpty")}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-gray-500">
                 <thead className="bg-gray-50 dark:bg-gray-800/40 text-gray-600 dark:text-gray-300 border-b border-gray-150 dark:border-gray-800">
                   <tr>
-                    <th className="p-3">업로드 시간</th>
-                    <th className="p-3">파일명</th>
-                    <th className="p-3">사용 모델</th>
-                    <th className="p-3">처리 결과</th>
-                    <th className="p-3">사용자 평점</th>
+                    <th className="p-3">{t("colUploadedAt")}</th>
+                    <th className="p-3">{t("colFileName")}</th>
+                    <th className="p-3">{t("colModel")}</th>
+                    <th className="p-3">{t("colResult")}</th>
+                    <th className="p-3">{t("colRating")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-150 dark:divide-gray-800/80">
@@ -1114,17 +1139,17 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                       </td>
                       <td className="p-3 font-mono text-xs">
                         <span className="rounded bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 border border-indigo-100 dark:border-indigo-900/40">
-                          {log.model_used || "미확인"}
+                          {log.model_used || t("unknownModel")}
                         </span>
                       </td>
                       <td className="p-3">
                         {log.status === "success" ? (
                           <span className="text-green-600 font-semibold flex items-center gap-0.5">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> 성공
+                            <CheckCircle2 className="h-3.5 w-3.5" /> {t("success")}
                           </span>
                         ) : (
                           <span className="text-red-500 font-semibold flex items-center gap-0.5" title={log.error_message || ""}>
-                            <AlertCircle className="h-3.5 w-3.5" /> 실패
+                            <AlertCircle className="h-3.5 w-3.5" /> {t("failed")}
                           </span>
                         )}
                       </td>
@@ -1139,7 +1164,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                             className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${
                               log.feedback === "thumbs_up" ? "text-green-500" : "text-gray-300"
                             }`}
-                            title="만족"
+                            title={t("ratingGood")}
                           >
                             <ThumbsUp className="h-4 w-4" />
                           </button>
@@ -1152,7 +1177,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                             className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${
                               log.feedback === "thumbs_down" ? "text-red-500" : "text-gray-300"
                             }`}
-                            title="불만족"
+                            title={t("ratingBad")}
                           >
                             <ThumbsDown className="h-4 w-4" />
                           </button>
