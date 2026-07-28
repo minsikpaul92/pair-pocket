@@ -542,6 +542,7 @@
     "errStream": "Streaming is not available.",
     "errAnalyze": "Unexpected error while analyzing the file.",
     "statusTrying": "Analyzing with {model}…",
+    "statusQuotaFallback": "Free-tier limit on {model}; switching to {fallback}.",
     "statusModelFailed": "{model} failed: {error}",
     "errQuotaOrAuth": "Quota exceeded or permission issue",
     "errAllModels": "All AI models failed.",

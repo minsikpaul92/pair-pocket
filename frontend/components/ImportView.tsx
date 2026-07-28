@@ -41,8 +41,11 @@ interface Props {
 }
 
 interface SSEStatus {
-  event: "trying" | "failed" | "success" | "error";
+  event: "trying" | "failed" | "success" | "error" | "quota_fallback";
   model?: string;
+  fallback_model?: string;
+  resume_at?: string;
+  message?: string;
   error?: string;
   result?: any;
   log_id?: string;
@@ -197,6 +200,13 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
   function handleSSEEvent(statusObj: SSEStatus) {
     if (statusObj.event === "trying") {
       const msg = `⚡ ${t("statusTrying", { model: statusObj.model! })}`;
+      setScanningStatus(msg);
+      setScanningHistory((prev) => [...prev, msg]);
+    } else if (statusObj.event === "quota_fallback") {
+      const msg = `⏳ ${t("statusQuotaFallback", {
+        model: statusObj.model || "",
+        fallback: statusObj.fallback_model || "",
+      })}`;
       setScanningStatus(msg);
       setScanningHistory((prev) => [...prev, msg]);
     } else if (statusObj.event === "failed") {

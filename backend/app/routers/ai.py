@@ -8,7 +8,10 @@ from app.core.security import get_current_user
 from app.database import get_database
 from app.models.user import UserOut
 from app.models.ocr_log import OCRLogOut, FeedbackUpdateBody
-from app.services.ai import parse_receipt_or_statement, parse_receipt_or_statement_stream
+from app.services.ai import (
+    parse_files_in_batches,
+    parse_receipt_or_statement_stream,
+)
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -18,24 +21,26 @@ async def parse_receipts_or_statements(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    results = []
-    errors = []
+    prepared: list[tuple[bytes, str, str]] = []
+    errors: list[str] = []
 
     for file in files:
         content_type = file.content_type or "image/jpeg"
         if not (content_type.startswith("image/") or content_type == "application/pdf"):
             errors.append(f"지원하지 않는 파일 형식입니다 ({file.filename}): {content_type}")
             continue
+        content = await file.read()
+        prepared.append((content, content_type, file.filename or "file"))
 
-        try:
-            content = await file.read()
-            parsed = await parse_receipt_or_statement(
-                db, current_user.id, content, content_type, file.filename
-            )
-            parsed["file_name"] = file.filename
-            results.append(parsed)
-        except Exception as e:
-            errors.append(f"파일 분석 중 오류 발생 ({file.filename}): {str(e)}")
+    outcomes = await parse_files_in_batches(db, current_user.id, prepared)
+    results = []
+    for item in outcomes:
+        if "error" in item:
+            errors.append(f"파일 분석 중 오류 발생 ({item['file_name']}): {item['error']}")
+            continue
+        parsed = item["result"]
+        parsed["file_name"] = item["file_name"]
+        results.append(parsed)
 
     if errors and not results:
         raise HTTPException(
