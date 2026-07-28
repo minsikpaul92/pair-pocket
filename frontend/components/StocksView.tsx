@@ -247,7 +247,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const handleAddHolding = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicker || !targetAccountId || !sharesInput || !priceInput) {
-      setFormError("모든 필수 항목을 입력해 주세요.");
+      setFormError(t("formRequired"));
       return;
     }
 
@@ -267,7 +267,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       loadData();
       if (onChanged) onChanged();
     } catch (err: any) {
-      setFormError(err.message || "주식 보유 등록에 실패했습니다.");
+      setFormError(err.message || t("addFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -288,7 +288,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       loadData();
       if (onChanged) onChanged();
     } catch (err: any) {
-      alert(err.message || "수정에 실패했습니다.");
+      alert(err.message || t("editFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -296,14 +296,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
 
   // Handle Delete Holding
   const handleDeleteHolding = async (id: string) => {
-    if (!confirm("보유 주식 데이터를 삭제하시겠습니까? (이체 내역은 유지됩니다)")) return;
+    if (!confirm(t("deleteConfirm"))) return;
     try {
       await deleteStockHolding(id);
       setShowEditModal(false);
       loadData();
       if (onChanged) onChanged();
     } catch (err: any) {
-      alert(err.message || "삭제에 실패했습니다.");
+      alert(err.message || t("deleteFailed"));
     }
   };
 
@@ -360,13 +360,13 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       {/* 1. Market Index Header */}
       <div className="flex items-center justify-between px-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
         <div className="flex items-center gap-1.5">
-          <span>나스닥</span>
+          <span>{t("nasdaq")}</span>
           <span className="text-gray-800 dark:text-gray-200">{nasdaqPrice}</span>
           <span className={nasdaqChange.startsWith("+") ? "text-red-500" : "text-blue-500"}>
             {nasdaqChange}
           </span>
         </div>
-        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" title="실시간 연동 활성화" />
+        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" title={t("liveSync")} />
       </div>
 
       {/* 2. 내 투자 계좌 (My Investment Accounts) */}
@@ -374,12 +374,12 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 tracking-tight">
-              투자 계좌별 실적
+              {t("performanceByAccount")}
             </h3>
             <button
               onClick={() => setShowAccountRegister(true)}
               className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-500 transition-colors"
-              title="계좌 추가"
+              title={t("addAccount")}
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -389,23 +389,23 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               onClick={() => setSelectedAccountIdFilter("ALL")}
               className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline transition-all bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md"
             >
-              전체보기 ✕
+              {t("showAll")}
             </button>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory">
           {/* 1. 전체 계좌 통합 카드 */}
           <button
             onClick={() => setSelectedAccountIdFilter("ALL")}
-            className={`text-left p-3.5 rounded-2xl transition-all border shrink-0 min-w-[150px] flex-1 ${
+            className={`text-left p-3.5 rounded-2xl transition-all border shrink-0 w-[148px] sm:w-[160px] snap-start ${
               selectedAccountIdFilter === "ALL"
                 ? "bg-blue-50/60 dark:bg-blue-950/30 border-blue-500 dark:border-blue-700 shadow-md ring-1 ring-blue-500"
                 : "bg-gray-50/50 dark:bg-gray-850 border-transparent hover:border-gray-200 dark:hover:border-gray-800"
             }`}
           >
-            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate">
-              전체 계좌 (합계)
+            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap">
+              {t("allAccountsTotal")}
             </div>
             <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
               {formatAmount(totalStats.valuation, displayCurrency)}
@@ -427,14 +427,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 onClick={() => {
                   setSelectedAccountIdFilter(prev => prev === acc.id ? "ALL" : acc.id);
                 }}
-                className={`text-left p-3.5 rounded-2xl transition-all border shrink-0 min-w-[150px] flex-1 ${
+                className={`text-left p-3.5 rounded-2xl transition-all border shrink-0 w-[148px] sm:w-[160px] snap-start ${
                   isSelected
                     ? "bg-blue-50/60 dark:bg-blue-950/30 border-blue-500 dark:border-blue-700 shadow-md ring-1 ring-blue-500"
                     : "bg-gray-50/50 dark:bg-gray-850 border-transparent hover:border-gray-200 dark:hover:border-gray-800"
                 }`}
               >
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate">
+                <div className="flex items-center justify-between gap-1 min-w-0">
+                  <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap" title={`${acc.institution ? `[${acc.institution}] ` : ""}${acc.nickname || acc.name}`}>
                     {acc.institution ? `[${acc.institution}] ` : ""}{acc.nickname || acc.name}
                   </span>
                   <span className="text-[9px] text-gray-400 dark:text-gray-500 uppercase font-black">
@@ -481,7 +481,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               </span>
             </div>
             <div className="text-[10px] text-gray-400 mt-2">
-              총 투자 원금: {formatAmount(summary?.total_invested ?? 0, displayCurrency)}
+              {t("totalInvestedLabel", { amount: formatAmount(summary?.total_invested ?? 0, displayCurrency) })}
             </div>
           </div>
         )}
@@ -494,7 +494,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           {/* Active Account Filter Badge */}
           <div className="flex items-center gap-1.5 bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm border border-blue-100/50 dark:border-blue-900/40 select-none">
             {selectedAccountIdFilter === "ALL" ? (
-              <span>전체 계좌 (한/캐 통합)</span>
+              <span className="truncate max-w-[10rem] sm:max-w-none">{t("allAccountsIntegrated")}</span>
             ) : (
               <div className="flex items-center gap-1">
                 <span>
@@ -502,13 +502,13 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                     const matchedAcc = investmentAccounts.find((a) => a.id === selectedAccountIdFilter);
                     return matchedAcc
                       ? `${matchedAcc.institution ? `[${matchedAcc.institution}] ` : ""}${matchedAcc.name}`
-                      : "필터링된 계좌";
+                      : t("filteredAccount");
                   })()}
                 </span>
                 <button
                   onClick={() => setSelectedAccountIdFilter("ALL")}
                   className="hover:text-blue-800 dark:hover:text-blue-300 font-black ml-1.5"
-                  title="필터 초기화"
+                  title={t("clearFilter")}
                 >
                   ✕
                 </button>
@@ -550,7 +550,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
               }`}
             >
-              달러
+              {t("displayCad")}
             </button>
             <button
               onClick={() => setDisplayCurrency("KRW")}
@@ -560,7 +560,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
               }`}
             >
-              원화
+              {t("displayKrw")}
             </button>
           </div>
         </div>
@@ -628,7 +628,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">{row.ticker}</span>
                     </div>
                     <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                      {row.shares}주 · 평단 {formatAmount(row.avg_price, row.currency as Currency)}
+                      {t("sharesAvg", { shares: row.shares, avg: formatAmount(row.avg_price, row.currency as Currency) })}
                     </div>
                   </div>
                 </div>
@@ -705,7 +705,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   className="w-full rounded-xl border border-gray-200 dark:border-gray-850 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
                   required
                 >
-                  <option value="">증권 계좌 선택...</option>
+                  <option value="">{t("selectBrokerage")}</option>
                   {investmentAccounts
                     .filter((a) => ledgerScope === "ALL" || a.currency === ledgerScope)
                     .map((acc) => (
@@ -719,7 +719,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               {/* Ticker Search & Auto-complete */}
               <div className="relative">
                 <label className="mb-1.5 block text-xs font-bold text-gray-400 dark:text-gray-500">
-                  {t("holdingTicker")} 검색
+                  {t("searchTicker")}
                 </label>
                 <div className="relative">
                   <input
@@ -727,7 +727,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 dark:border-gray-850 bg-white dark:bg-gray-900 pl-9 pr-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
-                    placeholder="예: 삼성전자, 테슬라, AAPL..."
+                    placeholder={t("searchPlaceholder")}
                   />
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 </div>
@@ -769,7 +769,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                     <div className="text-[10px] text-gray-400 mt-0.5">{selectedTicker} · {selectedCurrency}</div>
                   </div>
                   <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-black px-2 py-0.5 rounded text-[10px]">
-                    선택됨
+                    {t("selected")}
                   </span>
                 </div>
               )}
@@ -777,7 +777,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               {/* Currency Selector for Purchase */}
               <div>
                 <label className="mb-1.5 block text-xs font-bold text-gray-400 dark:text-gray-500">
-                  매수 통화
+                  {t("purchaseCurrency")}
                 </label>
                 <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5 max-w-[12rem]">
                   {(["USD", "CAD", "KRW"] as Currency[]).map((c) => (
@@ -835,14 +835,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   onClick={() => setShowAddModal(false)}
                   className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-bold py-2.5 rounded-xl transition-all"
                 >
-                  취소
+                  {t("cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-50"
                 >
-                  {submitting ? "등록 중..." : "등록 완료"}
+                  {submitting ? t("submitting") : t("submitAdd")}
                 </button>
               </div>
             </form>
@@ -875,7 +875,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             <form onSubmit={handleEditHolding} className="space-y-4">
               <div>
                 <label className="mb-1.5 block text-xs font-bold text-gray-400 dark:text-gray-500">
-                  보유 계좌
+                  {t("ownedAccount")}
                 </label>
                 {selectedHoldingGroup?.holdings && selectedHoldingGroup.holdings.length > 1 ? (
                   <select
@@ -898,7 +898,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   </select>
                 ) : (
                   <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-3.5 py-2 rounded-xl">
-                    {selectedHolding.account_name || selectedHolding.institution || "기본계좌"}
+                    {selectedHolding.account_name || selectedHolding.institution || t("defaultAccount")}
                   </div>
                 )}
               </div>
@@ -936,7 +936,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   type="button"
                   onClick={() => handleDeleteHolding(selectedHolding.id)}
                   className="bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-500 p-2.5 rounded-xl transition-all"
-                  title="삭제"
+                  title={t("delete")}
                 >
                   <Trash2 className="h-5 w-5" />
                 </button>
@@ -949,14 +949,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                     }}
                     className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-bold py-2.5 rounded-xl transition-all"
                   >
-                    취소
+                    {t("cancel")}
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-50"
                   >
-                    {submitting ? "저장 중..." : "저장 완료"}
+                    {submitting ? t("submitting") : t("submitSave")}
                   </button>
                 </div>
               </div>
