@@ -138,8 +138,12 @@ async def parse_receipt_or_statement_stream(
         }
     }
 
-    # API fallback chain
-    models = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemma-4-31b-it"]
+    # API fallback chain (free-tier friendly; prefer newer Flash then Lite)
+    models = [
+        "gemini-3.6-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+    ]
     last_error = None
 
     async with httpx.AsyncClient(timeout=45.0) as client:
