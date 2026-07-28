@@ -542,6 +542,7 @@
     "errStream": "스트리밍 리더를 사용할 수 없습니다.",
     "errAnalyze": "파일 분석 도중 예기치 못한 에러가 발생했습니다.",
     "statusTrying": "{model}로 분석 중입니다...",
+    "statusQuotaFallback": "무료 한도로 {model}을(를) 잠시 건너뛰고 {fallback}(으)로 분석합니다.",
     "statusModelFailed": "{model} 분석 실패: {error}",
     "errQuotaOrAuth": "사용량 초과 또는 권한 문제",
     "errAllModels": "모든 AI 모델 분석이 실패했습니다.",
