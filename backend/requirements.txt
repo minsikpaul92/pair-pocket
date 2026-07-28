@@ -11,3 +11,4 @@ itsdangerous
 pyjwt
 yfinance
 python-multipart
+cryptography

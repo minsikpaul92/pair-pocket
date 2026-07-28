@@ -5,13 +5,40 @@ import httpx
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.crypto import decrypt_secret, encrypt_secret, is_encrypted
+
+
 async def get_user_gemini_api_key(db: AsyncIOMotorDatabase, owner_id: str) -> str | None:
+    """Return the user's Gemini API key, decrypting at rest ciphertext when needed."""
     doc = await db["user_settings"].find_one({"owner_id": owner_id})
-    if doc:
-        key = doc.get("gemini_api_key")
-        if key and key.strip():
-            return key.strip()
-    return None
+    if not doc:
+        return None
+
+    stored = doc.get("gemini_api_key")
+    if not stored or not str(stored).strip():
+        return None
+
+    stored = str(stored).strip()
+    try:
+        plaintext = decrypt_secret(stored).strip()
+    except ValueError:
+        return None
+
+    if not plaintext:
+        return None
+
+    # Lazy-migrate legacy plaintext keys to encrypted storage.
+    if not is_encrypted(stored):
+        try:
+            await db["user_settings"].update_one(
+                {"owner_id": owner_id},
+                {"$set": {"gemini_api_key": encrypt_secret(plaintext)}},
+            )
+        except RuntimeError:
+            # Missing encryption key in misconfigured env; still return plaintext.
+            pass
+
+    return plaintext
 
 async def parse_receipt_or_statement_stream(
     db: AsyncIOMotorDatabase,
