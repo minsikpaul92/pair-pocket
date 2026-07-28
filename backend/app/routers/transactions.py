@@ -67,6 +67,7 @@ def _serialize(document: dict) -> dict:
         "shares": document.get("shares"),
         "price": document.get("price"),
         "fee": document.get("fee"),
+        "items": document.get("items"),
     }
 
 

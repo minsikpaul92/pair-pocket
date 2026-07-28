@@ -10,3 +10,4 @@ httpx
 itsdangerous
 pyjwt
 yfinance
+python-multipart

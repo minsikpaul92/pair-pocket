@@ -177,6 +177,16 @@ export interface Transaction {
   shares?: number;
   price?: number;
   fee?: number;
+  items?: TransactionItem[];
+}
+
+export interface TransactionItem {
+  name: string;
+  standardized_name?: string | null;
+  quantity: number;
+  unit?: string | null;
+  unit_price: number;
+  total_price: number;
 }
 
 export interface NewTransaction {
@@ -199,6 +209,7 @@ export interface NewTransaction {
   shares?: number;
   price?: number;
   fee?: number;
+  items?: TransactionItem[];
 }
 
 export interface CategoryGroup {
@@ -350,6 +361,7 @@ export interface UserSettings {
     income: Record<string, string[]>;
   };
   category_colors: Record<string, string>;
+  has_gemini_key?: boolean;
 }
 
 export async function fetchUserSettings(): Promise<UserSettings> {
@@ -1405,3 +1417,93 @@ export async function fetchStockSummary(
   if (!res.ok) throw new ApiError("fetchStockSummary");
   return (await res.json()) as StockSummary;
 }
+
+export interface ParsedTransaction {
+  date: string;
+  amount: number;
+  currency: "CAD" | "KRW" | "USD";
+  merchant: string;
+  category: string;
+  sub_category: string;
+  file_name: string;
+  items?: TransactionItem[];
+}
+
+export async function parseReceiptsOrStatements(files: File[]): Promise<ParsedTransaction[]> {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append("files", file);
+  });
+  const res = await fetch(`${API_BASE_URL}/api/ai/parse`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "AI 분석에 실패했습니다.");
+  }
+  const data = await res.json();
+  return data.results as ParsedTransaction[];
+}
+
+export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/ai`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ api_key: apiKey }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "API Key 저장에 실패했습니다.");
+  }
+  return (await res.json()) as UserSettings;
+}
+
+export async function resetUserData(): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/reset`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "데이터 초기화에 실패했습니다.");
+  }
+}
+
+export interface OCRLog {
+  id: string;
+  timestamp: string;
+  file_name: string;
+  model_used: string | null;
+  parsed_data: any;
+  feedback: "thumbs_up" | "thumbs_down" | null;
+  status: "success" | "failed";
+  error_message: string | null;
+  owner_id: string;
+}
+
+export async function fetchOCRLogs(): Promise<OCRLog[]> {
+  const res = await fetch(`${API_BASE_URL}/api/ai/logs`, {
+    method: "GET",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "OCR 로그 조회에 실패했습니다.");
+  }
+  return (await res.json()) as OCRLog[];
+}
+
+export async function updateOCRLogFeedback(logId: string, feedback: "thumbs_up" | "thumbs_down" | null): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/ai/logs/${logId}/feedback`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ feedback }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "피드백 업데이트에 실패했습니다.");
+  }
+}
+
