@@ -119,7 +119,12 @@ async def get_or_update_stock_price(db, ticker: str, force_refresh: bool = False
             return cached
             
     # Fetch from Yahoo Finance
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+    from urllib.parse import quote
+
+    url = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/"
+        f"{quote(ticker, safe='')}"
+    )
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }

@@ -36,6 +36,7 @@ import TransactionModal from "@/components/TransactionModal";
 import StocksView from "@/components/StocksView";
 import SettingsView from "@/components/SettingsView";
 import ImportView from "@/components/ImportView";
+import MonthPicker from "@/components/MonthPicker";
 import { LineChart, Sparkles } from "lucide-react";
 import {
   AccountType,
@@ -181,7 +182,6 @@ export default function AppShell({ user, onLogout }: Props) {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanMoreInputRef = useRef<HTMLInputElement>(null);
-  const monthPickerRef = useRef<HTMLInputElement>(null);
   const MAX_SCAN_FILES = 15;
 
   function enqueueScanFiles(fileList: FileList | File[] | null) {
@@ -672,46 +672,16 @@ export default function AppShell({ user, onLogout }: Props) {
         <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-28 md:pb-10">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              {view === "calendar" || view === "list" ? (
-                <div className="relative inline-block">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const el = monthPickerRef.current;
-                      if (!el) return;
-                      try {
-                        if (typeof el.showPicker === "function") {
-                          el.showPicker();
-                          return;
-                        }
-                      } catch {
-                        /* fall through to click() */
-                      }
-                      el.click();
-                    }}
-                    aria-label={tCommon("selectMonth")}
-                    className="rounded-xl px-1 -mx-1 text-left transition-colors hover:bg-gray-100 dark:hover:bg-gray-800/60"
-                  >
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                      {monthLabel(month, locale)}
-                    </h1>
-                  </button>
-                  <input
-                    ref={monthPickerRef}
-                    type="month"
-                    value={monthKey(month)}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (!value) return;
-                      const [y, m] = value.split("-").map(Number);
-                      if (!Number.isFinite(y) || !Number.isFinite(m)) return;
-                      setMonth(new Date(y, m - 1, 1));
-                    }}
-                    className="pointer-events-none absolute h-0 w-0 opacity-0"
-                    tabIndex={-1}
-                    aria-hidden
-                  />
-                </div>
+              {view === "calendar" ||
+              view === "list" ||
+              view === "subscriptions" ||
+              view === "stocks" ||
+              view === "dashboard" ? (
+                <MonthPicker
+                  value={month}
+                  onChange={setMonth}
+                  locale={locale}
+                />
               ) : (
                 <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                   {monthLabel(month, locale)}

@@ -377,6 +377,43 @@ async def get_portfolio_summary(
     }
 
 
+# Yahoo index symbols for the stocks tab rotating ticker strip.
+_MARKET_INDICES = [
+    {"id": "nasdaq", "symbol": "^IXIC"},
+    {"id": "sp500", "symbol": "^GSPC"},
+    {"id": "dow", "symbol": "^DJI"},
+    {"id": "kospi", "symbol": "^KS11"},
+    {"id": "tsx", "symbol": "^GSPTSE"},
+]
+
+
+@router.get("/market-indices")
+async def market_indices(
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    _: UserOut = Depends(get_current_user),
+) -> dict:
+    """Return major index quotes (cached via stock_prices, 2h TTL)."""
+    items: list[dict] = []
+    for meta in _MARKET_INDICES:
+        doc = await get_or_update_stock_price(db, meta["symbol"])
+        if not doc or doc.get("price") is None:
+            continue
+        price = float(doc["price"])
+        prev = float(doc.get("prev_close") or price)
+        change_pct = ((price - prev) / prev * 100.0) if prev else 0.0
+        items.append(
+            {
+                "id": meta["id"],
+                "symbol": meta["symbol"],
+                "price": price,
+                "prev_close": prev,
+                "change_percent": round(change_pct, 2),
+                "currency": doc.get("currency") or "USD",
+            }
+        )
+    return {"indices": items}
+
+
 @router.post("/update-prices")
 async def trigger_price_update(
     db: AsyncIOMotorDatabase = Depends(get_database),
