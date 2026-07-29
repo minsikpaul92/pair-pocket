@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
@@ -9,7 +9,11 @@ from app.database import get_database
 from app.models.user import UserOut
 from app.models.ocr_log import OCRLogOut, FeedbackUpdateBody
 from app.services.ai import (
+    ONBOARDING_MAX_IMAGES,
+    ONBOARDING_STEPS,
     parse_files_in_batches,
+    parse_onboarding_screenshots,
+    parse_onboarding_screenshots_stream,
     parse_receipt_or_statement_stream,
 )
 
@@ -78,6 +82,105 @@ async def parse_receipts_or_statements_stream(
             yield f"data: {json.dumps({'event': 'error', 'error': str(e)})}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+
+@router.post("/onboarding-parse")
+async def parse_onboarding_step_screenshots(
+    step: str = Query(..., description="assets | subscriptions | brokerage"),
+    files: list[UploadFile] = File(...),
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    if step not in ONBOARDING_STEPS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"step must be one of: {', '.join(ONBOARDING_STEPS)}",
+        )
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one image is required",
+        )
+    if len(files) > ONBOARDING_MAX_IMAGES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Maximum {ONBOARDING_MAX_IMAGES} images allowed",
+        )
+
+    prepared: list[tuple[bytes, str, str]] = []
+    for file in files:
+        content_type = file.content_type or "image/jpeg"
+        if not content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file type ({file.filename}): {content_type}",
+            )
+        content = await file.read()
+        prepared.append((content, content_type, file.filename or "image.jpg"))
+
+    try:
+        result = await parse_onboarding_screenshots(
+            db, current_user.id, step, prepared
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+
+    return {"status": "success", **result}
+
+
+@router.post("/onboarding-parse-stream")
+async def parse_onboarding_step_screenshots_stream(
+    step: str = Query(..., description="assets | subscriptions | brokerage"),
+    files: list[UploadFile] = File(...),
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    if step not in ONBOARDING_STEPS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"step must be one of: {', '.join(ONBOARDING_STEPS)}",
+        )
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one image is required",
+        )
+    if len(files) > ONBOARDING_MAX_IMAGES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Maximum {ONBOARDING_MAX_IMAGES} images allowed",
+        )
+
+    prepared: list[tuple[bytes, str, str]] = []
+    for file in files:
+        content_type = file.content_type or "image/jpeg"
+        if not content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file type ({file.filename}): {content_type}",
+            )
+        content = await file.read()
+        prepared.append((content, content_type, file.filename or "image.jpg"))
+
+    async def sse_generator():
+        try:
+            async for update in parse_onboarding_screenshots_stream(
+                db, current_user.id, step, prepared
+            ):
+                yield f"data: {json.dumps(update)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'event': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
 
 def _serialize_log(doc: dict) -> dict:
     return {

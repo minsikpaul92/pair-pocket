@@ -211,11 +211,11 @@ export default function CalendarView({
 
               {(hasTx || hasPending) && (
                 <>
-                  <span className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                  <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
                     {hasTx ? tCommon("count", { count: totals!.count }) : ""}
                     {hasTx && hasPending ? " · " : ""}
                     {hasPending ? (
-                      <span className="flex flex-col items-center gap-0 max-w-full">
+                      <span className="flex w-full min-w-0 flex-col items-stretch gap-0">
                         {pendingLines.map((line, idx) => (
                           <span
                             key={`${key}-${idx}-${line}`}
@@ -248,7 +248,7 @@ export default function CalendarView({
                                   }
                                 : undefined
                             }
-                            className={`${pendingDueClass} truncate max-w-full ${
+                            className={`${pendingDueClass} block w-full min-w-0 truncate whitespace-nowrap text-center ${
                               onPendingClick
                                 ? "cursor-pointer hover:underline"
                                 : ""

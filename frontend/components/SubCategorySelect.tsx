@@ -12,6 +12,7 @@ interface Props {
   onAdd?: (name: string) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
+  triggerClassName?: string;
 }
 
 export default function SubCategorySelect({
@@ -21,6 +22,7 @@ export default function SubCategorySelect({
   onAdd,
   placeholder,
   disabled = false,
+  triggerClassName,
 }: Props) {
   const t = useTranslations("subCategories");
   const tTx = useTranslations("transaction");
@@ -35,6 +37,7 @@ export default function SubCategorySelect({
       disabled={disabled}
       addLabel={tTx("addSubCategory")}
       formatOption={(sub) => translateSubCategory(sub, t)}
+      triggerClassName={triggerClassName}
     />
   );
 }

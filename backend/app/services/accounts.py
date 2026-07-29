@@ -20,10 +20,13 @@ def _serialize_account(doc: dict) -> dict:
         "kind": doc["kind"],
         "currency": doc["currency"],
         "account_type": doc["account_type"],
+        "country": doc.get("country"),
         "opening_balance": doc.get("opening_balance", 0.0),
         "is_liability": doc.get("is_liability", False),
         "is_default_expense": doc.get("is_default_expense", False),
         "is_default_income": doc.get("is_default_income", False),
+        "is_default_credit": doc.get("is_default_credit", False),
+        "is_default_investment": doc.get("is_default_investment", False),
         "is_active": doc.get("is_active", True),
         "institution": doc.get("institution"),
         "last_four": doc.get("last_four"),
@@ -33,14 +36,37 @@ def _serialize_account(doc: dict) -> dict:
     }
 
 
+async def _ledger_start_date_for_owners(
+    db: AsyncIOMotorDatabase, owner_ids: list[str]
+) -> str | None:
+    """Use the earliest personal ledger_start_date among owners when present."""
+    if not owner_ids:
+        return None
+    cursor = db["user_settings"].find(
+        {"owner_id": {"$in": owner_ids}, "ledger_start_date": {"$type": "string"}},
+        {"ledger_start_date": 1},
+    )
+    dates: list[str] = []
+    async for doc in cursor:
+        value = doc.get("ledger_start_date")
+        if isinstance(value, str) and len(value) >= 10:
+            dates.append(value[:10])
+    return min(dates) if dates else None
+
+
 async def compute_account_balance(
     db: AsyncIOMotorDatabase,
     *,
     account_doc: dict,
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
+    ledger_start_date: str | None = None,
 ) -> float:
     """Derive running balance for one financial account.
+
+    Live balance = opening_balance + transactions on/after ledger_start_date
+    (when configured). Pre-start transactions remain in history but do not
+    affect the live balance.
 
     Asset accounts (checking, savings):
       + income credited here
@@ -62,15 +88,21 @@ async def compute_account_balance(
         {"owner_id": ids[0]} if len(ids) == 1 else {"owner_id": {"$in": ids}}
     )
 
-    cursor = db[TX_COL].find(
-        {
-            **owner_clause,
-            "$or": [
-                {"account_id": account_id},
-                {"counter_account_id": account_id},
-            ],
-        }
-    )
+    start = ledger_start_date
+    if start is None:
+        start = await _ledger_start_date_for_owners(db, ids)
+
+    query: dict = {
+        **owner_clause,
+        "$or": [
+            {"account_id": account_id},
+            {"counter_account_id": account_id},
+        ],
+    }
+    if start:
+        query["date"] = {"$gte": start}
+
+    cursor = db[TX_COL].find(query)
 
     async for tx in cursor:
         amount = float(tx["amount"])

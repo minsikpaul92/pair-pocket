@@ -14,6 +14,8 @@ interface Props {
   addLabel?: string;
   formatOption?: (option: string) => string;
   renderLeading?: (option: string) => React.ReactNode;
+  /** Override trigger button classes (e.g. onboarding inputClass). */
+  triggerClassName?: string;
 }
 
 export default function AddableSelect({
@@ -26,6 +28,7 @@ export default function AddableSelect({
   addLabel,
   formatOption,
   renderLeading,
+  triggerClassName = "w-full flex items-center justify-between input-field text-left",
 }: Props) {
   const t = useTranslations("common");
   const [open, setOpen] = useState(false);
@@ -70,7 +73,7 @@ export default function AddableSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between input-field text-left disabled:opacity-50"
+        className={`${triggerClassName} disabled:opacity-50`}
       >
         <span className="flex items-center gap-2 min-w-0">
           {value ? (

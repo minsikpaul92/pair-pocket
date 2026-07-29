@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import CategorySelect from "@/components/CategorySelect";
+import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import {
   AccountType,
@@ -15,6 +16,7 @@ import {
   Currency,
   FinancialAccount,
   NewSubscription,
+  OnboardingParseResult,
   Subscription,
   SubscriptionHistory,
   addCustomCategory,
@@ -22,10 +24,11 @@ import {
   addMonthsToDateKey,
   categoriesForType,
   createSubscription,
-  defaultAccountId,
+  defaultPaymentAccountId,
   deleteSubscription,
   fetchAccounts,
   fetchSubscriptionHistory,
+  fetchUserSettings,
   formatAmount,
   formatAmountInput,
   monthsBetweenDates,
@@ -45,6 +48,7 @@ interface Props {
   accountType?: AccountType;
   presets: CategoryPresets;
   editing?: Subscription | null;
+  initialParse?: OnboardingParseResult | null;
   userEmail?: string | null;
   onClose: () => void;
   onSaved: () => void;
@@ -63,6 +67,7 @@ export default function SubscriptionRegisterModal({
   accountType = "personal",
   presets,
   editing = null,
+  initialParse = null,
   userEmail = null,
   onClose,
   onSaved,
@@ -90,15 +95,19 @@ export default function SubscriptionRegisterModal({
   const [promoEndDate, setPromoEndDate] = useState("");
   const [promoReminderEnabled, setPromoReminderEnabled] = useState(false);
   const [endReminderEnabled, setEndReminderEnabled] = useState(false);
+  const [isFixedBill, setIsFixedBill] = useState(false);
   const [history, setHistory] = useState<SubscriptionHistory | null>(null);
   const [category, setCategory] = useState("문화/취미");
   const [subCategory, setSubCategory] = useState("정기 구독");
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [accountId, setAccountId] = useState(ACCOUNT_NONE);
+  const [merchant, setMerchant] = useState("");
   const [showAccountRegister, setShowAccountRegister] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [aiHint, setAiHint] = useState<string | null>(null);
 
   const categoryOptions = useMemo(
     () => categoriesForType(presets, "expense"),
@@ -137,6 +146,7 @@ export default function SubscriptionRegisterModal({
     setName(editing.name);
     setAmount(formatAmountInput(String(editing.amount), editing.currency));
     setCycle(editing.cycle);
+    setIsFixedBill(Boolean(editing.is_fixed_bill));
     setStartDate(dateInputFromIso(editing.start_date));
     setInstallmentStartDate(dateInputFromIso(editing.installment_start_date));
     setShowEndDate(Boolean(editing.end_date) && editing.cycle !== "installment");
@@ -148,7 +158,7 @@ export default function SubscriptionRegisterModal({
     );
     setCompletedInstallments(String(editing.completed_installments));
     const hasPromo =
-      editing.promo_amount != null && Boolean(editing.promo_end_date);
+      editing.promo_amount != null;
     setShowPromo(hasPromo);
     setPromoAmount(
       hasPromo
@@ -156,10 +166,14 @@ export default function SubscriptionRegisterModal({
         : ""
     );
     setPromoEndDate(dateInputFromIso(editing.promo_end_date));
-    setPromoReminderEnabled(editing.promo_reminder_enabled);
+    // Reminder only makes sense with an end date; keep off otherwise.
+    setPromoReminderEnabled(
+      Boolean(editing.promo_end_date) && editing.promo_reminder_enabled
+    );
     setEndReminderEnabled(editing.end_reminder_enabled);
     setCategory(editing.category);
     setSubCategory(editing.sub_category);
+    setMerchant(editing.merchant || editing.name);
     setAccountId(editing.account_id);
   }, [editing]);
 
@@ -178,11 +192,48 @@ export default function SubscriptionRegisterModal({
       .then((list) => {
         setAccounts(list);
         if (!editing) {
-          setAccountId(defaultAccountId(list, "expense") || ACCOUNT_NONE);
+          setAccountId(defaultPaymentAccountId(list) || ACCOUNT_NONE);
         }
       })
       .catch(() => setAccounts([]));
   }, [currency, accountType, editing]);
+
+  useEffect(() => {
+    if (editing) return;
+    fetchUserSettings()
+      .then((s) => setHasGeminiKey(Boolean(s.has_gemini_key)))
+      .catch(() => setHasGeminiKey(false));
+  }, [editing]);
+
+  useEffect(() => {
+    if (initialParse && !editing) {
+      applyAiParse(initialParse);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialParse, editing]);
+
+  function applyAiParse(result: OnboardingParseResult) {
+    const list = result.data.subscriptions || [];
+    const first = list[0];
+    if (!first) {
+      setAiHint(t("aiEmpty"));
+      return;
+    }
+    if (first.name) {
+      setName(first.name);
+      setMerchant(first.name);
+    }
+    if (first.amount != null) {
+      setAmount(formatAmountInput(String(first.amount), currency));
+    }
+    const cycleRaw = String(first.cycle || "").toLowerCase();
+    if (cycleRaw === "yearly" || cycleRaw === "annual") setCycle("yearly");
+    else if (cycleRaw === "installment") setCycle("installment");
+    else setCycle("monthly");
+    setAiHint(
+      list.length > 1 ? t("aiFilledMany", { count: list.length }) : t("aiFilled")
+    );
+  }
 
   async function handleAddCategory(catName: string) {
     const updated = await addCustomCategory("expense", catName);
@@ -245,19 +296,19 @@ export default function SubscriptionRegisterModal({
         return;
       }
       if (!promoEndDate) {
-        setError(tErrors("promoEndRequired"));
-        return;
-      }
-      if (promoEndDate < startDate) {
+        // Optional — leave open-ended so promo stays on until user sets an end.
+        resolvedPromoEnd = null;
+      } else if (promoEndDate < startDate) {
         setError(tErrors("promoEndAfterStart"));
         return;
+      } else {
+        resolvedPromoEnd = `${promoEndDate}T00:00:00`;
       }
       if (numericAmount > 0 && promoNumeric >= numericAmount) {
         setError(tErrors("promoAmountLessThanRegular"));
         return;
       }
       resolvedPromoAmount = promoNumeric;
-      resolvedPromoEnd = `${promoEndDate}T00:00:00`;
     }
 
     const trimmedName = name.trim();
@@ -302,12 +353,14 @@ export default function SubscriptionRegisterModal({
       account_id: accountId,
       category,
       sub_category: subCategory,
-      merchant: trimmedName,
+      merchant: merchant.trim() || trimmedName,
       promo_amount: resolvedPromoAmount,
       promo_end_date: resolvedPromoEnd,
-      promo_reminder_enabled: showPromo ? promoReminderEnabled : false,
+      promo_reminder_enabled:
+        showPromo && resolvedPromoEnd ? promoReminderEnabled : false,
       end_reminder_enabled:
         cycle !== "installment" && showEndDate ? endReminderEnabled : false,
+      is_fixed_bill: isFixedBill && cycle === "monthly",
     };
 
     setSubmitting(true);
@@ -373,7 +426,11 @@ export default function SubscriptionRegisterModal({
         {isEditing && history && (
           <div className="mt-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-4 space-y-2 text-sm">
             <p className="font-semibold text-gray-800 dark:text-gray-100">
-              {t("history")}
+              {isFixedBill
+                ? t("historyFixedBill")
+                : cycle === "installment"
+                  ? t("historyInstallment")
+                  : t("history")}
             </p>
             <p className="text-gray-600 dark:text-gray-300">
               {formatSubscriptionDate(history.start_date, locale)}
@@ -412,6 +469,20 @@ export default function SubscriptionRegisterModal({
         )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {!isEditing && (
+            <div className="space-y-2">
+              <OnboardingScreenshotScan
+                step="subscriptions"
+                hasApiKey={hasGeminiKey}
+                disabled={submitting}
+                onParsed={applyAiParse}
+              />
+              {aiHint && (
+                <p className="text-xs text-blue-600 dark:text-blue-400">{aiHint}</p>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
               {t("name")}
@@ -429,20 +500,45 @@ export default function SubscriptionRegisterModal({
               {t("cycleLabel")}
             </label>
             <div className="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
-              {CYCLES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCycle(c)}
-                  className={`flex-1 rounded-lg px-2 py-2 text-sm font-medium transition-colors ${
-                    cycle === c
-                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                      : "text-gray-500"
-                  }`}
-                >
-                  {translateBillingCycle(c, t)}
-                </button>
-              ))}
+              {([...CYCLES, "fixed"] as const).map((c) => {
+                const selected =
+                  c === "fixed" ? isFixedBill : cycle === c && !isFixedBill;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      if (c === "fixed") {
+                        setIsFixedBill(true);
+                        setCycle("monthly");
+                        setShowEndDate(false);
+                        if (!category || category === "문화/취미") {
+                          setCategory("주거/통신");
+                          setSubCategory("관리비/공과금");
+                        }
+                      } else {
+                        setIsFixedBill(false);
+                        setCycle(c);
+                        if (c === "installment") setShowEndDate(false);
+                        if (
+                          (category === "주거/통신" || !category) &&
+                          (subCategory === "관리비/공과금" || !subCategory)
+                        ) {
+                          setCategory("문화/취미");
+                          setSubCategory("정기 구독");
+                        }
+                      }
+                    }}
+                    className={`flex-1 rounded-lg px-1.5 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                      selected
+                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {c === "fixed" ? t("cycle.fixed") : translateBillingCycle(c, t)}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -512,9 +608,82 @@ export default function SubscriptionRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {cycle === "installment" ? t("nextPaymentDate") : t("startNextPaymentDate")}
+              {tTx("category")}
             </label>
+            <CategorySelect
+              categories={categoryOptions}
+              value={category}
+              onChange={(next) => {
+                setCategory(next);
+                setSubCategory("");
+              }}
+              onAdd={handleAddCategory}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              {tTx("subCategory")}
+            </label>
+            <SubCategorySelect
+              options={subCategoryOptions}
+              value={subCategory}
+              onChange={setSubCategory}
+              onAdd={handleAddSubCategory}
+              disabled={!category}
+              placeholder={
+                category ? tTx("selectSubCategory") : tTx("selectSubCategoryFirst")
+              }
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              {tTx("merchant")}
+            </label>
+            <input
+              value={merchant}
+              onChange={(e) => setMerchant(e.target.value)}
+              placeholder={name.trim() || tTx("selectMerchant")}
+              className="input-field"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              {t("paymentAccount")}
+            </label>
+            <AccountSelect
+              accounts={accounts}
+              value={accountId}
+              onChange={setAccountId}
+              onRegister={() => setShowAccountRegister(true)}
+              allowNone={false}
+              placeholder={t("selectPaymentAccount")}
+              variant="field"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-end justify-between gap-2">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {cycle === "installment"
+                  ? t("nextPaymentDate")
+                  : t("startNextPaymentDate")}
+              </label>
+              {cycle !== "installment" && (
+                <span className="text-[11px] font-medium text-gray-400 whitespace-nowrap">
+                  {t("endDateOptional")}
+                </span>
+              )}
+            </div>
             <div className="flex gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="input-field flex-1 min-w-0"
+              />
               {cycle !== "installment" && (
                 <button
                   type="button"
@@ -537,12 +706,6 @@ export default function SubscriptionRegisterModal({
                   {showEndDate ? "−" : "+"}
                 </button>
               )}
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="input-field flex-1 min-w-0"
-              />
             </div>
           </div>
 
@@ -655,79 +818,55 @@ export default function SubscriptionRegisterModal({
                   type="date"
                   value={promoEndDate}
                   min={startDate}
-                  onChange={(e) => setPromoEndDate(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setPromoEndDate(next);
+                    if (!next) setPromoReminderEnabled(false);
+                  }}
                   className="input-field"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
                   {t("promoEndHint")}
                 </p>
               </div>
-              <label className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-500/10 px-3 py-2.5 cursor-pointer">
+              <label
+                className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${
+                  promoEndDate
+                    ? "bg-emerald-50/80 dark:bg-emerald-500/10 cursor-pointer"
+                    : "bg-gray-50 dark:bg-gray-800/60 cursor-not-allowed opacity-60"
+                }`}
+              >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                  <p
+                    className={`text-sm font-medium ${
+                      promoEndDate
+                        ? "text-emerald-800 dark:text-emerald-200"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
                     {t("promoReminder")}
                   </p>
-                  {userEmail && (
+                  {userEmail && promoEndDate && (
                     <p className="text-[11px] text-emerald-700/70 dark:text-emerald-300/70 truncate">
                       {t("emailTo", { email: userEmail })}
+                    </p>
+                  )}
+                  {!promoEndDate && (
+                    <p className="text-[11px] text-gray-400 truncate">
+                      {t("promoReminderNeedsEnd")}
                     </p>
                   )}
                 </div>
                 <input
                   type="checkbox"
-                  checked={promoReminderEnabled}
+                  checked={promoReminderEnabled && Boolean(promoEndDate)}
+                  disabled={!promoEndDate}
                   onChange={(e) => setPromoReminderEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-40"
                 />
               </label>
             </>
           )}
-
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {t("paymentAccount")}
-            </label>
-            <AccountSelect
-              accounts={accounts}
-              value={accountId}
-              onChange={setAccountId}
-              onRegister={() => setShowAccountRegister(true)}
-              allowNone={false}
-              placeholder={t("selectPaymentAccount")}
-              variant="field"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {tTx("category")}
-            </label>
-            <CategorySelect
-              categories={categoryOptions}
-              value={category}
-              onChange={(next) => {
-                setCategory(next);
-                setSubCategory("");
-              }}
-              onAdd={handleAddCategory}
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {tTx("subCategory")}
-            </label>
-            <SubCategorySelect
-              options={subCategoryOptions}
-              value={subCategory}
-              onChange={setSubCategory}
-              onAdd={handleAddSubCategory}
-              disabled={!category}
-              placeholder={
-                category ? tTx("selectSubCategory") : tTx("selectSubCategoryFirst")
-              }
-            />
-          </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 

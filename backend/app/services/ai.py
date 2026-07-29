@@ -274,7 +274,12 @@ def _receipt_prompt() -> str:
         "Do NOT use any other categories or sub_categories.\n"
         "If it is a single receipt, extract all individual items (sub-items/line items) from the receipt, "
         "including original item name, standardized Korean item name (e.g. 수박, 소고기, 우유, 화장지) for price tracking, "
-        "quantity, unit (e.g. 개, lb, kg, bag) or null, unit_price, and total_price."
+        "quantity, unit (e.g. 개, lb, kg, bag) or null, unit_price, and total_price.\n"
+        "For Canadian receipts: extract subtotal (pre-tax), tax_amount (HST/GST/PST), tip_amount if shown, "
+        "and amount as the final total paid. Line item unit_price should be pre-tax when the receipt shows it; "
+        "otherwise use the printed line total divided by quantity.\n"
+        "Line item parsing rules: each row must align to columns name | standardized_name | quantity | unit | unit_price | total_price. "
+        "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores)."
     )
 
 
@@ -298,7 +303,19 @@ def _receipt_response_schema() -> dict[str, Any]:
                         },
                         "amount": {
                             "type": "NUMBER",
-                            "description": "Total purchase or transaction amount.",
+                            "description": "Final total paid (after tax and tip).",
+                        },
+                        "subtotal": {
+                            "type": "NUMBER",
+                            "description": "Pre-tax subtotal when shown on receipt.",
+                        },
+                        "tax_amount": {
+                            "type": "NUMBER",
+                            "description": "Total tax (HST/GST/PST) when shown.",
+                        },
+                        "tip_amount": {
+                            "type": "NUMBER",
+                            "description": "Tip/gratuity when shown.",
                         },
                         "currency": {
                             "type": "STRING",
@@ -635,3 +652,452 @@ async def parse_files_in_batches(
         if batch_index < len(batches) - 1 and delay_seconds > 0:
             await asyncio.sleep(delay_seconds)
     return outcomes
+
+
+ONBOARDING_MAX_IMAGES = 15
+ONBOARDING_STEPS = ("assets", "subscriptions", "brokerage")
+
+
+def _onboarding_prompt(step: str) -> str:
+    if step == "assets":
+        return (
+            "You are helping PairPocket onboarding. Analyze bank/card/brokerage app screenshots.\n"
+            "Extract every distinct account or credit card visible across the images.\n"
+            "kind must be one of: checking, savings, credit_card, investment, cash.\n"
+            "currency must be CAD, KRW, or USD (default CAD if unsure).\n"
+            "\n"
+            "BALANCES (critical — avoid double-counting stocks):\n"
+            "- credit_card: opening_balance = amount currently owed (debt / unpaid).\n"
+            "- checking / savings / cash: opening_balance = available / ledger balance.\n"
+            "- investment / brokerage: opening_balance = CASH ONLY "
+            "(labels like 현금, 예수금, Available to trade, buying power, cash). "
+            "NEVER use total account value, 평가금액, portfolio total, or 총자산 "
+            "(those include stock holdings).\n"
+            "- If a brokerage screen shows multiple cash currencies "
+            "(e.g. Toss Securities 토스증권 with 원화 and 달러), emit SEPARATE "
+            "investment accounts — one per currency — with clear names like "
+            "'토스증권 한화' / '토스증권 달러' (or 'Toss Securities KRW' / "
+            "'Toss Securities USD'). Do not merge KRW+USD cash into one balance.\n"
+            "\n"
+            "PRIVACY (critical):\n"
+            "- For credit_card: set last_four to ONLY the last 4 digits of the card. "
+            "Never return the full card number. Leave account_number empty.\n"
+            "- For checking/savings/investment: set account_number to a MASKED value "
+            "showing only the last 4 digits, e.g. '••••1234' or '****1234'. "
+            "Do NOT return the full account number. Leave last_four empty.\n"
+            "- If the number is not visible, omit last_four / account_number.\n"
+            "Return JSON matching the schema. Deduplicate obvious duplicates."
+        )
+    if step == "subscriptions":
+        return (
+            "You are helping PairPocket onboarding. Analyze subscription, membership, "
+            "installment, and fixed-bill screenshots (Netflix, Apple, Costco membership, "
+            "Affirm, phone/internet bills, etc.).\n"
+            "For EACH distinct recurring charge extract:\n"
+            "- name (service / merchant)\n"
+            "- amount: the amount currently charged. If a promotion/intro price is active, "
+            "put that in promo_amount and put the regular/full price in amount "
+            "(or regular_amount). Set promo_end_date if shown.\n"
+            "- currency: CAD, KRW, or USD (default CAD)\n"
+            "- kind: subscription | installment | fixed "
+            "(memberships/streaming = subscription; Affirm/BNPL/할부 = installment; "
+            "rent/utilities/phone/internet = fixed)\n"
+            "- cycle: monthly or yearly (installments use monthly). Default monthly.\n"
+            "- billing_day: day of month (1-28) of renewal / next charge / 결제일. "
+            "Infer from 'renews on', 'next billing', '결제 예정', anniversary dates.\n"
+            "- start_date / end_date: ISO YYYY-MM-DD only (e.g. 2025-03-15). "
+            "Never use dots/slashes like 2025.03.15.\n"
+            "- Installments (Affirm/BNPL/할부): always set total_installments when "
+            "the plan shows N payments / N회 / 'of N'. Also set end_date when the "
+            "last payment / payoff / maturity date is shown. If only start + N "
+            "payments are visible, still return total_installments (client computes end).\n"
+            "Costco membership is a yearly subscription named Costco when visible.\n"
+            "Deduplicate by service name. Return JSON matching the schema."
+        )
+    return (
+        "You are helping PairPocket onboarding. Analyze brokerage / investment screenshots.\n"
+        "Extract brokerage name, CASH/buying-power only, currency, and holdings.\n"
+        "cash_balance must be CASH ONLY (현금, 예수금, Available to trade, buying power). "
+        "Never use total portfolio value / 총자산 / 평가금액.\n"
+        "If multiple cash currencies appear (e.g. KRW + USD on Toss Securities), "
+        "prefer the primary visible cash currency for cash_balance and note others "
+        "in holdings only if they are stocks; for multi-currency cash, the assets "
+        "step handles split accounts — here set cash_balance to the main cash line.\n"
+        "For each holding include ticker, name, shares, avg_price (cost basis / average "
+        "price if shown), currency.\n"
+        "CANADIAN LISTINGS (critical — Wealthsimple FHSA / TSX / CDR):\n"
+        "- If price shows CAD, or name contains CDR / CAD Hedged / TSX / NEO, "
+        "currency MUST be CAD.\n"
+        "- Prefer Yahoo-style Canadian tickers: TSX → .TO (e.g. VFV.TO, QQC.TO), "
+        "NEO CDRs → .NE (e.g. NVDA.NE, XOM.NE, LLY.NE, PLTR.NE), "
+        "TSXV → .V. Keep suffixes like ZXLE.F as shown.\n"
+        "- NEVER map a CAD-priced CDR (e.g. NVDA ~$44 CAD, XOM ~$28 CAD) to the "
+        "US-listed ticker without a Canadian suffix — that inflates valuation badly.\n"
+        "- Put the full visible name (including 'CDR (CAD Hedged)') in name.\n"
+        "currency must be CAD, KRW, or USD (default CAD if Wealthsimple / CAD labels).\n"
+        "If multiple screenshots belong to one account, merge into one brokerage object.\n"
+        "Return JSON matching the schema."
+    )
+
+
+def _onboarding_schema(step: str) -> dict[str, Any]:
+    if step == "assets":
+        return {
+            "type": "OBJECT",
+            "properties": {
+                "accounts": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "name": {"type": "STRING"},
+                            "institution": {"type": "STRING"},
+                            "kind": {"type": "STRING"},
+                            "currency": {"type": "STRING"},
+                            "opening_balance": {"type": "NUMBER"},
+                            "last_four": {
+                                "type": "STRING",
+                                "description": "Credit cards only: last 4 digits.",
+                            },
+                            "account_number": {
+                                "type": "STRING",
+                                "description": (
+                                    "Bank/broker only: masked account number "
+                                    "ending with last 4 digits (e.g. ••••1234)."
+                                ),
+                            },
+                        },
+                        "required": ["name", "kind", "currency", "opening_balance"],
+                    },
+                }
+            },
+            "required": ["accounts"],
+        }
+    if step == "subscriptions":
+        return {
+            "type": "OBJECT",
+            "properties": {
+                "subscriptions": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "name": {"type": "STRING"},
+                            "amount": {"type": "NUMBER"},
+                            "regular_amount": {"type": "NUMBER"},
+                            "currency": {"type": "STRING"},
+                            "kind": {"type": "STRING"},
+                            "cycle": {"type": "STRING"},
+                            "billing_day": {"type": "NUMBER"},
+                            "start_date": {"type": "STRING"},
+                            "end_date": {"type": "STRING"},
+                            "total_installments": {"type": "NUMBER"},
+                            "promo_amount": {"type": "NUMBER"},
+                            "promo_end_date": {"type": "STRING"},
+                            "category": {"type": "STRING"},
+                            "sub_category": {"type": "STRING"},
+                        },
+                        "required": ["name", "amount", "currency"],
+                    },
+                }
+            },
+            "required": ["subscriptions"],
+        }
+    return {
+        "type": "OBJECT",
+        "properties": {
+            "brokerage": {
+                "type": "OBJECT",
+                "properties": {
+                    "name": {"type": "STRING"},
+                    "currency": {"type": "STRING"},
+                    "cash_balance": {"type": "NUMBER"},
+                    "holdings": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "ticker": {"type": "STRING"},
+                                "name": {"type": "STRING"},
+                                "shares": {"type": "NUMBER"},
+                                "avg_price": {"type": "NUMBER"},
+                                "currency": {"type": "STRING"},
+                            },
+                            "required": ["ticker", "shares", "avg_price"],
+                        },
+                    },
+                },
+                "required": ["name", "currency", "cash_balance", "holdings"],
+            }
+        },
+        "required": ["brokerage"],
+    }
+
+
+def _build_onboarding_batch_payload(
+    step: str, images: Sequence[tuple[bytes, str]]
+) -> dict[str, Any]:
+    parts: list[dict[str, Any]] = [{"text": _onboarding_prompt(step)}]
+    for file_bytes, mime_type in images:
+        parts.append(
+            {
+                "inlineData": {
+                    "mimeType": mime_type,
+                    "data": base64.b64encode(file_bytes).decode("utf-8"),
+                }
+            }
+        )
+    return {
+        "contents": [{"parts": parts}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": _onboarding_schema(step),
+        },
+    }
+
+
+async def _generate_json_result(
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+    api_key: str,
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], str, list[str]]:
+    notes: list[str] = []
+    last_error = "Unknown error"
+    async for event in generate_content_with_routing(db, owner_id, api_key, payload):
+        if event["event"] == "quota_fallback":
+            msg = event.get("message")
+            if msg:
+                notes.append(str(msg))
+        elif event["event"] == "success":
+            return event["result"], str(event["model"]), notes
+        elif event["event"] == "error":
+            last_error = event.get("error", last_error)
+        elif event["event"] == "failed":
+            last_error = event.get("error", last_error)
+    raise Exception(last_error)
+
+
+def _empty_onboarding_data(step: str) -> dict[str, Any]:
+    if step == "assets":
+        return {"accounts": []}
+    if step == "subscriptions":
+        return {"subscriptions": []}
+    return {
+        "brokerage": {
+            "name": "",
+            "currency": "CAD",
+            "cash_balance": 0,
+            "holdings": [],
+        }
+    }
+
+
+def _merge_onboarding_batch(step: str, merged: dict[str, Any], batch: dict[str, Any]) -> None:
+    if step == "assets":
+        items = batch.get("accounts") or []
+        if isinstance(items, list):
+            merged["accounts"].extend(items)
+        return
+    if step == "subscriptions":
+        items = batch.get("subscriptions") or []
+        if isinstance(items, list):
+            merged["subscriptions"].extend(items)
+        return
+    brokerage = batch.get("brokerage") or {}
+    if not isinstance(brokerage, dict):
+        return
+    current = merged["brokerage"]
+    if brokerage.get("name") and not current.get("name"):
+        current["name"] = brokerage.get("name")
+    if brokerage.get("currency"):
+        current["currency"] = brokerage.get("currency")
+    if brokerage.get("cash_balance") is not None:
+        try:
+            current["cash_balance"] = float(brokerage.get("cash_balance") or 0)
+        except (TypeError, ValueError):
+            pass
+    holdings = brokerage.get("holdings") or []
+    if isinstance(holdings, list):
+        current["holdings"].extend(holdings)
+
+
+async def parse_onboarding_screenshots_stream(
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+    step: str,
+    files: Sequence[tuple[bytes, str, str]],
+    *,
+    batch_size: int = IMAGE_BATCH_SIZE,
+    delay_seconds: float = BATCH_DELAY_SECONDS,
+):
+    """
+    Yield progress events while parsing onboarding screenshots.
+    Final success payload matches parse_onboarding_screenshots().
+    Events: scanning | trying | quota_fallback | batch_done | success | error
+    """
+    if step not in ONBOARDING_STEPS:
+        yield {"event": "error", "error": f"Unsupported onboarding step: {step}"}
+        return
+    if not files:
+        yield {"event": "error", "error": "No images provided"}
+        return
+    if len(files) > ONBOARDING_MAX_IMAGES:
+        yield {
+            "event": "error",
+            "error": f"Maximum {ONBOARDING_MAX_IMAGES} images allowed",
+        }
+        return
+
+    try:
+        api_key = await get_user_gemini_api_key(db, owner_id)
+    except Exception as e:
+        yield {"event": "error", "error": str(e)}
+        return
+    if not api_key:
+        yield {
+            "event": "error",
+            "error": (
+                "Gemini API Key가 등록되어 있지 않습니다. "
+                "설정에서 키를 먼저 등록해 주세요."
+            ),
+        }
+        return
+
+    merged = _empty_onboarding_data(step)
+    models_used: list[str] = []
+    notes: list[str] = []
+    errors: list[str] = []
+    batches = list(iter_batches(list(files), batch_size))
+
+    yield {
+        "event": "scanning",
+        "count": len(files),
+        "batch_count": len(batches),
+    }
+
+    for batch_index, batch in enumerate(batches):
+        payload = _build_onboarding_batch_payload(
+            step, [(file_bytes, mime) for file_bytes, mime, _ in batch]
+        )
+        names = ", ".join(name for _, _, name in batch)
+        last_error = "Unknown error"
+        try:
+            async for event in generate_content_with_routing(
+                db, owner_id, api_key, payload
+            ):
+                if event["event"] == "trying":
+                    yield {
+                        "event": "trying",
+                        "model": event.get("model"),
+                        "count": len(files),
+                        "batch": batch_index + 1,
+                        "batch_count": len(batches),
+                    }
+                elif event["event"] == "quota_fallback":
+                    msg = event.get("message")
+                    if msg:
+                        notes.append(str(msg))
+                    yield {
+                        "event": "quota_fallback",
+                        "model": event.get("model"),
+                        "fallback_model": event.get("fallback_model"),
+                        "message": msg,
+                        "count": len(files),
+                    }
+                elif event["event"] == "success":
+                    model = str(event["model"])
+                    models_used.append(model)
+                    result = event["result"]
+                    if isinstance(result, dict):
+                        _merge_onboarding_batch(step, merged, result)
+                    yield {
+                        "event": "batch_done",
+                        "model": model,
+                        "batch": batch_index + 1,
+                        "batch_count": len(batches),
+                    }
+                    logger.info(
+                        "onboarding_parse_ok owner=%s step=%s batch=%s model=%s files=%s",
+                        owner_id,
+                        step,
+                        batch_index + 1,
+                        model,
+                        names,
+                    )
+                    last_error = ""
+                    break
+                elif event["event"] in ("failed", "error"):
+                    last_error = str(event.get("error") or last_error)
+            if last_error:
+                raise Exception(last_error)
+        except Exception as e:
+            errors.append(f"Batch {batch_index + 1} ({names}): {e}")
+            logger.warning(
+                "onboarding_parse_fail owner=%s step=%s batch=%s err=%s",
+                owner_id,
+                step,
+                batch_index + 1,
+                e,
+            )
+        if batch_index < len(batches) - 1 and delay_seconds > 0:
+            await asyncio.sleep(delay_seconds)
+
+    if errors and (
+        (step == "assets" and not merged["accounts"])
+        or (step == "subscriptions" and not merged["subscriptions"])
+        or (
+            step == "brokerage"
+            and not merged["brokerage"].get("name")
+            and not merged["brokerage"].get("holdings")
+        )
+    ):
+        yield {"event": "error", "error": "; ".join(errors)}
+        return
+
+    yield {
+        "event": "success",
+        "step": step,
+        "data": merged,
+        "models_used": models_used,
+        "notes": notes,
+        "errors": errors or None,
+        "batch_count": len(batches),
+        "image_count": len(files),
+    }
+
+
+async def parse_onboarding_screenshots(
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+    step: str,
+    files: Sequence[tuple[bytes, str, str]],
+    *,
+    batch_size: int = IMAGE_BATCH_SIZE,
+    delay_seconds: float = BATCH_DELAY_SECONDS,
+) -> dict[str, Any]:
+    """Non-streaming wrapper around parse_onboarding_screenshots_stream."""
+    final: dict[str, Any] | None = None
+    async for event in parse_onboarding_screenshots_stream(
+        db,
+        owner_id,
+        step,
+        files,
+        batch_size=batch_size,
+        delay_seconds=delay_seconds,
+    ):
+        if event.get("event") == "error":
+            raise Exception(event.get("error") or "Onboarding parse failed")
+        if event.get("event") == "success":
+            final = {
+                "step": event["step"],
+                "data": event["data"],
+                "models_used": event.get("models_used") or [],
+                "notes": event.get("notes") or [],
+                "errors": event.get("errors"),
+                "batch_count": event.get("batch_count"),
+                "image_count": event.get("image_count"),
+            }
+    if not final:
+        raise Exception("Onboarding parse failed")
+    return final

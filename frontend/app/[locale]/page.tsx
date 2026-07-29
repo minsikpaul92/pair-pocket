@@ -4,17 +4,46 @@ import { useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import LoginLanding from "@/components/LoginLanding";
-import { CurrentUser, fetchCurrentUser } from "@/lib/api";
+import { useRouter } from "@/i18n/navigation";
+import { locales, type AppLocale } from "@/i18n/locales";
+import {
+  CurrentUser,
+  fetchCurrentUser,
+  fetchUserSettings,
+} from "@/lib/api";
+
+function asAppLocale(value: string | null | undefined): AppLocale {
+  if (value && (locales as readonly string[]).includes(value)) {
+    return value as AppLocale;
+  }
+  return "en";
+}
 
 export default function Home() {
+  const router = useRouter();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCurrentUser()
-      .then(setUser)
-      .finally(() => setLoading(false));
-  }, []);
+    (async () => {
+      try {
+        const u = await fetchCurrentUser();
+        setUser(u);
+        if (u) {
+          const settings = await fetchUserSettings().catch(() => null);
+          if (settings && !settings.onboarding_personal_completed) {
+            // Default wizard copy to English until the user picks a language.
+            router.replace("/onboarding", {
+              locale: asAppLocale(settings.preferred_locale),
+            });
+            return;
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [router]);
 
   if (loading) {
     return (

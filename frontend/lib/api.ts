@@ -100,6 +100,8 @@ export type FinancialAccountKind =
   | "cash";
 export type TransactionKind = "normal" | "transfer";
 
+export type AccountCountry = "CA" | "KR";
+
 export interface FinancialAccount {
   id: string;
   owner_id: string;
@@ -108,10 +110,14 @@ export interface FinancialAccount {
   kind: FinancialAccountKind;
   currency: Currency;
   account_type: AccountType;
+  /** Canada vs Korea registration tab. Null on legacy rows. */
+  country: AccountCountry | null;
   opening_balance: number;
   is_liability: boolean;
   is_default_expense: boolean;
   is_default_income: boolean;
+  is_default_credit: boolean;
+  is_default_investment: boolean;
   is_active: boolean;
   institution: string | null;
   last_four: string | null;
@@ -126,9 +132,12 @@ export interface NewFinancialAccount {
   kind: FinancialAccountKind;
   currency: Currency;
   account_type?: AccountType;
+  country?: AccountCountry | null;
   opening_balance?: number;
   is_default_expense?: boolean;
   is_default_income?: boolean;
+  is_default_credit?: boolean;
+  is_default_investment?: boolean;
   institution?: string | null;
   last_four?: string | null;
   account_number?: string | null;
@@ -178,6 +187,10 @@ export interface Transaction {
   price?: number;
   fee?: number;
   items?: TransactionItem[];
+  tip_amount?: number | null;
+  tip_percent?: number | null;
+  subtotal?: number | null;
+  tax_amount?: number | null;
 }
 
 export interface TransactionItem {
@@ -210,6 +223,10 @@ export interface NewTransaction {
   price?: number;
   fee?: number;
   items?: TransactionItem[];
+  tip_amount?: number | null;
+  tip_percent?: number | null;
+  subtotal?: number | null;
+  tax_amount?: number | null;
 }
 
 export interface CategoryGroup {
@@ -353,6 +370,19 @@ export async function addInstitution(name: string): Promise<string[]> {
   return data.institutions as string[];
 }
 
+export async function removeInstitution(name: string): Promise<string[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/settings/institutions?name=${encodeURIComponent(name)}`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    }
+  );
+  if (!res.ok) throw new ApiError("removeInstitution");
+  const data = await res.json();
+  return data.institutions as string[];
+}
+
 export interface UserSettings {
   merchants: string[];
   institutions: string[];
@@ -362,6 +392,11 @@ export interface UserSettings {
   };
   category_colors: Record<string, string>;
   has_gemini_key?: boolean;
+  preferred_locale?: string | null;
+  preferred_locales?: string[];
+  ledger_start_date?: string | null;
+  onboarding_personal_completed?: boolean;
+  onboarding_personal_step?: number;
 }
 
 export async function fetchUserSettings(): Promise<UserSettings> {
@@ -595,6 +630,7 @@ export interface Subscription {
   promo_end_date: string | null;
   promo_reminder_enabled: boolean;
   end_reminder_enabled: boolean;
+  is_fixed_bill?: boolean;
   account_id: string;
   category: string;
   sub_category: string;
@@ -622,6 +658,7 @@ export interface NewSubscription {
   promo_end_date?: string | null;
   promo_reminder_enabled?: boolean;
   end_reminder_enabled?: boolean;
+  is_fixed_bill?: boolean;
   account_id: string;
   category: string;
   sub_category: string;
@@ -760,6 +797,7 @@ export async function updateSubscription(
     account_id: string;
     category: string;
     sub_category: string;
+    merchant?: string;
     start_date: string;
     installment_start_date: string | null;
     total_installments: number | null;
@@ -769,6 +807,7 @@ export async function updateSubscription(
     promo_end_date: string | null;
     promo_reminder_enabled?: boolean;
     end_reminder_enabled?: boolean;
+    is_fixed_bill?: boolean;
   }>
 ): Promise<Subscription> {
   const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
@@ -955,6 +994,8 @@ export async function updateAccount(
       | "opening_balance"
       | "is_default_expense"
       | "is_default_income"
+      | "is_default_credit"
+      | "is_default_investment"
       | "is_active"
       | "institution"
       | "last_four"
@@ -975,10 +1016,42 @@ export function defaultAccountId(
   accounts: FinancialAccount[],
   type: TransactionType
 ): string {
-  // Only use the type-specific default. Do not fall back to another account —
-  // expense and income defaults are independent; missing means "없음/현금".
-  const flag = type === "expense" ? "is_default_expense" : "is_default_income";
-  return accounts.find((a) => a[flag])?.id ?? "";
+  // Prefer non-investment wallets. Expense/income defaults are independent.
+  const usable = accounts.filter((a) => a.kind !== "investment");
+  if (type === "expense") {
+    return (
+      usable.find((a) => a.is_default_expense)?.id ||
+      usable.find((a) => a.is_default_credit)?.id ||
+      ""
+    );
+  }
+  return usable.find((a) => a.is_default_income)?.id ?? "";
+}
+
+/** Prefer default brokerage account for stock flows. */
+export function defaultInvestmentAccountId(
+  accounts: FinancialAccount[]
+): string {
+  const brokers = accounts.filter((a) => a.kind === "investment" && a.is_active);
+  return (
+    brokers.find((a) => a.is_default_investment)?.id ||
+    brokers[0]?.id ||
+    ""
+  );
+}
+
+/** Prefer default credit card when present, else default expense account. */
+export function defaultPaymentAccountId(
+  accounts: FinancialAccount[]
+): string {
+  const usable = accounts.filter((a) => a.kind !== "investment");
+  return (
+    usable.find((a) => a.is_default_credit)?.id ||
+    usable.find((a) => a.is_default_expense)?.id ||
+    usable.find((a) => a.kind === "credit_card")?.id ||
+    usable[0]?.id ||
+    ""
+  );
 }
 
 export function accountLabel(account: FinancialAccount): string {
@@ -992,13 +1065,45 @@ export function accountDetail(account: FinancialAccount): string {
       ? `···${account.last_four}`
       : null,
     account.kind !== "credit_card" && account.account_number
-      ? account.account_number
+      ? maskAccountNumber(account.account_number)
       : null,
   ].filter(Boolean);
   return parts.join(" · ");
 }
 
-export function formatAmount(amount: number, currency: Currency): string {
+/** Keep only last 4 digits for card PAN / display. */
+export function normalizeLastFour(raw: string | null | undefined): string | null {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  return digits.slice(-4);
+}
+
+/**
+ * Account numbers are sensitive. Store/display only a masked form ending in last 4.
+ * e.g. "123-456-789012" -> "••••9012"
+ */
+export function maskAccountNumber(raw: string | null | undefined): string | null {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  const last4 = digits.slice(-4);
+  if (digits.length <= 4) return `••••${last4}`;
+  return `••••${last4}`;
+}
+
+export function formatAmount(
+  amount: number,
+  currency: Currency,
+  options?: { plainUsd?: boolean }
+): string {
+  if (options?.plainUsd && currency === "USD") {
+    return (
+      "$" +
+      amount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
+  }
   const locale = currency === "KRW" ? "ko-KR" : "en-CA";
   return new Intl.NumberFormat(locale, {
     style: "currency",
@@ -1025,6 +1130,17 @@ export function formatAmountInput(value: string, currency: Currency): string {
   return hasDot ? `${intFormatted}.${decimals}` : intFormatted;
 }
 
+/** Share quantities may need more than 2 decimal places (fractional shares). */
+export function formatSharesInput(value: string): string {
+  const cleaned = value.replace(/[^\d.]/g, "");
+  if (!cleaned) return "";
+  const hasDot = cleaned.includes(".");
+  const [intRaw, ...rest] = cleaned.split(".");
+  const decimals = rest.join("").slice(0, 6);
+  const intFormatted = intRaw ? Number(intRaw).toLocaleString("en-US") : "0";
+  return hasDot ? `${intFormatted}.${decimals}` : intFormatted;
+}
+
 export function parseAmountInput(value: string): number {
   const n = Number(String(value).replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
@@ -1041,11 +1157,19 @@ export function amountToInput(amount: number, currency: Currency): string {
 }
 
 /** Compact calendar label for pending subscription names on a day. */
+const PENDING_NAME_MAX = 10;
+
+function truncatePendingName(name: string, max = PENDING_NAME_MAX): string {
+  if (name.length <= max) return name;
+  return `${name.slice(0, max)}...`;
+}
+
 export function formatPendingLabel(names: string[]): string {
   const cleaned = names.map((n) => n.trim()).filter(Boolean);
   if (cleaned.length === 0) return "";
-  if (cleaned.length === 1) return cleaned[0];
-  return `${cleaned[0]}...+${cleaned.length - 1}`;
+  const head = truncatePendingName(cleaned[0]);
+  if (cleaned.length === 1) return head;
+  return `${head} +${cleaned.length - 1}`;
 }
 
 export function formatPendingDayLabels(
@@ -1096,22 +1220,68 @@ export function subscriptionSourceLabel(
 
 export function subscriptionDisplayAmount(sub: Subscription): number {
   const regular = sub.amount;
-  if (sub.promo_amount == null || !sub.promo_end_date) return regular;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const promoEnd = new Date(sub.promo_end_date);
-  promoEnd.setHours(0, 0, 0, 0);
-  if (today <= promoEnd) return sub.promo_amount;
+  if (sub.promo_amount == null) return regular;
+  // No end date → promo stays on until the user sets one.
+  if (!sub.promo_end_date) return sub.promo_amount;
+  const today = localDateKey(new Date());
+  const end = String(sub.promo_end_date).slice(0, 10);
+  if (today <= end) return sub.promo_amount;
   return regular;
 }
 
 export function isPromoActive(sub: Subscription): boolean {
-  if (sub.promo_amount == null || !sub.promo_end_date) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const promoEnd = new Date(sub.promo_end_date);
-  promoEnd.setHours(0, 0, 0, 0);
-  return today <= promoEnd;
+  if (sub.promo_amount == null) return false;
+  if (!sub.promo_end_date) return true;
+  const today = localDateKey(new Date());
+  const end = String(sub.promo_end_date).slice(0, 10);
+  return today <= end;
+}
+
+/** Infer listing currency from Yahoo exchange suffix. */
+export function inferCurrencyFromTicker(ticker: string): Currency | null {
+  const t = ticker.trim().toUpperCase();
+  if (t.endsWith(".KS") || t.endsWith(".KQ")) return "KRW";
+  if (
+    t.endsWith(".TO") ||
+    t.endsWith(".V") ||
+    t.endsWith(".NE") ||
+    t.endsWith(".CN")
+  ) {
+    return "CAD";
+  }
+  return null;
+}
+
+function localDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Infer CA/KR tab for legacy accounts without country. */
+export function resolveAccountCountry(
+  account: Pick<FinancialAccount, "country" | "currency" | "institution" | "name">
+): AccountCountry | null {
+  if (account.country === "CA" || account.country === "KR") return account.country;
+  const hay = `${account.institution || ""} ${account.name || ""}`.toLowerCase();
+  if (
+    /toss|토스|키움|kiwoom|미래에셋|mirae|삼성증권|한국투자|kb증권|nh투자|나무|shinhan invest|한투/.test(
+      hay
+    )
+  ) {
+    return "KR";
+  }
+  if (
+    /wealthsimple|questrade|td direct|rbc direct|cibc investor|national bank direct|interactive brokers/.test(
+      hay
+    )
+  ) {
+    return "CA";
+  }
+  if (account.currency === "KRW") return "KR";
+  if (account.currency === "CAD") return "CA";
+  return null;
 }
 
 /** True when subscription charge is due today or already past (show red). */
@@ -1299,6 +1469,7 @@ export interface StockHolding {
   account_id: string;
   account_name: string;
   institution: string;
+  account_country?: AccountCountry | null;
   ticker: string;
   name: string;
   shares: number;
@@ -1460,15 +1631,262 @@ export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {
   return (await res.json()) as UserSettings;
 }
 
-export async function resetUserData(): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/reset`, {
+export async function saveOnboardingBasics(payload: {
+  preferred_locales: string[];
+  ledger_start_date: string;
+  api_key?: string | null;
+  preferred_locale?: string;
+}): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/basics`, {
     method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      preferred_locales: payload.preferred_locales,
+      preferred_locale: payload.preferred_locales[0] ?? payload.preferred_locale,
+      ledger_start_date: payload.ledger_start_date,
+      api_key: payload.api_key,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Failed to save onboarding basics");
+  }
+  return (await res.json()) as UserSettings;
+}
+
+export async function saveOnboardingStep(step: number): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/step`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ step }),
+  });
+  if (!res.ok) throw new ApiError("saveOnboardingStep");
+  return (await res.json()) as UserSettings;
+}
+
+export async function completeOnboarding(
+  completed = true
+): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ completed }),
+  });
+  if (!res.ok) throw new ApiError("completeOnboarding");
+  return (await res.json()) as UserSettings;
+}
+
+export type OnboardingParseStep = "assets" | "subscriptions" | "brokerage";
+
+export interface OnboardingParsedAccount {
+  name?: string;
+  institution?: string;
+  kind?: string;
+  currency?: string;
+  opening_balance?: number;
+  /** Credit cards only — last 4 digits. */
+  last_four?: string;
+  /** Bank/broker — may be full or already masked; client masks before save. */
+  account_number?: string;
+}
+
+export interface OnboardingParsedSubscription {
+  name?: string;
+  amount?: number;
+  regular_amount?: number;
+  currency?: string;
+  kind?: string;
+  cycle?: string;
+  billing_day?: number;
+  start_date?: string;
+  end_date?: string;
+  total_installments?: number;
+  promo_amount?: number;
+  promo_end_date?: string;
+  category?: string;
+  sub_category?: string;
+}
+
+export interface OnboardingParsedHolding {
+  ticker?: string;
+  name?: string;
+  shares?: number;
+  avg_price?: number;
+  currency?: string;
+}
+
+export interface OnboardingParseResult {
+  step: OnboardingParseStep;
+  data: {
+    accounts?: OnboardingParsedAccount[];
+    subscriptions?: OnboardingParsedSubscription[];
+    brokerage?: {
+      name?: string;
+      currency?: string;
+      cash_balance?: number;
+      holdings?: OnboardingParsedHolding[];
+    };
+  };
+  models_used?: string[];
+  notes?: string[];
+  errors?: string[] | null;
+  batch_count?: number;
+  image_count?: number;
+}
+
+export async function parseOnboardingScreenshots(
+  step: OnboardingParseStep,
+  files: File[],
+  onEvent?: (event: {
+    event: string;
+    model?: string;
+    fallback_model?: string;
+    resume_at?: string;
+    message?: string;
+    count?: number;
+    batch?: number;
+    batch_count?: number;
+    error?: string;
+  }) => void
+): Promise<OnboardingParseResult> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file);
+  }
+  const res = await fetch(
+    `${API_BASE_URL}/api/ai/onboarding-parse-stream?step=${encodeURIComponent(step)}`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData,
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Onboarding screenshot parse failed");
+  }
+  if (!res.body) {
+    throw new Error("Onboarding screenshot parse failed");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: OnboardingParseResult | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() || "";
+    for (const chunk of chunks) {
+      const line = chunk
+        .split("\n")
+        .map((l) => l.trim())
+        .find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      const raw = line.replace(/^data:\s*/, "");
+      let payload: Record<string, unknown>;
+      try {
+        payload = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      const eventName = String(payload.event || "");
+      if (
+        eventName === "trying" ||
+        eventName === "scanning" ||
+        eventName === "quota_fallback" ||
+        eventName === "batch_done"
+      ) {
+        onEvent?.({
+          event: eventName,
+          model: payload.model as string | undefined,
+          fallback_model: payload.fallback_model as string | undefined,
+          resume_at: payload.resume_at as string | undefined,
+          message: payload.message as string | undefined,
+          count: payload.count as number | undefined,
+          batch: payload.batch as number | undefined,
+          batch_count: payload.batch_count as number | undefined,
+        });
+      } else if (eventName === "error") {
+        throw new Error(String(payload.error || "Onboarding screenshot parse failed"));
+      } else if (eventName === "success") {
+        finalResult = {
+          step: payload.step as OnboardingParseStep,
+          data: payload.data as OnboardingParseResult["data"],
+          models_used: payload.models_used as string[] | undefined,
+          notes: payload.notes as string[] | undefined,
+          errors: (payload.errors as string[] | null | undefined) ?? null,
+          batch_count: payload.batch_count as number | undefined,
+          image_count: payload.image_count as number | undefined,
+        };
+      }
+    }
+  }
+
+  if (!finalResult) {
+    throw new Error("Onboarding screenshot parse failed");
+  }
+  return finalResult;
+}
+
+export interface CanadaSubscriptionChip {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export async function fetchCanadaSubscriptions(): Promise<{
+  top7: CanadaSubscriptionChip[];
+  more: CanadaSubscriptionChip[];
+}> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/canada-subscriptions`, {
     headers: authHeaders(),
   });
+  if (!res.ok) throw new ApiError("fetchCanadaSubscriptions");
+  return (await res.json()) as {
+    top7: CanadaSubscriptionChip[];
+    more: CanadaSubscriptionChip[];
+  };
+}
+
+export async function fetchKoreaSubscriptions(): Promise<{
+  top7: CanadaSubscriptionChip[];
+  more: CanadaSubscriptionChip[];
+}> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/korea-subscriptions`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("fetchKoreaSubscriptions");
+  return (await res.json()) as {
+    top7: CanadaSubscriptionChip[];
+    more: CanadaSubscriptionChip[];
+  };
+}
+
+export type ResetScope = "all" | "ledger" | "subscriptions" | "stocks";
+
+export async function resetUserData(
+  scope: ResetScope = "all"
+): Promise<{ status: string; scope: string; detail: string }> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/settings/reset?scope=${encodeURIComponent(scope)}`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+    }
+  );
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || "데이터 초기화에 실패했습니다.");
   }
+  return (await res.json()) as {
+    status: string;
+    scope: string;
+    detail: string;
+  };
 }
 
 export interface OCRLog {

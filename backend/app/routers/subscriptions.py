@@ -71,6 +71,7 @@ def _serialize_sub(doc: dict) -> dict:
         "promo_end_date": doc.get("promo_end_date"),
         "promo_reminder_enabled": doc.get("promo_reminder_enabled", False),
         "end_reminder_enabled": doc.get("end_reminder_enabled", False),
+        "is_fixed_bill": bool(doc.get("is_fixed_bill", False)),
         "account_id": doc["account_id"],
         "category": doc["category"],
         "sub_category": doc["sub_category"],
@@ -504,6 +505,42 @@ async def update_subscription(
                         }
                     },
                 )
+
+        # Keep already-materialized transactions in sync when price/promo changes
+        # (e.g. Figma promo $0 should update calendar/list amounts).
+        amount_fields_changed = any(
+            k in updates
+            for k in ("amount", "promo_amount", "promo_end_date")
+        )
+        if amount_fields_changed:
+            completed = await db[OCC_COL].find(
+                {
+                    "subscription_id": subscription_id,
+                    "status": OccurrenceStatus.COMPLETED.value,
+                }
+            ).to_list(length=500)
+            for occ in completed:
+                due = occ.get("due_date")
+                if not isinstance(due, datetime):
+                    continue
+                new_amt = amount_for_due_date(updated, due)
+                if float(occ.get("amount", 0)) == float(new_amt):
+                    continue
+                await db[OCC_COL].update_one(
+                    {"_id": occ["_id"]},
+                    {"$set": {"amount": new_amt}},
+                )
+                tx_id = occ.get("transaction_id")
+                if tx_id and ObjectId.is_valid(str(tx_id)):
+                    await db.transactions.update_one(
+                        {"_id": ObjectId(str(tx_id))},
+                        {"$set": {"amount": new_amt}},
+                    )
+                else:
+                    await db.transactions.update_one(
+                        {"subscription_occurrence_id": str(occ["_id"])},
+                        {"$set": {"amount": new_amt}},
+                    )
     return _serialize_sub(updated)
 
 

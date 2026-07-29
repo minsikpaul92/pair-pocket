@@ -17,6 +17,10 @@ import {
   UserCheck,
   UserPlus,
   Wallet,
+  Play,
+  X,
+  Trash2,
+  ImagePlus,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState, useRef } from "react";
@@ -167,35 +171,116 @@ export default function AppShell({ user, onLogout }: Props) {
   const [scanMenuOpen, setScanMenuOpen] = useState(false);
   const [aiParsing, setAiParsing] = useState(false);
   const [parsedData, setParsedData] = useState<any>(null);
+  const [scanQueue, setScanQueue] = useState<
+    { id: string; file: File; previewUrl: string | null }[]
+  >([]);
+  const [scanQueueOpen, setScanQueueOpen] = useState(false);
+  const [scanQueueError, setScanQueueError] = useState<string | null>(null);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scanMoreInputRef = useRef<HTMLInputElement>(null);
+  const MAX_SCAN_FILES = 15;
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+  function enqueueScanFiles(fileList: FileList | File[] | null) {
+    if (!fileList) return;
+    const list = Array.from(fileList as FileList | File[]);
+    const accepted = list.filter(
+      (f) => f.type.startsWith("image/") || f.type === "application/pdf"
+    );
+    if (!accepted.length) {
+      setScanQueueError("지원하지 않는 파일 형식입니다.");
+      return;
+    }
+    setScanQueueError(null);
+    setScanQueue((prev) => {
+      const room = MAX_SCAN_FILES - prev.length;
+      if (room <= 0) {
+        setScanQueueError(`최대 ${MAX_SCAN_FILES}장까지 올릴 수 있습니다.`);
+        return prev;
+      }
+      const slice = accepted.slice(0, room);
+      if (accepted.length > room) {
+        setScanQueueError(`최대 ${MAX_SCAN_FILES}장까지 올릴 수 있습니다.`);
+      }
+      return [
+        ...prev,
+        ...slice.map((file) => ({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          previewUrl: file.type.startsWith("image/")
+            ? URL.createObjectURL(file)
+            : null,
+        })),
+      ];
+    });
+    setScanQueueOpen(true);
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (scanMoreInputRef.current) scanMoreInputRef.current.value = "";
+  }
 
+  function clearScanQueue() {
+    setScanQueue((prev) => {
+      prev.forEach((q) => {
+        if (q.previewUrl) URL.revokeObjectURL(q.previewUrl);
+      });
+      return [];
+    });
+    setScanQueueError(null);
+  }
+
+  function removeScanQueued(id: string) {
+    setScanQueue((prev) => {
+      const target = prev.find((q) => q.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((q) => q.id !== id);
+    });
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    enqueueScanFiles(e.target.files);
+  }
+
+  async function startScanQueueAnalysis() {
+    if (aiParsing || scanQueue.length === 0) return;
     try {
       setAiParsing(true);
+      setScanQueueError(null);
+      const files = scanQueue.map((q) => q.file);
       const results = await parseReceiptsOrStatements(files);
-      if (results && results.length > 0) {
-        const parsed = results[0];
+      const flat: any[] = [];
+      for (const r of results as any[]) {
+        if (Array.isArray(r?.transactions)) {
+          for (const tx of r.transactions) {
+            flat.push({
+              ...tx,
+              file_name: r.file_name,
+              items: tx.items || [],
+            });
+          }
+        } else if (r?.date != null) {
+          flat.push(r);
+        }
+      }
+      if (flat.length > 0) {
+        const parsed = flat[0];
         setParsedData(parsed);
         const txDate = parsed.date ? new Date(parsed.date) : new Date();
         setModalDate(txDate);
-        setModalCurrency(parsed.currency);
+        setModalCurrency(parsed.currency || "CAD");
+        setScanQueueOpen(false);
+        clearScanQueue();
       } else {
-        alert("AI 분석 결과가 올바르지 않습니다.");
+        setScanQueueError("AI 분석 결과가 올바르지 않습니다.");
       }
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "AI 분석 중 오류가 발생했습니다.");
+      setScanQueueError(err.message || "AI 분석 중 오류가 발생했습니다.");
     } finally {
       setAiParsing(false);
-      if (cameraInputRef.current) cameraInputRef.current.value = "";
-      if (photoInputRef.current) photoInputRef.current.value = "";
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -242,7 +327,14 @@ export default function AppShell({ user, onLogout }: Props) {
     window.sessionStorage.setItem(ACTIVE_VIEW_KEY, view);
   }, [view]);
 
-  // Materialize due subscriptions, then load ledger data.
+  // Materialize due subscriptions when ledger type changes (not on every data bump).
+  useEffect(() => {
+    syncSubscriptions(accountType).catch(() => {
+      /* non-blocking */
+    });
+  }, [accountType]);
+
+  // Load ledger transactions / pending for the selected month & scope.
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -258,14 +350,9 @@ export default function AppShell({ user, onLogout }: Props) {
         ? fetchAllPendingOccurrences(pendingFilters)
         : fetchPendingOccurrences({ ...pendingFilters, currency: scope });
 
-    syncSubscriptions(accountType)
-      .then(() => {
-        if (!active) return null;
-        return Promise.all([txLoader, pendingLoader]);
-      })
-      .then((result) => {
-        if (!active || !result) return;
-        const [txs, pending] = result;
+    Promise.all([txLoader, pendingLoader])
+      .then(([txs, pending]) => {
+        if (!active) return;
         setTransactions(txs);
         setPendingOccurrences(pending);
       })
@@ -653,6 +740,7 @@ export default function AppShell({ user, onLogout }: Props) {
               presets={presets}
               transactions={transactions}
               onEditTransaction={openEdit}
+              onDeleted={bumpVersion}
             />
           ) : view === "subscriptions" ? (
             <SubscriptionsView
@@ -722,7 +810,123 @@ export default function AppShell({ user, onLogout }: Props) {
         onChange={handleFileChange}
         className="hidden"
         accept="image/*,application/pdf"
+        multiple
       />
+
+      {scanQueueOpen && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+          onClick={() => {
+            if (!aiParsing) {
+              setScanQueueOpen(false);
+            }
+          }}
+        >
+          <div
+            className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 space-y-4 max-h-[88dvh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  AI 스캔 대기열
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  사진을 모은 뒤 분석을 시작하세요. ({scanQueue.length} /{" "}
+                  {MAX_SCAN_FILES})
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={aiParsing}
+                onClick={() => setScanQueueOpen(false)}
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {scanQueue.length > 0 ? (
+              <ul className="grid grid-cols-4 gap-2">
+                {scanQueue.map((q) => (
+                  <li key={q.id} className="relative aspect-square">
+                    {q.previewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={q.previewUrl}
+                        alt=""
+                        className="h-full w-full rounded-lg object-cover border border-gray-200 dark:border-gray-700"
+                      />
+                    ) : (
+                      <div className="h-full w-full rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                        PDF
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      disabled={aiParsing}
+                      onClick={() => removeScanQueued(q.id)}
+                      className="absolute -top-1.5 -right-1.5 rounded-full bg-gray-900/80 text-white p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">아직 파일이 없습니다.</p>
+            )}
+
+            {scanQueueError && (
+              <p className="text-xs text-red-500">{scanQueueError}</p>
+            )}
+
+            <input
+              ref={scanMoreInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => enqueueScanFiles(e.target.files)}
+            />
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={aiParsing || scanQueue.length >= MAX_SCAN_FILES}
+                onClick={() => scanMoreInputRef.current?.click()}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-800 dark:text-gray-100 disabled:opacity-50"
+              >
+                <ImagePlus className="h-4 w-4" />
+                추가
+              </button>
+              <button
+                type="button"
+                disabled={aiParsing || scanQueue.length === 0}
+                onClick={() => void startScanQueueAnalysis()}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {aiParsing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                {aiParsing ? "분석 중…" : "분석 시작"}
+              </button>
+            </div>
+            {scanQueue.length > 0 && !aiParsing && (
+              <button
+                type="button"
+                onClick={clearScanQueue}
+                className="w-full inline-flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-red-500"
+              >
+                <Trash2 className="h-3 w-3" />
+                대기열 비우기
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Backdrop to close scan menu */}
       {scanMenuOpen && (
@@ -771,7 +975,8 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
       )}
 
-      {/* Floating Buttons Group */}
+      {/* Floating Buttons Group — hidden on stocks/subscriptions (view-specific FAB) */}
+      {view !== "stocks" && view !== "subscriptions" && (
       <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col gap-3">
         {/* Floating Camera Button (Scan) */}
         <button
@@ -793,8 +998,7 @@ export default function AppShell({ user, onLogout }: Props) {
           <Plus className="h-6 w-6" />
         </button>
       </div>
-
-      {/* AI Parsing Loading Overlay */}
+      )}
       {aiParsing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center space-y-4 max-w-xs text-center border border-gray-100 dark:border-gray-700">

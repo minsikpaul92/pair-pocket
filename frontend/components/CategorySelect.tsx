@@ -13,6 +13,7 @@ interface Props {
   onAdd?: (name: string) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
+  triggerClassName?: string;
 }
 
 export default function CategorySelect({
@@ -22,6 +23,7 @@ export default function CategorySelect({
   onAdd,
   placeholder,
   disabled = false,
+  triggerClassName,
 }: Props) {
   const t = useTranslations("categories");
   const tTx = useTranslations("transaction");
@@ -36,6 +38,7 @@ export default function CategorySelect({
       disabled={disabled}
       addLabel={tTx("addCategory")}
       formatOption={(cat) => translateCategory(cat, t)}
+      triggerClassName={triggerClassName}
       renderLeading={(cat) => (
         <CategoryIcon
           category={cat}

@@ -165,8 +165,11 @@ def amount_for_due_date(subscription: dict, due: datetime) -> float:
     promo_amount = subscription.get("promo_amount")
     promo_end = subscription.get("promo_end_date")
     regular = float(subscription["amount"])
-    if promo_amount is None or promo_end is None:
+    if promo_amount is None:
         return regular
+    # No end date → keep promo indefinitely until the user sets one.
+    if promo_end is None:
+        return float(promo_amount)
     if _calendar_day(due) <= _calendar_day(promo_end):
         return float(promo_amount)
     return regular

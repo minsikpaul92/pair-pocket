@@ -1,8 +1,8 @@
 "use client";
 
-import { CalendarX2, Plus, Repeat, SkipForward, Undo2 } from "lucide-react";
+import { CalendarX2, Camera, Loader2, Plus, Repeat, SkipForward, Undo2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import SubscriptionRegisterModal from "@/components/SubscriptionRegisterModal";
 import {
@@ -11,6 +11,7 @@ import {
   Currency,
   LedgerScope,
   MonthlySubscriptionSummary,
+  OnboardingParseResult,
   Subscription,
   SubscriptionOccurrence,
   accountLabel,
@@ -22,6 +23,7 @@ import {
   fetchSubscriptions,
   formatAmount,
   isPromoActive,
+  parseOnboardingScreenshots,
   scheduleSubscriptionCancel,
   skipSubscriptionOccurrence,
   subscriptionDisplayAmount,
@@ -131,6 +133,7 @@ function PendingSection({
     return items.map((occ) => {
       const sub = subById.get(occ.subscription_id);
       const cycle = occ.subscription_billing_cycle ?? sub?.cycle;
+      const sourceLabel = translateSubscriptionSource(sub ?? cycle, t);
       const tone = subscriptionScheduleAmountClass(occ.due_date);
       return (
         <li key={occ.id}>
@@ -143,10 +146,10 @@ function PendingSection({
               <div className="min-w-0">
                 <p className={`text-sm font-medium truncate ${tone}`}>
                   {occ.subscription_name || t("defaultName")}
-                  {translateSubscriptionSource(cycle, t) && (
+                  {sourceLabel && (
                     <span className="text-[10px] text-gray-400 font-normal">
                       {" "}
-                      {translateSubscriptionSource(cycle, t)}
+                      {sourceLabel}
                     </span>
                   )}
                 </p>
@@ -248,6 +251,11 @@ export default function SubscriptionsView({
   const [registerCurrency, setRegisterCurrency] = useState<Currency>(
     scope === "KRW" ? "KRW" : "CAD"
   );
+  const [initialParse, setInitialParse] = useState<OnboardingParseResult | null>(
+    null
+  );
+  const [scanning, setScanning] = useState(false);
+  const subCameraRef = useRef<HTMLInputElement>(null);
 
   const monthStr = monthKey(month);
 
@@ -326,8 +334,36 @@ export default function SubscriptionsView({
     }
   }
 
+  function closeModal() {
+    setShowRegister(false);
+    setEditing(null);
+    setInitialParse(null);
+  }
+
+  async function handleSubCameraFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setScanning(true);
+    try {
+      const result = await parseOnboardingScreenshots(
+        "subscriptions",
+        Array.from(files)
+      );
+      setEditing(null);
+      setRegisterCurrency(scope === "KRW" ? "KRW" : "CAD");
+      setInitialParse(result);
+      setShowRegister(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Scan failed");
+    } finally {
+      setScanning(false);
+      e.target.value = "";
+    }
+  }
+
   function openCreate() {
     setEditing(null);
+    setInitialParse(null);
     setRegisterCurrency(scope === "KRW" ? "KRW" : "CAD");
     setShowRegister(true);
   }
@@ -381,17 +417,14 @@ export default function SubscriptionsView({
   function renderSubscription(sub: Subscription, showFlag: boolean) {
     const displayAmount = subscriptionDisplayAmount(sub);
     const promoOn = isPromoActive(sub);
-    const sourceLabel = translateSubscriptionSource(sub.cycle, t);
+    const sourceLabel = translateSubscriptionSource(sub, t);
 
     return (
-      <li
-        key={sub.id}
-        className="flex items-start gap-2 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
-      >
+      <li key={sub.id} className="relative">
         <button
           type="button"
           onClick={() => openEdit(sub)}
-          className="flex min-w-0 flex-1 items-start gap-3 text-left"
+          className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
         >
           <div className="mt-0.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 p-2">
             <Repeat className="h-4 w-4 text-blue-500" />
@@ -445,7 +478,7 @@ export default function SubscriptionsView({
               </p>
             )}
           </div>
-          <div className="text-right shrink-0">
+          <div className="text-right shrink-0 pr-16">
             <p className="text-sm font-bold tabular-nums whitespace-nowrap">
               {formatAmount(displayAmount, sub.currency)}
             </p>
@@ -460,7 +493,7 @@ export default function SubscriptionsView({
           <button
             type="button"
             onClick={(e) => toggleCancelSchedule(sub, e)}
-            className="shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors self-center"
+            className="absolute right-3 top-1/2 -translate-y-1/2 shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             {sub.status === "cancel_scheduled" ? (
               <>
@@ -477,11 +510,6 @@ export default function SubscriptionsView({
     );
   }
 
-  function closeModal() {
-    setShowRegister(false);
-    setEditing(null);
-  }
-
   if (loading) {
     return (
       <div className="h-40 w-full animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
@@ -490,6 +518,38 @@ export default function SubscriptionsView({
 
   const cadSubs = subscriptions.filter((s) => s.currency === "CAD");
   const krwSubs = subscriptions.filter((s) => s.currency === "KRW");
+
+  function partitionSubs(list: Subscription[]) {
+    const fixed = list.filter((s) => s.is_fixed_bill);
+    const installments = list.filter(
+      (s) => !s.is_fixed_bill && s.cycle === "installment"
+    );
+    const recurring = list.filter(
+      (s) => !s.is_fixed_bill && s.cycle !== "installment"
+    );
+    return { recurring, installments, fixed };
+  }
+
+  function renderGroupedList(list: Subscription[], showFlag: boolean) {
+    const { recurring, installments, fixed } = partitionSubs(list);
+    const blocks: { label: string; items: Subscription[] }[] = [
+      { label: t("sectionSubscriptions"), items: recurring },
+      { label: t("sectionInstallments"), items: installments },
+      { label: t("sectionFixedBills"), items: fixed },
+    ];
+    return blocks.flatMap(({ label, items }) => {
+      if (items.length === 0) return [];
+      return [
+        <li
+          key={`sec-${label}-${showFlag ? "flag" : "plain"}`}
+          className="px-4 py-2 text-[11px] font-semibold text-gray-400 bg-gray-50/80 dark:bg-gray-800/50"
+        >
+          {label}
+        </li>,
+        ...items.map((sub) => renderSubscription(sub, showFlag)),
+      ];
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -542,7 +602,7 @@ export default function SubscriptionsView({
                     <li className="px-4 py-2 text-[11px] font-semibold text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
                       🇨🇦 {tCommon("canada")}
                     </li>
-                    {cadSubs.map((sub) => renderSubscription(sub, false))}
+                    {renderGroupedList(cadSubs, false)}
                   </>
                 )}
                 {krwSubs.length > 0 && (
@@ -550,12 +610,12 @@ export default function SubscriptionsView({
                     <li className="px-4 py-2 text-[11px] font-semibold text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
                       🇰🇷 {tCommon("korea")}
                     </li>
-                    {krwSubs.map((sub) => renderSubscription(sub, false))}
+                    {renderGroupedList(krwSubs, false)}
                   </>
                 )}
               </>
             ) : (
-              subscriptions.map((sub) => renderSubscription(sub, false))
+              renderGroupedList(subscriptions, false)
             )}
           </ul>
         )}
@@ -567,6 +627,7 @@ export default function SubscriptionsView({
           accountType={accountType}
           presets={presets}
           editing={editing}
+          initialParse={initialParse}
           userEmail={userEmail}
           onClose={closeModal}
           onSaved={() => {
@@ -576,6 +637,38 @@ export default function SubscriptionsView({
           onPresetsChange={onPresetsChange}
         />
       )}
+
+      <input
+        ref={subCameraRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void handleSubCameraFiles(e)}
+      />
+
+      <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => subCameraRef.current?.click()}
+          disabled={scanning}
+          aria-label={t("scanPhoto")}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 active:bg-indigo-700 transition-colors disabled:opacity-50"
+        >
+          {scanning ? (
+            <Loader2 className="h-6 w-6 animate-spin" />
+          ) : (
+            <Camera className="h-6 w-6" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={openCreate}
+          aria-label={t("add")}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
     </div>
   );
 }
