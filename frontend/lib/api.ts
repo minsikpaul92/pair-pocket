@@ -353,6 +353,19 @@ export async function addInstitution(name: string): Promise<string[]> {
   return data.institutions as string[];
 }
 
+export async function removeInstitution(name: string): Promise<string[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/settings/institutions?name=${encodeURIComponent(name)}`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    }
+  );
+  if (!res.ok) throw new ApiError("removeInstitution");
+  const data = await res.json();
+  return data.institutions as string[];
+}
+
 export interface UserSettings {
   merchants: string[];
   institutions: string[];
@@ -362,6 +375,11 @@ export interface UserSettings {
   };
   category_colors: Record<string, string>;
   has_gemini_key?: boolean;
+  preferred_locale?: string | null;
+  preferred_locales?: string[];
+  ledger_start_date?: string | null;
+  onboarding_personal_completed?: boolean;
+  onboarding_personal_step?: number;
 }
 
 export async function fetchUserSettings(): Promise<UserSettings> {
@@ -992,10 +1010,29 @@ export function accountDetail(account: FinancialAccount): string {
       ? `···${account.last_four}`
       : null,
     account.kind !== "credit_card" && account.account_number
-      ? account.account_number
+      ? maskAccountNumber(account.account_number)
       : null,
   ].filter(Boolean);
   return parts.join(" · ");
+}
+
+/** Keep only last 4 digits for card PAN / display. */
+export function normalizeLastFour(raw: string | null | undefined): string | null {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  return digits.slice(-4);
+}
+
+/**
+ * Account numbers are sensitive. Store/display only a masked form ending in last 4.
+ * e.g. "123-456-789012" -> "••••9012"
+ */
+export function maskAccountNumber(raw: string | null | undefined): string | null {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  const last4 = digits.slice(-4);
+  if (digits.length <= 4) return `••••${last4}`;
+  return `••••${last4}`;
 }
 
 export function formatAmount(amount: number, currency: Currency): string {
@@ -1460,15 +1497,245 @@ export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {
   return (await res.json()) as UserSettings;
 }
 
-export async function resetUserData(): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/reset`, {
+export async function saveOnboardingBasics(payload: {
+  preferred_locales: string[];
+  ledger_start_date: string;
+  api_key?: string | null;
+  preferred_locale?: string;
+}): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/basics`, {
     method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      preferred_locales: payload.preferred_locales,
+      preferred_locale: payload.preferred_locales[0] ?? payload.preferred_locale,
+      ledger_start_date: payload.ledger_start_date,
+      api_key: payload.api_key,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Failed to save onboarding basics");
+  }
+  return (await res.json()) as UserSettings;
+}
+
+export async function saveOnboardingStep(step: number): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/step`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ step }),
+  });
+  if (!res.ok) throw new ApiError("saveOnboardingStep");
+  return (await res.json()) as UserSettings;
+}
+
+export async function completeOnboarding(
+  completed = true
+): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ completed }),
+  });
+  if (!res.ok) throw new ApiError("completeOnboarding");
+  return (await res.json()) as UserSettings;
+}
+
+export type OnboardingParseStep = "assets" | "subscriptions" | "brokerage";
+
+export interface OnboardingParsedAccount {
+  name?: string;
+  institution?: string;
+  kind?: string;
+  currency?: string;
+  opening_balance?: number;
+  /** Credit cards only — last 4 digits. */
+  last_four?: string;
+  /** Bank/broker — may be full or already masked; client masks before save. */
+  account_number?: string;
+}
+
+export interface OnboardingParsedSubscription {
+  name?: string;
+  amount?: number;
+  regular_amount?: number;
+  currency?: string;
+  kind?: string;
+  cycle?: string;
+  billing_day?: number;
+  start_date?: string;
+  end_date?: string;
+  promo_amount?: number;
+  promo_end_date?: string;
+  category?: string;
+  sub_category?: string;
+}
+
+export interface OnboardingParsedHolding {
+  ticker?: string;
+  name?: string;
+  shares?: number;
+  avg_price?: number;
+  currency?: string;
+}
+
+export interface OnboardingParseResult {
+  step: OnboardingParseStep;
+  data: {
+    accounts?: OnboardingParsedAccount[];
+    subscriptions?: OnboardingParsedSubscription[];
+    brokerage?: {
+      name?: string;
+      currency?: string;
+      cash_balance?: number;
+      holdings?: OnboardingParsedHolding[];
+    };
+  };
+  models_used?: string[];
+  notes?: string[];
+  errors?: string[] | null;
+  batch_count?: number;
+  image_count?: number;
+}
+
+export async function parseOnboardingScreenshots(
+  step: OnboardingParseStep,
+  files: File[],
+  onEvent?: (event: {
+    event: string;
+    model?: string;
+    fallback_model?: string;
+    message?: string;
+    count?: number;
+    batch?: number;
+    batch_count?: number;
+    error?: string;
+  }) => void
+): Promise<OnboardingParseResult> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file);
+  }
+  const res = await fetch(
+    `${API_BASE_URL}/api/ai/onboarding-parse-stream?step=${encodeURIComponent(step)}`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData,
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Onboarding screenshot parse failed");
+  }
+  if (!res.body) {
+    throw new Error("Onboarding screenshot parse failed");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: OnboardingParseResult | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() || "";
+    for (const chunk of chunks) {
+      const line = chunk
+        .split("\n")
+        .map((l) => l.trim())
+        .find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      const raw = line.replace(/^data:\s*/, "");
+      let payload: Record<string, unknown>;
+      try {
+        payload = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      const eventName = String(payload.event || "");
+      if (
+        eventName === "trying" ||
+        eventName === "scanning" ||
+        eventName === "quota_fallback" ||
+        eventName === "batch_done"
+      ) {
+        onEvent?.({
+          event: eventName,
+          model: payload.model as string | undefined,
+          fallback_model: payload.fallback_model as string | undefined,
+          message: payload.message as string | undefined,
+          count: payload.count as number | undefined,
+          batch: payload.batch as number | undefined,
+          batch_count: payload.batch_count as number | undefined,
+        });
+      } else if (eventName === "error") {
+        throw new Error(String(payload.error || "Onboarding screenshot parse failed"));
+      } else if (eventName === "success") {
+        finalResult = {
+          step: payload.step as OnboardingParseStep,
+          data: payload.data as OnboardingParseResult["data"],
+          models_used: payload.models_used as string[] | undefined,
+          notes: payload.notes as string[] | undefined,
+          errors: (payload.errors as string[] | null | undefined) ?? null,
+          batch_count: payload.batch_count as number | undefined,
+          image_count: payload.image_count as number | undefined,
+        };
+      }
+    }
+  }
+
+  if (!finalResult) {
+    throw new Error("Onboarding screenshot parse failed");
+  }
+  return finalResult;
+}
+
+export interface CanadaSubscriptionChip {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export async function fetchCanadaSubscriptions(): Promise<{
+  top7: CanadaSubscriptionChip[];
+  more: CanadaSubscriptionChip[];
+}> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/canada-subscriptions`, {
     headers: authHeaders(),
   });
+  if (!res.ok) throw new ApiError("fetchCanadaSubscriptions");
+  return (await res.json()) as {
+    top7: CanadaSubscriptionChip[];
+    more: CanadaSubscriptionChip[];
+  };
+}
+
+export type ResetScope = "all" | "ledger" | "subscriptions" | "stocks";
+
+export async function resetUserData(
+  scope: ResetScope = "all"
+): Promise<{ status: string; scope: string; detail: string }> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/settings/reset?scope=${encodeURIComponent(scope)}`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+    }
+  );
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || "데이터 초기화에 실패했습니다.");
   }
+  return (await res.json()) as {
+    status: string;
+    scope: string;
+    detail: string;
+  };
 }
 
 export interface OCRLog {

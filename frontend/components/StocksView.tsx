@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
+import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 
 import {
   AccountType,
@@ -22,6 +23,7 @@ import {
   ExchangeRate,
   FinancialAccount,
   LedgerScope,
+  OnboardingParseResult,
   StockHolding,
   StockSummary,
   StockSearchResult,
@@ -33,6 +35,7 @@ import {
   fetchStockSummary,
   fetchAccounts,
   fetchExchangeRate,
+  fetchUserSettings,
   formatAmount,
 } from "@/lib/api";
 
@@ -80,6 +83,8 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const [targetAccountId, setTargetAccountId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [aiHint, setAiHint] = useState<string | null>(null);
 
   // Edit holding form states
   const [editShares, setEditShares] = useState("");
@@ -124,6 +129,13 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   useEffect(() => {
     loadData();
   }, [loadData, ledgerScope, version]);
+
+  useEffect(() => {
+    if (!showAddModal) return;
+    fetchUserSettings()
+      .then((s) => setHasGeminiKey(Boolean(s.has_gemini_key)))
+      .catch(() => setHasGeminiKey(false));
+  }, [showAddModal]);
 
   // Debounced Search suggestions
   useEffect(() => {
@@ -315,7 +327,77 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     setSharesInput("");
     setPriceInput("");
     setFormError(null);
+    setAiHint(null);
   };
+
+  async function applyAiParse(result: OnboardingParseResult) {
+    const holdingsParsed = result.data.brokerage?.holdings || [];
+    if (!holdingsParsed.length) {
+      setAiHint(t("aiEmpty"));
+      return;
+    }
+
+    const normalizeCurrency = (raw?: string): Currency => {
+      const c = String(raw || "").toUpperCase();
+      if (c === "KRW" || c === "CAD" || c === "USD") return c;
+      return selectedCurrency;
+    };
+
+    // Multiple holdings + account selected: batch create.
+    if (holdingsParsed.length > 1 && targetAccountId) {
+      setSubmitting(true);
+      setFormError(null);
+      let ok = 0;
+      try {
+        for (const h of holdingsParsed) {
+          const ticker = (h.ticker || "").trim().toUpperCase();
+          const shares = Number(h.shares);
+          if (!ticker || !Number.isFinite(shares) || shares <= 0) continue;
+          await createStockHolding({
+            account_id: targetAccountId,
+            ticker,
+            name: (h.name || ticker).trim(),
+            shares,
+            avg_price: Number(h.avg_price) || 0,
+            currency: normalizeCurrency(h.currency),
+          });
+          ok += 1;
+        }
+        if (ok === 0) {
+          setAiHint(t("aiEmpty"));
+        } else {
+          setAiHint(t("aiBatchSuccess", { count: ok }));
+          setShowAddModal(false);
+          resetAddForm();
+          loadData();
+          if (onChanged) onChanged();
+        }
+      } catch {
+        setFormError(ok > 0 ? t("aiPartialFail") : t("addFailed"));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (holdingsParsed.length > 1 && !targetAccountId) {
+      setFormError(t("aiNeedAccount"));
+    }
+
+    const first = holdingsParsed[0];
+    const ticker = (first.ticker || "").trim().toUpperCase();
+    setSelectedTicker(ticker);
+    setSelectedName((first.name || ticker).trim());
+    setSearchQuery(ticker);
+    setSharesInput(first.shares != null ? String(first.shares) : "");
+    setPriceInput(first.avg_price != null ? String(first.avg_price) : "");
+    setSelectedCurrency(normalizeCurrency(first.currency));
+    setAiHint(
+      holdingsParsed.length > 1
+        ? t("aiFilled") + ` (${holdingsParsed.length})`
+        : t("aiFilled")
+    );
+  }
 
   // Helpers
   const tickerGradient = (ticker: string) => {
@@ -676,7 +758,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             }
           }}
         >
-          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-2xl relative border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-150">
+          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-2xl relative border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-150 max-h-[92dvh] overflow-y-auto">
             <button
               onClick={() => setShowAddModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -710,10 +792,23 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                     .filter((a) => ledgerScope === "ALL" || a.currency === ledgerScope)
                     .map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.institution ? `[${acc.institution}] ` : ""}{acc.name} ({acc.currency})
+                        {acc.institution ? `[${acc.institution}] ` : ""}
+                        {acc.name} ({acc.currency})
                       </option>
                     ))}
                 </select>
+              </div>
+
+              <div className="space-y-2">
+                <OnboardingScreenshotScan
+                  step="brokerage"
+                  hasApiKey={hasGeminiKey}
+                  disabled={submitting}
+                  onParsed={applyAiParse}
+                />
+                {aiHint && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400">{aiHint}</p>
+                )}
               </div>
 
               {/* Ticker Search & Auto-complete */}

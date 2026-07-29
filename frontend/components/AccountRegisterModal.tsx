@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, ChevronDown, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
+import BankPicker from "@/components/BankPicker";
 import {
   ACCOUNT_KIND_KEYS,
   AccountType,
@@ -12,12 +13,16 @@ import {
   FinancialAccountKind,
   NewFinancialAccount,
   TransactionType,
+  addInstitution,
   createAccount,
+  fetchUserSettings,
   formatAmountInput,
+  maskAccountNumber,
+  normalizeLastFour,
   parseAmountInput,
+  removeInstitution,
   updateAccount,
 } from "@/lib/api";
-import { BANK_OPTIONS, bankLogoUrl } from "@/lib/banks";
 import { translateError } from "@/lib/errors";
 
 interface Props {
@@ -25,6 +30,8 @@ interface Props {
   accountType?: AccountType;
   preferredType: TransactionType;
   account?: FinancialAccount | null;
+  /** Prefill kind when creating (e.g. investment for brokerage). */
+  initialKind?: FinancialAccountKind;
   onClose: () => void;
   onCreated: (account: FinancialAccount) => void;
   onUpdated?: (account: FinancialAccount) => void;
@@ -38,48 +45,12 @@ const KINDS: FinancialAccountKind[] = [
   "cash",
 ];
 
-function BankIcon({
-  name,
-  color,
-  domain,
-}: {
-  name: string;
-  color: string;
-  domain: string | null;
-}) {
-  const [failed, setFailed] = useState(false);
-  const src = bankLogoUrl(domain);
-
-  if (!src || failed) {
-    return (
-      <span
-        className="flex h-6 w-6 items-center justify-center rounded-md text-[9px] font-bold text-white shrink-0"
-        style={{ backgroundColor: color }}
-        aria-hidden
-      >
-        {name.slice(0, 2).toUpperCase()}
-      </span>
-    );
-  }
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      width={24}
-      height={24}
-      className="h-6 w-6 rounded-md object-contain bg-white shrink-0"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
 export default function AccountRegisterModal({
   currency,
   accountType = "personal",
   preferredType,
   account = null,
+  initialKind,
   onClose,
   onCreated,
   onUpdated,
@@ -95,6 +66,7 @@ export default function AccountRegisterModal({
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(account?.currency ?? currency);
   const [kind, setKind] = useState<FinancialAccountKind>(
     account?.kind ??
+      initialKind ??
       (preferredType === "expense" ? "credit_card" : "checking")
   );
   const [openingBalance, setOpeningBalance] = useState(
@@ -109,7 +81,7 @@ export default function AccountRegisterModal({
   const [institution, setInstitution] = useState<string>(
     account?.institution ?? ""
   );
-  const [bankOpen, setBankOpen] = useState(false);
+  const [customInstitutions, setCustomInstitutions] = useState<string[]>([]);
   const [isDefault, setIsDefault] = useState(
     account
       ? preferredType === "expense"
@@ -120,20 +92,16 @@ export default function AccountRegisterModal({
   const [isActive, setIsActive] = useState(account?.is_active ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const bankRef = useRef<HTMLDivElement>(null);
 
-  const selectedBank = BANK_OPTIONS.find((b) => b.id === institution);
   const isCreditCard = kind === "credit_card";
+  const isCash = kind === "cash";
+  const isInvestment = kind === "investment";
   const displayCurrency = account?.currency ?? selectedCurrency;
 
   useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (bankRef.current && !bankRef.current.contains(e.target as Node)) {
-        setBankOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    fetchUserSettings()
+      .then((s) => setCustomInstitutions(s.institutions || []))
+      .catch(() => setCustomInstitutions([]));
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -153,6 +121,9 @@ export default function AccountRegisterModal({
     }
 
     const nick = nickname.trim();
+    const maskedAccount =
+      isCash || isCreditCard ? null : maskAccountNumber(accountNumber);
+    const cardLastFour = isCreditCard ? normalizeLastFour(lastFour) : null;
     setSubmitting(true);
     try {
       if (isEdit && account) {
@@ -160,9 +131,9 @@ export default function AccountRegisterModal({
           name: trimmed,
           nickname: nick || null,
           opening_balance: balance,
-          institution: institution || null,
-          last_four: isCreditCard ? lastFour.trim() || null : null,
-          account_number: isCreditCard ? null : accountNumber.trim() || null,
+          institution: isCash ? null : institution || null,
+          last_four: cardLastFour,
+          account_number: maskedAccount,
           is_default_expense:
             preferredType === "expense" ? isDefault : account.is_default_expense,
           is_default_income:
@@ -181,9 +152,9 @@ export default function AccountRegisterModal({
         currency: selectedCurrency,
         account_type: accountType,
         opening_balance: balance,
-        institution: institution || null,
-        last_four: isCreditCard ? lastFour.trim() || null : null,
-        account_number: isCreditCard ? null : accountNumber.trim() || null,
+        institution: isCash ? null : institution || null,
+        last_four: cardLastFour,
+        account_number: maskedAccount,
         is_default_expense: preferredType === "expense" ? isDefault : false,
         is_default_income: preferredType === "income" ? isDefault : false,
       };
@@ -291,7 +262,10 @@ export default function AccountRegisterModal({
                   key={k}
                   type="button"
                   disabled={isEdit}
-                  onClick={() => setKind(k)}
+                  onClick={() => {
+                    setKind(k);
+                    if (k === "cash") setInstitution("");
+                  }}
                   className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                     kind === k
                       ? "bg-blue-500 text-white"
@@ -320,7 +294,11 @@ export default function AccountRegisterModal({
                 className="input-field"
               />
               <p className="mt-1 text-[10px] text-gray-400">
-                {isCreditCard ? t("cardDebt") : t("accountBalance")}
+                {isCreditCard
+                  ? t("cardDebt")
+                  : isInvestment
+                    ? t("investmentCashOnly")
+                    : t("accountBalance")}
               </p>
             </div>
             <div>
@@ -328,84 +306,64 @@ export default function AccountRegisterModal({
                 {isCreditCard ? t("lastFour") : t("accountNumber")}
               </label>
               {isCreditCard ? (
-                <input
-                  value={lastFour}
-                  onChange={(e) =>
-                    setLastFour(e.target.value.replace(/\D/g, "").slice(0, 4))
-                  }
-                  placeholder="1234"
-                  className="input-field"
-                />
+                <>
+                  <input
+                    value={lastFour}
+                    onChange={(e) =>
+                      setLastFour(e.target.value.replace(/\D/g, "").slice(0, 4))
+                    }
+                    placeholder="1234"
+                    className="input-field"
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    {t("lastFourHint")}
+                  </p>
+                </>
+              ) : isCash ? (
+                <p className="text-xs text-gray-400 py-2">{tCommon("none")}</p>
               ) : (
                 <>
                   <input
                     value={accountNumber}
                     onChange={(e) => setAccountNumber(e.target.value)}
-                    placeholder={tCommon("optionalInput")}
+                    onBlur={() =>
+                      setAccountNumber((v) => maskAccountNumber(v) || "")
+                    }
+                    placeholder={t("accountNumberPlaceholder")}
                     className="input-field"
                   />
                   <p className="mt-1 text-[10px] text-gray-400">
-                    {tCommon("optional")}
+                    {t("accountNumberHint")}
                   </p>
                 </>
               )}
             </div>
           </div>
 
-          <div ref={bankRef} className="relative">
-            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {t("institution")}
-            </label>
-            <button
-              type="button"
-              onClick={() => setBankOpen((v) => !v)}
-              className="w-full flex items-center justify-between input-field text-left"
-            >
-              <span className="flex items-center gap-2 min-w-0">
-                {selectedBank ? (
-                  <>
-                    <BankIcon
-                      name={selectedBank.name}
-                      color={selectedBank.color}
-                      domain={selectedBank.domain}
-                    />
-                    <span className="truncate">{selectedBank.name}</span>
-                  </>
-                ) : (
-                  <span className="text-gray-400">{t("selectBank")}</span>
-                )}
-              </span>
-              <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
-            </button>
-            {bankOpen && (
-              <div className="absolute z-20 mt-2 w-full max-h-52 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10">
-                <ul className="py-1">
-                  {BANK_OPTIONS.map((bank) => (
-                    <li key={bank.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setInstitution(bank.id);
-                          setBankOpen(false);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <BankIcon
-                          name={bank.name}
-                          color={bank.color}
-                          domain={bank.domain}
-                        />
-                        <span className="flex-1 truncate">{bank.name}</span>
-                        {institution === bank.id && (
-                          <Check className="h-4 w-4 text-blue-500 shrink-0" />
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          {!isCash && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t("institution")}
+              </label>
+              <BankPicker
+                value={institution}
+                onChange={setInstitution}
+                customInstitutions={customInstitutions}
+                onAddCustom={async (n) => {
+                  const next = await addInstitution(n);
+                  setCustomInstitutions(next);
+                  return next;
+                }}
+                onRemoveCustom={async (n) => {
+                  const next = await removeInstitution(n);
+                  setCustomInstitutions(next);
+                  return next;
+                }}
+              />
+            </div>
+          )}
 
           <label className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 px-4 py-3 cursor-pointer">
             <input
@@ -415,9 +373,11 @@ export default function AccountRegisterModal({
               className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
             />
             <span className="text-sm">
-              {preferredType === "expense"
-                ? t("defaultExpenseAccount")
-                : t("defaultIncomeAccount")}
+              {isInvestment
+                ? t("defaultBrokerAccount")
+                : preferredType === "expense"
+                  ? t("defaultExpenseAccount")
+                  : t("defaultIncomeAccount")}
             </span>
           </label>
 

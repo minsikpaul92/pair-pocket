@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -17,6 +17,8 @@ import {
   Calendar,
   Layers,
   HelpCircle,
+  Play,
+  X,
 } from "lucide-react";
 import {
   CategoryPresets,
@@ -32,6 +34,14 @@ import {
   API_BASE_URL,
 } from "@/lib/api";
 import { useTranslations } from "next-intl";
+
+const MAX_AI_FILES = 15;
+
+type QueuedScanFile = {
+  id: string;
+  file: File;
+  previewUrl: string | null;
+};
 
 interface Props {
   scope: LedgerScope;
@@ -87,6 +97,9 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
   const [parsedTransactions, setParsedTransactions] = useState<EditableTransaction[]>([]);
   const [currentLogId, setCurrentLogId] = useState<string | null>(null);
   const [rating, setRating] = useState<"thumbs_up" | "thumbs_down" | null>(null);
+  const [aiQueue, setAiQueue] = useState<QueuedScanFile[]>([]);
+  const [aiDragging, setAiDragging] = useState(false);
+  const aiInputRef = useRef<HTMLInputElement>(null);
 
   // CSV Tab State
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -116,6 +129,67 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
     }
   }, [activeSubTab]);
 
+  useEffect(() => {
+    return () => {
+      aiQueue.forEach((q) => {
+        if (q.previewUrl) URL.revokeObjectURL(q.previewUrl);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function clearAiQueue() {
+    setAiQueue((prev) => {
+      prev.forEach((q) => {
+        if (q.previewUrl) URL.revokeObjectURL(q.previewUrl);
+      });
+      return [];
+    });
+  }
+
+  function addAiFiles(fileList: FileList | File[] | null) {
+    if (!fileList) return;
+    const list = Array.from(fileList as FileList | File[]);
+    const acceptedTypes = list.filter(
+      (f) => f.type.startsWith("image/") || f.type === "application/pdf"
+    );
+    if (!acceptedTypes.length) {
+      setErrorMsg(t("errUnsupported"));
+      return;
+    }
+    setErrorMsg(null);
+    setAiQueue((prev) => {
+      const room = MAX_AI_FILES - prev.length;
+      if (room <= 0) {
+        setErrorMsg(t("aiQueueMax", { max: MAX_AI_FILES }));
+        return prev;
+      }
+      const slice = acceptedTypes.slice(0, room);
+      if (acceptedTypes.length > room) {
+        setErrorMsg(t("aiQueueMax", { max: MAX_AI_FILES }));
+      }
+      return [
+        ...prev,
+        ...slice.map((file) => ({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          previewUrl: file.type.startsWith("image/")
+            ? URL.createObjectURL(file)
+            : null,
+        })),
+      ];
+    });
+    if (aiInputRef.current) aiInputRef.current.value = "";
+  }
+
+  function removeAiQueued(id: string) {
+    setAiQueue((prev) => {
+      const target = prev.find((q) => q.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((q) => q.id !== id);
+    });
+  }
+
   async function loadLogs() {
     try {
       setLoadingLogs(true);
@@ -130,13 +204,93 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
   }
 
   // --- AI Scan File Handlers ---
-  async function handleAIFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await processAIFile(file);
+  function mapParsedToEditable(parsed: any, fileName: string): EditableTransaction[] {
+    if (!parsed?.transactions) return [];
+    return parsed.transactions.map((tx: any, idx: number) => ({
+      id: `tx-${Date.now()}-${fileName}-${idx}`,
+      date: tx.date || new Date().toISOString().split("T")[0],
+      amount: tx.amount || 0,
+      currency: tx.currency || "CAD",
+      merchant: tx.merchant || t("unspecified"),
+      category: tx.category || "식비",
+      sub_category: tx.sub_category || "기타",
+      items: (tx.items || []).map((item: any) => ({
+        name: item.name || "",
+        standardized_name: item.standardized_name || item.name || "",
+        quantity: item.quantity || 1,
+        unit: item.unit || "개",
+        unit_price: item.unit_price || 0,
+        total_price: item.total_price || 0,
+      })),
+      expanded: false,
+      selected: true,
+    }));
   }
 
-  async function processAIFile(file: File) {
+  async function processAIFile(
+    file: File,
+    opts?: { append?: boolean }
+  ): Promise<EditableTransaction[]> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const token = localStorage.getItem("pairpocket_token") || "";
+
+    setScanningStatus(t("statusQueued", { name: file.name }));
+
+    const response = await fetch(`${API_BASE_URL}/api/ai/parse-stream`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => null);
+      throw new Error(errJson?.detail || t("errConnect"));
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    if (!reader) throw new Error(t("errStream"));
+
+    let buffer = "";
+    let mapped: EditableTransaction[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const dataStr = line.slice(6).trim();
+        if (!dataStr) continue;
+        const statusObj = JSON.parse(dataStr) as SSEStatus;
+        const result = handleSSEEvent(statusObj, { deferSuccessUi: true });
+        if (result?.mapped) {
+          mapped = result.mapped.map((tx, idx) => ({
+            ...tx,
+            id: `tx-${Date.now()}-${file.name}-${idx}`,
+          }));
+        }
+        if (statusObj.event === "error") {
+          throw new Error(statusObj.error || t("errAllModels"));
+        }
+      }
+    }
+
+    if (opts?.append && mapped.length) {
+      setParsedTransactions((prev) => [...prev, ...mapped]);
+    }
+    return mapped;
+  }
+
+  async function startAiQueueAnalysis() {
+    if (loading || aiQueue.length === 0) return;
     setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -145,59 +299,38 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
     setCurrentLogId(null);
     setParsedTransactions([]);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const token = localStorage.getItem("pairpocket_token") || "";
-
+    const files = [...aiQueue];
     try {
-      setScanningStatus(t("statusQueued", { name: file.name }));
-      // Start streaming SSE connection via POST
-      const response = await fetch(`${API_BASE_URL}/api/ai/parse-stream`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => null);
-        throw new Error(errJson?.detail || t("errConnect"));
+      const allMapped: EditableTransaction[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const item = files[i];
+        setScanningStatus(
+          t("statusQueuedBatch", {
+            current: i + 1,
+            total: files.length,
+            name: item.file.name,
+          })
+        );
+        const mapped = await processAIFile(item.file);
+        allMapped.push(...mapped);
       }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) throw new Error(t("errStream"));
-
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const dataStr = line.slice(6).trim();
-            if (!dataStr) continue;
-
-            const statusObj = JSON.parse(dataStr) as SSEStatus;
-            handleSSEEvent(statusObj);
-          }
-        }
-      }
+      setParsedTransactions(allMapped);
+      setSuccessMsg(t("scanSuccess"));
+      setScanningStatus(null);
+      clearAiQueue();
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || t("errAnalyze"));
       setScanningStatus(null);
+    } finally {
       setLoading(false);
     }
   }
 
-  function handleSSEEvent(statusObj: SSEStatus) {
+  function handleSSEEvent(
+    statusObj: SSEStatus,
+    opts?: { deferSuccessUi?: boolean }
+  ): { mapped?: EditableTransaction[] } | void {
     if (statusObj.event === "trying") {
       const msg = `⚡ ${t("statusTrying", { model: statusObj.model! })}`;
       setScanningStatus(msg);
@@ -216,39 +349,22 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       })}`;
       setScanningHistory((prev) => [...prev, msg]);
     } else if (statusObj.event === "error") {
-      setErrorMsg(statusObj.error || t("errAllModels"));
-      setScanningStatus(null);
-      setLoading(false);
+      if (!opts?.deferSuccessUi) {
+        setErrorMsg(statusObj.error || t("errAllModels"));
+        setScanningStatus(null);
+        setLoading(false);
+      }
       if (statusObj.log_id) setCurrentLogId(statusObj.log_id);
     } else if (statusObj.event === "success") {
-      setSuccessMsg(t("scanSuccess"));
-      setScanningStatus(null);
-      setLoading(false);
       if (statusObj.log_id) setCurrentLogId(statusObj.log_id);
-
-      const parsed = statusObj.result;
-      if (parsed && parsed.transactions) {
-        const mapped: EditableTransaction[] = parsed.transactions.map((tx: any, idx: number) => ({
-          id: `tx-${Date.now()}-${idx}`,
-          date: tx.date || new Date().toISOString().split("T")[0],
-          amount: tx.amount || 0,
-          currency: tx.currency || "CAD",
-          merchant: tx.merchant || t("unspecified"),
-          category: tx.category || "식비",
-          sub_category: tx.sub_category || "기타",
-          items: (tx.items || []).map((item: any) => ({
-            name: item.name || "",
-            standardized_name: item.standardized_name || item.name || "",
-            quantity: item.quantity || 1,
-            unit: item.unit || "개",
-            unit_price: item.unit_price || 0,
-            total_price: item.total_price || 0,
-          })),
-          expanded: false,
-          selected: true,
-        }));
+      const mapped = mapParsedToEditable(statusObj.result, "scan");
+      if (!opts?.deferSuccessUi) {
+        setSuccessMsg(t("scanSuccess"));
+        setScanningStatus(null);
+        setLoading(false);
         setParsedTransactions(mapped);
       }
+      return { mapped };
     }
   }
 
@@ -400,6 +516,25 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
     }
   }
 
+  function downloadCSVTemplate() {
+    // Column order must match parseCSV: date, amount, currency, merchant, category, sub_category
+    const csvContent = [
+      "date,amount,currency,merchant,category,sub_category",
+      "2026-01-15,12.50,CAD,Example Cafe,생활/쇼핑,식비",
+      "2026-01-16,45.00,CAD,Grocery Store,생활/쇼핑,기타",
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "PairPocket_import_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   function parseCSV(file: File) {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -536,14 +671,11 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
         <div className="min-w-0 flex-1">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2 min-w-0">
             <Sparkles className="h-6 w-6 shrink-0 text-indigo-500 animate-pulse" />
-            <span className="truncate" title={t("title")}>
+            <span className="break-words min-w-0" title={t("title")}>
               {t("title")}
             </span>
           </h1>
-          <p
-            className="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate"
-            title={t("subtitle")}
-          >
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 break-words whitespace-normal">
             {t("subtitle")}
           </p>
         </div>
@@ -600,32 +732,120 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       {/* SUB TAB 1: AI FILE SCANNER */}
       {activeSubTab === "ai" && (
         <div className="space-y-6">
-          {/* Dropzone */}
+          {/* Dropzone + queue */}
           <div className="grid gap-6 md:grid-cols-3">
-            <div className="md:col-span-1 card-inset border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-500 dark:hover:border-indigo-500 p-6 sm:p-8 text-center transition-all flex flex-col items-center justify-center min-h-[220px] min-w-0">
-              <UploadCloud className="h-12 w-12 text-gray-400 mb-3 shrink-0" />
-              <p
-                className="w-full max-w-[16rem] text-sm font-semibold text-gray-800 dark:text-gray-100 truncate"
-                title={t("uploadTitle")}
-              >
-                {t("uploadTitle")}
-              </p>
-              <p
-                className="w-full max-w-[16rem] text-xs text-gray-500 dark:text-gray-400 mt-1 truncate"
-                title={t("uploadHint")}
-              >
-                {t("uploadHint")}
-              </p>
-              <label className="mt-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 cursor-pointer shadow-sm whitespace-nowrap">
-                {t("selectFile")}
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={handleAIFileUpload}
-                  className="hidden"
-                  disabled={loading}
-                />
-              </label>
+            <div
+              className={`md:col-span-1 card-inset border-2 border-dashed p-6 sm:p-8 transition-all flex flex-col min-h-[220px] min-w-0 ${
+                aiDragging
+                  ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20"
+                  : "border-gray-300 dark:border-gray-600 hover:border-indigo-500"
+              }`}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                if (!loading) setAiDragging(true);
+              }}
+              onDragOver={(e) => e.preventDefault()}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setAiDragging(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setAiDragging(false);
+                if (loading) return;
+                addAiFiles(e.dataTransfer.files);
+              }}
+            >
+              <div className="flex flex-col items-center text-center">
+                <UploadCloud className="h-10 w-10 text-gray-400 mb-2 shrink-0" />
+                <p
+                  className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 break-words"
+                  title={t("uploadTitle")}
+                >
+                  {t("uploadTitle")}
+                </p>
+                <p className="w-full text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">
+                  {t("uploadHintQueue")}
+                </p>
+                <p className="mt-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  {t("aiQueueCount", { count: aiQueue.length, max: MAX_AI_FILES })}
+                </p>
+              </div>
+
+              {aiQueue.length > 0 && (
+                <ul className="mt-3 grid grid-cols-3 gap-1.5 max-h-28 overflow-y-auto">
+                  {aiQueue.map((q) => (
+                    <li key={q.id} className="relative aspect-square">
+                      {q.previewUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={q.previewUrl}
+                          alt=""
+                          className="h-full w-full rounded-md object-cover border border-gray-200 dark:border-gray-700"
+                        />
+                      ) : (
+                        <div className="h-full w-full rounded-md bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-[9px] font-bold text-gray-500 px-1 text-center break-all">
+                          PDF
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => removeAiQueued(q.id)}
+                        className="absolute -top-1 -right-1 rounded-full bg-gray-900/80 text-white p-0.5"
+                        aria-label={tCommon("delete")}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="mt-3 flex flex-col gap-2 w-full">
+                <button
+                  type="button"
+                  disabled={loading || aiQueue.length >= MAX_AI_FILES}
+                  onClick={() => aiInputRef.current?.click()}
+                  className="rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 text-gray-800 dark:text-gray-100 text-xs font-semibold px-4 py-2.5"
+                >
+                  {aiQueue.length >= MAX_AI_FILES
+                    ? t("aiQueueFull")
+                    : t("selectFile")}
+                </button>
+                <button
+                  type="button"
+                  disabled={loading || aiQueue.length === 0}
+                  onClick={() => void startAiQueueAnalysis()}
+                  className="rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2.5 inline-flex items-center justify-center gap-1.5"
+                >
+                  {loading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                  {loading ? t("scanning") : t("aiStart")}
+                </button>
+                {aiQueue.length > 0 && !loading && (
+                  <button
+                    type="button"
+                    onClick={clearAiQueue}
+                    className="text-[11px] text-gray-500 hover:text-red-500 inline-flex items-center justify-center gap-1"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {t("aiClearQueue")}
+                  </button>
+                )}
+              </div>
+              <input
+                ref={aiInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                className="hidden"
+                disabled={loading}
+                onChange={(e) => addAiFiles(e.target.files)}
+              />
             </div>
 
             {/* SSE streaming history logs */}
@@ -653,8 +873,8 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                     </div>
                   )}
                   {scanningHistory.length === 0 && !scanningStatus && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 italic">
-                      {t("scanLiveEmpty")}
+                    <div className="text-xs text-gray-500 dark:text-gray-400 italic break-words">
+                      {t("scanLiveEmptyQueue")}
                     </div>
                   )}
                 </div>
@@ -941,8 +1161,20 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                 <FileSpreadsheet className="h-5 w-5 text-indigo-500" />
                 {t("csvImportTitle")}
               </h2>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {t("csvImportHint")}
+              </p>
+              <button
+                type="button"
+                onClick={downloadCSVTemplate}
+                title={t("csvDownloadTemplateTooltip")}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold px-3.5 py-2 transition-all"
+              >
+                <Download className="h-3.5 w-3.5 shrink-0" />
+                <span className="whitespace-nowrap">{t("csvDownloadTemplate")}</span>
+              </button>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5 break-words">
+                {t("csvDownloadTemplateTooltip")}
               </p>
             </div>
 

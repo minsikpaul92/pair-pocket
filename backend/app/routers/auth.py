@@ -85,6 +85,8 @@ async def callback(request: Request, db: AsyncIOMotorDatabase = Depends(get_data
                 "institutions": [],
                 "custom_categories": {"expense": {}, "income": {}},
                 "category_colors": {},
+                "onboarding_personal_completed": False,
+                "onboarding_personal_step": 0,
             }
         },
         upsert=True,

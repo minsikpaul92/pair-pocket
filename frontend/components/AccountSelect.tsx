@@ -8,6 +8,7 @@ import {
   ACCOUNT_KIND_KEYS,
   FinancialAccount,
   accountLabel,
+  maskAccountNumber,
 } from "@/lib/api";
 
 /** Empty string means none / cash — no linked financial account. */
@@ -62,7 +63,7 @@ export default function AccountSelect({
         ? `···${account.last_four}`
         : null,
       account.kind !== "credit_card" && account.account_number
-        ? account.account_number
+        ? maskAccountNumber(account.account_number)
         : null,
     ].filter(Boolean);
     return parts.join(" · ");

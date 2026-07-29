@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import CategorySelect from "@/components/CategorySelect";
+import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import {
   AccountType,
@@ -15,6 +16,7 @@ import {
   Currency,
   FinancialAccount,
   NewSubscription,
+  OnboardingParseResult,
   Subscription,
   SubscriptionHistory,
   addCustomCategory,
@@ -26,6 +28,7 @@ import {
   deleteSubscription,
   fetchAccounts,
   fetchSubscriptionHistory,
+  fetchUserSettings,
   formatAmount,
   formatAmountInput,
   monthsBetweenDates,
@@ -99,6 +102,8 @@ export default function SubscriptionRegisterModal({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [aiHint, setAiHint] = useState<string | null>(null);
 
   const categoryOptions = useMemo(
     () => categoriesForType(presets, "expense"),
@@ -183,6 +188,33 @@ export default function SubscriptionRegisterModal({
       })
       .catch(() => setAccounts([]));
   }, [currency, accountType, editing]);
+
+  useEffect(() => {
+    if (editing) return;
+    fetchUserSettings()
+      .then((s) => setHasGeminiKey(Boolean(s.has_gemini_key)))
+      .catch(() => setHasGeminiKey(false));
+  }, [editing]);
+
+  function applyAiParse(result: OnboardingParseResult) {
+    const list = result.data.subscriptions || [];
+    const first = list[0];
+    if (!first) {
+      setAiHint(t("aiEmpty"));
+      return;
+    }
+    if (first.name) setName(first.name);
+    if (first.amount != null) {
+      setAmount(formatAmountInput(String(first.amount), currency));
+    }
+    const cycleRaw = String(first.cycle || "").toLowerCase();
+    if (cycleRaw === "yearly" || cycleRaw === "annual") setCycle("yearly");
+    else if (cycleRaw === "installment") setCycle("installment");
+    else setCycle("monthly");
+    setAiHint(
+      list.length > 1 ? t("aiFilledMany", { count: list.length }) : t("aiFilled")
+    );
+  }
 
   async function handleAddCategory(catName: string) {
     const updated = await addCustomCategory("expense", catName);
@@ -412,6 +444,20 @@ export default function SubscriptionRegisterModal({
         )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {!isEditing && (
+            <div className="space-y-2">
+              <OnboardingScreenshotScan
+                step="subscriptions"
+                hasApiKey={hasGeminiKey}
+                disabled={submitting}
+                onParsed={applyAiParse}
+              />
+              {aiHint && (
+                <p className="text-xs text-blue-600 dark:text-blue-400">{aiHint}</p>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
               {t("name")}
