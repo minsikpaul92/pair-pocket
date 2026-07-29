@@ -379,55 +379,87 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     return aggregatedList;
   }, [holdings, selectedAccountIdFilter, sortBy, visibleAccountIds]);
 
-  // Helper to convert native stock currency to the active display currency
-  const convertNativeToDisplay = useCallback((amount: number, from: Currency | "USD"): number => {
-    if (!rates) return amount;
-    if (from === displayCurrency) return amount;
-    
-    // Target is KRW
-    if (displayCurrency === "KRW") {
-      if (from === "USD") return amount * (rates.usd_krw || 1350);
-      if (from === "CAD") return amount * (rates.cad_krw || 980);
-    }
-    // Target is CAD
-    if (displayCurrency === "CAD") {
-      if (from === "USD") return amount * (rates.usd_cad || 1.37);
-      if (from === "KRW") return amount * (rates.krw_cad || 0.001);
-    }
-    return amount;
-  }, [rates, displayCurrency]);
-
-  // Compute stats per investment account for the top cards
-  const accountStatsMap = useMemo(() => {
-    const stats: Record<string, { valuation: number; invested: number; profit: number; yield: number }> = {};
-    
-    // Initialize for all investment accounts
-    investmentAccounts.forEach(acc => {
-      stats[acc.id] = { valuation: 0, invested: 0, profit: 0, yield: 0 };
-    });
-    
-    holdings.forEach(h => {
-      const accId = h.account_id;
-      if (!stats[accId]) {
-        stats[accId] = { valuation: 0, invested: 0, profit: 0, yield: 0 };
+  // Convert between CAD / KRW / USD. Account cards use account currency (Toss-style);
+  // ALL-tab rollup still converts into displayCurrency.
+  const convertBetween = useCallback(
+    (amount: number, from: string, to: Currency): number => {
+      if (!rates || from === to) return amount;
+      if (to === "KRW") {
+        if (from === "USD") return amount * (rates.usd_krw || 1350);
+        if (from === "CAD") return amount * (rates.cad_krw || 980);
       }
-      
-      const valDisplay = convertNativeToDisplay(h.valuation, h.currency as Currency | "USD");
-      const invDisplay = convertNativeToDisplay(h.invested, h.currency as Currency | "USD");
-      
-      stats[accId].valuation += valDisplay;
-      stats[accId].invested += invDisplay;
+      if (to === "CAD") {
+        if (from === "USD") return amount * (rates.usd_cad || 1.37);
+        if (from === "KRW") return amount * (rates.krw_cad || 0.001);
+      }
+      if (to === "USD") {
+        if (from === "CAD") return amount / (rates.usd_cad || 1.37);
+        if (from === "KRW") return amount / (rates.usd_krw || 1350);
+      }
+      return amount;
+    },
+    [rates]
+  );
+
+  function formatStockAmount(amount: number, currency: Currency) {
+    return formatAmount(amount, currency, { plainUsd: currency === "USD" });
+  }
+
+  // Per-account stats in the account's own currency (USD wallet stays $).
+  const accountStatsMap = useMemo(() => {
+    const stats: Record<
+      string,
+      {
+        valuation: number;
+        invested: number;
+        profit: number;
+        yield: number;
+        currency: Currency;
+      }
+    > = {};
+
+    investmentAccounts.forEach((acc) => {
+      stats[acc.id] = {
+        valuation: 0,
+        invested: 0,
+        profit: 0,
+        yield: 0,
+        currency: acc.currency,
+      };
     });
-    
-    // Calculate yields
-    Object.keys(stats).forEach(accId => {
+
+    holdings.forEach((h) => {
+      const acc = investmentAccounts.find((a) => a.id === h.account_id);
+      const target = (acc?.currency ?? h.currency) as Currency;
+      if (!stats[h.account_id]) {
+        stats[h.account_id] = {
+          valuation: 0,
+          invested: 0,
+          profit: 0,
+          yield: 0,
+          currency: target,
+        };
+      }
+      stats[h.account_id].valuation += convertBetween(
+        h.valuation,
+        h.currency,
+        target
+      );
+      stats[h.account_id].invested += convertBetween(
+        h.invested,
+        h.currency,
+        target
+      );
+    });
+
+    Object.keys(stats).forEach((accId) => {
       const s = stats[accId];
       s.profit = s.valuation - s.invested;
       s.yield = s.invested > 0 ? (s.profit / s.invested) * 100 : 0;
     });
-    
+
     return stats;
-  }, [holdings, investmentAccounts, convertNativeToDisplay]);
+  }, [holdings, investmentAccounts, convertBetween]);
 
   // Handle Add Holding
   const handleAddHolding = async (e: React.FormEvent) => {
@@ -619,49 +651,170 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     return colors[sum % colors.length];
   };
 
-  // Aggregate total stock statistics (valuation, profit, yield) across the visible accounts
+  /** Country-tab totals by account currency — stock only (cash excluded from yield). */
+  const totalsByCurrency = useMemo(() => {
+    const map = new Map<Currency, { valuation: number; invested: number }>();
+    visibleAccounts.forEach((acc) => {
+      const cur = acc.currency;
+      const bucket = map.get(cur) ?? { valuation: 0, invested: 0 };
+      const stats = accountStatsMap[acc.id];
+      if (stats) {
+        bucket.valuation += stats.valuation;
+        bucket.invested += stats.invested;
+      }
+      map.set(cur, bucket);
+    });
+    const order: Currency[] = ["KRW", "USD", "CAD"];
+    return order
+      .filter((c) => map.has(c))
+      .map((currency) => {
+        const v = map.get(currency)!;
+        const profit = v.valuation - v.invested;
+        return {
+          currency,
+          valuation: v.valuation,
+          invested: v.invested,
+          profit,
+          yield: v.invested > 0 ? (profit / v.invested) * 100 : 0,
+        };
+      });
+  }, [visibleAccounts, accountStatsMap]);
+
+  /** Korea + All tabs: roll holdings into displayCurrency. Canada keeps native wallets. */
+  const useFxRollup = ledgerScope === "ALL" || ledgerScope === "KRW";
+
+  // Stock-only rollup (no cash) into displayCurrency.
   const totalStats = useMemo(() => {
     let val = 0;
     let inv = 0;
     visibleAccounts.forEach((acc) => {
       const stats = accountStatsMap[acc.id];
-      if (stats) {
+      if (!stats) return;
+      if (useFxRollup) {
+        val += convertBetween(stats.valuation, stats.currency, displayCurrency);
+        inv += convertBetween(stats.invested, stats.currency, displayCurrency);
+      } else {
         val += stats.valuation;
         inv += stats.invested;
       }
-      const cash = cashBalanceMap[acc.id] ?? 0;
-      val += convertNativeToDisplay(cash, acc.currency);
     });
     const profit = val - inv;
     const y = inv > 0 ? (profit / inv) * 100 : 0;
-    return { valuation: val, profit, yield: y, invested: inv };
-  }, [visibleAccounts, accountStatsMap, cashBalanceMap, convertNativeToDisplay]);
-
-  /** Scope-aware totals for the hero card (never mix KR+CA on a country tab). */
-  const headerStats = useMemo(() => {
-    if (selectedAccountIdFilter === "ALL") return totalStats;
-    const acc = investmentAccounts.find((a) => a.id === selectedAccountIdFilter);
-    const stats = accountStatsMap[selectedAccountIdFilter] || {
-      valuation: 0,
-      invested: 0,
-      profit: 0,
-      yield: 0,
+    return {
+      valuation: val,
+      profit,
+      yield: y,
+      invested: inv,
+      currency: useFxRollup
+        ? displayCurrency
+        : ((totalsByCurrency[0]?.currency ?? displayCurrency) as Currency),
     };
-    const cashNative = cashBalanceMap[selectedAccountIdFilter] ?? 0;
-    const cash = acc
-      ? convertNativeToDisplay(cashNative, acc.currency)
-      : cashNative;
-    const valuation = stats.valuation + cash;
-    const profit = valuation - stats.invested;
-    const y = stats.invested > 0 ? (profit / stats.invested) * 100 : 0;
-    return { valuation, profit, yield: y, invested: stats.invested };
+  }, [
+    visibleAccounts,
+    accountStatsMap,
+    useFxRollup,
+    displayCurrency,
+    convertBetween,
+    totalsByCurrency,
+  ]);
+
+  const headerLines = useMemo(() => {
+    if (selectedAccountIdFilter !== "ALL") {
+      const acc = investmentAccounts.find(
+        (a) => a.id === selectedAccountIdFilter
+      );
+      const stats = accountStatsMap[selectedAccountIdFilter] || {
+        valuation: 0,
+        invested: 0,
+        profit: 0,
+        yield: 0,
+        currency: (acc?.currency ?? displayCurrency) as Currency,
+      };
+      if (useFxRollup) {
+        const valuation = convertBetween(
+          stats.valuation,
+          stats.currency,
+          displayCurrency
+        );
+        const invested = convertBetween(
+          stats.invested,
+          stats.currency,
+          displayCurrency
+        );
+        const profit = valuation - invested;
+        return [
+          {
+            currency: displayCurrency,
+            valuation,
+            invested,
+            profit,
+            yield: invested > 0 ? (profit / invested) * 100 : 0,
+          },
+        ];
+      }
+      return [
+        {
+          currency: stats.currency,
+          valuation: stats.valuation,
+          invested: stats.invested,
+          profit: stats.profit,
+          yield: stats.yield,
+        },
+      ];
+    }
+    if (useFxRollup) {
+      return [
+        {
+          currency: displayCurrency,
+          valuation: totalStats.valuation,
+          invested: totalStats.invested,
+          profit: totalStats.profit,
+          yield: totalStats.yield,
+        },
+      ];
+    }
+    return totalsByCurrency;
   }, [
     selectedAccountIdFilter,
-    totalStats,
     investmentAccounts,
     accountStatsMap,
+    useFxRollup,
+    displayCurrency,
+    convertBetween,
+    totalStats,
+    totalsByCurrency,
+  ]);
+
+  const cashTotalLines = useMemo(() => {
+    const map = new Map<Currency, number>();
+    const accounts =
+      selectedAccountIdFilter === "ALL"
+        ? visibleAccounts
+        : visibleAccounts.filter((a) => a.id === selectedAccountIdFilter);
+    accounts.forEach((acc) => {
+      const cash = cashBalanceMap[acc.id] ?? 0;
+      if (Math.abs(cash) < 0.0001) return;
+      if (useFxRollup) {
+        const converted = convertBetween(cash, acc.currency, displayCurrency);
+        map.set(
+          displayCurrency,
+          (map.get(displayCurrency) ?? 0) + converted
+        );
+      } else {
+        map.set(acc.currency, (map.get(acc.currency) ?? 0) + cash);
+      }
+    });
+    return Array.from(map.entries()).map(([currency, amount]) => ({
+      currency,
+      amount,
+    }));
+  }, [
+    selectedAccountIdFilter,
+    visibleAccounts,
     cashBalanceMap,
-    convertNativeToDisplay,
+    useFxRollup,
+    displayCurrency,
+    convertBetween,
   ]);
 
   return (
@@ -733,23 +886,73 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap">
               {allAccountsLabel}
             </div>
-            <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
-              {formatAmount(totalStats.valuation, displayCurrency)}
-            </div>
-            <div className={`text-[11px] font-bold mt-1.5 ${totalStats.profit >= 0 ? "text-red-500" : "text-blue-500"}`}>
-              {totalStats.profit >= 0 ? "+" : ""}
-              {formatAmount(totalStats.profit, displayCurrency)} ({totalStats.yield.toFixed(1)}%)
-            </div>
+            {useFxRollup ? (
+              <>
+                <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
+                  {formatStockAmount(totalStats.valuation, displayCurrency)}
+                </div>
+                <div
+                  className={`text-[11px] font-bold mt-1.5 ${
+                    totalStats.profit >= 0 ? "text-red-500" : "text-blue-500"
+                  }`}
+                >
+                  {totalStats.profit >= 0 ? "+" : ""}
+                  {formatStockAmount(totalStats.profit, displayCurrency)} (
+                  {totalStats.yield.toFixed(1)}%)
+                </div>
+              </>
+            ) : (
+              <div className="mt-1 space-y-1">
+                {totalsByCurrency.map((line) => (
+                  <div key={line.currency}>
+                    <div className="text-base font-black text-gray-900 dark:text-white tabular-nums">
+                      {formatStockAmount(line.valuation, line.currency)}
+                    </div>
+                    <div
+                      className={`text-[11px] font-bold ${
+                        line.profit >= 0 ? "text-red-500" : "text-blue-500"
+                      }`}
+                    >
+                      {line.profit >= 0 ? "+" : ""}
+                      {formatStockAmount(line.profit, line.currency)} (
+                      {line.yield.toFixed(1)}%)
+                    </div>
+                  </div>
+                ))}
+                {totalsByCurrency.length === 0 && (
+                  <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
+                    {formatStockAmount(0, "CAD")}
+                  </div>
+                )}
+              </div>
+            )}
           </button>
 
           {/* 2. 개별 계좌 카드 목록 */}
           {orderedVisibleAccounts.map((acc) => {
             const isSelected = selectedAccountIdFilter === acc.id;
-            const stats = accountStatsMap[acc.id] || { valuation: 0, profit: 0, yield: 0 };
+            const stats = accountStatsMap[acc.id] || {
+              valuation: 0,
+              invested: 0,
+              profit: 0,
+              yield: 0,
+              currency: acc.currency,
+            };
             const cash = cashBalanceMap[acc.id] ?? 0;
-            const cashDisplay = convertNativeToDisplay(cash, acc.currency);
-            const totalDisplay = stats.valuation + cashDisplay;
-            const isProfit = stats.profit >= 0;
+            const cardCurrency = useFxRollup ? displayCurrency : acc.currency;
+            const cardValuation = useFxRollup
+              ? convertBetween(stats.valuation, stats.currency, displayCurrency)
+              : stats.valuation;
+            const cardInvested = useFxRollup
+              ? convertBetween(stats.invested, stats.currency, displayCurrency)
+              : stats.invested;
+            const cardProfit = cardValuation - cardInvested;
+            const cardYield =
+              cardInvested > 0 ? (cardProfit / cardInvested) * 100 : 0;
+            const cashDisplay = useFxRollup
+              ? convertBetween(cash, acc.currency, displayCurrency)
+              : cash;
+            const isProfit = cardProfit >= 0;
             const isDragging = dragAccountId === acc.id;
             return (
               <div
@@ -801,15 +1004,21 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       <Filter className="h-3 w-3" />
                     </button>
                   </div>
-                  <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
-                    {formatAmount(totalDisplay, displayCurrency)}
+                  <div className="text-[9px] font-black uppercase tracking-wider text-gray-400 mt-0.5">
+                    {acc.currency}
+                    {useFxRollup && acc.currency !== displayCurrency
+                      ? ` → ${displayCurrency}`
+                      : ""}
+                  </div>
+                  <div className="text-base font-black text-gray-900 dark:text-white mt-0.5 tabular-nums">
+                    {formatStockAmount(cardValuation, cardCurrency)}
                   </div>
                   <div className={`text-[11px] font-bold mt-1 ${isProfit ? "text-red-500" : "text-blue-500"}`}>
                     {isProfit ? "+" : ""}
-                    {formatAmount(stats.profit, displayCurrency)} ({stats.yield.toFixed(1)}%)
+                    {formatStockAmount(cardProfit, cardCurrency)} ({cardYield.toFixed(1)}%)
                   </div>
                   <div className="text-[10px] text-gray-400 mt-1 tabular-nums">
-                    {t("cashBalance")}: {formatAmount(cashDisplay, displayCurrency)}
+                    {t("cashBalance")}: {formatStockAmount(cashDisplay, cardCurrency)}
                   </div>
                 </div>
               </div>
@@ -820,38 +1029,85 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
 
       {/* 3. My Investments Valuation Card */}
       <div className="card-inset p-4 sm:p-5 relative overflow-hidden">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 gap-2">
           <h3 className="text-sm font-bold text-gray-400 dark:text-gray-500 tracking-wider">
             {t("myInvestment")}
           </h3>
-          <Briefcase className="h-4 w-4 text-gray-400 opacity-60" />
+          <div className="flex items-center gap-2">
+            {ledgerScope === "KRW" && (
+              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDisplayCurrency("KRW")}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                    displayCurrency === "KRW"
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {t("displayKrw")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayCurrency("USD")}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                    displayCurrency === "USD"
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {t("displayUsd")}
+                </button>
+              </div>
+            )}
+            <Briefcase className="h-4 w-4 text-gray-400 opacity-60" />
+          </div>
         </div>
 
         {loading ? (
           <div className="h-16 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-xl" />
         ) : (
-          <div>
-            <div className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mt-1">
-              {formatAmount(headerStats.valuation, displayCurrency)}
-            </div>
-            
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <span className={`text-sm font-bold flex items-center gap-0.5 ${
-                headerStats.profit >= 0 ? "text-red-500" : "text-blue-500"
-              }`}>
-                {headerStats.profit >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                {formatAmount(headerStats.profit, displayCurrency)} (
-                {headerStats.yield.toFixed(2)}%)
-              </span>
-            </div>
-            <div className="text-[10px] text-gray-400 mt-2">
-              {t("totalInvestedLabel", { amount: formatAmount(headerStats.invested, displayCurrency) })}
-            </div>
+          <div className="space-y-3">
+            {headerLines.map((line) => (
+              <div key={line.currency}>
+                <div className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mt-1 tabular-nums">
+                  {formatStockAmount(line.valuation, line.currency)}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span
+                    className={`text-sm font-bold flex items-center gap-0.5 ${
+                      line.profit >= 0 ? "text-red-500" : "text-blue-500"
+                    }`}
+                  >
+                    {line.profit >= 0 ? (
+                      <TrendingUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5" />
+                    )}
+                    {formatStockAmount(line.profit, line.currency)} (
+                    {line.yield.toFixed(2)}%)
+                  </span>
+                </div>
+                <div className="text-[10px] text-gray-400 mt-2">
+                  {t("totalInvestedLabel", {
+                    amount: formatStockAmount(line.invested, line.currency),
+                  })}
+                </div>
+              </div>
+            ))}
+            {cashTotalLines.length > 0 && (
+              <div className="text-[11px] text-gray-400 tabular-nums space-y-0.5">
+                {cashTotalLines.map((line) => (
+                  <div key={line.currency}>
+                    {t("cashBalance")}:{" "}
+                    {formatStockAmount(line.amount, line.currency)}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </div>
-
-      {/* 4. Sorting & Filter Controls Header */}
+      </div>      {/* 4. Sorting & Filter Controls Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
         {/* Toggle selectors */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -904,7 +1160,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
           </div>
 
-          {/* CAD / KRW toggle only on ALL tab */}
+          {/* CAD / KRW on ALL; KRW / USD on Korea */}
           {ledgerScope === "ALL" && (
           <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
@@ -926,6 +1182,30 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               }`}
             >
               {t("displayKrw")}
+            </button>
+          </div>
+          )}
+          {ledgerScope === "KRW" && (
+          <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
+            <button
+              onClick={() => setDisplayCurrency("KRW")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                displayCurrency === "KRW"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("displayKrw")}
+            </button>
+            <button
+              onClick={() => setDisplayCurrency("USD")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                displayCurrency === "USD"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("displayUsd")}
             </button>
           </div>
           )}
@@ -977,6 +1257,20 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         <div className="space-y-3">
           {sortedHoldings.map((row) => {
             const isProfit = row.profit >= 0;
+            const rowCurrency = row.currency as Currency;
+            const listCurrency = useFxRollup ? displayCurrency : rowCurrency;
+            const listValuation = useFxRollup
+              ? convertBetween(row.valuation, rowCurrency, displayCurrency)
+              : row.valuation;
+            const listPrice = useFxRollup
+              ? convertBetween(row.price, rowCurrency, displayCurrency)
+              : row.price;
+            const listProfit = useFxRollup
+              ? convertBetween(row.profit, rowCurrency, displayCurrency)
+              : row.profit;
+            const listAvg = useFxRollup
+              ? convertBetween(row.avg_price, rowCurrency, displayCurrency)
+              : row.avg_price;
             return (
               <div
                 key={row.id}
@@ -1000,7 +1294,10 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">{row.ticker}</span>
                     </div>
                     <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                      {t("sharesAvg", { shares: row.shares, avg: formatAmount(row.avg_price, row.currency as Currency) })}
+                      {t("sharesAvg", {
+                        shares: row.shares,
+                        avg: formatStockAmount(listAvg, listCurrency),
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1009,12 +1306,12 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   <div className="text-right">
                     <div className="font-bold text-gray-900 dark:text-white text-sm">
                       {viewMode === "valuation"
-                        ? formatAmount(row.valuation, row.currency as Currency)
-                        : formatAmount(row.price, row.currency as Currency)}
+                        ? formatStockAmount(listValuation, listCurrency)
+                        : formatStockAmount(listPrice, listCurrency)}
                     </div>
                     <div className={`text-xs font-semibold mt-0.5 ${isProfit ? "text-red-500" : "text-blue-500"}`}>
                       {isProfit ? "+" : ""}
-                      {formatAmount(row.profit, row.currency as Currency)} ({row.yield.toFixed(1)}%)
+                      {formatStockAmount(listProfit, listCurrency)} ({row.yield.toFixed(1)}%)
                     </div>
                   </div>
                 </div>

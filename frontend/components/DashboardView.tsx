@@ -2,13 +2,14 @@
 
 import {
   CreditCard,
+  GripVertical,
   Landmark,
   Plus,
   RefreshCw,
   Wallet,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import DashboardAnalytics from "@/components/DashboardAnalytics";
@@ -37,7 +38,7 @@ import type { BankCountry } from "@/lib/banks";
 import { translateCategory } from "@/lib/category-i18n";
 import { monthKey, monthLabel } from "@/lib/date";
 
-type StockTotalMode = "both" | "KRW" | "USD";
+type StockTotalMode = "all" | "KRW" | "CAD" | "USD";
 type CreatingKind = FinancialAccountKind | null;
 
 interface Props {
@@ -77,9 +78,10 @@ export default function DashboardView({
   const [krwStats, setKrwStats] = useState<StatsSummary | null>(null);
   const [cadWorth, setCadWorth] = useState<NetWorthSummary | null>(null);
   const [krwWorth, setKrwWorth] = useState<NetWorthSummary | null>(null);
+  const [usdWorth, setUsdWorth] = useState<NetWorthSummary | null>(null);
   const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [display, setDisplay] = useState<Currency>("CAD");
-  const [stockTotalMode, setStockTotalMode] = useState<StockTotalMode>("both");
+  const [stockTotalMode, setStockTotalMode] = useState<StockTotalMode>("all");
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
@@ -87,6 +89,12 @@ export default function DashboardView({
     null
   );
   const [creatingKind, setCreatingKind] = useState<CreatingKind>(null);
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
+  const [brokerOrder, setBrokerOrder] = useState<string[]>([]);
+  const [dragCardId, setDragCardId] = useState<string | null>(null);
+  const [dragBrokerId, setDragBrokerId] = useState<string | null>(null);
+  const suppressCardClick = useRef(false);
+  const suppressBrokerClick = useRef(false);
 
   const monthStr = monthKey(month);
 
@@ -128,6 +136,12 @@ export default function DashboardView({
       worthJobs.push(Promise.resolve(null));
     }
 
+    // USD brokerage wallets (e.g. Toss US) are neither CAD nor KRW — always load
+    // when the dashboard is visible so country tabs can attach them by country.
+    worthJobs.push(
+      fetchNetWorth({ currency: "USD", accountType }).catch(() => null)
+    );
+
     const accountJobs: Promise<FinancialAccount[]>[] = [
       fetchAccounts({ accountType }).catch(() => []),
     ];
@@ -139,11 +153,12 @@ export default function DashboardView({
       Promise.all(accountJobs).then((lists) => lists.flat()),
       fetchStockHoldings(accountType).catch(() => []),
     ])
-      .then(([cadS, krwS, cadW, krwW, r, accountList, holdingsList]) => {
+      .then(([cadS, krwS, cadW, krwW, usdW, r, accountList, holdingsList]) => {
         setCadStats(cadS as StatsSummary | null);
         setKrwStats(krwS as StatsSummary | null);
         setCadWorth(cadW as NetWorthSummary | null);
         setKrwWorth(krwW as NetWorthSummary | null);
+        setUsdWorth(usdW as NetWorthSummary | null);
         setRate(r as ExchangeRate | null);
         setAccounts(accountList as FinancialAccount[]);
         setHoldings(holdingsList as StockHolding[]);
@@ -285,23 +300,31 @@ export default function DashboardView({
   }
 
   // Balances filtered by Canada/Korea *country* (not cash currency).
+  // Include USD wallets (Toss US, etc.) — they are absent from CAD/KRW net-worth.
   // Exclude virtual stock lumps — equity is shown in the stock section from holdings.
   const scopedBalances = useMemo(() => {
+    const usdAccounts = usdWorth?.accounts ?? [];
     const list =
       scope === "CAD"
-        ? cadWorth?.accounts ?? []
+        ? [...(cadWorth?.accounts ?? []), ...usdAccounts]
         : scope === "KRW"
-          ? krwWorth?.accounts ?? []
-          : [...(cadWorth?.accounts ?? []), ...(krwWorth?.accounts ?? [])];
+          ? [...(krwWorth?.accounts ?? []), ...usdAccounts]
+          : [
+              ...(cadWorth?.accounts ?? []),
+              ...(krwWorth?.accounts ?? []),
+              ...usdAccounts,
+            ];
     return list.filter(
       (a) =>
         !a.account_id.startsWith("virtual_stocks") &&
         accountMatchesScope(a.account_id, a.currency)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cadWorth, krwWorth, accounts, scope, scopeCountry]);
+  }, [cadWorth, krwWorth, usdWorth, accounts, scope, scopeCountry]);
 
-  // Calculate stock account stats by country tab.
+  // Stock account cards + header totals.
+  // "all": native buckets by holding/cash currency (hide zero lines).
+  // KRW/CAD/USD: FX-convert every wallet into that currency and sum.
   const stockAccountsStats = useMemo(() => {
     const invAccounts = scopedBalances.filter((a) => a.kind === "investment");
 
@@ -328,32 +351,113 @@ export default function DashboardView({
       };
     });
 
-    const totalKrw = list.reduce(
-      (sum, item) =>
-        sum +
-        convertNative(item.total, item.account.currency, "KRW"),
-      0
-    );
-    const totalUsd = list.reduce(
-      (sum, item) =>
-        sum +
-        convertNative(item.total, item.account.currency, "USD"),
-      0
-    );
+    const native: Record<"KRW" | "CAD" | "USD", number> = {
+      KRW: 0,
+      CAD: 0,
+      USD: 0,
+    };
+
+    for (const item of list) {
+      const accCur = item.account.currency;
+      if (accCur === "KRW" || accCur === "CAD" || accCur === "USD") {
+        native[accCur] += item.cash;
+      }
+      const accHoldings = accountHoldingsMap[item.account.account_id] || [];
+      for (const h of accHoldings) {
+        const hc = h.currency;
+        if (hc === "KRW" || hc === "CAD" || hc === "USD") {
+          native[hc] += h.valuation;
+        }
+      }
+    }
+
+    const nativeLines = (
+      ["KRW", "CAD", "USD"] as const
+    )
+      .filter((c) => Math.abs(native[c]) > 0.0001)
+      .map((currency) => ({ currency, amount: native[currency] }));
+
+    function convertedTotal(to: "KRW" | "CAD" | "USD") {
+      return (["KRW", "CAD", "USD"] as const).reduce(
+        (sum, from) => sum + convertNative(native[from], from, to),
+        0
+      );
+    }
 
     return {
       accounts: list,
-      totalKrw,
-      totalUsd,
+      nativeLines,
+      totals: {
+        KRW: convertedTotal("KRW"),
+        CAD: convertedTotal("CAD"),
+        USD: convertedTotal("USD"),
+      },
     };
   }, [scopedBalances, accountHoldingsMap, convertNative]);
 
   const hasCadAccounts = useMemo(
     () =>
       stockAccountsStats.accounts.some((a) => a.account.currency === "CAD") ||
+      stockAccountsStats.nativeLines.some((l) => l.currency === "CAD") ||
       scopedBalances.some((a) => a.currency === "CAD"),
     [stockAccountsStats, scopedBalances]
   );
+
+  useEffect(() => {
+    const cardKey = `pairpocket:dashboardCardOrder:${accountType}:${scope}`;
+    const brokerKey = `pairpocket:dashboardBrokerOrder:${accountType}:${scope}`;
+    try {
+      const cardRaw = localStorage.getItem(cardKey);
+      const brokerRaw = localStorage.getItem(brokerKey);
+      setCardOrder(cardRaw ? (JSON.parse(cardRaw) as string[]) : []);
+      setBrokerOrder(brokerRaw ? (JSON.parse(brokerRaw) as string[]) : []);
+    } catch {
+      setCardOrder([]);
+      setBrokerOrder([]);
+    }
+  }, [accountType, scope]);
+
+  function orderByIds<T>(
+    items: T[],
+    idOf: (item: T) => string,
+    order: string[]
+  ): T[] {
+    if (!order.length) return items;
+    const orderMap = new Map(order.map((id, i) => [id, i]));
+    return [...items].sort((a, b) => {
+      const ai = orderMap.get(idOf(a)) ?? 999;
+      const bi = orderMap.get(idOf(b)) ?? 999;
+      return ai - bi;
+    });
+  }
+
+  function persistOrder(
+    kind: "card" | "broker",
+    ids: string[]
+  ) {
+    const key =
+      kind === "card"
+        ? `pairpocket:dashboardCardOrder:${accountType}:${scope}`
+        : `pairpocket:dashboardBrokerOrder:${accountType}:${scope}`;
+    localStorage.setItem(key, JSON.stringify(ids));
+    if (kind === "card") setCardOrder(ids);
+    else setBrokerOrder(ids);
+  }
+
+  function reorderIds(
+    orderedIds: string[],
+    fromId: string,
+    toId: string
+  ): string[] | null {
+    if (fromId === toId) return null;
+    const ids = [...orderedIds];
+    const fromIdx = ids.indexOf(fromId);
+    const toIdx = ids.indexOf(toId);
+    if (fromIdx < 0 || toIdx < 0) return null;
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, fromId);
+    return ids;
+  }
 
   const fmt = useCallback(
     (amount: number, currency: Currency) =>
@@ -381,7 +485,16 @@ export default function DashboardView({
   const assetAccounts = scopedBalances.filter(
     (a) => !a.is_liability && a.kind !== "investment"
   );
-  const liabilityAccounts = scopedBalances.filter((a) => a.is_liability);
+  const liabilityAccounts = orderByIds(
+    scopedBalances.filter((a) => a.is_liability),
+    (a) => a.account_id,
+    cardOrder
+  );
+  const orderedStockAccounts = orderByIds(
+    stockAccountsStats.accounts,
+    (a) => a.account.account_id,
+    brokerOrder
+  );
   const hasCashAccount = assetAccounts.some((a) => a.kind === "cash");
   const createCountry: BankCountry | null = scopeCountry;
   const createCurrency: Currency =
@@ -389,6 +502,28 @@ export default function DashboardView({
   const cardBalancesLabel =
     tDashboard("cardBalances") ||
     translateCategory(TRANSFER_CATEGORY, tCategories);
+
+  function handleCardDrop(toId: string) {
+    if (!dragCardId) return;
+    const next = reorderIds(
+      liabilityAccounts.map((a) => a.account_id),
+      dragCardId,
+      toId
+    );
+    if (next) persistOrder("card", next);
+    setDragCardId(null);
+  }
+
+  function handleBrokerDrop(toId: string) {
+    if (!dragBrokerId) return;
+    const next = reorderIds(
+      orderedStockAccounts.map((a) => a.account.account_id),
+      dragBrokerId,
+      toId
+    );
+    if (next) persistOrder("broker", next);
+    setDragBrokerId(null);
+  }
 
   // Removed old duplicate position of hooks
   return (
@@ -574,14 +709,36 @@ export default function DashboardView({
                 overpaid ? Math.abs(acc.balance) : acc.balance,
                 acc.currency
               );
+              const isDragging = dragCardId === acc.account_id;
               return (
-                <li key={acc.account_id}>
+                <li
+                  key={acc.account_id}
+                  draggable
+                  onDragStart={() => setDragCardId(acc.account_id)}
+                  onDragEnd={() => {
+                    suppressCardClick.current = true;
+                    setDragCardId(null);
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleCardDrop(acc.account_id);
+                  }}
+                  className={isDragging ? "opacity-50" : undefined}
+                >
                   <button
                     type="button"
-                    onClick={() => openAccountEdit(acc.account_id)}
+                    onClick={() => {
+                      if (suppressCardClick.current) {
+                        suppressCardClick.current = false;
+                        return;
+                      }
+                      openAccountEdit(acc.account_id);
+                    }}
                     className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors"
                   >
                     <div className="flex items-center gap-2 min-w-0">
+                      <GripVertical className="h-3.5 w-3.5 text-gray-300 shrink-0 cursor-grab" />
                       <KindIcon kind={acc.kind} />
                       <p className="text-sm font-medium truncate flex-1">
                         {scope === "ALL" &&
@@ -627,8 +784,9 @@ export default function DashboardView({
             <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
               {(
                 [
-                  ["both", tDashboard("stockTotalBoth")],
+                  ["all", tDashboard("stockTotalAll")],
                   ["KRW", "KRW"],
+                  ["CAD", "CAD"],
                   ["USD", "USD"],
                 ] as const
               ).map(([mode, label]) => (
@@ -647,26 +805,31 @@ export default function DashboardView({
               ))}
             </div>
             <div className="text-sm font-black text-blue-600 dark:text-blue-400 tabular-nums">
-              {stockTotalMode === "both" ? (
+              {stockTotalMode === "all" ? (
                 <div className="flex flex-col items-end gap-0.5">
-                  <span>{fmt(stockAccountsStats.totalKrw, "KRW")}</span>
-                  <span>{fmt(stockAccountsStats.totalUsd, "USD")}</span>
+                  {stockAccountsStats.nativeLines.length === 0 ? (
+                    <span>—</span>
+                  ) : (
+                    stockAccountsStats.nativeLines.map((line) => (
+                      <span key={line.currency}>
+                        {fmt(line.amount, line.currency)}
+                      </span>
+                    ))
+                  )}
                 </div>
-              ) : stockTotalMode === "KRW" ? (
-                fmt(stockAccountsStats.totalKrw, "KRW")
               ) : (
-                fmt(stockAccountsStats.totalUsd, "USD")
+                fmt(stockAccountsStats.totals[stockTotalMode], stockTotalMode)
               )}
             </div>
           </div>
         </div>
         <ul className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {stockAccountsStats.accounts.length === 0 ? (
+          {orderedStockAccounts.length === 0 ? (
             <li className="col-span-full rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-6 text-center text-xs text-gray-400">
               {tDashboard("emptyBrokers")}
             </li>
           ) : (
-            stockAccountsStats.accounts.map(
+            orderedStockAccounts.map(
               ({ account, cash, stockValuation, total }) => {
                 const fullAcc = accountById.get(account.account_id);
                 const inst = fullAcc?.institution;
@@ -674,17 +837,41 @@ export default function DashboardView({
                   fullAcc?.nickname?.trim() ||
                   account.nickname?.trim() ||
                   account.name;
+                const isDragging = dragBrokerId === account.account_id;
                 return (
-                  <li key={account.account_id}>
+                  <li
+                    key={account.account_id}
+                    draggable
+                    onDragStart={() => setDragBrokerId(account.account_id)}
+                    onDragEnd={() => {
+                      suppressBrokerClick.current = true;
+                      setDragBrokerId(null);
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleBrokerDrop(account.account_id);
+                    }}
+                    className={isDragging ? "opacity-50" : undefined}
+                  >
                     <button
                       type="button"
-                      onClick={() => openAccountEdit(account.account_id)}
+                      onClick={() => {
+                        if (suppressBrokerClick.current) {
+                          suppressBrokerClick.current = false;
+                          return;
+                        }
+                        openAccountEdit(account.account_id);
+                      }}
                       className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 text-left hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-all border border-gray-100 dark:border-gray-800/80"
                     >
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate">
-                          {inst ? `[${inst}] ` : ""}
-                          {label}
+                        <span className="flex items-center gap-1 min-w-0 text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate">
+                          <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-grab" />
+                          <span className="truncate">
+                            {inst ? `[${inst}] ` : ""}
+                            {label}
+                          </span>
                         </span>
                         <span className="text-[9px] bg-gray-200 dark:bg-gray-850 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
                           {account.currency}

@@ -15,6 +15,7 @@ export type BankOption = {
 };
 
 export const CANADA_BANKS: BankOption[] = [
+  // Banks
   { id: "TD", name: "TD", domain: "td.com", color: "#34A853", country: "CA" },
   { id: "RBC", name: "RBC", domain: "rbcroyalbank.com", color: "#003DA5", country: "CA" },
   { id: "BMO", name: "BMO", domain: "bmo.com", color: "#0079C1", country: "CA" },
@@ -42,17 +43,54 @@ export const CANADA_BANKS: BankOption[] = [
   },
   { id: "EQ Bank", name: "EQ Bank", domain: "eqbank.ca", color: "#6C2BD9", country: "CA" },
   {
+    id: "Neo",
+    name: "Neo",
+    domain: "neofinancial.com",
+    color: "#000000",
+    country: "CA",
+  },
+  // Cards
+  { id: "Amex", name: "Amex", domain: "americanexpress.com", color: "#006FCF", country: "CA" },
+  {
+    id: "Neo Card",
+    name: "Neo Card",
+    domain: "neofinancial.com",
+    color: "#000000",
+    country: "CA",
+  },
+  // Brokerages
+  {
     id: "Wealthsimple",
     name: "Wealthsimple",
     domain: "wealthsimple.com",
     color: "#09171e",
     country: "CA",
   },
-  { id: "Amex", name: "Amex", domain: "americanexpress.com", color: "#006FCF", country: "CA" },
-  { id: "Costco", name: "Costco", domain: "costco.com", color: "#E31837", country: "CA" },
+  {
+    id: "Questrade",
+    name: "Questrade",
+    domain: "questrade.com",
+    color: "#003366",
+    country: "CA",
+  },
+  {
+    id: "Interactive Brokers",
+    name: "Interactive Brokers",
+    domain: "interactivebrokers.com",
+    color: "#D0011B",
+    country: "CA",
+  },
+  {
+    id: "TD Direct Investing",
+    name: "TD Direct Investing",
+    domain: "td.com",
+    color: "#34A853",
+    country: "CA",
+  },
 ];
 
 export const KOREA_BANKS: BankOption[] = [
+  // Banks
   { id: "신한", name: "신한", domain: "shinhan.com", color: "#0046FF", country: "KR" },
   { id: "국민", name: "국민", domain: "kbstar.com", color: "#FFBC00", country: "KR" },
   { id: "하나", name: "하나", domain: "hanabank.com", color: "#009490", country: "KR" },
@@ -65,6 +103,13 @@ export const KOREA_BANKS: BankOption[] = [
     country: "KR",
   },
   { id: "토스뱅크", name: "토스뱅크", domain: "tossbank.com", color: "#0064FF", country: "KR" },
+  {
+    id: "케이뱅크",
+    name: "케이뱅크",
+    domain: "kbanknow.com",
+    color: "#1A1A1A",
+    country: "KR",
+  },
   { id: "NH", name: "농협", domain: "nonghyup.com", color: "#1B9E3E", country: "KR" },
   { id: "IBK", name: "기업", domain: "ibk.co.kr", color: "#0056A4", country: "KR" },
   // Cards
