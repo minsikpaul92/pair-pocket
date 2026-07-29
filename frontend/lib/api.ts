@@ -1844,6 +1844,20 @@ export async function fetchCanadaSubscriptions(): Promise<{
   };
 }
 
+export async function fetchKoreaSubscriptions(): Promise<{
+  top7: CanadaSubscriptionChip[];
+  more: CanadaSubscriptionChip[];
+}> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/korea-subscriptions`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("fetchKoreaSubscriptions");
+  return (await res.json()) as {
+    top7: CanadaSubscriptionChip[];
+    more: CanadaSubscriptionChip[];
+  };
+}
+
 export type ResetScope = "all" | "ledger" | "subscriptions" | "stocks";
 
 export async function resetUserData(

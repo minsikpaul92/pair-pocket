@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
   CreditCard,
   ExternalLink,
   KeyRound,
@@ -50,6 +51,9 @@ import {
   fetchAccounts,
   fetchCanadaSubscriptions,
   fetchCategoryPresets,
+  fetchKoreaSubscriptions,
+  fetchStockHoldings,
+  fetchSubscriptions,
   fetchUserSettings,
   formatAmountInput,
   maskAccountNumber,
@@ -58,15 +62,21 @@ import {
   OnboardingParseResult,
   parseAmountInput,
   removeInstitution,
+  resolveAccountCountry,
   saveOnboardingBasics,
   saveOnboardingStep,
   subCategoriesFor,
   TRANSFER_CATEGORY,
   formatSharesInput,
+  updateAccount,
+  updateStockHolding,
+  updateSubscription,
   type BillingCycle,
   type Currency,
   type FinancialAccount,
   type FinancialAccountKind,
+  type Subscription,
+  type StockHolding,
   type UserSettings,
 } from "@/lib/api";
 
@@ -74,6 +84,8 @@ type Step = 0 | 1 | 2 | 3;
 
 type DraftAccount = {
   key: string;
+  /** Set after the draft was created on the server (prevents duplicates on Continue). */
+  serverId?: string;
   name: string;
   kind: FinancialAccountKind;
   currency: Currency;
@@ -89,6 +101,7 @@ type DraftAccount = {
 
 type DraftSub = {
   key: string;
+  serverId?: string;
   name: string;
   amount: string;
   currency: Currency;
@@ -160,6 +173,18 @@ function preferredPaymentAccountId(
     pool[0]?.id ||
     ""
   );
+}
+
+function matchesBrokerCountry(
+  acc: FinancialAccount,
+  country: BankCountry
+): boolean {
+  const resolved = resolveAccountCountry(acc);
+  if (resolved === "CA" || resolved === "KR") return resolved === country;
+  if (acc.currency === "KRW") return country === "KR";
+  if (acc.currency === "CAD") return country === "CA";
+  // USD (and other) without country — show on both tabs.
+  return true;
 }
 
 /** Accept ISO or common dotted/slash dates from AI screenshots. */
@@ -239,6 +264,7 @@ function syncInstallmentFields(
 
 type DraftHolding = {
   key: string;
+  serverId?: string;
   ticker: string;
   name: string;
   shares: string;
@@ -257,6 +283,9 @@ function newKey() {
 
 const STEP_STORAGE_KEY = "pairpocket_onboarding_step";
 const LOCALES_STORAGE_KEY = "pairpocket_onboarding_locales";
+const ACCOUNTS_STORAGE_KEY = "pairpocket_onboarding_accounts";
+const SUBS_STORAGE_KEY = "pairpocket_onboarding_subs";
+const HOLDINGS_STORAGE_KEY = "pairpocket_onboarding_holdings";
 
 function readStoredStep(): Step | null {
   if (typeof window === "undefined") return null;
@@ -300,6 +329,98 @@ function clearStoredLocales() {
   sessionStorage.removeItem(LOCALES_STORAGE_KEY);
 }
 
+function readJsonSession<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function writeJsonSession(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(key, JSON.stringify(value));
+}
+
+function clearDraftStorage() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(ACCOUNTS_STORAGE_KEY);
+  sessionStorage.removeItem(SUBS_STORAGE_KEY);
+  sessionStorage.removeItem(HOLDINGS_STORAGE_KEY);
+}
+
+function accountToDraft(acc: FinancialAccount): DraftAccount {
+  const resolved = resolveAccountCountry(acc);
+  const country: BankCountry =
+    resolved === "KR" || resolved === "CA"
+      ? resolved
+      : acc.currency === "KRW"
+        ? "KR"
+        : "CA";
+  return {
+    key: acc.id,
+    serverId: acc.id,
+    name: acc.nickname?.trim() || acc.name,
+    kind: acc.kind,
+    currency: acc.currency,
+    country,
+    opening_balance: amountToInput(acc.opening_balance, acc.currency),
+    institution: acc.institution || "",
+    last_four: acc.last_four || "",
+    account_number: acc.account_number || "",
+    is_default_expense: Boolean(acc.is_default_expense),
+    is_default_credit: Boolean(acc.is_default_credit),
+    is_default_investment: Boolean(acc.is_default_investment),
+  };
+}
+
+function subscriptionToDraft(s: Subscription): DraftSub {
+  const start = (s.installment_start_date || s.start_date || "").slice(0, 10);
+  const day = start.slice(8, 10) || "1";
+  const isFixed = Boolean(s.is_fixed_bill);
+  const isInstallment = s.cycle === "installment";
+  return {
+    key: s.id,
+    serverId: s.id,
+    name: s.name,
+    amount: amountToInput(s.amount, s.currency),
+    currency: s.currency,
+    billing_day: String(Number(day) || 1),
+    sub_kind: isFixed ? "fixed" : isInstallment ? "installment" : "subscription",
+    cycle: s.cycle === "yearly" ? "yearly" : "monthly",
+    start_date: start,
+    end_date: s.end_date ? s.end_date.slice(0, 10) : "",
+    promo_enabled: s.promo_amount != null,
+    promo_amount:
+      s.promo_amount != null ? amountToInput(s.promo_amount, s.currency) : "",
+    promo_end_date: s.promo_end_date ? s.promo_end_date.slice(0, 10) : "",
+    regular_amount: amountToInput(s.amount, s.currency),
+    category: s.category,
+    sub_category: s.sub_category,
+    merchant: s.merchant || "",
+    total_installments: s.total_installments
+      ? String(s.total_installments)
+      : "",
+    account_id: s.account_id,
+  };
+}
+
+function holdingToDraft(h: StockHolding): DraftHolding {
+  return {
+    key: h.id,
+    serverId: h.id,
+    ticker: h.ticker,
+    name: h.name,
+    shares: formatSharesInput(String(h.shares)),
+    avg_price: amountToInput(h.avg_price, h.currency as Currency),
+    currency: h.currency as Currency,
+    account_id: h.account_id,
+  };
+}
+
 export default function OnboardingWizard() {
   const t = useTranslations("onboarding");
   const tTx = useTranslations("transaction");
@@ -319,6 +440,8 @@ export default function OnboardingWizard() {
 
   const [accounts, setAccounts] = useState<DraftAccount[]>([]);
   const [assetCountry, setAssetCountry] = useState<BankCountry>("CA");
+  const [subsCountry, setSubsCountry] = useState<BankCountry>("CA");
+  const [brokerCountry, setBrokerCountry] = useState<BankCountry>("CA");
   const [customInstitutions, setCustomInstitutions] = useState<string[]>([]);
   const [subs, setSubs] = useState<DraftSub[]>([]);
   const [paymentAccounts, setPaymentAccounts] = useState<FinancialAccount[]>(
@@ -336,6 +459,10 @@ export default function OnboardingWizard() {
     top7: CanadaSubscriptionChip[];
     more: CanadaSubscriptionChip[];
   }>({ top7: [], more: [] });
+  const [krChips, setKrChips] = useState<{
+    top7: CanadaSubscriptionChip[];
+    more: CanadaSubscriptionChip[];
+  }>({ top7: [], more: [] });
   const [showMoreChips, setShowMoreChips] = useState(false);
   const hydratedRef = useRef(false);
 
@@ -345,13 +472,15 @@ export default function OnboardingWizard() {
 
     (async () => {
       try {
-        const [s, canada, categoryPresets] = await Promise.all([
+        const [s, canada, korea, categoryPresets] = await Promise.all([
           fetchUserSettings(),
           fetchCanadaSubscriptions().catch(() => ({ top7: [], more: [] })),
+          fetchKoreaSubscriptions().catch(() => ({ top7: [], more: [] })),
           fetchCategoryPresets().catch(() => null),
         ]);
         setSettings(s);
         setChips(canada);
+        setKrChips(korea);
         if (categoryPresets) setPresets(categoryPresets);
         setCustomInstitutions(s.institutions || []);
         if (s.ledger_start_date) setStartDate(s.ledger_start_date);
@@ -373,6 +502,7 @@ export default function OnboardingWizard() {
         if (freshStart) {
           clearStoredStep();
           clearStoredLocales();
+          clearDraftStorage();
         }
 
         const storedLocales = freshStart ? null : readStoredLocales();
@@ -389,6 +519,19 @@ export default function OnboardingWizard() {
               : [];
         setSelectedLocales(initialLocales);
         if (initialLocales.length) writeStoredLocales(initialLocales);
+
+        // Restore drafts after locale remount so Back/Continue keep user input.
+        if (!freshStart) {
+          const storedAccounts =
+            readJsonSession<DraftAccount[]>(ACCOUNTS_STORAGE_KEY) || [];
+          const storedSubs =
+            readJsonSession<DraftSub[]>(SUBS_STORAGE_KEY) || [];
+          const storedHoldings =
+            readJsonSession<DraftHolding[]>(HOLDINGS_STORAGE_KEY) || [];
+          if (storedAccounts.length) setAccounts(storedAccounts);
+          if (storedSubs.length) setSubs(storedSubs);
+          if (storedHoldings.length) setHoldings(storedHoldings);
+        }
 
         // Locale switch remounts this page; prefer in-session step so the
         // wizard does not jump ahead from stale server progress.
@@ -414,6 +557,57 @@ export default function OnboardingWizard() {
             setPaymentAccounts([]);
           }
         }
+
+        // If drafts were lost (no session) but server already has data, hydrate.
+        if (!freshStart && initial >= 1) {
+          const hasStoredAccounts = Boolean(
+            (readJsonSession<DraftAccount[]>(ACCOUNTS_STORAGE_KEY) || []).length
+          );
+          if (!hasStoredAccounts) {
+            try {
+              const list = await fetchAccounts({ accountType: "personal" });
+              if (list.length) setAccounts(list.map(accountToDraft));
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        if (!freshStart && initial >= 2) {
+          const hasStoredSubs = Boolean(
+            (readJsonSession<DraftSub[]>(SUBS_STORAGE_KEY) || []).length
+          );
+          if (!hasStoredSubs) {
+            try {
+              const [cad, krw] = await Promise.all([
+                fetchSubscriptions({
+                  currency: "CAD",
+                  accountType: "personal",
+                }).catch(() => [] as Subscription[]),
+                fetchSubscriptions({
+                  currency: "KRW",
+                  accountType: "personal",
+                }).catch(() => [] as Subscription[]),
+              ]);
+              const list = [...cad, ...krw];
+              if (list.length) setSubs(list.map(subscriptionToDraft));
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        if (!freshStart && initial >= 3) {
+          const hasStoredHoldings = Boolean(
+            (readJsonSession<DraftHolding[]>(HOLDINGS_STORAGE_KEY) || []).length
+          );
+          if (!hasStoredHoldings) {
+            try {
+              const list = await fetchStockHoldings("personal");
+              if (list.length) setHoldings(list.map(holdingToDraft));
+            } catch {
+              /* ignore */
+            }
+          }
+        }
       } catch (err) {
         console.error(err);
         setError(t("loadError"));
@@ -426,7 +620,35 @@ export default function OnboardingWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep drafts across locale remounts / Back navigation.
+  useEffect(() => {
+    if (loading) return;
+    writeJsonSession(ACCOUNTS_STORAGE_KEY, accounts);
+  }, [accounts, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    writeJsonSession(SUBS_STORAGE_KEY, subs);
+  }, [subs, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    writeJsonSession(HOLDINGS_STORAGE_KEY, holdings);
+  }, [holdings, loading]);
+
   const progressLabel = useMemo(() => t("stepOf", { current: step + 1, total: 4 }), [step, t]);
+
+  /** Prefer country-specific copy; fall back if message pack is stale. */
+  function onboardingMsg(
+    key:
+      | "subsHelpCanada"
+      | "subsHelpKorea"
+      | "brokerHelpCanada"
+      | "brokerHelpKorea",
+    fallback: "subsHelp" | "brokerHelp"
+  ) {
+    return t.has(key) ? t(key) : t(fallback);
+  }
   const defaultPaymentAccountId = useMemo(
     () => preferredPaymentAccountId(paymentAccounts),
     [paymentAccounts]
@@ -481,6 +703,89 @@ export default function OnboardingWizard() {
     }
   }
 
+  async function hydrateAccountsFromServer() {
+    try {
+      const list = await fetchAccounts({ accountType: "personal" });
+      if (!list.length) return;
+      setAccounts(list.map(accountToDraft));
+    } catch {
+      /* keep current drafts */
+    }
+  }
+
+  async function hydrateSubsFromServer() {
+    try {
+      const [cad, krw] = await Promise.all([
+        fetchSubscriptions({
+          currency: "CAD",
+          accountType: "personal",
+        }).catch(() => [] as Subscription[]),
+        fetchSubscriptions({
+          currency: "KRW",
+          accountType: "personal",
+        }).catch(() => [] as Subscription[]),
+      ]);
+      const list = [...cad, ...krw];
+      if (!list.length) return;
+      setSubs(list.map(subscriptionToDraft));
+    } catch {
+      /* keep current drafts */
+    }
+  }
+
+  async function hydrateHoldingsFromServer() {
+    try {
+      const list = await fetchStockHoldings("personal");
+      if (!list.length) return;
+      setHoldings(list.map(holdingToDraft));
+    } catch {
+      /* keep current drafts */
+    }
+  }
+
+  /** Restore drafts if React state was wiped (e.g. locale remount). */
+  async function ensureDraftsForStep(target: Step) {
+    if (target === 1) {
+      if (accounts.length > 0) return;
+      const stored =
+        readJsonSession<DraftAccount[]>(ACCOUNTS_STORAGE_KEY) || [];
+      if (stored.length) {
+        setAccounts(stored);
+        return;
+      }
+      await hydrateAccountsFromServer();
+      return;
+    }
+    if (target === 2) {
+      if (subs.length > 0) return;
+      const stored = readJsonSession<DraftSub[]>(SUBS_STORAGE_KEY) || [];
+      if (stored.length) {
+        setSubs(stored);
+        return;
+      }
+      await hydrateSubsFromServer();
+      return;
+    }
+    if (target === 3) {
+      if (holdings.length > 0) return;
+      const stored =
+        readJsonSession<DraftHolding[]>(HOLDINGS_STORAGE_KEY) || [];
+      if (stored.length) {
+        setHoldings(stored);
+        return;
+      }
+      await hydrateHoldingsFromServer();
+    }
+  }
+
+  async function goBack() {
+    if (step <= 0 || saving) return;
+    setError(null);
+    const prev = (step - 1) as Step;
+    await ensureDraftsForStep(prev);
+    await goStep(prev);
+  }
+
   async function refreshInvestmentAccounts() {
     try {
       const list = await fetchAccounts({ accountType: "personal" });
@@ -507,6 +812,7 @@ export default function OnboardingWizard() {
       setSettings(updated);
       setApiKey("");
       writeStoredLocales(selectedLocales);
+      await ensureDraftsForStep(1);
       await goStep(1);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("saveError"));
@@ -524,32 +830,61 @@ export default function OnboardingWizard() {
           const balance = parseAmountInput(a.opening_balance || "0");
           const isInvestment = a.kind === "investment";
           const isCard = a.kind === "credit_card";
-          await createAccount({
-            name: a.name.trim() || a.institution || t("unnamedAccount"),
-            kind: a.kind,
-            currency: a.currency,
-            account_type: "personal",
-            country: a.country,
-            opening_balance: Number.isFinite(balance) ? balance : 0,
-            institution: a.kind === "cash" ? null : a.institution || null,
-            last_four:
-              a.kind === "credit_card"
-                ? normalizeLastFour(a.last_four)
-                : null,
-            account_number:
-              a.kind === "cash" || a.kind === "credit_card"
-                ? null
-                : maskAccountNumber(a.account_number),
-            // Bank/cash only — never map card/investment into expense default.
-            is_default_expense:
-              !isInvestment && !isCard ? Boolean(a.is_default_expense) : false,
-            is_default_credit: isCard ? Boolean(a.is_default_credit) : false,
-            is_default_investment: isInvestment
-              ? Boolean(a.is_default_investment)
-              : false,
-            is_default_income: false,
-          });
+          const openingBalance = Number.isFinite(balance) ? balance : 0;
+          const institution =
+            a.kind === "cash" ? null : a.institution || null;
+          const lastFour =
+            a.kind === "credit_card"
+              ? normalizeLastFour(a.last_four)
+              : null;
+          const accountNumber =
+            a.kind === "cash" || a.kind === "credit_card"
+              ? null
+              : maskAccountNumber(a.account_number);
+          if (a.serverId) {
+            await updateAccount(a.serverId, {
+              name: a.name.trim() || a.institution || t("unnamedAccount"),
+              opening_balance: openingBalance,
+              institution,
+              last_four: lastFour,
+              account_number: accountNumber,
+              is_default_expense:
+                !isInvestment && !isCard
+                  ? Boolean(a.is_default_expense)
+                  : false,
+              is_default_credit: isCard
+                ? Boolean(a.is_default_credit)
+                : false,
+              is_default_investment: isInvestment
+                ? Boolean(a.is_default_investment)
+                : false,
+            });
+          } else {
+            await createAccount({
+              name: a.name.trim() || a.institution || t("unnamedAccount"),
+              kind: a.kind,
+              currency: a.currency,
+              account_type: "personal",
+              country: a.country,
+              opening_balance: openingBalance,
+              institution,
+              last_four: lastFour,
+              account_number: accountNumber,
+              is_default_expense:
+                !isInvestment && !isCard
+                  ? Boolean(a.is_default_expense)
+                  : false,
+              is_default_credit: isCard
+                ? Boolean(a.is_default_credit)
+                : false,
+              is_default_investment: isInvestment
+                ? Boolean(a.is_default_investment)
+                : false,
+              is_default_income: false,
+            });
+          }
         }
+        await hydrateAccountsFromServer();
       }
       await goStep(2);
     } catch (err: unknown) {
@@ -636,7 +971,7 @@ export default function OnboardingWizard() {
           const completed =
             currentRound != null ? Math.max(0, currentRound - 1) : 0;
 
-          await createSubscription({
+          const subPayload = {
             name: s.name.trim(),
             amount: Number.isFinite(regular) && regular > 0 ? regular : promo,
             currency,
@@ -648,13 +983,11 @@ export default function OnboardingWizard() {
             account_id: accountId,
             category,
             sub_category: subCategory,
-            account_type: "personal",
+            account_type: "personal" as const,
             merchant,
             is_fixed_bill: isFixed,
             promo_amount: hasPromo ? promo : null,
-            // Match SubscriptionRegisterModal: bare date → ISO datetime.
             promo_end_date: promoEndKey ? toIsoDateTime(promoEndKey) : null,
-            // Reminder stays off until user opts in with an end date later.
             promo_reminder_enabled: false,
             end_reminder_enabled: false,
             total_installments:
@@ -665,9 +998,17 @@ export default function OnboardingWizard() {
                 : cycle === "installment"
                   ? 12
                   : null,
-            completed_installments: cycle === "installment" ? completed : undefined,
-          });
+            completed_installments:
+              cycle === "installment" ? completed : undefined,
+          };
+
+          if (s.serverId) {
+            await updateSubscription(s.serverId, subPayload);
+          } else {
+            await createSubscription(subPayload);
+          }
         }
+        await hydrateSubsFromServer();
       }
       await goStep(3);
     } catch (err: unknown) {
@@ -693,19 +1034,28 @@ export default function OnboardingWizard() {
           ) {
             continue;
           }
-          await createStockHolding({
-            account_id: h.account_id,
-            ticker: h.ticker.trim().toUpperCase(),
-            name: h.name.trim() || h.ticker.trim().toUpperCase(),
-            shares,
-            avg_price: Number.isFinite(avg) ? avg : 0,
-            currency: h.currency,
-          });
+          if (h.serverId) {
+            await updateStockHolding(h.serverId, {
+              shares,
+              avg_price: Number.isFinite(avg) ? avg : 0,
+            });
+          } else {
+            await createStockHolding({
+              account_id: h.account_id,
+              ticker: h.ticker.trim().toUpperCase(),
+              name: h.name.trim() || h.ticker.trim().toUpperCase(),
+              shares,
+              avg_price: Number.isFinite(avg) ? avg : 0,
+              currency: h.currency,
+            });
+          }
         }
+        await hydrateHoldingsFromServer();
       }
       await completeOnboarding(true);
       clearStoredStep();
       clearStoredLocales();
+      clearDraftStorage();
       router.replace("/");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("saveError"));
@@ -715,11 +1065,19 @@ export default function OnboardingWizard() {
   }
 
   function addChipAsSub(chip: CanadaSubscriptionChip) {
+    const currency = currencyForCountry(subsCountry);
+    const accountId = paymentAccountForCurrency(currency);
     setSubs((prev) => {
-      if (prev.some((s) => s.name === chip.name)) return prev;
+      if (
+        prev.some(
+          (s) => s.name === chip.name && s.currency === currency
+        )
+      ) {
+        return prev;
+      }
       return [
         {
-          ...emptyDraftSub(startDate, "CAD", defaultPaymentAccountId),
+          ...emptyDraftSub(startDate, currency, accountId),
           name: chip.name,
           url: chip.url,
         },
@@ -730,17 +1088,22 @@ export default function OnboardingWizard() {
   }
 
   function addFixedBillOption(opt: (typeof FIXED_BILL_OPTIONS)[number]) {
+    const currency = currencyForCountry(subsCountry);
+    const accountId = paymentAccountForCurrency(currency);
     setSubs((prev) => {
-      if (prev.some((s) => s.name === opt.name && s.sub_kind === "fixed")) {
+      if (
+        prev.some(
+          (s) =>
+            s.name === opt.name &&
+            s.sub_kind === "fixed" &&
+            s.currency === currency
+        )
+      ) {
         return prev;
       }
       return [
         {
-          ...emptyDraftSub(
-            startDate,
-            currencyForCountry(assetCountry),
-            defaultPaymentAccountId
-          ),
+          ...emptyDraftSub(startDate, currency, accountId),
           name: opt.name,
           sub_kind: "fixed",
           category: opt.category,
@@ -753,8 +1116,13 @@ export default function OnboardingWizard() {
   }
 
   function addManualSub() {
+    const currency = currencyForCountry(subsCountry);
     setSubs((prev) => [
-      emptyDraftSub(startDate, "CAD", defaultPaymentAccountId),
+      emptyDraftSub(
+        startDate,
+        currency,
+        paymentAccountForCurrency(currency)
+      ),
       ...prev,
     ]);
   }
@@ -813,7 +1181,7 @@ export default function OnboardingWizard() {
           const currency = (
             ["CAD", "KRW", "USD"].includes(String(s.currency).toUpperCase())
               ? String(s.currency).toUpperCase()
-              : "CAD"
+              : currencyForCountry(subsCountry)
           ) as Currency;
           const kindRaw = String(s.kind || "").toLowerCase();
           const sub_kind: DraftSub["sub_kind"] =
@@ -915,14 +1283,16 @@ export default function OnboardingWizard() {
 
     const brokerage = result.data.brokerage;
     if (!brokerage) return;
+    const scopedBrokers = investmentAccounts.filter((a) =>
+      matchesBrokerCountry(a, brokerCountry)
+    );
+    const pool = scopedBrokers.length ? scopedBrokers : investmentAccounts;
     const defaultAccountId =
-      defaultInvestmentAccountId(investmentAccounts) ||
-      investmentAccounts[0]?.id ||
-      "";
+      defaultInvestmentAccountId(pool) || pool[0]?.id || "";
     let matchedId = defaultAccountId;
-    if (brokerage.name && investmentAccounts.length) {
+    if (brokerage.name && pool.length) {
       const needle = brokerage.name.toLowerCase();
-      const hit = investmentAccounts.find(
+      const hit = pool.find(
         (a) =>
           a.name.toLowerCase().includes(needle) ||
           (a.institution || "").toLowerCase().includes(needle) ||
@@ -937,8 +1307,8 @@ export default function OnboardingWizard() {
           const currency = (
             ["CAD", "KRW", "USD"].includes(String(h.currency || "").toUpperCase())
               ? String(h.currency).toUpperCase()
-              : investmentAccounts.find((a) => a.id === matchedId)?.currency ||
-                "CAD"
+              : pool.find((a) => a.id === matchedId)?.currency ||
+                (brokerCountry === "KR" ? "KRW" : "CAD")
           ) as Currency;
           return {
             key: newKey(),
@@ -956,6 +1326,26 @@ export default function OnboardingWizard() {
   }
 
   const visibleAccounts = accounts.filter((a) => a.country === assetCountry);
+  const subsCurrency = currencyForCountry(subsCountry);
+  const visibleSubs = subs.filter((s) => s.currency === subsCurrency);
+  const activeSubChips = subsCountry === "KR" ? krChips : chips;
+  const visibleInvestmentAccounts = investmentAccounts.filter((a) =>
+    matchesBrokerCountry(a, brokerCountry)
+  );
+  const visibleHoldings = holdings.filter((h) => {
+    if (!h.account_id) return true;
+    const acc = investmentAccounts.find((a) => a.id === h.account_id);
+    if (!acc) return true;
+    return matchesBrokerCountry(acc, brokerCountry);
+  });
+  const defaultVisibleBrokerId =
+    defaultInvestmentAccountId(visibleInvestmentAccounts) ||
+    visibleInvestmentAccounts[0]?.id ||
+    "";
+  const defaultVisibleBrokerCurrency = (
+    visibleInvestmentAccounts.find((a) => a.id === defaultVisibleBrokerId)
+      ?.currency || (brokerCountry === "KR" ? "KRW" : "CAD")
+  ) as Currency;
   const expenseCategoryOptions = useMemo(() => {
     if (!presets) return [];
     return categoriesForType(presets, "expense").filter(
@@ -1445,6 +1835,16 @@ export default function OnboardingWizard() {
               <button
                 type="button"
                 disabled={saving}
+                onClick={() => void goBack()}
+                className="shrink-0 rounded-2xl border border-gray-200 dark:border-gray-700 px-3.5 py-3.5 font-semibold text-gray-700 dark:text-gray-200 inline-flex items-center justify-center gap-1"
+                aria-label={t("back")}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("back")}</span>
+              </button>
+              <button
+                type="button"
+                disabled={saving}
                 onClick={() => saveAssetsAndContinue(true)}
                 className="flex-1 rounded-2xl border border-gray-200 dark:border-gray-700 py-3.5 font-semibold text-gray-700 dark:text-gray-200 inline-flex items-center justify-center gap-1.5"
               >
@@ -1472,8 +1872,32 @@ export default function OnboardingWizard() {
                   {t("subsTitle")}
                 </h2>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{t("subsHelp")}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {subsCountry === "KR"
+                  ? onboardingMsg("subsHelpKorea", "subsHelp")
+                  : onboardingMsg("subsHelpCanada", "subsHelp")}
+              </p>
               <p className="text-xs text-blue-600 dark:text-blue-400">{t("subsChipHint")}</p>
+            </div>
+
+            <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5">
+              {(["CA", "KR"] as BankCountry[]).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => {
+                    setSubsCountry(c);
+                    setShowMoreChips(false);
+                  }}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    subsCountry === c
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {c === "CA" ? t("countryCanada") : t("countryKorea")}
+                </button>
+              ))}
             </div>
 
             <OnboardingScreenshotScan
@@ -1484,7 +1908,7 @@ export default function OnboardingWizard() {
             />
 
             <div className="flex flex-wrap gap-2">
-              {chips.top7.map((chip) => (
+              {activeSubChips.top7.map((chip) => (
                 <button
                   key={chip.id}
                   type="button"
@@ -1506,7 +1930,7 @@ export default function OnboardingWizard() {
             </div>
             {showMoreChips && (
               <div className="flex flex-wrap gap-2">
-                {chips.more.map((chip) => (
+                {activeSubChips.more.map((chip) => (
                   <button
                     key={chip.id}
                     type="button"
@@ -1548,7 +1972,7 @@ export default function OnboardingWizard() {
               {t("addSub")}
             </button>
 
-            {subs.map((s) => (
+            {visibleSubs.map((s) => (
               <div
                 key={s.key}
                 className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 space-y-3"
@@ -1912,7 +2336,9 @@ export default function OnboardingWizard() {
                     allowNone={false}
                     placeholder={t("selectPaymentAccount")}
                     variant="field"
-                    filterAccounts={(a) => a.kind !== "investment"}
+                    filterAccounts={(a) =>
+                      a.kind !== "investment" && a.currency === s.currency
+                    }
                     triggerClassName={dropdownClass}
                   />
                 </OnboardingField>
@@ -2013,6 +2439,16 @@ export default function OnboardingWizard() {
               <button
                 type="button"
                 disabled={saving}
+                onClick={() => void goBack()}
+                className="shrink-0 rounded-2xl border border-gray-200 dark:border-gray-700 px-3.5 py-3.5 font-semibold text-gray-700 dark:text-gray-200 inline-flex items-center justify-center gap-1"
+                aria-label={t("back")}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("back")}</span>
+              </button>
+              <button
+                type="button"
+                disabled={saving}
                 onClick={() => saveSubsAndContinue(true)}
                 className="flex-1 rounded-2xl border border-gray-200 dark:border-gray-700 py-3.5 font-semibold text-gray-700 dark:text-gray-200 inline-flex items-center justify-center gap-1.5"
               >
@@ -2033,9 +2469,10 @@ export default function OnboardingWizard() {
 
         {showPaymentAccountRegister && (
           <AccountRegisterModal
-            currency={assetCountry === "KR" ? "KRW" : "CAD"}
+            currency={subsCurrency}
             accountType="personal"
             preferredType="expense"
+            country={subsCountry}
             onClose={() => setShowPaymentAccountRegister(false)}
             onCreated={async (acc) => {
               setShowPaymentAccountRegister(false);
@@ -2043,7 +2480,11 @@ export default function OnboardingWizard() {
               if (acc.kind !== "investment") {
                 setSubs((prev) =>
                   prev.map((s) =>
-                    s.account_id ? s : { ...s, account_id: acc.id }
+                    s.account_id
+                      ? s
+                      : s.currency === acc.currency
+                        ? { ...s, account_id: acc.id }
+                        : s
                   )
                 );
               }
@@ -2060,7 +2501,28 @@ export default function OnboardingWizard() {
                   {t("brokerTitle")}
                 </h2>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{t("brokerHelp")}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {brokerCountry === "KR"
+                  ? onboardingMsg("brokerHelpKorea", "brokerHelp")
+                  : onboardingMsg("brokerHelpCanada", "brokerHelp")}
+              </p>
+            </div>
+
+            <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5">
+              {(["CA", "KR"] as BankCountry[]).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setBrokerCountry(c)}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    brokerCountry === c
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {c === "CA" ? t("countryCanada") : t("countryKorea")}
+                </button>
+              ))}
             </div>
 
             <OnboardingScreenshotScan
@@ -2070,7 +2532,7 @@ export default function OnboardingWizard() {
               onParsed={applyScreenshotResult}
             />
 
-            {investmentAccounts.length === 0 ? (
+            {visibleInvestmentAccounts.length === 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 space-y-3">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {t("noBrokerAccounts")}
@@ -2090,7 +2552,7 @@ export default function OnboardingWizard() {
                   {t("brokerAccountSelect")}
                 </p>
                 <ul className="space-y-1.5">
-                  {investmentAccounts.map((acc) => (
+                  {visibleInvestmentAccounts.map((acc) => (
                     <li
                       key={acc.id}
                       className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200"
@@ -2123,16 +2585,8 @@ export default function OnboardingWizard() {
                     name: "",
                     shares: "",
                     avg_price: "",
-                    currency:
-                      investmentAccounts[0]?.currency === "USD"
-                        ? "USD"
-                        : investmentAccounts[0]?.currency === "KRW"
-                          ? "KRW"
-                          : "CAD",
-                    account_id:
-                      defaultInvestmentAccountId(investmentAccounts) ||
-                      investmentAccounts[0]?.id ||
-                      "",
+                    currency: defaultVisibleBrokerCurrency,
+                    account_id: defaultVisibleBrokerId,
                   },
                   ...prev,
                 ])
@@ -2143,7 +2597,7 @@ export default function OnboardingWizard() {
               {t("addHolding")}
             </button>
 
-            {holdings.map((h) => (
+            {visibleHoldings.map((h) => (
               <div
                 key={h.key}
                 className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 space-y-3"
@@ -2183,7 +2637,7 @@ export default function OnboardingWizard() {
                     className={selectClass}
                   >
                     <option value="">{t("brokerAccountPick")}</option>
-                    {investmentAccounts.map((acc) => (
+                    {visibleInvestmentAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
                         {acc.institution ? `[${acc.institution}] ` : ""}
                         {acc.nickname || acc.name} ({acc.currency})
@@ -2299,6 +2753,16 @@ export default function OnboardingWizard() {
               <button
                 type="button"
                 disabled={saving}
+                onClick={() => void goBack()}
+                className="shrink-0 rounded-2xl border border-gray-200 dark:border-gray-700 px-3.5 py-3.5 font-semibold text-gray-700 dark:text-gray-200 inline-flex items-center justify-center gap-1"
+                aria-label={t("back")}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("back")}</span>
+              </button>
+              <button
+                type="button"
+                disabled={saving}
                 onClick={() => saveBrokerAndFinish(true)}
                 className="flex-1 rounded-2xl border border-gray-200 dark:border-gray-700 py-3.5 font-semibold text-gray-700 dark:text-gray-200 inline-flex items-center justify-center gap-1.5"
               >
@@ -2317,10 +2781,14 @@ export default function OnboardingWizard() {
 
             {showBrokerRegister && (
               <AccountRegisterModal
-                currency={assetCountry === "KR" ? "KRW" : "CAD"}
+                currency={
+                  brokerCountry === "KR"
+                    ? "USD"
+                    : "CAD"
+                }
                 accountType="personal"
                 preferredType="income"
-                country={assetCountry}
+                country={brokerCountry}
                 initialKind="investment"
                 onClose={() => setShowBrokerRegister(false)}
                 onCreated={async (acc) => {
@@ -2329,7 +2797,13 @@ export default function OnboardingWizard() {
                   if (acc.kind === "investment") {
                     setHoldings((prev) =>
                       prev.map((h) =>
-                        h.account_id ? h : { ...h, account_id: acc.id }
+                        h.account_id
+                          ? h
+                          : {
+                              ...h,
+                              account_id: acc.id,
+                              currency: acc.currency as Currency,
+                            }
                       )
                     );
                   }

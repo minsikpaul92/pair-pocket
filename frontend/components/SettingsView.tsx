@@ -35,11 +35,17 @@ const RESET_SCOPES: ResetScope[] = [
 /** Must match OnboardingWizard session keys. */
 const ONBOARDING_STEP_KEY = "pairpocket_onboarding_step";
 const ONBOARDING_LOCALES_KEY = "pairpocket_onboarding_locales";
+const ONBOARDING_ACCOUNTS_KEY = "pairpocket_onboarding_accounts";
+const ONBOARDING_SUBS_KEY = "pairpocket_onboarding_subs";
+const ONBOARDING_HOLDINGS_KEY = "pairpocket_onboarding_holdings";
 
 function clearOnboardingSession() {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem(ONBOARDING_STEP_KEY);
   sessionStorage.removeItem(ONBOARDING_LOCALES_KEY);
+  sessionStorage.removeItem(ONBOARDING_ACCOUNTS_KEY);
+  sessionStorage.removeItem(ONBOARDING_SUBS_KEY);
+  sessionStorage.removeItem(ONBOARDING_HOLDINGS_KEY);
 }
 
 export default function SettingsView({ onChanged }: Props) {

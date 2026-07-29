@@ -9,6 +9,10 @@ from app.data.canada_subscriptions import (
     CANADA_SUBSCRIPTION_MORE,
     CANADA_SUBSCRIPTION_TOP7,
 )
+from app.data.korea_subscriptions import (
+    KOREA_SUBSCRIPTION_MORE,
+    KOREA_SUBSCRIPTION_TOP7,
+)
 from app.database import get_database
 from app.models.user import UserOut
 from app.models.user_settings import (
@@ -126,6 +130,11 @@ async def list_locales() -> dict:
 @router.get("/canada-subscriptions")
 async def list_canada_subscriptions() -> dict:
     return {"top7": CANADA_SUBSCRIPTION_TOP7, "more": CANADA_SUBSCRIPTION_MORE}
+
+
+@router.get("/korea-subscriptions")
+async def list_korea_subscriptions() -> dict:
+    return {"top7": KOREA_SUBSCRIPTION_TOP7, "more": KOREA_SUBSCRIPTION_MORE}
 
 
 @router.post("/institutions", response_model=UserSettingsOut)
