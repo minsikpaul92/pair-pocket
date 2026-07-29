@@ -10,23 +10,22 @@ interface Props {
   className?: string;
 }
 
-/** Distance that reveals the delete action (button width). */
-const REVEAL = 72;
-/** Must swipe at least this far to auto-delete on release. */
-const FULL_DELETE = 128;
+/** Partial swipe snaps open here so the delete label stays tappable. */
+const REVEAL = 80;
 
 /**
- * Swipe left (touch or mouse drag) to reveal a red delete action.
- * Only a full swipe past FULL_DELETE triggers onDelete; a partial swipe
- * snaps open/closed without deleting (tap the red button to delete).
+ * Swipe left (touch or mouse drag) over a full-width red delete layer.
+ * Partial swipe reveals the action; only a near-full swipe triggers onDelete.
  */
 export default function SwipeableRow({
   children,
   onDelete,
-  deleteLabel = "삭제",
+  deleteLabel = "Delete",
   disabled = false,
   className = "",
 }: Props) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const widthRef = useRef(0);
   const startX = useRef(0);
   const startY = useRef(0);
   const dragging = useRef(false);
@@ -34,6 +33,22 @@ export default function SwipeableRow({
   const offsetRef = useRef(0);
   const openRef = useRef(false);
   const [offset, setOffset] = useState(0);
+
+  function measureWidth() {
+    widthRef.current = rowRef.current?.offsetWidth ?? 0;
+  }
+
+  /** Allow sliding almost the full row so red stays visible to the end. */
+  function maxSlide() {
+    const w = widthRef.current;
+    if (w <= 0) return 280;
+    return Math.max(REVEAL, w - 4);
+  }
+
+  /** Auto-delete only when released near the full swipe end. */
+  function deleteTrigger() {
+    return maxSlide() * 0.85;
+  }
 
   function applyOffset(next: number) {
     offsetRef.current = next;
@@ -46,6 +61,7 @@ export default function SwipeableRow({
 
   function beginDrag(clientX: number, clientY: number) {
     if (disabled) return;
+    measureWidth();
     startX.current = clientX;
     startY.current = clientY;
     dragging.current = true;
@@ -61,7 +77,7 @@ export default function SwipeableRow({
       return;
     }
     const base = openRef.current ? -REVEAL : 0;
-    const next = Math.min(0, Math.max(-FULL_DELETE, dx + base));
+    const next = Math.min(0, Math.max(-maxSlide(), dx + base));
     applyOffset(next);
   }
 
@@ -70,9 +86,10 @@ export default function SwipeableRow({
     dragging.current = false;
     pointerId.current = null;
     const current = offsetRef.current;
+    const trigger = -deleteTrigger();
 
-    // Full swipe only — mid-swipe / reveal must not delete.
-    if (current <= -FULL_DELETE + 4) {
+    // Near-full swipe only — mid-swipe / reveal must not delete.
+    if (current <= trigger) {
       applyOffset(0);
       applyOpen(false);
       onDelete();
@@ -117,25 +134,30 @@ export default function SwipeableRow({
     endDrag();
   }
 
+  const revealWidth = Math.max(0, -offset);
+
   return (
-    <div className={`relative overflow-hidden ${className}`}>
-      <div
-        className="pointer-events-none absolute inset-y-1 right-1 flex w-[68px] items-stretch"
-        aria-hidden
-      >
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            applyOffset(0);
-            applyOpen(false);
-            onDelete();
-          }}
-          className="pointer-events-auto flex w-full items-center justify-center rounded-lg bg-red-500 text-sm font-semibold text-white"
+    <div ref={rowRef} className={`relative overflow-hidden ${className}`}>
+      {revealWidth > 0 && (
+        <div
+          className="pointer-events-none absolute top-0.5 bottom-0.5 right-0 flex items-stretch justify-end overflow-hidden bg-red-500"
+          style={{ width: revealWidth }}
+          aria-hidden
         >
-          {deleteLabel}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              applyOffset(0);
+              applyOpen(false);
+              onDelete();
+            }}
+            className="pointer-events-auto flex h-full min-w-[80px] shrink-0 items-center justify-center px-5 text-sm font-semibold text-white"
+          >
+            {deleteLabel}
+          </button>
+        </div>
+      )}
       <div
         className="relative z-10 bg-white dark:bg-gray-800 transition-transform duration-150 ease-out touch-pan-y select-none"
         style={{ transform: `translateX(${offset}px)` }}
