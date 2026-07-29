@@ -1157,11 +1157,19 @@ export function amountToInput(amount: number, currency: Currency): string {
 }
 
 /** Compact calendar label for pending subscription names on a day. */
+const PENDING_NAME_MAX = 10;
+
+function truncatePendingName(name: string, max = PENDING_NAME_MAX): string {
+  if (name.length <= max) return name;
+  return `${name.slice(0, max)}...`;
+}
+
 export function formatPendingLabel(names: string[]): string {
   const cleaned = names.map((n) => n.trim()).filter(Boolean);
   if (cleaned.length === 0) return "";
-  if (cleaned.length === 1) return cleaned[0];
-  return `${cleaned[0]}...+${cleaned.length - 1}`;
+  const head = truncatePendingName(cleaned[0]);
+  if (cleaned.length === 1) return head;
+  return `${head} +${cleaned.length - 1}`;
 }
 
 export function formatPendingDayLabels(

@@ -10,12 +10,15 @@ interface Props {
   className?: string;
 }
 
-const THRESHOLD = 72;
-const MAX_SLIDE = 88;
+/** Distance that reveals the delete action (button width). */
+const REVEAL = 72;
+/** Must swipe at least this far to auto-delete on release. */
+const FULL_DELETE = 128;
 
 /**
  * Swipe left (touch or mouse drag) to reveal a red delete action.
- * Full swipe past threshold triggers onDelete (caller shows confirm).
+ * Only a full swipe past FULL_DELETE triggers onDelete; a partial swipe
+ * snaps open/closed without deleting (tap the red button to delete).
  */
 export default function SwipeableRow({
   children,
@@ -28,8 +31,18 @@ export default function SwipeableRow({
   const startY = useRef(0);
   const dragging = useRef(false);
   const pointerId = useRef<number | null>(null);
+  const offsetRef = useRef(0);
+  const openRef = useRef(false);
   const [offset, setOffset] = useState(0);
-  const [open, setOpen] = useState(false);
+
+  function applyOffset(next: number) {
+    offsetRef.current = next;
+    setOffset(next);
+  }
+
+  function applyOpen(next: boolean) {
+    openRef.current = next;
+  }
 
   function beginDrag(clientX: number, clientY: number) {
     if (disabled) return;
@@ -44,29 +57,33 @@ export default function SwipeableRow({
     const dy = clientY - startY.current;
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
       dragging.current = false;
-      setOffset(open ? -THRESHOLD : 0);
+      applyOffset(openRef.current ? -REVEAL : 0);
       return;
     }
-    const next = Math.min(0, Math.max(-MAX_SLIDE, dx + (open ? -THRESHOLD : 0)));
-    setOffset(next);
+    const base = openRef.current ? -REVEAL : 0;
+    const next = Math.min(0, Math.max(-FULL_DELETE, dx + base));
+    applyOffset(next);
   }
 
   function endDrag() {
     if (!dragging.current || disabled) return;
     dragging.current = false;
     pointerId.current = null;
-    if (offset <= -MAX_SLIDE + 8) {
-      setOffset(0);
-      setOpen(false);
+    const current = offsetRef.current;
+
+    // Full swipe only — mid-swipe / reveal must not delete.
+    if (current <= -FULL_DELETE + 4) {
+      applyOffset(0);
+      applyOpen(false);
       onDelete();
       return;
     }
-    if (offset <= -THRESHOLD / 2) {
-      setOffset(-THRESHOLD);
-      setOpen(true);
+    if (current <= -REVEAL / 2) {
+      applyOffset(-REVEAL);
+      applyOpen(true);
     } else {
-      setOffset(0);
-      setOpen(false);
+      applyOffset(0);
+      applyOpen(false);
     }
   }
 
@@ -103,24 +120,24 @@ export default function SwipeableRow({
   return (
     <div className={`relative overflow-hidden ${className}`}>
       <div
-        className="absolute inset-y-0 right-0 flex items-stretch"
+        className="pointer-events-none absolute inset-y-1 right-1 flex w-[68px] items-stretch"
         aria-hidden
       >
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setOffset(0);
-            setOpen(false);
+            applyOffset(0);
+            applyOpen(false);
             onDelete();
           }}
-          className="flex w-[88px] items-center justify-center bg-red-500 text-sm font-semibold text-white"
+          className="pointer-events-auto flex w-full items-center justify-center rounded-lg bg-red-500 text-sm font-semibold text-white"
         >
           {deleteLabel}
         </button>
       </div>
       <div
-        className="relative bg-white dark:bg-gray-800 transition-transform duration-150 ease-out touch-pan-y select-none"
+        className="relative z-10 bg-white dark:bg-gray-800 transition-transform duration-150 ease-out touch-pan-y select-none"
         style={{ transform: `translateX(${offset}px)` }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}

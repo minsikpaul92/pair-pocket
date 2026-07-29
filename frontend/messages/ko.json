@@ -355,6 +355,8 @@
     "sectionInstallments": "할부",
     "sectionFixedBills": "고정지출",
     "history": "구독 이력",
+    "historyInstallment": "할부 이력",
+    "historyFixedBill": "고정지출 이력",
     "present": "현재",
     "monthsActive": "{count}개월",
     "totalPaid": "총 결제: {amount}",

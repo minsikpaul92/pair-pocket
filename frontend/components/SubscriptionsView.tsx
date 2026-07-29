@@ -133,6 +133,7 @@ function PendingSection({
     return items.map((occ) => {
       const sub = subById.get(occ.subscription_id);
       const cycle = occ.subscription_billing_cycle ?? sub?.cycle;
+      const sourceLabel = translateSubscriptionSource(sub ?? cycle, t);
       const tone = subscriptionScheduleAmountClass(occ.due_date);
       return (
         <li key={occ.id}>
@@ -145,10 +146,10 @@ function PendingSection({
               <div className="min-w-0">
                 <p className={`text-sm font-medium truncate ${tone}`}>
                   {occ.subscription_name || t("defaultName")}
-                  {translateSubscriptionSource(cycle, t) && (
+                  {sourceLabel && (
                     <span className="text-[10px] text-gray-400 font-normal">
                       {" "}
-                      {translateSubscriptionSource(cycle, t)}
+                      {sourceLabel}
                     </span>
                   )}
                 </p>

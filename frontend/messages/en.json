@@ -355,6 +355,8 @@
     "sectionInstallments": "Installments",
     "sectionFixedBills": "Fixed bills",
     "history": "Subscription history",
+    "historyInstallment": "Installment history",
+    "historyFixedBill": "Fixed bill history",
     "present": "Present",
     "monthsActive": "{count} months",
     "totalPaid": "Total paid: {amount}",

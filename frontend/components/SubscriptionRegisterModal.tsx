@@ -426,7 +426,11 @@ export default function SubscriptionRegisterModal({
         {isEditing && history && (
           <div className="mt-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-4 space-y-2 text-sm">
             <p className="font-semibold text-gray-800 dark:text-gray-100">
-              {t("history")}
+              {isFixedBill
+                ? t("historyFixedBill")
+                : cycle === "installment"
+                  ? t("historyInstallment")
+                  : t("history")}
             </p>
             <p className="text-gray-600 dark:text-gray-300">
               {formatSubscriptionDate(history.start_date, locale)}
