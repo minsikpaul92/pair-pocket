@@ -113,19 +113,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     try {
       const accId =
         selectedAccountIdFilter === "ALL" ? undefined : selectedAccountIdFilter;
-      // Holdings first so Yahoo prices warm the cache; summary then hits cache.
-      const [holdingsData, accountsData, ratesData, indicesData] =
+      const [holdingsData, accountsData, ratesData, indicesData, summaryData] =
         await Promise.all([
           fetchStockHoldings(accountType),
           fetchAccounts({ accountType }),
           fetchExchangeRate(),
           fetchMarketIndices().catch(() => [] as MarketIndexQuote[]),
+          fetchStockSummary(accountType, displayCurrency, accId),
         ]);
-      const summaryData = await fetchStockSummary(
-        accountType,
-        displayCurrency,
-        accId
-      );
 
       setHoldings(holdingsData);
       setSummary(summaryData);

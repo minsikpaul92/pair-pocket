@@ -101,24 +101,17 @@ async def sync_holding_from_transactions(db, owner_id: str, account_id: str, tic
         })
 
 
-async def get_or_update_stock_price(db, ticker: str, force_refresh: bool = False) -> dict | None:
-    """
-    Returns the cached stock price. If cache is expired (> 2 hours) or missing,
-    fetches live price from Yahoo Finance and updates cache.
-    """
-    ticker = (ticker or "").strip().upper()
-    if not ticker:
-        return None
+# ~2 Yahoo checks per day for a user who opens the app in morning + evening.
+_PRICE_SESSION_TTL_SECONDS = 6 * 60 * 60
 
-    now = datetime.datetime.utcnow()
-    cached = await db.stock_prices.find_one({"_id": ticker})
-    
-    if cached and not force_refresh:
-        updated_at = cached.get("updated_at")
-        if updated_at and (now - updated_at).total_seconds() < 7200: # 2 hours
-            return cached
-            
-    # Fetch from Yahoo Finance
+
+def _prices_close(a: float, b: float, rel_tol: float = 1e-4) -> bool:
+    """True when prices match within 0.01% (ignore tiny quote noise)."""
+    scale = max(abs(a), abs(b), 1e-9)
+    return abs(a - b) / scale <= rel_tol
+
+
+async def _fetch_yahoo_quote(ticker: str) -> dict | None:
     from urllib.parse import quote
 
     url = (
@@ -128,48 +121,87 @@ async def get_or_update_stock_price(db, ticker: str, force_refresh: bool = False
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
-    
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url, headers=headers)
             if resp.status_code != 200:
-                return cached
+                return None
             data = resp.json()
-            
             result = data.get("chart", {}).get("result", [])
             if not result:
-                return cached
-                
+                return None
             meta = result[0].get("meta", {})
-            symbol = meta.get("symbol", ticker)
             price = meta.get("regularMarketPrice")
-            prev_close = meta.get("previousClose") or price
-            currency = meta.get("currency", "USD")
-            
-            name = meta.get("shortName") or meta.get("longName") or symbol
-            
             if price is None:
-                return cached
-                
-            doc = {
-                "_id": ticker,
-                "ticker": ticker,
+                return None
+            prev_close = meta.get("previousClose") or price
+            symbol = meta.get("symbol", ticker)
+            name = meta.get("shortName") or meta.get("longName") or symbol
+            return {
                 "price": float(price),
                 "prev_close": float(prev_close),
-                "currency": currency,
+                "currency": meta.get("currency", "USD"),
                 "name": name,
-                "updated_at": now
             }
-            
-            await db.stock_prices.update_one(
-                {"_id": ticker},
-                {"$set": doc},
-                upsert=True
-            )
-            return doc
     except Exception as e:
         print(f"Error fetching stock price for {ticker}: {e}")
+        return None
+
+
+async def get_or_update_stock_price(db, ticker: str, force_refresh: bool = False) -> dict | None:
+    """Return Mongo-cached price; refresh from Yahoo at most ~2×/day.
+
+    Fast path: if ``checked_at`` (or ``updated_at``) is within the session TTL,
+    return the cached doc without calling Yahoo.
+
+    Slow path: fetch Yahoo. If price/prev_close match the cache (within tolerance),
+    only bump ``checked_at``. If they differ, upsert the new values.
+    """
+    ticker = (ticker or "").strip().upper()
+    if not ticker:
+        return None
+
+    now = datetime.datetime.utcnow()
+    cached = await db.stock_prices.find_one({"_id": ticker})
+
+    if cached and not force_refresh:
+        checked = cached.get("checked_at") or cached.get("updated_at")
+        if checked and (now - checked).total_seconds() < _PRICE_SESSION_TTL_SECONDS:
+            return cached
+
+    live = await _fetch_yahoo_quote(ticker)
+    if live is None:
         return cached
+
+    live_price = float(live["price"])
+    live_prev = float(live["prev_close"])
+
+    if cached and not force_refresh:
+        cached_price = float(cached.get("price") or 0)
+        cached_prev = float(cached.get("prev_close") or cached_price)
+        if _prices_close(cached_price, live_price) and _prices_close(
+            cached_prev, live_prev
+        ):
+            await db.stock_prices.update_one(
+                {"_id": ticker},
+                {"$set": {"checked_at": now}},
+            )
+            out = dict(cached)
+            out["checked_at"] = now
+            return out
+
+    doc = {
+        "_id": ticker,
+        "ticker": ticker,
+        "price": live_price,
+        "prev_close": live_prev,
+        "currency": live.get("currency") or "USD",
+        "name": live.get("name") or ticker,
+        "updated_at": now,
+        "checked_at": now,
+    }
+    await db.stock_prices.update_one({"_id": ticker}, {"$set": doc}, upsert=True)
+    return doc
 
 
 def _ticker_has_exchange_suffix(ticker: str) -> bool:

@@ -1,5 +1,7 @@
 """Account balance derivation from opening_balance + ledger movements."""
 
+import asyncio
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.account import AccountBalanceOut, FinancialAccountKind, NetWorthSummary
@@ -223,8 +225,11 @@ async def compute_net_worth(
         target_currency = currency if currency else Currency.CAD
         stocks_valuation_total = 0.0
 
-        for h in holdings_docs:
-            price_info = await get_or_update_stock_price(db, h["ticker"])
+        price_infos = await asyncio.gather(
+            *[get_or_update_stock_price(db, h["ticker"]) for h in holdings_docs]
+        )
+
+        for h, price_info in zip(holdings_docs, price_infos):
             price = price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
             stock_curr = price_info.get("currency", h["currency"]) if price_info else h["currency"]
             shares = h["shares"]
