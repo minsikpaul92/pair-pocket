@@ -336,9 +336,26 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       setScanningStatus(msg);
       setScanningHistory((prev) => [...prev, msg]);
     } else if (statusObj.event === "quota_fallback") {
+      let resumeAt = "—";
+      if (statusObj.resume_at) {
+        try {
+          resumeAt = new Intl.DateTimeFormat("ko-KR", {
+            timeZone: "America/Toronto",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          }).format(new Date(statusObj.resume_at));
+        } catch {
+          resumeAt = statusObj.resume_at;
+        }
+      }
       const msg = `⏳ ${t("statusQuotaFallback", {
         model: statusObj.model || "",
         fallback: statusObj.fallback_model || "",
+        resumeAt,
       })}`;
       setScanningStatus(msg);
       setScanningHistory((prev) => [...prev, msg]);

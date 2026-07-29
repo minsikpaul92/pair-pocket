@@ -10,7 +10,7 @@ import {
   Sparkles,
   Languages,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import {
   fetchUserSettings,
@@ -19,21 +19,33 @@ import {
   ResetScope,
   UserSettings,
 } from "@/lib/api";
+import type { AppLocale } from "@/i18n/locales";
 
 interface Props {
   onChanged: () => void;
 }
 
 const RESET_SCOPES: ResetScope[] = [
+  "all",
   "ledger",
   "subscriptions",
   "stocks",
-  "all",
 ];
+
+/** Must match OnboardingWizard session keys. */
+const ONBOARDING_STEP_KEY = "pairpocket_onboarding_step";
+const ONBOARDING_LOCALES_KEY = "pairpocket_onboarding_locales";
+
+function clearOnboardingSession() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(ONBOARDING_STEP_KEY);
+  sessionStorage.removeItem(ONBOARDING_LOCALES_KEY);
+}
 
 export default function SettingsView({ onChanged }: Props) {
   const t = useTranslations("settingsPage");
   const tCommon = useTranslations("common");
+  const locale = useLocale() as AppLocale;
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -41,7 +53,7 @@ export default function SettingsView({ onChanged }: Props) {
   const [savingKey, setSavingKey] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
-  const [resetScope, setResetScope] = useState<ResetScope>("ledger");
+  const [resetScope, setResetScope] = useState<ResetScope>("all");
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -89,7 +101,7 @@ export default function SettingsView({ onChanged }: Props) {
 
   function openResetModal() {
     setResetConfirmText("");
-    setResetScope("ledger");
+    setResetScope("all");
     setShowResetModal(true);
   }
 
@@ -135,6 +147,14 @@ export default function SettingsView({ onChanged }: Props) {
       await resetUserData(resetScope);
       setShowResetModal(false);
       setResetConfirmText("");
+
+      if (resetScope === "all") {
+        clearOnboardingSession();
+        // Hard navigation so AppShell unmounts and onboarding starts at step 0.
+        window.location.assign(`/${locale}/onboarding`);
+        return;
+      }
+
       setSuccessMsg(successMessageForScope(resetScope));
       onChanged();
       await loadSettings();

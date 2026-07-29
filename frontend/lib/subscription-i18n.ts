@@ -27,11 +27,23 @@ export function translateSubscriptionStatus(
 }
 
 export function translateSubscriptionSource(
-  cycle: BillingCycle | null | undefined,
+  cycleOrSub:
+    | BillingCycle
+    | Pick<Subscription, "cycle" | "is_fixed_bill">
+    | null
+    | undefined,
   t: TranslateFn
 ): string | null {
-  if (!cycle) return null;
-  return cycle === "installment" ? t("sourceInstallment") : t("sourceSubscription");
+  if (!cycleOrSub) return null;
+  if (typeof cycleOrSub === "string") {
+    return cycleOrSub === "installment"
+      ? t("sourceInstallment")
+      : t("sourceSubscription");
+  }
+  if (cycleOrSub.is_fixed_bill) return t("sourceFixedBill");
+  return cycleOrSub.cycle === "installment"
+    ? t("sourceInstallment")
+    : t("sourceSubscription");
 }
 
 /** Installment progress for the month being viewed (not only materialized payments). */

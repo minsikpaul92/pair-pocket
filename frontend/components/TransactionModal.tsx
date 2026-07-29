@@ -11,6 +11,7 @@ import InstitutionSelect from "@/components/InstitutionSelect";
 import MerchantSelect from "@/components/MerchantSelect";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
+import SwipeableRow from "@/components/SwipeableRow";
 import {
   AccountType,
   CategoryPresets,
@@ -64,6 +65,12 @@ import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, formatDayLabel } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
+
+const TIP_SUB_CATEGORIES = new Set(["외식/배달", "카페/간식"]);
+const NO_SPIN =
+  "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+const ITEM_GRID =
+  "grid grid-cols-[minmax(6rem,2fr)_minmax(5rem,1.5fr)_minmax(3.5rem,0.75fr)_minmax(3rem,0.65fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_2rem] gap-2";
 
 interface Props {
   currency: Currency;
@@ -187,6 +194,8 @@ export default function TransactionModal({
   const [hydratedEditId, setHydratedEditId] = useState<string | null>(null);
   const [items, setItems] = useState<TransactionItem[]>([]);
   const [showItems, setShowItems] = useState(false);
+  const [tipPercent, setTipPercent] = useState("");
+  const [tipAmount, setTipAmount] = useState("");
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const dateStr = dayKey(defaultDate);
@@ -218,6 +227,8 @@ export default function TransactionModal({
   const isStockBuy = type === "expense" && category === "투자/저축" && subCategory === "주식 매수";
   const isStockSell = type === "income" && category === "금융/기타" && subCategory === "주식 판매수익";
   const isStock = isStockBuy || isStockSell;
+  const showTip =
+    type === "expense" && TIP_SUB_CATEGORIES.has(subCategory) && !isTransfer;
 
   // Filter owned holdings by active ledger currency scope and payment account
   const visibleHoldings = useMemo(() => {
@@ -341,6 +352,8 @@ export default function TransactionModal({
         setTxCurrency(currency);
         setItems([]);
         setShowItems(false);
+        setTipPercent("");
+        setTipAmount("");
         setError(null);
         setHydratedEditId(null);
       }
@@ -368,6 +381,16 @@ export default function TransactionModal({
     setTxCurrency(tx.currency);
     setItems(tx.items || []);
     setShowItems((tx.items || []).length > 0);
+    setTipPercent(
+      tx.tip_percent != null && tx.tip_percent > 0
+        ? String(tx.tip_percent)
+        : ""
+    );
+    setTipAmount(
+      tx.tip_amount != null && tx.tip_amount > 0
+        ? amountToInput(tx.tip_amount, tx.currency)
+        : ""
+    );
     setError(null);
     setHydratedEditId(tx.id);
   }, [editingTransaction, hydratedEditId, currency]);
@@ -677,6 +700,12 @@ export default function TransactionModal({
       price: isStock ? parseFloat(price) : undefined,
       fee: undefined,
       items: showItems ? items : undefined,
+      tip_percent: showTip && tipPercent
+        ? parseFloat(tipPercent) || null
+        : null,
+      tip_amount: showTip && tipAmount
+        ? parseAmountInput(tipAmount)
+        : null,
     };
 
     setSubmitting(true);
@@ -1217,7 +1246,7 @@ export default function TransactionModal({
         )}
 
         {dayTransactions.length > 0 && (
-          <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-32 overflow-auto">
+          <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-40 overflow-auto">
             {dayTransactions.map((tx) => {
               const settled = hasSettlement(tx);
               const nonCashflow = isNonCashflowTransaction(tx);
@@ -1229,82 +1258,76 @@ export default function TransactionModal({
               const isActive = editingTransaction?.id === tx.id;
               return (
                 <li key={tx.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (tx.subscription_id && onSelectPendingOccurrence) {
-                        onSelectPendingOccurrence({
-                          id: tx.id,
-                          subscription_id: tx.subscription_id,
-                          due_date: tx.date,
-                          amount: tx.amount,
-                          currency: tx.currency,
-                          status: "completed",
-                          transaction_id: tx.id,
-                          subscription_name: tx.merchant,
-                          subscription_billing_cycle:
-                            tx.subscription_billing_cycle,
-                        });
-                        return;
+                  <SwipeableRow
+                    onDelete={async () => {
+                      if (!window.confirm(tTx("deleteConfirm"))) return;
+                      try {
+                        await deleteTransaction(tx.id);
+                        onSaved();
+                      } catch (err) {
+                        setError(
+                          translateError(err, tErrors, "deleteTransaction")
+                        );
                       }
-                      onSelectTransaction?.(tx);
                     }}
-                    className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors ${
-                      isActive
-                        ? "bg-blue-50 dark:bg-blue-500/10"
-                        : "hover:bg-gray-50 dark:hover:bg-gray-800/80"
-                    }`}
+                    deleteLabel={tCommon("delete")}
                   >
-                    <span
-                      className={`text-sm truncate ${
-                      isSubscription
-                        ? "text-red-500"
-                        : ""
-                    }`}
-                    >
-                      {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"}{" "}
-                      {translateCategory(tx.category, tCategories)} ›{" "}
-                      {tx.sub_category
-                        ? translateSubCategory(tx.sub_category, tSubCategories)
-                        : tCommon("none")}{" "}
-                      · {tx.merchant || tCommon("unspecified")}
-                      {translateSubscriptionSource(tx.subscription_billing_cycle, tSub) && (
-                        <span className="text-[10px] text-gray-400 font-normal">
-                          {" "}
-                          {translateSubscriptionSource(tx.subscription_billing_cycle, tSub)}
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
-                        isSubscription
-                          ? "text-red-500"
-                          : nonCashflow
-                            ? "text-gray-500 dark:text-gray-400"
-                            : tx.type === "income"
-                              ? "text-blue-500"
-                              : "text-red-500"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (tx.subscription_id && onSelectPendingOccurrence) {
+                          onSelectPendingOccurrence({
+                            id: tx.id,
+                            subscription_id: tx.subscription_id,
+                            due_date: tx.date,
+                            amount: tx.amount,
+                            currency: tx.currency,
+                            status: "completed",
+                            transaction_id: tx.id,
+                            subscription_name: tx.merchant,
+                            subscription_billing_cycle:
+                              tx.subscription_billing_cycle,
+                          });
+                          return;
+                        }
+                        onSelectTransaction?.(tx);
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors ${
+                        isActive
+                          ? "bg-blue-50 dark:bg-blue-500/10"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-800/80"
                       }`}
                     >
-                      {settled ? (
-                        <span className="flex flex-col items-end">
-                          <span className="text-[10px] text-gray-400 line-through font-normal">
-                            {formatAmount(tx.amount, tx.currency)}
-                          </span>
-                          <span>{formatAmount(displayAmt, tx.currency)}</span>
-                        </span>
-                      ) : (
-                        <>
-                          {nonCashflow
-                            ? ""
-                            : tx.type === "income"
-                              ? "+"
-                              : ""}
-                          {formatAmount(displayAmt, tx.currency)}
-                        </>
-                      )}
-                    </span>
-                  </button>
+                      <span
+                        className={`text-sm truncate ${
+                          isSubscription ? "text-red-500" : ""
+                        }`}
+                      >
+                        {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"}{" "}
+                        {translateCategory(tx.category, tCategories)} ›{" "}
+                        {tx.sub_category
+                          ? translateSubCategory(
+                              tx.sub_category,
+                              tSubCategories
+                            )
+                          : tCommon("none")}{" "}
+                        · {tx.merchant || tCommon("unspecified")}
+                      </span>
+                      <span
+                        className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
+                          isSubscription
+                            ? "text-red-500"
+                            : nonCashflow
+                              ? "text-gray-500 dark:text-gray-400"
+                              : tx.type === "income"
+                                ? "text-blue-500"
+                                : "text-red-500"
+                        }`}
+                      >
+                        {formatAmount(displayAmt, tx.currency)}
+                      </span>
+                    </button>
+                  </SwipeableRow>
                 </li>
               );
             })}
@@ -1399,6 +1422,41 @@ export default function TransactionModal({
             </div>
           </div>
 
+          {showTip && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("tipLabel")}
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <input
+                    inputMode="decimal"
+                    value={tipPercent}
+                    onChange={(e) =>
+                      setTipPercent(e.target.value.replace(/[^\d.]/g, ""))
+                    }
+                    placeholder={tTx("tipPercent")}
+                    className={`input-field ${NO_SPIN}`}
+                  />
+                </div>
+                <div>
+                  <input
+                    inputMode="decimal"
+                    value={tipAmount}
+                    onChange={(e) =>
+                      setTipAmount(
+                        formatAmountInput(e.target.value, transactionCurrency)
+                      )
+                    }
+                    placeholder={tTx("tipAmount")}
+                    className={`input-field ${NO_SPIN}`}
+                  />
+                </div>
+              </div>
+              <p className="mt-1 text-[10px] text-gray-400">{tTx("tipHint")}</p>
+            </div>
+          )}
+
           {/* Sub-items (소분류 세부항목) Expandable Section */}
           <div className="border-t border-gray-100 dark:border-gray-800/80 pt-4 mt-2">
             {!showItems ? (
@@ -1407,140 +1465,215 @@ export default function TransactionModal({
                 onClick={() => {
                   setShowItems(true);
                   if (items.length === 0) {
-                    setItems([{ name: "", standardized_name: "", quantity: 1, unit: "개", unit_price: 0, total_price: 0 }]);
+                    setItems([
+                      {
+                        name: "",
+                        standardized_name: "",
+                        quantity: 1,
+                        unit: "개",
+                        unit_price: 0,
+                        total_price: 0,
+                      },
+                    ]);
                   }
                 }}
                 className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
               >
                 <Plus className="h-3.5 w-3.5" />
-                소분류 세부 항목 추가하기
+                {tTx("itemsAdd")}
               </button>
             ) : (
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                    소분류 세부 품목 내역 (단가/총액 자동 연동 계산)
+                    {tTx("itemsTitle")}
                   </span>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => {
-                        setItems([...items, { name: "", standardized_name: "", quantity: 1, unit: "개", unit_price: 0, total_price: 0 }]);
+                        setItems([
+                          ...items,
+                          {
+                            name: "",
+                            standardized_name: "",
+                            quantity: 1,
+                            unit: "개",
+                            unit_price: 0,
+                            total_price: 0,
+                          },
+                        ]);
                       }}
                       className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-0.5"
                     >
                       <Plus className="h-3 w-3" />
-                      추가
+                      {tCommon("add")}
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowItems(false);
-                      }}
+                      onClick={() => setShowItems(false)}
                       className="text-xs text-gray-500 hover:text-gray-700 font-semibold"
                     >
-                      숨기기
+                      {tTx("itemsHide")}
                     </button>
                   </div>
                 </div>
 
-                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                  {items.map((item, itemIdx) => {
-                    const updateItem = (field: keyof TransactionItem, val: any) => {
-                      const newItems = [...items];
-                      const updatedItem = { ...newItems[itemIdx], [field]: val };
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800">
+                  <div className="min-w-0">
+                    <div className={`${ITEM_GRID} bg-gray-50 dark:bg-gray-900/60 px-2 py-1.5 text-[10px] font-semibold text-gray-500`}>
+                      <span>{tTx("itemName")}</span>
+                      <span>{tTx("itemStandard")}</span>
+                      <span className="text-right">{tTx("itemQty")}</span>
+                      <span>{tTx("itemUnit")}</span>
+                      <span className="text-right">{tTx("itemUnitPrice")}</span>
+                      <span className="text-right">{tTx("itemTotal")}</span>
+                      <span />
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                      {items.map((item, itemIdx) => {
+                        const updateItem = (
+                          field: keyof TransactionItem,
+                          val: string | number
+                        ) => {
+                          const newItems = [...items];
+                          const updatedItem = {
+                            ...newItems[itemIdx],
+                            [field]: val,
+                          };
 
-                      // Auto calculation logic
-                      if (field === "quantity" || field === "unit_price") {
-                        updatedItem.total_price = Number((updatedItem.quantity * updatedItem.unit_price).toFixed(2));
-                      } else if (field === "total_price") {
-                        if (updatedItem.quantity > 0) {
-                          updatedItem.unit_price = Number((updatedItem.total_price / updatedItem.quantity).toFixed(4));
-                        }
-                      }
-
-                      newItems[itemIdx] = updatedItem;
-                      setItems(newItems);
-
-                      // Update overall transaction amount based on sum of items
-                      const sumTotal = newItems.reduce((acc, it) => acc + it.total_price, 0);
-                      if (sumTotal > 0) {
-                        setAmount(amountToInput(sumTotal, transactionCurrency));
-                      }
-                    };
-
-                    return (
-                      <div key={itemIdx} className="flex flex-col sm:flex-row gap-2 items-center border border-gray-100 dark:border-gray-800 p-2.5 rounded-xl bg-gray-50/50 dark:bg-gray-800/10">
-                        <div className="grid grid-cols-2 gap-2 w-full sm:flex-1">
-                          <input
-                            type="text"
-                            placeholder="품목명 (예: 수박)"
-                            value={item.name}
-                            onChange={(e) => updateItem("name", e.target.value)}
-                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="표준품목명"
-                            value={item.standardized_name || ""}
-                            onChange={(e) => updateItem("standardized_name", e.target.value)}
-                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 gap-1 w-full sm:w-[240px]">
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="수량"
-                            value={item.quantity || ""}
-                            onChange={(e) => updateItem("quantity", parseFloat(e.target.value) || 0)}
-                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full text-right focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="단위"
-                            value={item.unit || ""}
-                            onChange={(e) => updateItem("unit", e.target.value)}
-                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
-                          />
-                          <input
-                            type="number"
-                            step="0.0001"
-                            placeholder="단가"
-                            value={item.unit_price || ""}
-                            onChange={(e) => updateItem("unit_price", parseFloat(e.target.value) || 0)}
-                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full text-right focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
-                            required
-                          />
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="합계"
-                            value={item.total_price || ""}
-                            onChange={(e) => updateItem("total_price", parseFloat(e.target.value) || 0)}
-                            className="bg-white dark:bg-gray-900 border-gray-250 dark:border-gray-700 rounded-lg p-2 text-xs w-full text-right font-semibold focus:ring-0 focus:outline-none border text-gray-850 dark:text-gray-100"
-                            required
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newItems = items.filter((_, idx) => idx !== itemIdx);
-                            setItems(newItems);
-                            const sumTotal = newItems.reduce((acc, it) => acc + it.total_price, 0);
-                            if (sumTotal > 0) {
-                              setAmount(amountToInput(sumTotal, transactionCurrency));
+                          if (field === "quantity" || field === "unit_price") {
+                            updatedItem.total_price = Number(
+                              (
+                                Number(updatedItem.quantity) *
+                                Number(updatedItem.unit_price)
+                              ).toFixed(2)
+                            );
+                          } else if (field === "total_price") {
+                            if (Number(updatedItem.quantity) > 0) {
+                              updatedItem.unit_price = Number(
+                                (
+                                  Number(updatedItem.total_price) /
+                                  Number(updatedItem.quantity)
+                                ).toFixed(4)
+                              );
                             }
-                          }}
-                          className="text-red-500 hover:text-red-600 p-1"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
+                          }
+
+                          newItems[itemIdx] = updatedItem;
+                          setItems(newItems);
+
+                          const sumTotal = newItems.reduce(
+                            (acc, it) => acc + it.total_price,
+                            0
+                          );
+                          if (sumTotal > 0) {
+                            setAmount(
+                              amountToInput(sumTotal, transactionCurrency)
+                            );
+                          }
+                        };
+
+                        return (
+                          <div
+                            key={itemIdx}
+                            className={`${ITEM_GRID} px-2 py-1.5 items-center`}
+                          >
+                            <input
+                              type="text"
+                              placeholder={tTx("itemNamePlaceholder")}
+                              value={item.name}
+                              onChange={(e) =>
+                                updateItem("name", e.target.value)
+                              }
+                              className="input-field py-1.5 text-xs"
+                            />
+                            <input
+                              type="text"
+                              placeholder={tTx("itemStandardPlaceholder")}
+                              value={item.standardized_name || ""}
+                              onChange={(e) =>
+                                updateItem("standardized_name", e.target.value)
+                              }
+                              className="input-field py-1.5 text-xs"
+                            />
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={item.quantity || ""}
+                              onChange={(e) =>
+                                updateItem(
+                                  "quantity",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
+                            />
+                            <select
+                              value={item.unit || "개"}
+                              onChange={(e) =>
+                                updateItem("unit", e.target.value)
+                              }
+                              className="input-field py-1.5 text-xs"
+                            >
+                              {["개", "g", "kg", "ml", "L", "lb", "pack", "ea"].map(
+                                (u) => (
+                                  <option key={u} value={u}>
+                                    {u}
+                                  </option>
+                                )
+                              )}
+                            </select>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={item.unit_price || ""}
+                              onChange={(e) =>
+                                updateItem(
+                                  "unit_price",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
+                            />
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={item.total_price || ""}
+                              onChange={(e) =>
+                                updateItem(
+                                  "total_price",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              className={`input-field py-1.5 text-xs text-right font-semibold ${NO_SPIN}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newItems = items.filter(
+                                  (_, idx) => idx !== itemIdx
+                                );
+                                setItems(newItems);
+                                const sumTotal = newItems.reduce(
+                                  (acc, it) => acc + it.total_price,
+                                  0
+                                );
+                                if (sumTotal > 0) {
+                                  setAmount(
+                                    amountToInput(sumTotal, transactionCurrency)
+                                  );
+                                }
+                              }}
+                              className="text-red-500 hover:text-red-600 p-1"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

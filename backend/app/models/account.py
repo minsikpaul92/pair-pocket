@@ -22,6 +22,13 @@ class FinancialAccountKind(str, Enum):
     CASH = "cash"
 
 
+class AccountCountry(str, Enum):
+    """Brokerage / bank country tab (independent of currency)."""
+
+    CA = "CA"
+    KR = "KR"
+
+
 class AccountBase(BaseModel):
     """A trackable wallet: bank account, credit card, brokerage, etc."""
 
@@ -30,6 +37,8 @@ class AccountBase(BaseModel):
     kind: FinancialAccountKind
     currency: Currency
     account_type: AccountType = AccountType.PERSONAL
+    # Where the account was registered (Canada vs Korea tab). Optional for legacy rows.
+    country: AccountCountry | None = None
 
     # Starting point when the account is registered (can be 0).
     # For credit cards this is existing debt; for banks it is current cash.
@@ -40,6 +49,10 @@ class AccountBase(BaseModel):
 
     is_default_expense: bool = False
     is_default_income: bool = False
+    # Default credit card for card payments (independent of bank expense default).
+    is_default_credit: bool = False
+    # Default brokerage for stock buys / holdings (independent of expense wallets).
+    is_default_investment: bool = False
     is_active: bool = True
 
     # Optional display metadata (issuer icon, last four digits, etc.)
@@ -75,10 +88,13 @@ class AccountUpdate(BaseModel):
     opening_balance: float | None = None
     is_default_expense: bool | None = None
     is_default_income: bool | None = None
+    is_default_credit: bool | None = None
+    is_default_investment: bool | None = None
     is_active: bool | None = None
     institution: str | None = None
     last_four: str | None = None
     account_number: str | None = None
+    country: AccountCountry | None = None
 
 
 class AccountOut(AccountBase):

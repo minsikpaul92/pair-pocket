@@ -20,9 +20,11 @@ import { useLocale, useTranslations } from "next-intl";
 import LanguagePicker from "@/components/LanguagePicker";
 import OnboardingField from "@/components/OnboardingField";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
+import AccountSelect from "@/components/AccountSelect";
 import BankPicker from "@/components/BankPicker";
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import CategorySelect from "@/components/CategorySelect";
+import HoldingTickerSearch from "@/components/HoldingTickerSearch";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import { useRouter } from "@/i18n/navigation";
 import type { AppLocale } from "@/i18n/locales";
@@ -37,18 +39,21 @@ import {
   addCustomCategory,
   addCustomSubCategory,
   addInstitution,
+  addMonthsToDateKey,
   amountToInput,
   categoriesForType,
   createAccount,
   createStockHolding,
   createSubscription,
   completeOnboarding,
+  defaultInvestmentAccountId,
   fetchAccounts,
   fetchCanadaSubscriptions,
   fetchCategoryPresets,
   fetchUserSettings,
   formatAmountInput,
   maskAccountNumber,
+  monthsBetweenDates,
   normalizeLastFour,
   OnboardingParseResult,
   parseAmountInput,
@@ -57,6 +62,7 @@ import {
   saveOnboardingStep,
   subCategoriesFor,
   TRANSFER_CATEGORY,
+  formatSharesInput,
   type BillingCycle,
   type Currency,
   type FinancialAccount,
@@ -78,6 +84,7 @@ type DraftAccount = {
   account_number: string;
   is_default_expense: boolean;
   is_default_credit: boolean;
+  is_default_investment: boolean;
 };
 
 type DraftSub = {
@@ -99,6 +106,7 @@ type DraftSub = {
   sub_category: string;
   merchant: string;
   total_installments: string;
+  account_id: string;
 };
 
 const FIXED_BILL_OPTIONS = [
@@ -109,7 +117,11 @@ const FIXED_BILL_OPTIONS = [
   { name: "학원비", category: "문화/취미", sub_category: "학원/교육" },
 ] as const;
 
-function emptyDraftSub(start: string, currency: Currency = "CAD"): DraftSub {
+function emptyDraftSub(
+  start: string,
+  currency: Currency = "CAD",
+  accountId = ""
+): DraftSub {
   return {
     key: newKey(),
     name: "",
@@ -128,7 +140,101 @@ function emptyDraftSub(start: string, currency: Currency = "CAD"): DraftSub {
     sub_category: "정기 구독",
     merchant: "",
     total_installments: "",
+    account_id: accountId,
   };
+}
+
+function preferredPaymentAccountId(
+  list: FinancialAccount[],
+  currency?: Currency
+): string {
+  const scoped = currency
+    ? list.filter((a) => a.currency === currency)
+    : list;
+  const pool = scoped.length ? scoped : list;
+  return (
+    pool.find((a) => a.is_default_credit)?.id ||
+    pool.find((a) => a.is_default_expense)?.id ||
+    pool.find((a) => a.kind === "credit_card")?.id ||
+    pool.find((a) => a.kind !== "investment")?.id ||
+    pool[0]?.id ||
+    ""
+  );
+}
+
+/** Accept ISO or common dotted/slash dates from AI screenshots. */
+function normalizeIsoDate(raw?: string | null): string {
+  if (!raw) return "";
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const dotted = s.match(/^(\d{4})[./](\d{1,2})[./](\d{1,2})/);
+  if (dotted) {
+    return `${dotted[1]}-${dotted[2].padStart(2, "0")}-${dotted[3].padStart(2, "0")}`;
+  }
+  return "";
+}
+
+function installmentTotalFromDates(start: string, end: string): string {
+  if (!start || !end) return "";
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+  if (![sy, sm, sd, ey, em, ed].every(Number.isFinite)) return "";
+  const s = new Date(sy, sm - 1, sd);
+  const e = new Date(ey, em - 1, ed);
+  if (e < s) return "";
+  return String(monthsBetweenDates(s, e) + 1);
+}
+
+function installmentEndFromTotal(start: string, totalRaw: string): string {
+  const total = Number(totalRaw);
+  if (!start || !Number.isFinite(total) || total < 1) return "";
+  return addMonthsToDateKey(start, total - 1);
+}
+
+/** Current installment round as of today (1-based, capped at total). */
+function installmentCurrentRound(start: string, totalRaw: string): number | null {
+  const total = Number(totalRaw);
+  if (!start || !Number.isFinite(total) || total < 1) return null;
+  const [y, m] = start.split("-").map(Number);
+  if (![y, m].every(Number.isFinite)) return null;
+  const startMonth = new Date(y, m - 1, 1);
+  const now = new Date();
+  const view = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (view < startMonth) return 1;
+  return Math.min(monthsBetweenDates(startMonth, view) + 1, total);
+}
+
+function syncInstallmentFields(
+  draft: DraftSub,
+  changed: "start_date" | "end_date" | "total_installments"
+): DraftSub {
+  if (draft.sub_kind !== "installment") return draft;
+  if (changed === "end_date" && draft.start_date && draft.end_date) {
+    const total = installmentTotalFromDates(draft.start_date, draft.end_date);
+    return total ? { ...draft, total_installments: total } : draft;
+  }
+  if (
+    changed === "total_installments" &&
+    draft.start_date &&
+    draft.total_installments
+  ) {
+    const end = installmentEndFromTotal(draft.start_date, draft.total_installments);
+    return end ? { ...draft, end_date: end } : draft;
+  }
+  if (changed === "start_date" && draft.start_date) {
+    if (draft.total_installments) {
+      const end = installmentEndFromTotal(
+        draft.start_date,
+        draft.total_installments
+      );
+      return end ? { ...draft, end_date: end } : draft;
+    }
+    if (draft.end_date) {
+      const total = installmentTotalFromDates(draft.start_date, draft.end_date);
+      return total ? { ...draft, total_installments: total } : draft;
+    }
+  }
+  return draft;
 }
 
 type DraftHolding = {
@@ -215,6 +321,11 @@ export default function OnboardingWizard() {
   const [assetCountry, setAssetCountry] = useState<BankCountry>("CA");
   const [customInstitutions, setCustomInstitutions] = useState<string[]>([]);
   const [subs, setSubs] = useState<DraftSub[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<FinancialAccount[]>(
+    []
+  );
+  const [showPaymentAccountRegister, setShowPaymentAccountRegister] =
+    useState(false);
   const [investmentAccounts, setInvestmentAccounts] = useState<
     FinancialAccount[]
   >([]);
@@ -245,7 +356,26 @@ export default function OnboardingWizard() {
         setCustomInstitutions(s.institutions || []);
         if (s.ledger_start_date) setStartDate(s.ledger_start_date);
 
-        const storedLocales = readStoredLocales();
+        const savedStep = Math.min(
+          Math.max(s.onboarding_personal_step ?? 0, 0),
+          3
+        ) as Step;
+        const basicsDone = Boolean(
+          s.ledger_start_date &&
+            (s.preferred_locales?.length || s.preferred_locale)
+        );
+        const freshStart =
+          !s.onboarding_personal_completed &&
+          !basicsDone &&
+          savedStep === 0;
+
+        // After full data reset, ignore stale session and start at step 0.
+        if (freshStart) {
+          clearStoredStep();
+          clearStoredLocales();
+        }
+
+        const storedLocales = freshStart ? null : readStoredLocales();
         const fromSettings = (s.preferred_locales?.length
           ? s.preferred_locales
           : s.preferred_locale
@@ -260,17 +390,9 @@ export default function OnboardingWizard() {
         setSelectedLocales(initialLocales);
         if (initialLocales.length) writeStoredLocales(initialLocales);
 
-        const savedStep = Math.min(
-          Math.max(s.onboarding_personal_step ?? 0, 0),
-          3
-        ) as Step;
-        const basicsDone = Boolean(
-          s.ledger_start_date &&
-            (s.preferred_locales?.length || s.preferred_locale)
-        );
         // Locale switch remounts this page; prefer in-session step so the
         // wizard does not jump ahead from stale server progress.
-        const sessionStep = readStoredStep();
+        const sessionStep = freshStart ? null : readStoredStep();
         let initial: Step = 0;
         if (sessionStep != null) {
           initial = sessionStep;
@@ -281,6 +403,17 @@ export default function OnboardingWizard() {
         }
         setStep(initial);
         writeStoredStep(initial);
+        if (initial >= 2) {
+          try {
+            const list = await fetchAccounts({ accountType: "personal" });
+            setPaymentAccounts(list.filter((a) => a.kind !== "investment"));
+            if (initial >= 3) {
+              setInvestmentAccounts(list.filter((a) => a.kind === "investment"));
+            }
+          } catch {
+            setPaymentAccounts([]);
+          }
+        }
       } catch (err) {
         console.error(err);
         setError(t("loadError"));
@@ -294,10 +427,45 @@ export default function OnboardingWizard() {
   }, []);
 
   const progressLabel = useMemo(() => t("stepOf", { current: step + 1, total: 4 }), [step, t]);
+  const defaultPaymentAccountId = useMemo(
+    () => preferredPaymentAccountId(paymentAccounts),
+    [paymentAccounts]
+  );
+
+  function paymentAccountForCurrency(currency: Currency): string {
+    return preferredPaymentAccountId(paymentAccounts, currency);
+  }
+
+  async function refreshPaymentAccounts() {
+    try {
+      const list = await fetchAccounts({ accountType: "personal" });
+      const payable = list.filter((a) => a.kind !== "investment");
+      setPaymentAccounts(payable);
+      setSubs((prev) =>
+        prev.map((s) => {
+          if (s.account_id && payable.some((a) => a.id === s.account_id)) {
+            const acc = payable.find((a) => a.id === s.account_id);
+            // Keep account; align draft currency to the selected payment account.
+            if (acc && acc.currency !== s.currency) {
+              return { ...s, currency: acc.currency as Currency };
+            }
+            return s;
+          }
+          const preferred = preferredPaymentAccountId(payable, s.currency);
+          return preferred ? { ...s, account_id: preferred } : s;
+        })
+      );
+    } catch {
+      setPaymentAccounts([]);
+    }
+  }
 
   async function goStep(next: Step) {
     setStep(next);
     writeStoredStep(next);
+    if (next === 2) {
+      await refreshPaymentAccounts();
+    }
     if (next === 3) {
       try {
         const list = await fetchAccounts({ accountType: "personal" });
@@ -354,15 +522,14 @@ export default function OnboardingWizard() {
       if (!skip) {
         for (const a of accounts) {
           const balance = parseAmountInput(a.opening_balance || "0");
-          const isDefaultExpense =
-            a.kind === "credit_card"
-              ? a.is_default_credit
-              : a.is_default_expense;
+          const isInvestment = a.kind === "investment";
+          const isCard = a.kind === "credit_card";
           await createAccount({
             name: a.name.trim() || a.institution || t("unnamedAccount"),
             kind: a.kind,
             currency: a.currency,
             account_type: "personal",
+            country: a.country,
             opening_balance: Number.isFinite(balance) ? balance : 0,
             institution: a.kind === "cash" ? null : a.institution || null,
             last_four:
@@ -373,7 +540,13 @@ export default function OnboardingWizard() {
               a.kind === "cash" || a.kind === "credit_card"
                 ? null
                 : maskAccountNumber(a.account_number),
-            is_default_expense: isDefaultExpense,
+            // Bank/cash only — never map card/investment into expense default.
+            is_default_expense:
+              !isInvestment && !isCard ? Boolean(a.is_default_expense) : false,
+            is_default_credit: isCard ? Boolean(a.is_default_credit) : false,
+            is_default_investment: isInvestment
+              ? Boolean(a.is_default_investment)
+              : false,
             is_default_income: false,
           });
         }
@@ -389,8 +562,15 @@ export default function OnboardingWizard() {
   function billingStartDate(base: string, dayRaw: string): string {
     const day = Math.min(28, Math.max(1, Number(dayRaw) || 1));
     const parts = (base || startDate || todayISO()).split("-");
-    if (parts.length < 3) return `${todayISO().slice(0, 8)}${String(day).padStart(2, "0")}`;
+    if (parts.length < 3) {
+      return `${todayISO().slice(0, 8)}${String(day).padStart(2, "0")}`;
+    }
     return `${parts[0]}-${parts[1]}-${String(day).padStart(2, "0")}`;
+  }
+
+  function toIsoDateTime(dateKey: string): string {
+    const key = dateKey.slice(0, 10);
+    return key.includes("T") ? dateKey : `${key}T00:00:00`;
   }
 
   async function saveSubsAndContinue(skip: boolean) {
@@ -399,12 +579,9 @@ export default function OnboardingWizard() {
     try {
       if (!skip && subs.length > 0) {
         const existing = await fetchAccounts({ accountType: "personal" });
-        const preferred =
-          existing.find((a) => a.is_default_expense) ||
-          existing.find((a) => a.kind !== "credit_card") ||
-          existing[0];
-        let accountId = preferred?.id ?? null;
-        if (!accountId) {
+        const payable = existing.filter((a) => a.kind !== "investment");
+        let fallbackId = preferredPaymentAccountId(payable);
+        if (!fallbackId) {
           const cash = await createAccount({
             name: t("defaultCashAccount"),
             kind: "cash",
@@ -413,7 +590,7 @@ export default function OnboardingWizard() {
             opening_balance: 0,
             is_default_expense: true,
           });
-          accountId = cash.id;
+          fallbackId = cash.id;
         }
 
         for (const s of subs) {
@@ -427,44 +604,68 @@ export default function OnboardingWizard() {
                 ? "yearly"
                 : "monthly";
           const baseStart = s.start_date || startDate;
+          const startKey = billingStartDate(baseStart, s.billing_day);
           const isFixed = s.sub_kind === "fixed";
           const category = isFixed
             ? s.category || "주거/통신"
-            : "문화/취미";
+            : s.category || "문화/취미";
           const subCategory = isFixed
             ? s.sub_category || "관리비/공과금"
-            : "정기 구독";
+            : s.sub_category || "정기 구독";
           const merchant =
             (isFixed ? s.merchant : "")?.trim() || s.name.trim();
           const installments = Number(s.total_installments);
+          const accountId =
+            (s.account_id &&
+              payable.some((a) => a.id === s.account_id) &&
+              s.account_id) ||
+            preferredPaymentAccountId(payable, s.currency) ||
+            fallbackId;
+          const account = payable.find((a) => a.id === accountId);
+          // Account currency is source of truth — avoids CAD card + KRW draft mismatch.
+          const currency = (account?.currency as Currency) || s.currency;
+          const hasPromo =
+            s.promo_enabled && Number.isFinite(promo) && promo >= 0;
+          const promoEndKey =
+            hasPromo && s.promo_end_date ? s.promo_end_date.slice(0, 10) : "";
+          const endKey = s.end_date ? s.end_date.slice(0, 10) : "";
+          const currentRound =
+            cycle === "installment"
+              ? installmentCurrentRound(startKey, s.total_installments || "12")
+              : null;
+          const completed =
+            currentRound != null ? Math.max(0, currentRound - 1) : 0;
+
           await createSubscription({
             name: s.name.trim(),
             amount: Number.isFinite(regular) && regular > 0 ? regular : promo,
-            currency: s.currency,
+            currency,
             cycle,
-            start_date: billingStartDate(baseStart, s.billing_day),
-            end_date: s.end_date || null,
+            start_date: toIsoDateTime(startKey),
+            end_date: endKey ? toIsoDateTime(endKey) : null,
+            installment_start_date:
+              cycle === "installment" ? toIsoDateTime(startKey) : null,
             account_id: accountId,
             category,
             sub_category: subCategory,
             account_type: "personal",
             merchant,
-            promo_amount:
-              s.promo_enabled && Number.isFinite(promo) && promo > 0
-                ? promo
-                : null,
-            promo_end_date:
-              s.promo_enabled && s.promo_end_date ? s.promo_end_date : null,
-            promo_reminder_enabled: Boolean(s.promo_enabled),
-            end_reminder_enabled: Boolean(s.end_date),
+            is_fixed_bill: isFixed,
+            promo_amount: hasPromo ? promo : null,
+            // Match SubscriptionRegisterModal: bare date → ISO datetime.
+            promo_end_date: promoEndKey ? toIsoDateTime(promoEndKey) : null,
+            // Reminder stays off until user opts in with an end date later.
+            promo_reminder_enabled: false,
+            end_reminder_enabled: false,
             total_installments:
-              s.sub_kind === "installment" &&
+              cycle === "installment" &&
               Number.isFinite(installments) &&
               installments > 0
                 ? installments
-                : s.sub_kind === "installment"
+                : cycle === "installment"
                   ? 12
                   : null,
+            completed_installments: cycle === "installment" ? completed : undefined,
           });
         }
       }
@@ -482,8 +683,8 @@ export default function OnboardingWizard() {
     try {
       if (!skip) {
         for (const h of holdings) {
-          const shares = Number(h.shares || 0);
-          const avg = Number(h.avg_price || 0);
+          const shares = parseAmountInput(h.shares || "0");
+          const avg = parseAmountInput(h.avg_price || "0");
           if (
             !h.account_id ||
             !h.ticker.trim() ||
@@ -517,12 +718,12 @@ export default function OnboardingWizard() {
     setSubs((prev) => {
       if (prev.some((s) => s.name === chip.name)) return prev;
       return [
-        ...prev,
         {
-          ...emptyDraftSub(startDate, "CAD"),
+          ...emptyDraftSub(startDate, "CAD", defaultPaymentAccountId),
           name: chip.name,
           url: chip.url,
         },
+        ...prev,
       ];
     });
     window.open(chip.url, "_blank", "noopener,noreferrer");
@@ -534,28 +735,34 @@ export default function OnboardingWizard() {
         return prev;
       }
       return [
-        ...prev,
         {
-          ...emptyDraftSub(startDate, currencyForCountry(assetCountry)),
+          ...emptyDraftSub(
+            startDate,
+            currencyForCountry(assetCountry),
+            defaultPaymentAccountId
+          ),
           name: opt.name,
           sub_kind: "fixed",
           category: opt.category,
           sub_category: opt.sub_category,
           merchant: opt.name,
         },
+        ...prev,
       ];
     });
   }
 
   function addManualSub() {
-    setSubs((prev) => [...prev, emptyDraftSub(startDate)]);
+    setSubs((prev) => [
+      emptyDraftSub(startDate, "CAD", defaultPaymentAccountId),
+      ...prev,
+    ]);
   }
 
   function applyScreenshotResult(result: OnboardingParseResult) {
     if (result.step === "assets") {
       const parsed = result.data.accounts || [];
       setAccounts((prev) => [
-        ...prev,
         ...parsed.map((a, index) => {
           const kind = (
             ["checking", "savings", "credit_card", "cash", "investment"].includes(
@@ -583,10 +790,18 @@ export default function OnboardingWizard() {
             institution: a.institution || "",
             last_four: normalizeLastFour(a.last_four) || "",
             account_number: maskAccountNumber(a.account_number) || "",
-            is_default_expense: prev.length === 0 && index === 0 && kind !== "credit_card",
-            is_default_credit: prev.length === 0 && index === 0 && kind === "credit_card",
+            is_default_expense:
+              prev.length === 0 &&
+              index === 0 &&
+              kind !== "credit_card" &&
+              kind !== "investment",
+            is_default_credit:
+              prev.length === 0 && index === 0 && kind === "credit_card",
+            is_default_investment:
+              prev.length === 0 && index === 0 && kind === "investment",
           };
         }),
+        ...prev,
       ]);
       return;
     }
@@ -594,7 +809,6 @@ export default function OnboardingWizard() {
     if (result.step === "subscriptions") {
       const parsed = result.data.subscriptions || [];
       setSubs((prev) => [
-        ...prev,
         ...parsed.map((s) => {
           const currency = (
             ["CAD", "KRW", "USD"].includes(String(s.currency).toUpperCase())
@@ -612,12 +826,13 @@ export default function OnboardingWizard() {
             String(s.cycle || "").toLowerCase() === "yearly"
               ? "yearly"
               : "monthly";
+          const startIso = normalizeIsoDate(s.start_date) || startDate;
           const dayNum = Number(s.billing_day);
           const billing_day =
             Number.isFinite(dayNum) && dayNum >= 1 && dayNum <= 28
               ? String(Math.floor(dayNum))
-              : s.start_date && /^\d{4}-\d{2}-\d{2}/.test(s.start_date)
-                ? String(Number(s.start_date.slice(8, 10)) || 1)
+              : startIso
+                ? String(Number(startIso.slice(8, 10)) || 1)
                 : "1";
           const hasPromo =
             s.promo_amount != null && Number(s.promo_amount) > 0;
@@ -647,12 +862,26 @@ export default function OnboardingWizard() {
             s.sub_category ||
             fixedMatch?.sub_category ||
             (sub_kind === "fixed" ? "관리비/공과금" : "정기 구독");
+          let end_date = normalizeIsoDate(s.end_date);
+          const totalNum = Number(s.total_installments);
+          let total_installments =
+            Number.isFinite(totalNum) && totalNum > 0
+              ? String(Math.floor(totalNum))
+              : "";
+          if (sub_kind === "installment") {
+            if (!total_installments && startIso && end_date) {
+              total_installments = installmentTotalFromDates(startIso, end_date);
+            }
+            if (!end_date && startIso && total_installments) {
+              end_date = installmentEndFromTotal(startIso, total_installments);
+            }
+          }
           return {
             ...emptyDraftSub(
-              s.start_date && /^\d{4}-\d{2}-\d{2}/.test(s.start_date)
-                ? s.start_date.slice(0, 10)
-                : startDate,
-              currency
+              startIso,
+              currency,
+              preferredPaymentAccountId(paymentAccounts, currency) ||
+                defaultPaymentAccountId
             ),
             name: s.name || "",
             amount:
@@ -666,31 +895,30 @@ export default function OnboardingWizard() {
             billing_day,
             sub_kind,
             cycle: sub_kind === "installment" ? "monthly" : cycle,
-            end_date:
-              s.end_date && /^\d{4}-\d{2}-\d{2}/.test(s.end_date)
-                ? s.end_date.slice(0, 10)
-                : "",
+            end_date,
+            total_installments,
             promo_enabled: hasPromo,
             promo_amount:
               hasPromo && Number.isFinite(Number(s.promo_amount))
                 ? amountToInput(Number(s.promo_amount), currency)
                 : "",
-            promo_end_date:
-              s.promo_end_date && /^\d{4}-\d{2}-\d{2}/.test(s.promo_end_date)
-                ? s.promo_end_date.slice(0, 10)
-                : "",
+            promo_end_date: normalizeIsoDate(s.promo_end_date),
             category,
             sub_category,
             merchant: s.name || "",
           };
         }),
+        ...prev,
       ]);
       return;
     }
 
     const brokerage = result.data.brokerage;
     if (!brokerage) return;
-    const defaultAccountId = investmentAccounts[0]?.id || "";
+    const defaultAccountId =
+      defaultInvestmentAccountId(investmentAccounts) ||
+      investmentAccounts[0]?.id ||
+      "";
     let matchedId = defaultAccountId;
     if (brokerage.name && investmentAccounts.length) {
       const needle = brokerage.name.toLowerCase();
@@ -705,7 +933,6 @@ export default function OnboardingWizard() {
     const holdingsParsed = brokerage.holdings || [];
     if (holdingsParsed.length) {
       setHoldings((prev) => [
-        ...prev,
         ...holdingsParsed.map((h) => {
           const currency = (
             ["CAD", "KRW", "USD"].includes(String(h.currency || "").toUpperCase())
@@ -723,6 +950,7 @@ export default function OnboardingWizard() {
             account_id: matchedId,
           };
         }),
+        ...prev,
       ]);
     }
   }
@@ -736,6 +964,9 @@ export default function OnboardingWizard() {
   }, [presets]);
   const inputClass =
     "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-900 dark:text-white";
+  // Native/custom selects get extra inset; pull content one step left to match text inputs.
+  const selectClass = `${inputClass} appearance-none pl-2`;
+  const dropdownClass = `${inputClass} flex items-center justify-between text-left pl-2`;
 
   if (loading) {
     return (
@@ -886,6 +1117,33 @@ export default function OnboardingWizard() {
               onParsed={applyScreenshotResult}
             />
 
+            <button
+              type="button"
+              onClick={() =>
+                setAccounts((prev) => [
+                  {
+                    key: newKey(),
+                    name: "",
+                    kind: "checking",
+                    currency: currencyForCountry(assetCountry),
+                    country: assetCountry,
+                    opening_balance: "",
+                    institution: "",
+                    last_four: "",
+                    account_number: "",
+                    is_default_expense: false,
+                    is_default_credit: false,
+                    is_default_investment: false,
+                  },
+                  ...prev,
+                ])
+              }
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              <Plus className="h-4 w-4" />
+              {t("addAccount")}
+            </button>
+
             {visibleAccounts.map((a) => (
               <div
                 key={a.key}
@@ -934,7 +1192,7 @@ export default function OnboardingWizard() {
                           )
                         )
                       }
-                      className={inputClass}
+                      className={selectClass}
                     >
                       <option value="checking">{t("kindChecking")}</option>
                       <option value="savings">{t("kindSavings")}</option>
@@ -966,7 +1224,7 @@ export default function OnboardingWizard() {
                           )
                         );
                       }}
-                      className={inputClass}
+                      className={selectClass}
                     >
                       <option value="CAD">CAD</option>
                       <option value="KRW">KRW</option>
@@ -999,7 +1257,7 @@ export default function OnboardingWizard() {
                         setCustomInstitutions(next);
                         return next;
                       }}
-                      triggerClassName={`${inputClass} flex items-center justify-between text-left`}
+                      triggerClassName={dropdownClass}
                     />
                   </OnboardingField>
                 )}
@@ -1156,19 +1414,21 @@ export default function OnboardingWizard() {
                     <label className="inline-flex items-center gap-1.5">
                       <input
                         type="checkbox"
-                        checked={a.is_default_expense}
+                        checked={a.is_default_investment}
                         onChange={(e) =>
                           setAccounts((prev) =>
                             prev.map((x) => {
                               if (x.kind !== "investment") return x;
+                              // One default broker per country tab.
+                              if (x.country !== a.country) return x;
                               return {
                                 ...x,
-                                is_default_expense:
+                                is_default_investment:
                                   x.key === a.key
                                     ? e.target.checked
                                     : e.target.checked
                                       ? false
-                                      : x.is_default_expense,
+                                      : x.is_default_investment,
                               };
                             })
                           )
@@ -1180,32 +1440,6 @@ export default function OnboardingWizard() {
                 </div>
               </div>
             ))}
-
-            <button
-              type="button"
-              onClick={() =>
-                setAccounts((prev) => [
-                  ...prev,
-                  {
-                    key: newKey(),
-                    name: "",
-                    kind: "checking",
-                    currency: currencyForCountry(assetCountry),
-                    country: assetCountry,
-                    opening_balance: "",
-                    institution: "",
-                    last_four: "",
-                    account_number: "",
-                    is_default_expense: false,
-                    is_default_credit: false,
-                  },
-                ])
-              }
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              <Plus className="h-4 w-4" />
-              {t("addAccount")}
-            </button>
 
             <div className="flex gap-2">
               <button
@@ -1305,6 +1539,15 @@ export default function OnboardingWizard() {
               </div>
             </div>
 
+            <button
+              type="button"
+              onClick={addManualSub}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              <Plus className="h-4 w-4" />
+              {t("addSub")}
+            </button>
+
             {subs.map((s) => (
               <div
                 key={s.key}
@@ -1351,16 +1594,27 @@ export default function OnboardingWizard() {
                                 merchant: x.merchant || x.name,
                               };
                             }
-                            return {
+                            const next: DraftSub = {
                               ...x,
                               sub_kind,
                               category: "문화/취미",
                               sub_category: "정기 구독",
                             };
+                            if (sub_kind !== "installment") return next;
+                            if (next.end_date) {
+                              return syncInstallmentFields(next, "end_date");
+                            }
+                            if (next.total_installments) {
+                              return syncInstallmentFields(
+                                next,
+                                "total_installments"
+                              );
+                            }
+                            return next;
                           })
                         );
                       }}
-                      className={inputClass}
+                      className={selectClass}
                     >
                       <option value="subscription">{t("subKindSubscription")}</option>
                       <option value="installment">{t("subKindInstallment")}</option>
@@ -1383,7 +1637,7 @@ export default function OnboardingWizard() {
                             )
                           )
                         }
-                        className={inputClass}
+                        className={selectClass}
                       >
                         <option value="monthly">{t("cycleMonthly")}</option>
                         <option value="yearly">{t("cycleYearly")}</option>
@@ -1437,11 +1691,13 @@ export default function OnboardingWizard() {
                       value={s.start_date}
                       onChange={(e) =>
                         setSubs((prev) =>
-                          prev.map((x) =>
-                            x.key === s.key
-                              ? { ...x, start_date: e.target.value }
-                              : x
-                          )
+                          prev.map((x) => {
+                            if (x.key !== s.key) return x;
+                            return syncInstallmentFields(
+                              { ...x, start_date: e.target.value },
+                              "start_date"
+                            );
+                          })
                         )
                       }
                       className={inputClass}
@@ -1461,11 +1717,13 @@ export default function OnboardingWizard() {
                         value={s.end_date}
                         onChange={(e) =>
                           setSubs((prev) =>
-                            prev.map((x) =>
-                              x.key === s.key
-                                ? { ...x, end_date: e.target.value }
-                                : x
-                            )
+                            prev.map((x) => {
+                              if (x.key !== s.key) return x;
+                              return syncInstallmentFields(
+                                { ...x, end_date: e.target.value },
+                                "end_date"
+                              );
+                            })
                           )
                         }
                         className={inputClass}
@@ -1481,15 +1739,38 @@ export default function OnboardingWizard() {
                       value={s.total_installments}
                       onChange={(e) =>
                         setSubs((prev) =>
-                          prev.map((x) =>
-                            x.key === s.key
-                              ? { ...x, total_installments: e.target.value }
-                              : x
-                          )
+                          prev.map((x) => {
+                            if (x.key !== s.key) return x;
+                            return syncInstallmentFields(
+                              { ...x, total_installments: e.target.value },
+                              "total_installments"
+                            );
+                          })
                         )
                       }
                       className={inputClass}
                     />
+                    {(() => {
+                      const current = installmentCurrentRound(
+                        s.start_date,
+                        s.total_installments
+                      );
+                      if (current == null) {
+                        return (
+                          <p className="mt-1 text-[11px] text-gray-400">
+                            {t("installmentSyncHint")}
+                          </p>
+                        );
+                      }
+                      return (
+                        <p className="mt-1 text-[11px] font-medium text-blue-500">
+                          {t("installmentProgress", {
+                            current,
+                            total: s.total_installments,
+                          })}
+                        </p>
+                      );
+                    })()}
                   </OnboardingField>
                 )}
                 {s.sub_kind === "fixed" && (
@@ -1498,6 +1779,7 @@ export default function OnboardingWizard() {
                       <CategorySelect
                         categories={expenseCategoryOptions}
                         value={s.category}
+                        triggerClassName={dropdownClass}
                         onChange={(next) =>
                           setSubs((prev) =>
                             prev.map((x) =>
@@ -1524,6 +1806,7 @@ export default function OnboardingWizard() {
                             : []
                         }
                         value={s.sub_category}
+                        triggerClassName={dropdownClass}
                         onChange={(next) =>
                           setSubs((prev) =>
                             prev.map((x) =>
@@ -1568,7 +1851,13 @@ export default function OnboardingWizard() {
                     </OnboardingField>
                   </>
                 )}
-                <OnboardingField label={t("regularAmount")}>
+                <OnboardingField
+                  label={
+                    s.sub_kind === "installment"
+                      ? t("installmentAmount")
+                      : t("regularAmount")
+                  }
+                >
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-sm text-gray-500">
                       {currencySymbol(s.currency)}
@@ -1599,19 +1888,49 @@ export default function OnboardingWizard() {
                     />
                   </div>
                 </OnboardingField>
+                <OnboardingField label={t("paymentAccount")}>
+                  <AccountSelect
+                    accounts={paymentAccounts}
+                    value={s.account_id}
+                    onChange={(accountId) =>
+                      setSubs((prev) =>
+                        prev.map((x) => {
+                          if (x.key !== s.key) return x;
+                          const acc = paymentAccounts.find(
+                            (a) => a.id === accountId
+                          );
+                          if (!acc) return { ...x, account_id: accountId };
+                          return {
+                            ...x,
+                            account_id: accountId,
+                            currency: acc.currency as Currency,
+                          };
+                        })
+                      )
+                    }
+                    onRegister={() => setShowPaymentAccountRegister(true)}
+                    allowNone={false}
+                    placeholder={t("selectPaymentAccount")}
+                    variant="field"
+                    filterAccounts={(a) => a.kind !== "investment"}
+                    triggerClassName={dropdownClass}
+                  />
+                </OnboardingField>
                 <OnboardingField label={t("currency")}>
                   <select
                     value={s.currency}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const currency = e.target.value as Currency;
                       setSubs((prev) =>
-                        prev.map((x) =>
-                          x.key === s.key
-                            ? { ...x, currency: e.target.value as Currency }
-                            : x
-                        )
-                      )
-                    }
-                    className={inputClass}
+                        prev.map((x) => {
+                          if (x.key !== s.key) return x;
+                          const account_id =
+                            paymentAccountForCurrency(currency) || x.account_id;
+                          return { ...x, currency, account_id };
+                        })
+                      );
+                    }}
+                    className={selectClass}
                   >
                     <option value="CAD">CAD</option>
                     <option value="KRW">KRW</option>
@@ -1679,6 +1998,9 @@ export default function OnboardingWizard() {
                             }
                             className={inputClass}
                           />
+                          <p className="mt-1 text-[11px] text-gray-400">
+                            {t("promoEndOptionalHint")}
+                          </p>
                         </OnboardingField>
                       </div>
                     )}
@@ -1686,15 +2008,6 @@ export default function OnboardingWizard() {
                 )}
               </div>
             ))}
-
-            <button
-              type="button"
-              onClick={addManualSub}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              <Plus className="h-4 w-4" />
-              {t("addSub")}
-            </button>
 
             <div className="flex gap-2">
               <button
@@ -1716,6 +2029,26 @@ export default function OnboardingWizard() {
               </button>
             </div>
           </section>
+        )}
+
+        {showPaymentAccountRegister && (
+          <AccountRegisterModal
+            currency={assetCountry === "KR" ? "KRW" : "CAD"}
+            accountType="personal"
+            preferredType="expense"
+            onClose={() => setShowPaymentAccountRegister(false)}
+            onCreated={async (acc) => {
+              setShowPaymentAccountRegister(false);
+              await refreshPaymentAccounts();
+              if (acc.kind !== "investment") {
+                setSubs((prev) =>
+                  prev.map((s) =>
+                    s.account_id ? s : { ...s, account_id: acc.id }
+                  )
+                );
+              }
+            }}
+          />
         )}
 
         {step === 3 && (
@@ -1780,6 +2113,36 @@ export default function OnboardingWizard() {
               </div>
             )}
 
+            <button
+              type="button"
+              onClick={() =>
+                setHoldings((prev) => [
+                  {
+                    key: newKey(),
+                    ticker: "",
+                    name: "",
+                    shares: "",
+                    avg_price: "",
+                    currency:
+                      investmentAccounts[0]?.currency === "USD"
+                        ? "USD"
+                        : investmentAccounts[0]?.currency === "KRW"
+                          ? "KRW"
+                          : "CAD",
+                    account_id:
+                      defaultInvestmentAccountId(investmentAccounts) ||
+                      investmentAccounts[0]?.id ||
+                      "",
+                  },
+                  ...prev,
+                ])
+              }
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              <Plus className="h-4 w-4" />
+              {t("addHolding")}
+            </button>
+
             {holdings.map((h) => (
               <div
                 key={h.key}
@@ -1800,16 +2163,24 @@ export default function OnboardingWizard() {
                 <OnboardingField label={t("brokerAccountPick")}>
                   <select
                     value={h.account_id}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const account_id = e.target.value;
+                      const acc = investmentAccounts.find(
+                        (a) => a.id === account_id
+                      );
                       setHoldings((prev) =>
-                        prev.map((x) =>
-                          x.key === h.key
-                            ? { ...x, account_id: e.target.value }
-                            : x
-                        )
-                      )
-                    }
-                    className={inputClass}
+                        prev.map((x) => {
+                          if (x.key !== h.key) return x;
+                          if (!acc) return { ...x, account_id };
+                          return {
+                            ...x,
+                            account_id,
+                            currency: (acc.currency as Currency) || x.currency,
+                          };
+                        })
+                      );
+                    }}
+                    className={selectClass}
                   >
                     <option value="">{t("brokerAccountPick")}</option>
                     {investmentAccounts.map((acc) => (
@@ -1821,18 +2192,58 @@ export default function OnboardingWizard() {
                   </select>
                 </OnboardingField>
                 <div className="grid grid-cols-2 gap-2">
-                  <OnboardingField label={t("ticker")}>
-                    <input
-                      value={h.ticker}
-                      onChange={(e) =>
+                  <OnboardingField label={t("ticker")} className="col-span-2">
+                    <HoldingTickerSearch
+                      ticker={h.ticker}
+                      name={h.name}
+                      currency={h.currency}
+                      inputClassName={`${inputClass} pl-9`}
+                      onSelect={({ ticker, name, currency }) =>
                         setHoldings((prev) =>
                           prev.map((x) =>
-                            x.key === h.key ? { ...x, ticker: e.target.value } : x
+                            x.key === h.key
+                              ? {
+                                  ...x,
+                                  ticker,
+                                  name,
+                                  currency,
+                                  avg_price: x.avg_price
+                                    ? formatAmountInput(x.avg_price, currency)
+                                    : x.avg_price,
+                                }
+                              : x
                           )
                         )
                       }
-                      className={inputClass}
                     />
+                  </OnboardingField>
+                  <OnboardingField label={t("currency")}>
+                    <select
+                      value={h.currency}
+                      onChange={(e) =>
+                        setHoldings((prev) =>
+                          prev.map((x) =>
+                            x.key === h.key
+                              ? {
+                                  ...x,
+                                  currency: e.target.value as Currency,
+                                  avg_price: x.avg_price
+                                    ? formatAmountInput(
+                                        x.avg_price,
+                                        e.target.value as Currency
+                                      )
+                                    : x.avg_price,
+                                }
+                              : x
+                          )
+                        )
+                      }
+                      className={selectClass}
+                    >
+                      <option value="CAD">CAD</option>
+                      <option value="KRW">KRW</option>
+                      <option value="USD">USD</option>
+                    </select>
                   </OnboardingField>
                   <OnboardingField label={t("shares")}>
                     <input
@@ -1840,7 +2251,12 @@ export default function OnboardingWizard() {
                       onChange={(e) =>
                         setHoldings((prev) =>
                           prev.map((x) =>
-                            x.key === h.key ? { ...x, shares: e.target.value } : x
+                            x.key === h.key
+                              ? {
+                                  ...x,
+                                  shares: formatSharesInput(e.target.value),
+                                }
+                              : x
                           )
                         )
                       }
@@ -1849,19 +2265,6 @@ export default function OnboardingWizard() {
                     />
                   </OnboardingField>
                 </div>
-                <OnboardingField label={t("stockName")}>
-                  <input
-                    value={h.name}
-                    onChange={(e) =>
-                      setHoldings((prev) =>
-                        prev.map((x) =>
-                          x.key === h.key ? { ...x, name: e.target.value } : x
-                        )
-                      )
-                    }
-                    className={inputClass}
-                  />
-                </OnboardingField>
                 <OnboardingField label={t("avgPrice")}>
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-sm text-gray-500">
@@ -1873,7 +2276,13 @@ export default function OnboardingWizard() {
                         setHoldings((prev) =>
                           prev.map((x) =>
                             x.key === h.key
-                              ? { ...x, avg_price: e.target.value }
+                              ? {
+                                  ...x,
+                                  avg_price: formatAmountInput(
+                                    e.target.value,
+                                    h.currency
+                                  ),
+                                }
                               : x
                           )
                         )
@@ -1885,33 +2294,6 @@ export default function OnboardingWizard() {
                 </OnboardingField>
               </div>
             ))}
-
-            <button
-              type="button"
-              onClick={() =>
-                setHoldings((prev) => [
-                  ...prev,
-                  {
-                    key: newKey(),
-                    ticker: "",
-                    name: "",
-                    shares: "",
-                    avg_price: "",
-                    currency:
-                      investmentAccounts[0]?.currency === "USD"
-                        ? "USD"
-                        : investmentAccounts[0]?.currency === "KRW"
-                          ? "KRW"
-                          : "CAD",
-                    account_id: investmentAccounts[0]?.id || "",
-                  },
-                ])
-              }
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              <Plus className="h-4 w-4" />
-              {t("addHolding")}
-            </button>
 
             <div className="flex gap-2">
               <button
@@ -1938,6 +2320,7 @@ export default function OnboardingWizard() {
                 currency={assetCountry === "KR" ? "KRW" : "CAD"}
                 accountType="personal"
                 preferredType="income"
+                country={assetCountry}
                 initialKind="investment"
                 onClose={() => setShowBrokerRegister(false)}
                 onCreated={async (acc) => {

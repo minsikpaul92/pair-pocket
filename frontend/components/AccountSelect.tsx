@@ -24,6 +24,8 @@ interface Props {
   placeholder?: string;
   variant?: "compact" | "field";
   filterAccounts?: (account: FinancialAccount) => boolean;
+  /** Override trigger button classes (e.g. onboarding alignment). */
+  triggerClassName?: string;
 }
 
 export default function AccountSelect({
@@ -36,6 +38,7 @@ export default function AccountSelect({
   placeholder,
   variant = "compact",
   filterAccounts,
+  triggerClassName,
 }: Props) {
   const t = useTranslations("account");
   const tKinds = useTranslations("accountKinds");
@@ -76,9 +79,10 @@ export default function AccountSelect({
       : (placeholder ?? t("select"));
 
   const triggerClass =
-    variant === "field"
+    triggerClassName ??
+    (variant === "field"
       ? "w-full flex items-center justify-between gap-2 rounded-xl bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm font-medium text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-      : "flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 max-w-[9rem]";
+      : "flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 max-w-[9rem]");
 
   const menuClass =
     variant === "field"

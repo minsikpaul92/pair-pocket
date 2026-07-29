@@ -2,8 +2,9 @@
 
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import SwipeableRow from "@/components/SwipeableRow";
 import {
   CategoryPresets,
   Currency,
@@ -13,6 +14,7 @@ import {
   Transaction,
   TransactionType,
   categoriesForType,
+  deleteTransaction,
   effectiveExpenseAmount,
   formatAmount,
   hasSettlement,
@@ -21,6 +23,7 @@ import {
   subCategoriesFor,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
 interface Props {
@@ -28,6 +31,7 @@ interface Props {
   presets: CategoryPresets | null;
   transactions: Transaction[];
   onEditTransaction?: (tx: Transaction) => void;
+  onDeleted?: () => void;
 }
 
 type TypeFilter = "all" | TransactionType;
@@ -57,10 +61,13 @@ export default function ListView({
   presets,
   transactions,
   onEditTransaction,
+  onDeleted,
 }: Props) {
   const locale = useLocale();
   const tList = useTranslations("list");
   const tCommon = useTranslations("common");
+  const tTx = useTranslations("transaction");
+  const tErrors = useTranslations("errors");
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
   const tSub = useTranslations("subscriptions");
@@ -71,8 +78,27 @@ export default function ListView({
   const [merchantQuery, setMerchantQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [localTxs, setLocalTxs] = useState<Transaction[] | null>(null);
 
   const showCurrencyCol = scope === "ALL";
+  const visibleTxs = localTxs ?? transactions;
+
+  useEffect(() => {
+    setLocalTxs(null);
+  }, [transactions]);
+
+  async function handleDelete(tx: Transaction) {
+    if (!window.confirm(tTx("deleteConfirm"))) return;
+    try {
+      await deleteTransaction(tx.id);
+      setLocalTxs((prev) =>
+        (prev ?? transactions).filter((t) => t.id !== tx.id)
+      );
+      onDeleted?.();
+    } catch (err) {
+      window.alert(translateError(err, tErrors, "deleteTransaction"));
+    }
+  }
 
   const allCategories = useMemo(() => {
     if (!presets) return [];
@@ -116,7 +142,7 @@ export default function ListView({
 
   const filtered = useMemo(() => {
     const q = merchantQuery.trim().toLowerCase();
-    return transactions.filter((tx) => {
+    return visibleTxs.filter((tx) => {
       if (typeFilter !== "all" && tx.type !== typeFilter) return false;
       if (categoryFilter !== "all" && tx.category !== categoryFilter) return false;
       if (subCategoryFilter !== "all" && tx.sub_category !== subCategoryFilter)
@@ -124,7 +150,7 @@ export default function ListView({
       if (q && !tx.merchant.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [transactions, typeFilter, categoryFilter, subCategoryFilter, merchantQuery]);
+  }, [visibleTxs, typeFilter, categoryFilter, subCategoryFilter, merchantQuery]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
@@ -283,7 +309,64 @@ export default function ListView({
       </div>
 
       <div className="mt-4 card-inset overflow-hidden">
-        <div className="overflow-x-auto max-h-[28rem] overflow-y-auto">
+        <ul className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[28rem] overflow-y-auto">
+          {sorted.length === 0 ? (
+            <li className="px-4 py-12 text-center text-gray-400 text-sm">
+              {tList("noTransactions")}
+            </li>
+          ) : (
+            sorted.map((tx) => {
+              const settled = hasSettlement(tx);
+              const transfer = isNonCashflowTransaction(tx);
+              const subscription = isSubscriptionTransaction(tx);
+              const effective = displayAmount(tx);
+              return (
+                <li key={tx.id}>
+                  <SwipeableRow
+                    onDelete={() => handleDelete(tx)}
+                    deleteLabel={tCommon("delete")}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onEditTransaction?.(tx)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {showCurrencyCol &&
+                            (tx.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
+                          {translateCategory(tx.category, tCategories)}
+                          {tx.sub_category
+                            ? ` › ${translateSubCategory(tx.sub_category, tSubCategories)}`
+                            : ""}
+                        </p>
+                        <p className="text-[11px] text-gray-400 truncate">
+                          {formatDay(tx.date)} · {tx.merchant}
+                        </p>
+                      </div>
+                      <p
+                        className={`shrink-0 text-sm font-semibold tabular-nums ${
+                          transfer
+                            ? "text-gray-500"
+                            : tx.type === "income"
+                              ? "text-blue-500"
+                              : subscription
+                                ? "text-red-500"
+                                : "text-gray-900 dark:text-white"
+                        }`}
+                      >
+                        {settled
+                          ? formatAmount(effective, tx.currency)
+                          : formatAmount(effective, tx.currency)}
+                      </p>
+                    </button>
+                  </SwipeableRow>
+                </li>
+              );
+            })
+          )}
+        </ul>
+        <div className="hidden overflow-x-auto max-h-[28rem] overflow-y-auto">
           <table className="min-w-full text-sm border-collapse">
             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/95 backdrop-blur-sm">
               <tr className="border-b border-gray-200 dark:border-gray-700">

@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { 
   Briefcase, 
-  ChevronRight, 
-  Edit3, 
+  Camera,
+  Filter,
+  GripVertical,
+  Loader2,
   Plus, 
   Search, 
   TrendingDown, 
@@ -32,11 +34,15 @@ import {
   createStockHolding,
   updateStockHolding,
   deleteStockHolding,
+  defaultInvestmentAccountId,
   fetchStockSummary,
   fetchAccounts,
   fetchExchangeRate,
   fetchUserSettings,
   formatAmount,
+  inferCurrencyFromTicker,
+  parseOnboardingScreenshots,
+  resolveAccountCountry,
 } from "@/lib/api";
 
 interface Props {
@@ -57,6 +63,11 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const [viewMode, setViewMode] = useState<ViewMode>("valuation");
   const [sortBy, setSortBy] = useState<SortOption>("valuation");
   const [showAccountRegister, setShowAccountRegister] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
+  const [accountOrder, setAccountOrder] = useState<string[]>([]);
+  const [dragAccountId, setDragAccountId] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const stockCameraRef = useRef<HTMLInputElement>(null);
 
   // Data states
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
@@ -98,15 +109,25 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const holdingsData = await fetchStockHoldings(accountType);
-      const accId = selectedAccountIdFilter === "ALL" ? undefined : selectedAccountIdFilter;
-      const summaryData = await fetchStockSummary(accountType, displayCurrency, accId);
-      const accountsData = await fetchAccounts({ accountType });
-      const ratesData = await fetchExchangeRate();
-      
+      const accId =
+        selectedAccountIdFilter === "ALL" ? undefined : selectedAccountIdFilter;
+      // Holdings first so Yahoo prices warm the cache; summary then hits cache.
+      const [holdingsData, accountsData, ratesData] = await Promise.all([
+        fetchStockHoldings(accountType),
+        fetchAccounts({ accountType }),
+        fetchExchangeRate(),
+      ]);
+      const summaryData = await fetchStockSummary(
+        accountType,
+        displayCurrency,
+        accId
+      );
+
       setHoldings(holdingsData);
       setSummary(summaryData);
-      setInvestmentAccounts(accountsData.filter(a => a.kind === "investment" && a.is_active));
+      setInvestmentAccounts(
+        accountsData.filter((a) => a.kind === "investment" && a.is_active)
+      );
       setRates(ratesData);
       
       // Update NASDAQ mock status randomly for high-fidelity feel
@@ -151,11 +172,81 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Filter investment accounts by Canada/Korea tab (country), not cash currency.
+  const visibleAccounts = useMemo(() => {
+    if (ledgerScope === "ALL") return investmentAccounts;
+    const want = ledgerScope === "CAD" ? "CA" : "KR";
+    return investmentAccounts.filter((a) => {
+      const country = resolveAccountCountry(a);
+      if (country) return country === want;
+      return a.currency === ledgerScope;
+    });
+  }, [investmentAccounts, ledgerScope]);
+
+  useEffect(() => {
+    const key = `pairpocket:stockAccountOrder:${accountType}:${ledgerScope}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) setAccountOrder(JSON.parse(raw) as string[]);
+    } catch {
+      setAccountOrder([]);
+    }
+  }, [accountType, ledgerScope]);
+
+  const orderedVisibleAccounts = useMemo(() => {
+    if (!accountOrder.length) return visibleAccounts;
+    const orderMap = new Map(accountOrder.map((id, i) => [id, i]));
+    return [...visibleAccounts].sort((a, b) => {
+      const ai = orderMap.get(a.id) ?? 999;
+      const bi = orderMap.get(b.id) ?? 999;
+      return ai - bi;
+    });
+  }, [visibleAccounts, accountOrder]);
+
+  function persistAccountOrder(ids: string[]) {
+    const key = `pairpocket:stockAccountOrder:${accountType}:${ledgerScope}`;
+    localStorage.setItem(key, JSON.stringify(ids));
+    setAccountOrder(ids);
+  }
+
+  function reorderAccounts(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const ids = orderedVisibleAccounts.map((a) => a.id);
+    const fromIdx = ids.indexOf(fromId);
+    const toIdx = ids.indexOf(toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, fromId);
+    persistAccountOrder(ids);
+  }
+
+  const cashBalanceMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    summary?.cash_balances?.forEach((cb) => {
+      map[cb.account_id] = cb.balance;
+    });
+    return map;
+  }, [summary]);
+
+  useEffect(() => {
+    if (!showAddModal) return;
+    if (targetAccountId) return;
+    const preferred = defaultInvestmentAccountId(visibleAccounts);
+    if (preferred) setTargetAccountId(preferred);
+  }, [showAddModal, targetAccountId, visibleAccounts]);
+
+  const visibleAccountIds = useMemo(
+    () => new Set(visibleAccounts.map((a) => a.id)),
+    [visibleAccounts]
+  );
+
   // Sort and group holdings
   const sortedHoldings = useMemo(() => {
-    const filtered = selectedAccountIdFilter === "ALL"
-      ? holdings
-      : holdings.filter(h => h.account_id === selectedAccountIdFilter);
+    const filtered = holdings.filter((h) => {
+      if (!visibleAccountIds.has(h.account_id)) return false;
+      if (selectedAccountIdFilter === "ALL") return true;
+      return h.account_id === selectedAccountIdFilter;
+    });
 
     const groups: { [ticker: string]: StockHolding[] } = {};
     filtered.forEach((h) => {
@@ -203,7 +294,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       return aggregatedList.sort((a, b) => b.shares - a.shares);
     }
     return aggregatedList;
-  }, [holdings, selectedAccountIdFilter, sortBy]);
+  }, [holdings, selectedAccountIdFilter, sortBy, visibleAccountIds]);
 
   // Helper to convert native stock currency to the active display currency
   const convertNativeToDisplay = useCallback((amount: number, from: Currency | "USD"): number => {
@@ -399,6 +490,37 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     );
   }
 
+  async function handleStockCameraFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setScanning(true);
+    setFormError(null);
+    try {
+      const preferred = defaultInvestmentAccountId(visibleAccounts);
+      if (preferred) setTargetAccountId(preferred);
+      setShowAddModal(true);
+      const result = await parseOnboardingScreenshots(
+        "brokerage",
+        Array.from(files)
+      );
+      await applyAiParse(result);
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : t("addFailed"));
+    } finally {
+      setScanning(false);
+      e.target.value = "";
+    }
+  }
+
+  function openEditHolding(row: (typeof sortedHoldings)[number]) {
+    const firstHolding = row.holdings?.[0] || row;
+    setSelectedHoldingGroup(row);
+    setSelectedHolding(firstHolding);
+    setEditShares(firstHolding.shares.toString());
+    setEditPrice(firstHolding.avg_price.toString());
+    setShowEditModal(true);
+  }
+
   // Helpers
   const tickerGradient = (ticker: string) => {
     const colors = [
@@ -414,13 +536,6 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     return colors[sum % colors.length];
   };
 
-  // Filter accounts matching ledgerScope
-  const visibleAccounts = useMemo(() => {
-    return investmentAccounts.filter(
-      (a) => ledgerScope === "ALL" || a.currency === ledgerScope
-    );
-  }, [investmentAccounts, ledgerScope]);
-
   // Aggregate total stock statistics (valuation, profit, yield) across the visible accounts
   const totalStats = useMemo(() => {
     let val = 0;
@@ -431,11 +546,13 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         val += stats.valuation;
         inv += stats.invested;
       }
+      const cash = cashBalanceMap[acc.id] ?? 0;
+      val += convertNativeToDisplay(cash, acc.currency);
     });
     const profit = val - inv;
     const y = inv > 0 ? (profit / inv) * 100 : 0;
     return { valuation: val, profit, yield: y };
-  }, [visibleAccounts, accountStatsMap]);
+  }, [visibleAccounts, accountStatsMap, cashBalanceMap, convertNativeToDisplay]);
 
   return (
     <div className="space-y-4">
@@ -499,38 +616,76 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           </button>
 
           {/* 2. 개별 계좌 카드 목록 */}
-          {visibleAccounts.map((acc) => {
+          {orderedVisibleAccounts.map((acc) => {
             const isSelected = selectedAccountIdFilter === acc.id;
             const stats = accountStatsMap[acc.id] || { valuation: 0, profit: 0, yield: 0 };
+            const cash = cashBalanceMap[acc.id] ?? 0;
+            const cashDisplay = convertNativeToDisplay(cash, acc.currency);
+            const totalDisplay = stats.valuation + cashDisplay;
             const isProfit = stats.profit >= 0;
+            const isDragging = dragAccountId === acc.id;
             return (
-              <button
+              <div
                 key={acc.id}
-                onClick={() => {
-                  setSelectedAccountIdFilter(prev => prev === acc.id ? "ALL" : acc.id);
+                draggable
+                onDragStart={() => setDragAccountId(acc.id)}
+                onDragEnd={() => setDragAccountId(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragAccountId) reorderAccounts(dragAccountId, acc.id);
+                  setDragAccountId(null);
                 }}
-                className={`text-left p-3.5 rounded-2xl transition-all border shrink-0 w-[148px] sm:w-[160px] snap-start ${
-                  isSelected
-                    ? "bg-blue-50/60 dark:bg-blue-950/30 border-blue-500 dark:border-blue-700 shadow-md ring-1 ring-blue-500"
-                    : "bg-gray-50/50 dark:bg-gray-850 border-transparent hover:border-gray-200 dark:hover:border-gray-800"
-                }`}
+                className={`relative shrink-0 w-[148px] sm:w-[160px] snap-start ${isDragging ? "opacity-50" : ""}`}
               >
-                <div className="flex items-center justify-between gap-1 min-w-0">
-                  <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap" title={`${acc.institution ? `[${acc.institution}] ` : ""}${acc.nickname || acc.name}`}>
-                    {acc.institution ? `[${acc.institution}] ` : ""}{acc.nickname || acc.name}
-                  </span>
-                  <span className="text-[9px] text-gray-400 dark:text-gray-500 uppercase font-black">
-                    {acc.currency}
-                  </span>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setEditingAccount(acc)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") setEditingAccount(acc);
+                  }}
+                  className={`text-left p-3.5 rounded-2xl transition-all border w-full cursor-pointer ${
+                    isSelected
+                      ? "bg-blue-50/60 dark:bg-blue-950/30 border-blue-500 dark:border-blue-700 shadow-md ring-1 ring-blue-500"
+                      : "bg-gray-50/50 dark:bg-gray-850 border-transparent hover:border-gray-200 dark:hover:border-gray-800"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1 min-w-0">
+                    <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-grab" />
+                    <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap flex-1" title={`${acc.institution ? `[${acc.institution}] ` : ""}${acc.nickname || acc.name}`}>
+                      {acc.institution ? `[${acc.institution}] ` : ""}{acc.nickname || acc.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedAccountIdFilter((prev) =>
+                          prev === acc.id ? "ALL" : acc.id
+                        );
+                      }}
+                      className={`p-0.5 rounded-md shrink-0 ${
+                        isSelected
+                          ? "text-blue-600"
+                          : "text-gray-300 hover:text-blue-500"
+                      }`}
+                      title={t("filterAccount")}
+                    >
+                      <Filter className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
+                    {formatAmount(totalDisplay, displayCurrency)}
+                  </div>
+                  <div className={`text-[11px] font-bold mt-1 ${isProfit ? "text-red-500" : "text-blue-500"}`}>
+                    {isProfit ? "+" : ""}
+                    {formatAmount(stats.profit, displayCurrency)} ({stats.yield.toFixed(1)}%)
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-1 tabular-nums">
+                    {t("cashBalance")}: {formatAmount(cashDisplay, displayCurrency)}
+                  </div>
                 </div>
-                <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
-                  {formatAmount(stats.valuation, displayCurrency)}
-                </div>
-                <div className={`text-[11px] font-bold mt-1.5 ${isProfit ? "text-red-500" : "text-blue-500"}`}>
-                  {isProfit ? "+" : ""}
-                  {formatAmount(stats.profit, displayCurrency)} ({stats.yield.toFixed(1)}%)
-                </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -696,7 +851,13 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             return (
               <div
                 key={row.id}
-                className="flex items-center justify-between gap-3 p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800/80 hover:shadow-md transition-shadow group"
+                role="button"
+                tabIndex={0}
+                onClick={() => openEditHolding(row)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") openEditHolding(row);
+                }}
+                className="flex items-center justify-between gap-3 p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800/80 hover:shadow-md transition-shadow group cursor-pointer"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {/* Circle initial gradient logo */}
@@ -727,20 +888,6 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       {formatAmount(row.profit, row.currency as Currency)} ({row.yield.toFixed(1)}%)
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      const firstHolding = row.holdings?.[0] || row;
-                      setSelectedHoldingGroup(row);
-                      setSelectedHolding(firstHolding);
-                      setEditShares(firstHolding.shares.toString());
-                      setEditPrice(firstHolding.avg_price.toString());
-                      setShowEditModal(true);
-                    }}
-                    className="p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                  </button>
                 </div>
               </div>
             );
@@ -788,14 +935,12 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   required
                 >
                   <option value="">{t("selectBrokerage")}</option>
-                  {investmentAccounts
-                    .filter((a) => ledgerScope === "ALL" || a.currency === ledgerScope)
-                    .map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.institution ? `[${acc.institution}] ` : ""}
-                        {acc.name} ({acc.currency})
-                      </option>
-                    ))}
+                  {visibleAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.institution ? `[${acc.institution}] ` : ""}
+                      {acc.name} ({acc.currency})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -837,14 +982,9 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                           setSelectedTicker(s.ticker);
                           setSelectedName(s.name);
                           setSearchQuery(`${s.name} (${s.ticker})`);
-                          // Infer currency based on exchange suffix
-                          if (s.ticker.endsWith(".KS") || s.ticker.endsWith(".KQ")) {
-                            setSelectedCurrency("KRW");
-                          } else if (s.ticker.endsWith(".TO") || s.ticker.endsWith(".V")) {
-                            setSelectedCurrency("CAD");
-                          } else {
-                            setSelectedCurrency("USD"); // Standard NYSE/NASDAQ
-                          }
+                          setSelectedCurrency(
+                            inferCurrencyFromTicker(s.ticker) || "USD"
+                          );
                           setSearchSuggestions([]);
                         }}
                         className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center justify-between"
@@ -1053,6 +1193,19 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   >
                     {submitting ? t("submitting") : t("submitSave")}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setSelectedHoldingGroup(null);
+                      resetAddForm();
+                      setShowAddModal(true);
+                    }}
+                    className="shrink-0 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 text-blue-600 p-2.5 rounded-xl transition-all"
+                    title={t("addHolding")}
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
                 </div>
               </div>
             </form>
@@ -1065,6 +1218,8 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           currency={displayCurrency}
           accountType={accountType}
           preferredType="expense"
+          country={ledgerScope === "KRW" ? "KR" : ledgerScope === "CAD" ? "CA" : null}
+          initialKind="investment"
           onClose={() => setShowAccountRegister(false)}
           onCreated={() => {
             setShowAccountRegister(false);
@@ -1073,6 +1228,62 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           }}
         />
       )}
+
+      {editingAccount && (
+        <AccountRegisterModal
+          currency={editingAccount.currency}
+          accountType={accountType}
+          preferredType="income"
+          account={editingAccount}
+          country={resolveAccountCountry(editingAccount)}
+          onClose={() => setEditingAccount(null)}
+          onCreated={() => {
+            setEditingAccount(null);
+            loadData();
+            if (onChanged) onChanged();
+          }}
+          onUpdated={() => {
+            setEditingAccount(null);
+            loadData();
+            if (onChanged) onChanged();
+          }}
+        />
+      )}
+
+      <input
+        ref={stockCameraRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void handleStockCameraFiles(e)}
+      />
+
+      <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => stockCameraRef.current?.click()}
+          disabled={scanning}
+          aria-label={t("scanPhoto")}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 active:bg-indigo-700 transition-colors disabled:opacity-50"
+        >
+          {scanning ? (
+            <Loader2 className="h-6 w-6 animate-spin" />
+          ) : (
+            <Camera className="h-6 w-6" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            resetAddForm();
+            setShowAddModal(true);
+          }}
+          aria-label={t("addHolding")}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
     </div>
   );
 }

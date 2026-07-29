@@ -3,7 +3,7 @@
 import {
   CreditCard,
   Landmark,
-  Pencil,
+  Plus,
   RefreshCw,
   Wallet,
 } from "lucide-react";
@@ -31,9 +31,14 @@ import {
   fetchStockHoldings,
   StockHolding,
   formatAmount,
+  resolveAccountCountry,
 } from "@/lib/api";
+import type { BankCountry } from "@/lib/banks";
 import { translateCategory } from "@/lib/category-i18n";
 import { monthKey, monthLabel } from "@/lib/date";
+
+type StockTotalMode = "both" | "KRW" | "USD";
+type CreatingKind = FinancialAccountKind | null;
 
 interface Props {
   month: Date;
@@ -72,14 +77,17 @@ export default function DashboardView({
   const [krwStats, setKrwStats] = useState<StatsSummary | null>(null);
   const [cadWorth, setCadWorth] = useState<NetWorthSummary | null>(null);
   const [krwWorth, setKrwWorth] = useState<NetWorthSummary | null>(null);
+  const [allWorth, setAllWorth] = useState<NetWorthSummary | null>(null);
   const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [display, setDisplay] = useState<Currency>("CAD");
+  const [stockTotalMode, setStockTotalMode] = useState<StockTotalMode>("both");
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(
     null
   );
+  const [creatingKind, setCreatingKind] = useState<CreatingKind>(null);
 
   const monthStr = monthKey(month);
 
@@ -121,30 +129,24 @@ export default function DashboardView({
       worthJobs.push(Promise.resolve(null));
     }
 
-    const accountJobs: Promise<FinancialAccount[]>[] = [];
-    if (scope === "CAD" || scope === "ALL") {
-      accountJobs.push(
-        fetchAccounts({ currency: "CAD", accountType }).catch(() => [])
-      );
-    }
-    if (scope === "KRW" || scope === "ALL") {
-      accountJobs.push(
-        fetchAccounts({ currency: "KRW", accountType }).catch(() => [])
-      );
-    }
+    const accountJobs: Promise<FinancialAccount[]>[] = [
+      fetchAccounts({ accountType }).catch(() => []),
+    ];
 
     Promise.all([
       ...statsJobs,
       ...worthJobs,
+      fetchNetWorth({ accountType }).catch(() => null),
       fetchExchangeRate().catch(() => null),
       Promise.all(accountJobs).then((lists) => lists.flat()),
       fetchStockHoldings(accountType).catch(() => []),
     ])
-      .then(([cadS, krwS, cadW, krwW, r, accountList, holdingsList]) => {
+      .then(([cadS, krwS, cadW, krwW, allW, r, accountList, holdingsList]) => {
         setCadStats(cadS as StatsSummary | null);
         setKrwStats(krwS as StatsSummary | null);
         setCadWorth(cadW as NetWorthSummary | null);
         setKrwWorth(krwW as NetWorthSummary | null);
+        setAllWorth(allW as NetWorthSummary | null);
         setRate(r as ExchangeRate | null);
         setAccounts(accountList as FinancialAccount[]);
         setHoldings(holdingsList as StockHolding[]);
@@ -251,33 +253,65 @@ export default function DashboardView({
     return map;
   }, [holdings]);
 
-  // Helper to convert native stock valuation to a target currency
-  const convertNative = useCallback((amount: number, from: string, to: Currency): number => {
-    if (!rate) return amount;
-    if (from === to) return amount;
-    
-    if (to === "CAD") {
-      if (from === "USD") return amount * (rate.usd_cad || 1.37);
-      if (from === "KRW") return amount * (rate.krw_cad || 0.001);
-    } else if (to === "KRW") {
-      if (from === "USD") return amount * (rate.usd_krw || 1350);
-      if (from === "CAD") return amount * (rate.cad_krw || 980);
-    }
-    return amount;
-  }, [rate]);
+  // Helper to convert native amounts between CAD / KRW / USD.
+  const convertNative = useCallback(
+    (amount: number, from: string, to: Currency | "USD"): number => {
+      if (!rate) return amount;
+      if (from === to) return amount;
 
-  // Calculate stock account stats
+      if (to === "CAD") {
+        if (from === "USD") return amount * (rate.usd_cad || 1.37);
+        if (from === "KRW") return amount * (rate.krw_cad || 0.001);
+      } else if (to === "KRW") {
+        if (from === "USD") return amount * (rate.usd_krw || 1350);
+        if (from === "CAD") return amount * (rate.cad_krw || 980);
+      } else if (to === "USD") {
+        if (from === "CAD") return amount * (rate.cad_usd || 1 / 1.37);
+        if (from === "KRW") return amount * (rate.krw_usd || 1 / 1350);
+      }
+      return amount;
+    },
+    [rate]
+  );
+
+  const scopeCountry: BankCountry | null =
+    scope === "CAD" ? "CA" : scope === "KRW" ? "KR" : null;
+
+  function accountMatchesScope(accountId: string, currency: string): boolean {
+    if (scope === "ALL") return true;
+    const full = accountById.get(accountId);
+    if (full) {
+      const country = resolveAccountCountry(full);
+      if (country) return country === scopeCountry;
+    }
+    return currency === scope;
+  }
+
+  // Balances filtered by Canada/Korea *country* (not cash currency).
+  const scopedBalances = useMemo(() => {
+    const list = allWorth?.accounts ?? [];
+    return list.filter(
+      (a) =>
+        !a.account_id.startsWith("virtual_stocks") &&
+        accountMatchesScope(a.account_id, a.currency)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allWorth, accounts, scope, scopeCountry]);
+
+  // Calculate stock account stats by country tab.
   const stockAccountsStats = useMemo(() => {
-    const invAccounts = netWorth?.accounts.filter(
-      (a) => a.kind === "investment" && !a.account_id.startsWith("virtual_stocks") && (scope === "ALL" || a.currency === scope)
-    ) ?? [];
+    const invAccounts = scopedBalances.filter((a) => a.kind === "investment");
 
     const list = invAccounts.map((acc) => {
       const cash = acc.balance;
       const accHoldings = accountHoldingsMap[acc.account_id] || [];
-      
+
       const stockValuation = accHoldings.reduce((sum, h) => {
-        const converted = convertNative(h.valuation, h.currency, acc.currency as Currency);
+        const converted = convertNative(
+          h.valuation,
+          h.currency,
+          acc.currency as Currency
+        );
         return sum + converted;
       }, 0);
 
@@ -291,19 +325,40 @@ export default function DashboardView({
       };
     });
 
-    const displayCurr = scope === "ALL" ? display : (scope as Currency);
-    
-    const totalValuation = list.reduce((sum, item) => {
-      const converted = convertNative(item.total, item.account.currency, displayCurr);
-      return sum + converted;
-    }, 0);
+    const totalKrw = list.reduce(
+      (sum, item) =>
+        sum +
+        convertNative(item.total, item.account.currency, "KRW"),
+      0
+    );
+    const totalUsd = list.reduce(
+      (sum, item) =>
+        sum +
+        convertNative(item.total, item.account.currency, "USD"),
+      0
+    );
 
     return {
       accounts: list,
-      totalValuation,
-      currency: displayCurr,
+      totalKrw,
+      totalUsd,
     };
-  }, [netWorth, accountHoldingsMap, scope, display, convertNative]);
+  }, [scopedBalances, accountHoldingsMap, convertNative]);
+
+  const hasCadAccounts = useMemo(
+    () =>
+      stockAccountsStats.accounts.some((a) => a.account.currency === "CAD") ||
+      scopedBalances.some((a) => a.currency === "CAD"),
+    [stockAccountsStats, scopedBalances]
+  );
+
+  const fmt = useCallback(
+    (amount: number, currency: Currency) =>
+      formatAmount(amount, currency, {
+        plainUsd: !hasCadAccounts && currency === "USD",
+      }),
+    [hasCadAccounts]
+  );
 
   if (loading) {
     return (
@@ -320,10 +375,14 @@ export default function DashboardView({
         ? tCommon("canada")
         : tCommon("korea");
 
-  const assetAccounts =
-    netWorth?.accounts.filter((a) => !a.is_liability && a.kind !== "investment") ?? [];
-  const liabilityAccounts =
-    netWorth?.accounts.filter((a) => a.is_liability) ?? [];
+  const assetAccounts = scopedBalances.filter(
+    (a) => !a.is_liability && a.kind !== "investment"
+  );
+  const liabilityAccounts = scopedBalances.filter((a) => a.is_liability);
+  const hasCashAccount = assetAccounts.some((a) => a.kind === "cash");
+  const createCountry: BankCountry | null = scopeCountry;
+  const createCurrency: Currency =
+    scope === "KRW" ? "KRW" : scope === "CAD" ? "CAD" : display;
   const cardBalancesLabel =
     tDashboard("cardBalances") ||
     translateCategory(TRANSFER_CATEGORY, tCategories);
@@ -485,110 +544,191 @@ export default function DashboardView({
         krwStats={krwStats}
       />
 
-      {liabilityAccounts.length > 0 && (
-        <section className="card-inset p-4">
+      <section className="card-inset p-4">
+        <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
             {cardBalancesLabel}
           </p>
-          <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {liabilityAccounts.map((acc) => {
+          <button
+            type="button"
+            onClick={() => setCreatingKind("credit_card")}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {tDashboard("addGeneric")}
+          </button>
+        </div>
+        <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {liabilityAccounts.length === 0 ? (
+            <li className="col-span-full rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-6 text-center text-xs text-gray-400">
+              {tDashboard("emptyCards")}
+            </li>
+          ) : (
+            liabilityAccounts.map((acc) => {
               const label = acc.nickname?.trim() || acc.name;
-              // Negative liability = overpayment / credit balance.
               const overpaid = acc.balance < 0;
-              const display = formatAmount(
+              const displayAmt = formatAmount(
                 overpaid ? Math.abs(acc.balance) : acc.balance,
                 acc.currency
               );
               return (
-                <li
-                  key={acc.account_id}
-                  className="rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-3"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <KindIcon kind={acc.kind} />
-                    <p className="text-sm font-medium truncate flex-1">
-                      {scope === "ALL" &&
-                        (acc.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
-                      {label}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => openAccountEdit(acc.account_id)}
-                      className="shrink-0 rounded-lg p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-                      aria-label={tAccount("editTitle")}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <p
-                    className={`mt-1.5 text-base font-bold tabular-nums truncate ${
-                      overpaid ? "text-blue-500" : "text-red-500"
-                    }`}
+                <li key={acc.account_id}>
+                  <button
+                    type="button"
+                    onClick={() => openAccountEdit(acc.account_id)}
+                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors"
                   >
-                    {overpaid ? `+${display}` : display}
-                  </p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <KindIcon kind={acc.kind} />
+                      <p className="text-sm font-medium truncate flex-1">
+                        {scope === "ALL" &&
+                          (acc.currency === "CAD"
+                            ? "🇨🇦 "
+                            : acc.currency === "KRW"
+                              ? "🇰🇷 "
+                              : "🇺🇸 ")}
+                        {label}
+                      </p>
+                    </div>
+                    <p
+                      className={`mt-1.5 text-base font-bold tabular-nums truncate ${
+                        overpaid ? "text-blue-500" : "text-red-500"
+                      }`}
+                    >
+                      {overpaid ? `+${displayAmt}` : displayAmt}
+                    </p>
+                  </button>
                 </li>
               );
-            })}
-          </ul>
-        </section>
-      )}
+            })
+          )}
+        </ul>
+      </section>
 
-      {stockAccountsStats.accounts.length > 0 && (
-        <section className="card-inset p-4">
-          <div className="flex items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-2.5">
+      <section className="card-inset p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-2.5">
+          <div className="flex items-center gap-2 min-w-0">
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-              주식 계좌 현황
+              {tDashboard("stockAccounts")}
             </p>
-            <div className="text-sm font-black text-blue-600 dark:text-blue-400">
-              총액: {formatAmount(stockAccountsStats.totalValuation, stockAccountsStats.currency)}
+            <button
+              type="button"
+              onClick={() => setCreatingKind("investment")}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {tDashboard("addGeneric")}
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+              {(
+                [
+                  ["both", tDashboard("stockTotalBoth")],
+                  ["KRW", "KRW"],
+                  ["USD", "USD"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setStockTotalMode(mode)}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors whitespace-nowrap ${
+                    stockTotalMode === mode
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="text-sm font-black text-blue-600 dark:text-blue-400 tabular-nums">
+              {stockTotalMode === "both" ? (
+                <div className="flex flex-col items-end gap-0.5">
+                  <span>{fmt(stockAccountsStats.totalKrw, "KRW")}</span>
+                  <span>{fmt(stockAccountsStats.totalUsd, "USD")}</span>
+                </div>
+              ) : stockTotalMode === "KRW" ? (
+                fmt(stockAccountsStats.totalKrw, "KRW")
+              ) : (
+                fmt(stockAccountsStats.totalUsd, "USD")
+              )}
             </div>
           </div>
-          <ul className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {stockAccountsStats.accounts.map(({ account, cash, stockValuation, total }) => {
-              const fullAcc = accountById.get(account.account_id);
-              const inst = fullAcc?.institution;
-              const label = fullAcc?.nickname?.trim() || account.nickname?.trim() || account.name;
-              return (
-                <li
-                  key={account.account_id}
-                  className="rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 hover:shadow-sm transition-shadow border border-gray-100 dark:border-gray-800/80"
-                >
-                  <div className="flex items-center justify-between gap-2 min-w-0">
-                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate">
-                      {inst ? `[${inst}] ` : ""}{label}
-                    </span>
-                    <span className="text-[9px] bg-gray-200 dark:bg-gray-850 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
-                      {account.currency}
-                    </span>
-                  </div>
-                  <div className="mt-2.5 flex items-baseline justify-between">
-                    <span className="text-[10px] text-gray-400">평가금 + 예수금</span>
-                    <span className="text-base font-black text-gray-900 dark:text-white tabular-nums">
-                      {formatAmount(total, account.currency as Currency)}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
-                    <span>주식: {formatAmount(stockValuation, account.currency as Currency)}</span>
-                    <span>예수금: {formatAmount(cash, account.currency as Currency)}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+        </div>
+        <ul className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {stockAccountsStats.accounts.length === 0 ? (
+            <li className="col-span-full rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-6 text-center text-xs text-gray-400">
+              {tDashboard("emptyBrokers")}
+            </li>
+          ) : (
+            stockAccountsStats.accounts.map(
+              ({ account, cash, stockValuation, total }) => {
+                const fullAcc = accountById.get(account.account_id);
+                const inst = fullAcc?.institution;
+                const label =
+                  fullAcc?.nickname?.trim() ||
+                  account.nickname?.trim() ||
+                  account.name;
+                return (
+                  <li key={account.account_id}>
+                    <button
+                      type="button"
+                      onClick={() => openAccountEdit(account.account_id)}
+                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 text-left hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-all border border-gray-100 dark:border-gray-800/80"
+                    >
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate">
+                          {inst ? `[${inst}] ` : ""}
+                          {label}
+                        </span>
+                        <span className="text-[9px] bg-gray-200 dark:bg-gray-850 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                          {account.currency}
+                        </span>
+                      </div>
+                      <div className="mt-2.5 flex items-baseline justify-between">
+                        <span className="text-[10px] text-gray-400">
+                          {tDashboard("stockPlusCash")}
+                        </span>
+                        <span className="text-base font-black text-gray-900 dark:text-white tabular-nums">
+                          {fmt(total, account.currency as Currency)}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
+                        <span>
+                          {tDashboard("stocksLabel")}:{" "}
+                          {fmt(
+                            stockValuation,
+                            account.currency as Currency
+                          )}
+                        </span>
+                        <span>
+                          {tDashboard("cashLabel")}:{" "}
+                          {fmt(cash, account.currency as Currency)}
+                        </span>
+                      </div>
+                    </button>
+                  </li>
+                );
+              }
+            )
+          )}
+        </ul>
+      </section>
 
-      {assetAccounts.length > 0 && (
-        <AccountGroup
-          title={tDashboard("assets")}
-          accounts={assetAccounts}
-          scope={scope}
-          kindLabel={(kind) => tAccountKinds(ACCOUNT_KIND_KEYS[kind])}
-          editLabel={tAccount("editTitle")}
-          onEdit={openAccountEdit}
-        />
-      )}
+      <AccountGroup
+        title={tDashboard("assets")}
+        accounts={assetAccounts}
+        scope={scope}
+        kindLabel={(kind) => tAccountKinds(ACCOUNT_KIND_KEYS[kind])}
+        onEdit={openAccountEdit}
+        onAdd={() => setCreatingKind("checking")}
+        showCashPlaceholder={!hasCashAccount}
+        cashPlaceholderLabel={tDashboard("cashZero")}
+        addLabel={tDashboard("addGeneric")}
+        formatAmountFn={fmt}
+      />
 
       {scope === "ALL" && (
         <div className="grid grid-cols-2 gap-3">
@@ -619,9 +759,16 @@ export default function DashboardView({
           currency={editingAccount.currency}
           accountType={accountType}
           preferredType={
-            editingAccount.is_default_income ? "income" : "expense"
+            editingAccount.kind === "investment"
+              ? "income"
+              : editingAccount.is_default_income
+                ? "income"
+                : "expense"
           }
           account={editingAccount}
+          country={
+            resolveAccountCountry(editingAccount) ?? createCountry ?? undefined
+          }
           onClose={() => setEditingAccount(null)}
           onCreated={() => {
             setEditingAccount(null);
@@ -629,6 +776,26 @@ export default function DashboardView({
           }}
           onUpdated={() => {
             setEditingAccount(null);
+            onChanged?.();
+          }}
+        />
+      )}
+      {creatingKind && (
+        <AccountRegisterModal
+          currency={
+            creatingKind === "investment" && createCountry === "KR"
+              ? "USD"
+              : createCurrency
+          }
+          accountType={accountType}
+          preferredType={
+            creatingKind === "investment" ? "income" : "expense"
+          }
+          initialKind={creatingKind}
+          country={createCountry}
+          onClose={() => setCreatingKind(null)}
+          onCreated={() => {
+            setCreatingKind(null);
             onChanged?.();
           }}
         />
@@ -642,53 +809,93 @@ function AccountGroup({
   accounts,
   scope,
   kindLabel,
-  editLabel,
   onEdit,
+  onAdd,
+  showCashPlaceholder,
+  cashPlaceholderLabel,
+  addLabel,
+  formatAmountFn = formatAmount,
 }: {
   title: string;
   accounts: AccountBalance[];
   scope: LedgerScope;
   kindLabel: (kind: FinancialAccountKind) => string;
-  editLabel: string;
   onEdit: (accountId: string) => void;
+  onAdd?: () => void;
+  showCashPlaceholder?: boolean;
+  cashPlaceholderLabel?: string;
+  addLabel?: string;
+  formatAmountFn?: (amount: number, currency: Currency) => string;
 }) {
   return (
     <div className="card-inset overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-700">
         <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
           {title}
         </p>
+        {onAdd && (
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {addLabel}
+          </button>
+        )}
       </div>
       <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+        {showCashPlaceholder && (
+          <li>
+            <button
+              type="button"
+              onClick={onAdd}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+            >
+              <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">
+                  {cashPlaceholderLabel}
+                </p>
+                <p className="text-[11px] text-gray-400 truncate">
+                  {kindLabel("cash")}
+                </p>
+              </div>
+              <p className="text-sm font-semibold tabular-nums whitespace-nowrap text-gray-900 dark:text-white">
+                {formatAmountFn(0, scope === "KRW" ? "KRW" : "CAD")}
+              </p>
+            </button>
+          </li>
+        )}
         {accounts.map((acc) => {
           const label = acc.nickname?.trim() || acc.name;
           const showFlag = scope === "ALL";
           return (
-            <li
-              key={acc.account_id}
-              className="flex items-center gap-3 px-4 py-3"
-            >
-              <KindIcon kind={acc.kind} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">
-                  {showFlag && (acc.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
-                  {label}
-                </p>
-                <p className="text-[11px] text-gray-400 truncate">
-                  {kindLabel(acc.kind)}
-                </p>
-              </div>
+            <li key={acc.account_id}>
               <button
                 type="button"
                 onClick={() => onEdit(acc.account_id)}
-                className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-                aria-label={editLabel}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <KindIcon kind={acc.kind} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">
+                    {showFlag &&
+                      (acc.currency === "CAD"
+                        ? "🇨🇦 "
+                        : acc.currency === "KRW"
+                          ? "🇰🇷 "
+                          : "🇺🇸 ")}
+                    {label}
+                  </p>
+                  <p className="text-[11px] text-gray-400 truncate">
+                    {kindLabel(acc.kind)}
+                  </p>
+                </div>
+                <p className="text-sm font-semibold tabular-nums whitespace-nowrap text-gray-900 dark:text-white">
+                  {formatAmount(acc.balance, acc.currency)}
+                </p>
               </button>
-              <p className="text-sm font-semibold tabular-nums whitespace-nowrap text-gray-900 dark:text-white">
-                {formatAmount(acc.balance, acc.currency)}
-              </p>
             </li>
           );
         })}

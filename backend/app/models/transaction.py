@@ -82,6 +82,12 @@ class TransactionBase(BaseModel):
     # Sub-items (line items) for detailed itemization
     items: list[TransactionItem] | None = None
 
+    # Dining tip metadata (optional)
+    tip_amount: float | None = None
+    tip_percent: float | None = None
+    subtotal: float | None = None
+    tax_amount: float | None = None
+
     @field_validator(
         "category", "sub_category", "merchant", "institution", "ticker", mode="before"
     )

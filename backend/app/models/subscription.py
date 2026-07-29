@@ -50,6 +50,8 @@ class SubscriptionBase(BaseModel):
     promo_end_date: datetime | None = None
     promo_reminder_enabled: bool = False
     end_reminder_enabled: bool = False
+    # True for rent/utilities/phone etc. (still uses monthly cycle for billing).
+    is_fixed_bill: bool = False
 
     account_id: str
     category: str
@@ -76,6 +78,7 @@ class SubscriptionUpdate(BaseModel):
     account_id: str | None = None
     category: str | None = None
     sub_category: str | None = None
+    merchant: str | None = None
     start_date: datetime | None = None
     installment_start_date: datetime | None = None
     total_installments: int | None = Field(default=None, gt=0)
@@ -85,6 +88,7 @@ class SubscriptionUpdate(BaseModel):
     promo_end_date: datetime | None = None
     promo_reminder_enabled: bool | None = None
     end_reminder_enabled: bool | None = None
+    is_fixed_bill: bool | None = None
 
 
 class SubscriptionOut(SubscriptionBase):

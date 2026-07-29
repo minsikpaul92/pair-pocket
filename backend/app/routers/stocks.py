@@ -15,6 +15,7 @@ from app.services.access import resolve_owner_ids, assert_can_access_doc
 from app.services.accounts import compute_account_balance
 from app.services.stocks import (
     get_or_update_stock_price,
+    resolve_stock_price,
     search_tickers_yfinance,
     sync_holding_from_transactions,
 )
@@ -48,13 +49,53 @@ async def get_holdings(
     holdings_docs = await cursor.to_list(length=None)
     
     holdings = []
+    # Batch-load accounts once (avoid N+1).
+    account_ids = {
+        h["account_id"] for h in holdings_docs if ObjectId.is_valid(h.get("account_id", ""))
+    }
+    accounts_by_id: dict[str, dict] = {}
+    if account_ids:
+        cursor_acc = db.accounts.find(
+            {"_id": {"$in": [ObjectId(i) for i in account_ids]}}
+        )
+        async for acc in cursor_acc:
+            accounts_by_id[str(acc["_id"])] = acc
+
     for h in holdings_docs:
         ticker = h["ticker"]
-        price_info = await get_or_update_stock_price(db, ticker)
+        holding_currency = h.get("currency") or "USD"
+        hint = h.get("avg_price")
+        price_info = await resolve_stock_price(
+            db,
+            ticker,
+            preferred_currency=holding_currency,
+            hint_price=float(hint) if hint is not None else None,
+        )
+
+        # Persist resolved Yahoo symbol when bare US ticker was wrong for CAD/KRW.
+        resolved_ticker = (
+            price_info.get("ticker") if price_info else None
+        ) or ticker
+        if (
+            price_info
+            and resolved_ticker != ticker
+            and str(price_info.get("currency", "")).upper()
+            == str(holding_currency).upper()
+        ):
+            await db.holdings.update_one(
+                {"_id": h["_id"]},
+                {"$set": {"ticker": resolved_ticker}},
+            )
+            ticker = resolved_ticker
         
         price = price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
         prev_close = price_info.get("prev_close", price) if price_info else price
-        currency = price_info.get("currency", h["currency"]) if price_info else h["currency"]
+        # Keep holding currency as source of truth for CAD CDRs (don't overwrite with USD).
+        currency = holding_currency
+        if price_info and str(price_info.get("currency", "")).upper() == str(
+            holding_currency
+        ).upper():
+            currency = price_info["currency"]
         
         shares = h["shares"]
         avg_price = h["avg_price"]
@@ -67,16 +108,17 @@ async def get_holdings(
         daily_change = price - prev_close
         daily_change_percent = (daily_change / prev_close * 100) if prev_close > 0 else 0.0
         
-        # Look up account details (for institution name)
-        account = await db.accounts.find_one({"_id": ObjectId(h["account_id"])})
+        account = accounts_by_id.get(h["account_id"])
         institution = account.get("institution") if account else "기타"
         account_name = account.get("name") if account else "기타 계좌"
+        account_country = account.get("country") if account else None
 
         holdings.append({
             "id": str(h["_id"]),
             "account_id": h["account_id"],
             "account_name": account_name,
             "institution": institution,
+            "account_country": account_country,
             "ticker": ticker,
             "name": h["name"],
             "shares": shares,
@@ -113,16 +155,36 @@ async def create_holding(
     # Check authorization
     await assert_can_access_doc(db, current_user, account)
     
-    # Try fetching details from Yahoo Finance to normalize name & currency
-    price_info = await get_or_update_stock_price(db, payload.ticker)
+    # Resolve Yahoo symbol with holding currency (CAD CDRs must not map to US).
+    price_info = await resolve_stock_price(
+        db,
+        payload.ticker,
+        preferred_currency=payload.currency.value
+        if hasattr(payload.currency, "value")
+        else str(payload.currency),
+        hint_price=payload.avg_price,
+    )
     name = price_info.get("name", payload.name) if price_info else payload.name
-    currency = price_info.get("currency", payload.currency) if price_info else payload.currency
+    resolved_ticker = (
+        (price_info.get("ticker") if price_info else None) or payload.ticker
+    ).upper()
+    # Prefer client currency; only adopt Yahoo currency when it matches.
+    currency = (
+        payload.currency.value
+        if hasattr(payload.currency, "value")
+        else str(payload.currency)
+    )
+    if (
+        price_info
+        and str(price_info.get("currency", "")).upper() == currency.upper()
+    ):
+        currency = price_info["currency"]
 
     holding_doc = {
         "owner_id": current_user.id,
         "account_id": payload.account_id,
         "account_type": account["account_type"],
-        "ticker": payload.ticker.upper(),
+        "ticker": resolved_ticker,
         "name": name,
         "avg_price": payload.avg_price,
         "shares": payload.shares,

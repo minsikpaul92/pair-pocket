@@ -69,13 +69,39 @@ async def create_account(
     owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
 
     if payload.is_default_expense:
+        # Bank/cash defaults must not wipe credit-card defaults.
         await db[COLLECTION].update_many(
             {
                 **owner_match(owner_ids),
                 "account_type": payload.account_type.value,
                 "currency": payload.currency.value,
+                "kind": {"$ne": FinancialAccountKind.CREDIT_CARD.value},
             },
             {"$set": {"is_default_expense": False}},
+        )
+    if payload.is_default_credit:
+        await db[COLLECTION].update_many(
+            {
+                **owner_match(owner_ids),
+                "account_type": payload.account_type.value,
+                "currency": payload.currency.value,
+                "kind": FinancialAccountKind.CREDIT_CARD.value,
+            },
+            {"$set": {"is_default_credit": False}},
+        )
+    if payload.is_default_investment:
+        inv_filter: dict = {
+            **owner_match(owner_ids),
+            "account_type": payload.account_type.value,
+            "kind": FinancialAccountKind.INVESTMENT.value,
+        }
+        if payload.country is not None:
+            inv_filter["country"] = payload.country.value
+        else:
+            inv_filter["currency"] = payload.currency.value
+        await db[COLLECTION].update_many(
+            inv_filter,
+            {"$set": {"is_default_investment": False}},
         )
     if payload.is_default_income:
         await db[COLLECTION].update_many(
@@ -91,6 +117,14 @@ async def create_account(
     doc["kind"] = payload.kind.value
     doc["currency"] = payload.currency.value
     doc["account_type"] = payload.account_type.value
+    if payload.country is not None:
+        doc["country"] = payload.country.value
+    # Investment never acts as expense/credit wallet; use is_default_investment.
+    if payload.kind == FinancialAccountKind.INVESTMENT:
+        doc["is_default_expense"] = False
+        doc["is_default_credit"] = False
+    else:
+        doc["is_default_investment"] = False
     doc["is_liability"] = is_liability
     doc["owner_id"] = current_user.id
     doc["created_at"] = now
@@ -149,8 +183,36 @@ async def update_account(
                 **owner_match(owner_ids),
                 "account_type": existing["account_type"],
                 "currency": existing["currency"],
+                "kind": {"$ne": FinancialAccountKind.CREDIT_CARD.value},
             },
             {"$set": {"is_default_expense": False}},
+        )
+    if updates.get("is_default_credit"):
+        await db[COLLECTION].update_many(
+            {
+                **owner_match(owner_ids),
+                "account_type": existing["account_type"],
+                "currency": existing["currency"],
+                "kind": FinancialAccountKind.CREDIT_CARD.value,
+            },
+            {"$set": {"is_default_credit": False}},
+        )
+    if updates.get("is_default_investment"):
+        inv_filter: dict = {
+            **owner_match(owner_ids),
+            "account_type": existing["account_type"],
+            "kind": FinancialAccountKind.INVESTMENT.value,
+        }
+        country = updates.get("country") or existing.get("country")
+        if country:
+            inv_filter["country"] = (
+                country.value if hasattr(country, "value") else country
+            )
+        else:
+            inv_filter["currency"] = existing["currency"]
+        await db[COLLECTION].update_many(
+            inv_filter,
+            {"$set": {"is_default_investment": False}},
         )
     if updates.get("is_default_income"):
         await db[COLLECTION].update_many(

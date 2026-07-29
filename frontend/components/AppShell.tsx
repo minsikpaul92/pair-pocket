@@ -327,7 +327,14 @@ export default function AppShell({ user, onLogout }: Props) {
     window.sessionStorage.setItem(ACTIVE_VIEW_KEY, view);
   }, [view]);
 
-  // Materialize due subscriptions, then load ledger data.
+  // Materialize due subscriptions when ledger type changes (not on every data bump).
+  useEffect(() => {
+    syncSubscriptions(accountType).catch(() => {
+      /* non-blocking */
+    });
+  }, [accountType]);
+
+  // Load ledger transactions / pending for the selected month & scope.
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -343,14 +350,9 @@ export default function AppShell({ user, onLogout }: Props) {
         ? fetchAllPendingOccurrences(pendingFilters)
         : fetchPendingOccurrences({ ...pendingFilters, currency: scope });
 
-    syncSubscriptions(accountType)
-      .then(() => {
-        if (!active) return null;
-        return Promise.all([txLoader, pendingLoader]);
-      })
-      .then((result) => {
-        if (!active || !result) return;
-        const [txs, pending] = result;
+    Promise.all([txLoader, pendingLoader])
+      .then(([txs, pending]) => {
+        if (!active) return;
         setTransactions(txs);
         setPendingOccurrences(pending);
       })
@@ -738,6 +740,7 @@ export default function AppShell({ user, onLogout }: Props) {
               presets={presets}
               transactions={transactions}
               onEditTransaction={openEdit}
+              onDeleted={bumpVersion}
             />
           ) : view === "subscriptions" ? (
             <SubscriptionsView
@@ -972,7 +975,8 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
       )}
 
-      {/* Floating Buttons Group */}
+      {/* Floating Buttons Group — hidden on stocks/subscriptions (view-specific FAB) */}
+      {view !== "stocks" && view !== "subscriptions" && (
       <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col gap-3">
         {/* Floating Camera Button (Scan) */}
         <button
@@ -994,8 +998,7 @@ export default function AppShell({ user, onLogout }: Props) {
           <Plus className="h-6 w-6" />
         </button>
       </div>
-
-      {/* AI Parsing Loading Overlay */}
+      )}
       {aiParsing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center space-y-4 max-w-xs text-center border border-gray-100 dark:border-gray-700">

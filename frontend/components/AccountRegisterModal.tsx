@@ -23,6 +23,7 @@ import {
   removeInstitution,
   updateAccount,
 } from "@/lib/api";
+import type { BankCountry } from "@/lib/banks";
 import { translateError } from "@/lib/errors";
 
 interface Props {
@@ -32,6 +33,8 @@ interface Props {
   account?: FinancialAccount | null;
   /** Prefill kind when creating (e.g. investment for brokerage). */
   initialKind?: FinancialAccountKind;
+  /** Canada/Korea tab for brokerage filtering. */
+  country?: BankCountry | null;
   onClose: () => void;
   onCreated: (account: FinancialAccount) => void;
   onUpdated?: (account: FinancialAccount) => void;
@@ -51,6 +54,7 @@ export default function AccountRegisterModal({
   preferredType,
   account = null,
   initialKind,
+  country = null,
   onClose,
   onCreated,
   onUpdated,
@@ -82,13 +86,14 @@ export default function AccountRegisterModal({
     account?.institution ?? ""
   );
   const [customInstitutions, setCustomInstitutions] = useState<string[]>([]);
-  const [isDefault, setIsDefault] = useState(
-    account
-      ? preferredType === "expense"
-        ? account.is_default_expense
-        : account.is_default_income
-      : true
-  );
+  const [isDefault, setIsDefault] = useState(() => {
+    if (!account) return true;
+    if (account.kind === "investment") return Boolean(account.is_default_investment);
+    if (account.kind === "credit_card") return Boolean(account.is_default_credit);
+    return preferredType === "expense"
+      ? Boolean(account.is_default_expense)
+      : Boolean(account.is_default_income);
+  });
   const [isActive, setIsActive] = useState(account?.is_active ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +131,31 @@ export default function AccountRegisterModal({
     const cardLastFour = isCreditCard ? normalizeLastFour(lastFour) : null;
     setSubmitting(true);
     try {
+      const defaultFlags = {
+        is_default_expense:
+          !isInvestment && !isCreditCard && preferredType === "expense"
+            ? isDefault
+            : isEdit && account
+              ? account.is_default_expense
+              : false,
+        is_default_income:
+          !isInvestment && !isCreditCard && preferredType === "income"
+            ? isDefault
+            : isEdit && account
+              ? account.is_default_income
+              : false,
+        is_default_credit: isCreditCard
+          ? isDefault
+          : isEdit && account
+            ? account.is_default_credit
+            : false,
+        is_default_investment: isInvestment
+          ? isDefault
+          : isEdit && account
+            ? account.is_default_investment
+            : false,
+      };
+
       if (isEdit && account) {
         const updated = await updateAccount(account.id, {
           name: trimmed,
@@ -134,10 +164,7 @@ export default function AccountRegisterModal({
           institution: isCash ? null : institution || null,
           last_four: cardLastFour,
           account_number: maskedAccount,
-          is_default_expense:
-            preferredType === "expense" ? isDefault : account.is_default_expense,
-          is_default_income:
-            preferredType === "income" ? isDefault : account.is_default_income,
+          ...defaultFlags,
           is_active: isActive,
         });
         onUpdated?.(updated);
@@ -151,12 +178,12 @@ export default function AccountRegisterModal({
         kind,
         currency: selectedCurrency,
         account_type: accountType,
+        country: country ?? undefined,
         opening_balance: balance,
         institution: isCash ? null : institution || null,
         last_four: cardLastFour,
         account_number: maskedAccount,
-        is_default_expense: preferredType === "expense" ? isDefault : false,
-        is_default_income: preferredType === "income" ? isDefault : false,
+        ...defaultFlags,
       };
 
       const created = await createAccount(payload);
@@ -278,7 +305,7 @@ export default function AccountRegisterModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className={isCash ? "space-y-3" : "grid grid-cols-2 gap-3"}>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
                 {t("currentBalance")}
@@ -301,6 +328,7 @@ export default function AccountRegisterModal({
                     : t("accountBalance")}
               </p>
             </div>
+            {!isCash && (
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
                 {isCreditCard ? t("lastFour") : t("accountNumber")}
@@ -321,8 +349,6 @@ export default function AccountRegisterModal({
                     {t("lastFourHint")}
                   </p>
                 </>
-              ) : isCash ? (
-                <p className="text-xs text-gray-400 py-2">{tCommon("none")}</p>
               ) : (
                 <>
                   <input
@@ -340,6 +366,7 @@ export default function AccountRegisterModal({
                 </>
               )}
             </div>
+            )}
           </div>
 
           {!isCash && (
@@ -350,6 +377,7 @@ export default function AccountRegisterModal({
               <BankPicker
                 value={institution}
                 onChange={setInstitution}
+                country={country ?? "ALL"}
                 customInstitutions={customInstitutions}
                 onAddCustom={async (n) => {
                   const next = await addInstitution(n);
@@ -375,9 +403,11 @@ export default function AccountRegisterModal({
             <span className="text-sm">
               {isInvestment
                 ? t("defaultBrokerAccount")
-                : preferredType === "expense"
-                  ? t("defaultExpenseAccount")
-                  : t("defaultIncomeAccount")}
+                : isCreditCard
+                  ? t("defaultCreditAccount")
+                  : preferredType === "expense"
+                    ? t("defaultExpenseAccount")
+                    : t("defaultIncomeAccount")}
             </span>
           </label>
 

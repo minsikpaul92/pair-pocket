@@ -274,7 +274,12 @@ def _receipt_prompt() -> str:
         "Do NOT use any other categories or sub_categories.\n"
         "If it is a single receipt, extract all individual items (sub-items/line items) from the receipt, "
         "including original item name, standardized Korean item name (e.g. 수박, 소고기, 우유, 화장지) for price tracking, "
-        "quantity, unit (e.g. 개, lb, kg, bag) or null, unit_price, and total_price."
+        "quantity, unit (e.g. 개, lb, kg, bag) or null, unit_price, and total_price.\n"
+        "For Canadian receipts: extract subtotal (pre-tax), tax_amount (HST/GST/PST), tip_amount if shown, "
+        "and amount as the final total paid. Line item unit_price should be pre-tax when the receipt shows it; "
+        "otherwise use the printed line total divided by quantity.\n"
+        "Line item parsing rules: each row must align to columns name | standardized_name | quantity | unit | unit_price | total_price. "
+        "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores)."
     )
 
 
@@ -298,7 +303,19 @@ def _receipt_response_schema() -> dict[str, Any]:
                         },
                         "amount": {
                             "type": "NUMBER",
-                            "description": "Total purchase or transaction amount.",
+                            "description": "Final total paid (after tax and tip).",
+                        },
+                        "subtotal": {
+                            "type": "NUMBER",
+                            "description": "Pre-tax subtotal when shown on receipt.",
+                        },
+                        "tax_amount": {
+                            "type": "NUMBER",
+                            "description": "Total tax (HST/GST/PST) when shown.",
+                        },
+                        "tip_amount": {
+                            "type": "NUMBER",
+                            "description": "Tip/gratuity when shown.",
                         },
                         "currency": {
                             "type": "STRING",
@@ -688,8 +705,12 @@ def _onboarding_prompt(step: str) -> str:
             "- cycle: monthly or yearly (installments use monthly). Default monthly.\n"
             "- billing_day: day of month (1-28) of renewal / next charge / 결제일. "
             "Infer from 'renews on', 'next billing', '결제 예정', anniversary dates.\n"
-            "- start_date / end_date: ISO YYYY-MM-DD when visible. "
-            "Installments MUST include end_date (or last payment date) when shown.\n"
+            "- start_date / end_date: ISO YYYY-MM-DD only (e.g. 2025-03-15). "
+            "Never use dots/slashes like 2025.03.15.\n"
+            "- Installments (Affirm/BNPL/할부): always set total_installments when "
+            "the plan shows N payments / N회 / 'of N'. Also set end_date when the "
+            "last payment / payoff / maturity date is shown. If only start + N "
+            "payments are visible, still return total_installments (client computes end).\n"
             "Costco membership is a yearly subscription named Costco when visible.\n"
             "Deduplicate by service name. Return JSON matching the schema."
         )
@@ -702,8 +723,18 @@ def _onboarding_prompt(step: str) -> str:
         "prefer the primary visible cash currency for cash_balance and note others "
         "in holdings only if they are stocks; for multi-currency cash, the assets "
         "step handles split accounts — here set cash_balance to the main cash line.\n"
-        "For each holding include ticker, name, shares, avg_price (cost basis if shown), currency.\n"
-        "currency must be CAD, KRW, or USD (default CAD if unsure).\n"
+        "For each holding include ticker, name, shares, avg_price (cost basis / average "
+        "price if shown), currency.\n"
+        "CANADIAN LISTINGS (critical — Wealthsimple FHSA / TSX / CDR):\n"
+        "- If price shows CAD, or name contains CDR / CAD Hedged / TSX / NEO, "
+        "currency MUST be CAD.\n"
+        "- Prefer Yahoo-style Canadian tickers: TSX → .TO (e.g. VFV.TO, QQC.TO), "
+        "NEO CDRs → .NE (e.g. NVDA.NE, XOM.NE, LLY.NE, PLTR.NE), "
+        "TSXV → .V. Keep suffixes like ZXLE.F as shown.\n"
+        "- NEVER map a CAD-priced CDR (e.g. NVDA ~$44 CAD, XOM ~$28 CAD) to the "
+        "US-listed ticker without a Canadian suffix — that inflates valuation badly.\n"
+        "- Put the full visible name (including 'CDR (CAD Hedged)') in name.\n"
+        "currency must be CAD, KRW, or USD (default CAD if Wealthsimple / CAD labels).\n"
         "If multiple screenshots belong to one account, merge into one brokerage object.\n"
         "Return JSON matching the schema."
     )
@@ -760,6 +791,7 @@ def _onboarding_schema(step: str) -> dict[str, Any]:
                             "billing_day": {"type": "NUMBER"},
                             "start_date": {"type": "STRING"},
                             "end_date": {"type": "STRING"},
+                            "total_installments": {"type": "NUMBER"},
                             "promo_amount": {"type": "NUMBER"},
                             "promo_end_date": {"type": "STRING"},
                             "category": {"type": "STRING"},

@@ -65,6 +65,7 @@ export default function OnboardingScreenshotScan({
   onParsed,
 }: Props) {
   const t = useTranslations("onboarding");
+  const tImport = useTranslations("import");
   const inputRef = useRef<HTMLInputElement>(null);
   const [queue, setQueue] = useState<QueuedImage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -78,6 +79,24 @@ export default function OnboardingScreenshotScan({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function formatResumeAtEastern(iso?: string | null): string {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso);
+      return new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "America/Toronto",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(d);
+    } catch {
+      return iso;
+    }
+  }
 
   function clearQueue() {
     setQueue((prev) => {
@@ -154,15 +173,14 @@ export default function OnboardingScreenshotScan({
             })
           );
         } else if (ev.event === "quota_fallback") {
-          const msg =
-            ev.message ||
-            (ev.fallback_model
-              ? t("aiScanningModel", {
-                  count: ev.count ?? resized.length,
-                  model: ev.fallback_model,
-                })
-              : null);
-          if (msg) setStatus(msg);
+          const resumeAt = formatResumeAtEastern(ev.resume_at);
+          setStatus(
+            tImport("statusQuotaFallback", {
+              model: ev.model || "gemini-3.6-flash",
+              fallback: ev.fallback_model || "gemini-3.5-flash-lite",
+              resumeAt,
+            })
+          );
         } else if (ev.event === "scanning") {
           setStatus(t("aiScanning", { count: ev.count ?? resized.length }));
         }
@@ -170,8 +188,11 @@ export default function OnboardingScreenshotScan({
       const modelLabel = result.models_used?.length
         ? [...new Set(result.models_used)].join(", ")
         : null;
-      if (result.notes?.length) {
-        setStatus(result.notes[result.notes.length - 1]);
+      const humanNotes = (result.notes || []).filter(
+        (n) => !/free-tier|quota\/rate|using gemini/i.test(n)
+      );
+      if (humanNotes.length) {
+        setStatus(humanNotes[humanNotes.length - 1]);
       } else if (modelLabel) {
         setStatus(
           t("aiDoneModel", {

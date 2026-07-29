@@ -106,6 +106,10 @@ async def get_or_update_stock_price(db, ticker: str, force_refresh: bool = False
     Returns the cached stock price. If cache is expired (> 2 hours) or missing,
     fetches live price from Yahoo Finance and updates cache.
     """
+    ticker = (ticker or "").strip().upper()
+    if not ticker:
+        return None
+
     now = datetime.datetime.utcnow()
     cached = await db.stock_prices.find_one({"_id": ticker})
     
@@ -161,6 +165,81 @@ async def get_or_update_stock_price(db, ticker: str, force_refresh: bool = False
     except Exception as e:
         print(f"Error fetching stock price for {ticker}: {e}")
         return cached
+
+
+def _ticker_has_exchange_suffix(ticker: str) -> bool:
+    return "." in ticker
+
+
+def _candidate_tickers(ticker: str, preferred_currency: str | None) -> list[str]:
+    """Build Yahoo symbol candidates. CAD CDRs often need .NE / .TO, not bare US ticker."""
+    t = (ticker or "").strip().upper()
+    if not t:
+        return []
+    if _ticker_has_exchange_suffix(t):
+        return [t]
+
+    preferred = (preferred_currency or "").upper()
+    if preferred == "CAD":
+        # NEO CDRs first (NVDA/XOM/LLY/PLTR CAD-hedged), then TSX, then bare US last.
+        return [f"{t}.NE", f"{t}.TO", f"{t}.V", t]
+    if preferred == "KRW":
+        return [f"{t}.KS", f"{t}.KQ", t]
+    return [t]
+
+
+async def resolve_stock_price(
+    db,
+    ticker: str,
+    preferred_currency: str | None = None,
+    hint_price: float | None = None,
+    force_refresh: bool = False,
+) -> dict | None:
+    """
+    Fetch price, preferring exchange symbols that match preferred_currency.
+    Prevents CAD CDRs (e.g. NVDA @ ~$44 CAD) from resolving to US NVDA.
+
+    Stops early on the first preferred-currency match so CAD bare tickers do not
+    sequentially hit .NE/.TO/.V/US Yahoo endpoints on every load.
+    """
+    candidates = _candidate_tickers(ticker, preferred_currency)
+    preferred = (preferred_currency or "").upper()
+    results: list[dict] = []
+    matching: list[dict] = []
+
+    for cand in candidates:
+        info = await get_or_update_stock_price(db, cand, force_refresh=force_refresh)
+        if not info or info.get("price") is None:
+            continue
+        results.append(info)
+        if preferred and str(info.get("currency", "")).upper() == preferred:
+            matching.append(info)
+            # Without a hint, first exchange match is enough (e.g. NVDA.NE).
+            if hint_price is None or hint_price <= 0:
+                return info
+
+    if matching:
+        if hint_price is not None and hint_price > 0:
+            matching.sort(key=lambda r: abs(float(r["price"]) - float(hint_price)))
+        return matching[0]
+
+    if not results:
+        return None
+
+    if preferred:
+        # Do not fall back to US NVDA (~$120) for a CAD CDR (~$44).
+        if preferred in ("CAD", "KRW") and hint_price is not None and hint_price > 0:
+            results.sort(key=lambda r: abs(float(r["price"]) - float(hint_price)))
+            best = results[0]
+            if abs(float(best["price"]) - float(hint_price)) / hint_price <= 1.5:
+                return best
+            return None
+        if preferred in ("CAD", "KRW"):
+            return None
+
+    if hint_price is not None and hint_price > 0 and len(results) > 1:
+        results.sort(key=lambda r: abs(float(r["price"]) - float(hint_price)))
+    return results[0]
 
 
 KOREAN_STOCK_MAP = {
