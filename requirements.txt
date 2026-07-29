@@ -1,0 +1,2 @@
+# Heroku Python buildpack reads this from the repo root (monorepo).
+-r backend/requirements.txt
