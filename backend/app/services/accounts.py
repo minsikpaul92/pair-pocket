@@ -205,11 +205,18 @@ async def compute_net_worth(
             )
         )
 
-    # Calculate stock holdings valuation
-    holdings_cursor = db.holdings.find({
+    # Calculate stock holdings valuation (once per account currency bucket).
+    # When currency is filtered, only include holdings on accounts in that currency
+    # so CAD + KRW dashboard totals do not double-count the same portfolio.
+    holdings_query: dict = {
         "owner_id": {"$in": ids},
-        "account_type": account_type.value
-    })
+        "account_type": account_type.value,
+    }
+    account_ids = {str(d["_id"]) for d in docs}
+    if currency is not None:
+        holdings_query["account_id"] = {"$in": list(account_ids)}
+
+    holdings_cursor = db.holdings.find(holdings_query)
     holdings_docs = await holdings_cursor.to_list(length=None)
 
     if holdings_docs:
@@ -230,8 +237,13 @@ async def compute_net_worth(
         )
 
         for h, price_info in zip(holdings_docs, price_infos):
-            price = price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
-            stock_curr = price_info.get("currency", h["currency"]) if price_info else h["currency"]
+            # Prefer holding's stored currency (CAD CDR / KR listing) over Yahoo.
+            price = (
+                price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
+            )
+            stock_curr = h.get("currency") or (
+                price_info.get("currency") if price_info else "USD"
+            )
             shares = h["shares"]
             valuation_native = shares * price
 
@@ -249,9 +261,9 @@ async def compute_net_worth(
                         val_converted = valuation_native * usd_cad
                 elif target_currency == Currency.USD:
                     if stock_curr == "KRW":
-                        val_converted = valuation_native * krw_cad * usd_cad
+                        val_converted = valuation_native * (rates_info.get("krw_usd") or (1 / usd_krw))
                     elif stock_curr == "CAD":
-                        val_converted = valuation_native / usd_cad
+                        val_converted = valuation_native * (rates_info.get("cad_usd") or (1 / usd_cad))
 
             stocks_valuation_total += val_converted
 
