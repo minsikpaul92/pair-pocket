@@ -1522,6 +1522,24 @@ export interface StockSearchResult {
   quote_type: string;
 }
 
+export interface MarketIndexQuote {
+  id: string;
+  symbol: string;
+  price: number;
+  prev_close: number;
+  change_percent: number;
+  currency: string;
+}
+
+export async function fetchMarketIndices(): Promise<MarketIndexQuote[]> {
+  const res = await fetch(`${API_BASE_URL}/api/stocks/market-indices`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("fetchMarketIndices");
+  const data = (await res.json()) as { indices: MarketIndexQuote[] };
+  return data.indices ?? [];
+}
+
 export async function searchStocks(query: string): Promise<StockSearchResult[]> {
   const res = await fetch(
     `${API_BASE_URL}/api/stocks/search?q=${encodeURIComponent(query)}`,

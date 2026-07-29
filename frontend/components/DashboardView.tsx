@@ -77,7 +77,6 @@ export default function DashboardView({
   const [krwStats, setKrwStats] = useState<StatsSummary | null>(null);
   const [cadWorth, setCadWorth] = useState<NetWorthSummary | null>(null);
   const [krwWorth, setKrwWorth] = useState<NetWorthSummary | null>(null);
-  const [allWorth, setAllWorth] = useState<NetWorthSummary | null>(null);
   const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [display, setDisplay] = useState<Currency>("CAD");
   const [stockTotalMode, setStockTotalMode] = useState<StockTotalMode>("both");
@@ -136,17 +135,15 @@ export default function DashboardView({
     Promise.all([
       ...statsJobs,
       ...worthJobs,
-      fetchNetWorth({ accountType }).catch(() => null),
       fetchExchangeRate().catch(() => null),
       Promise.all(accountJobs).then((lists) => lists.flat()),
       fetchStockHoldings(accountType).catch(() => []),
     ])
-      .then(([cadS, krwS, cadW, krwW, allW, r, accountList, holdingsList]) => {
+      .then(([cadS, krwS, cadW, krwW, r, accountList, holdingsList]) => {
         setCadStats(cadS as StatsSummary | null);
         setKrwStats(krwS as StatsSummary | null);
         setCadWorth(cadW as NetWorthSummary | null);
         setKrwWorth(krwW as NetWorthSummary | null);
-        setAllWorth(allW as NetWorthSummary | null);
         setRate(r as ExchangeRate | null);
         setAccounts(accountList as FinancialAccount[]);
         setHoldings(holdingsList as StockHolding[]);
@@ -288,15 +285,21 @@ export default function DashboardView({
   }
 
   // Balances filtered by Canada/Korea *country* (not cash currency).
+  // Exclude virtual stock lumps — equity is shown in the stock section from holdings.
   const scopedBalances = useMemo(() => {
-    const list = allWorth?.accounts ?? [];
+    const list =
+      scope === "CAD"
+        ? cadWorth?.accounts ?? []
+        : scope === "KRW"
+          ? krwWorth?.accounts ?? []
+          : [...(cadWorth?.accounts ?? []), ...(krwWorth?.accounts ?? [])];
     return list.filter(
       (a) =>
         !a.account_id.startsWith("virtual_stocks") &&
         accountMatchesScope(a.account_id, a.currency)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allWorth, accounts, scope, scopeCountry]);
+  }, [cadWorth, krwWorth, accounts, scope, scopeCountry]);
 
   // Calculate stock account stats by country tab.
   const stockAccountsStats = useMemo(() => {

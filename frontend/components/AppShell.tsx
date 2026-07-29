@@ -36,6 +36,7 @@ import TransactionModal from "@/components/TransactionModal";
 import StocksView from "@/components/StocksView";
 import SettingsView from "@/components/SettingsView";
 import ImportView from "@/components/ImportView";
+import MonthPicker from "@/components/MonthPicker";
 import { LineChart, Sparkles } from "lucide-react";
 import {
   AccountType,
@@ -671,9 +672,21 @@ export default function AppShell({ user, onLogout }: Props) {
         <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-28 md:pb-10">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                {monthLabel(month, locale)}
-              </h1>
+              {view === "calendar" ||
+              view === "list" ||
+              view === "subscriptions" ||
+              view === "stocks" ||
+              view === "dashboard" ? (
+                <MonthPicker
+                  value={month}
+                  onChange={setMonth}
+                  locale={locale}
+                />
+              ) : (
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                  {monthLabel(month, locale)}
+                </h1>
+              )}
               <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                 {scopeLabel}
               </p>

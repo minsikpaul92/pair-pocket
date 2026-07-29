@@ -33,7 +33,28 @@ import {
   OCRLog,
   API_BASE_URL,
 } from "@/lib/api";
+import {
+  canonicalizeCategory,
+  canonicalizeSubCategory,
+} from "@/lib/category-i18n";
 import { useTranslations } from "next-intl";
+
+/** Excel needs a UTF-8 BOM to open Korean CSV correctly on macOS/Windows. */
+const CSV_UTF8_BOM = "\uFEFF";
+
+function downloadTextCsv(filename: string, body: string) {
+  const blob = new Blob([CSV_UTF8_BOM + body], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 const MAX_AI_FILES = 15;
 
@@ -534,39 +555,40 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
   }
 
   function downloadCSVTemplate() {
-    // Column order must match parseCSV: date, amount, currency, merchant, category, sub_category
+    // Valid expense preset pairs only — column order matches parseCSV.
     const csvContent = [
       "date,amount,currency,merchant,category,sub_category",
-      "2026-01-15,12.50,CAD,Example Cafe,생활/쇼핑,식비",
-      "2026-01-16,45.00,CAD,Grocery Store,생활/쇼핑,기타",
+      "2026-01-15,12.50,CAD,Example Cafe,식비,카페/간식",
+      "2026-01-16,45.00,CAD,Grocery Store,식비,식재료/장보기",
+      "2026-01-17,28.00,CAD,Shoppers,생활/쇼핑,생필품",
     ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "PairPocket_import_template.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadTextCsv("PairPocket_import_template.csv", csvContent);
   }
 
   function parseCSV(file: File) {
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
+      const text = ((event.target?.result as string) || "").replace(/^\uFEFF/, "");
       if (!text) return;
 
-      const rows = text.split("\n");
+      const rows = text.split(/\r?\n/);
       const mapped: EditableTransaction[] = [];
-      
-      // Simple CSV parser
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i].trim();
-        if (!row) continue;
 
-        // Split by comma (handles simple cases, does not support quotes with commas)
+      // Find header row (skip guide comments if present).
+      let dataStart = 1;
+      for (let i = 0; i < rows.length; i++) {
+        const head = rows[i].trim().toLowerCase();
+        if (head.startsWith("date,") || head.startsWith('"date"')) {
+          dataStart = i + 1;
+          break;
+        }
+      }
+
+      for (let i = dataStart; i < rows.length; i++) {
+        const row = rows[i].trim();
+        if (!row || row.startsWith("#")) continue;
+
         const cols = row.split(",").map((c) => c.replace(/^["']|["']$/g, "").trim());
         if (cols.length < 5) continue;
 
@@ -574,8 +596,8 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
         const amount = parseFloat(cols[1]) || 0;
         const currency = (cols[2] || "CAD").toUpperCase() as any;
         const merchant = cols[3] || t("unspecified");
-        const category = cols[4] || "생활/쇼핑";
-        const sub_category = cols[5] || "기타";
+        const category = canonicalizeCategory(cols[4] || "식비");
+        const sub_category = canonicalizeSubCategory(cols[5] || "카페/간식");
 
         mapped.push({
           id: `csv-${Date.now()}-${i}`,
@@ -652,7 +674,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
         return;
       }
 
-      // Generate CSV string
+      // Generate CSV string (UTF-8 BOM added in downloadTextCsv for Excel)
       const headers = "Date,Amount,Currency,Merchant,Category,SubCategory,Type,AccountId\n";
       const csvContent =
         headers +
@@ -663,15 +685,10 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
           })
           .join("\n");
 
-      // Download file
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `PairPocket_${exportAccountType}_${exportCurrency}_${new Date().toISOString().split("T")[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadTextCsv(
+        `PairPocket_${exportAccountType}_${exportCurrency}_${new Date().toISOString().split("T")[0]}.csv`,
+        csvContent
+      );
       setSuccessMsg(t("csvExportSuccess"));
     } catch (err: any) {
       console.error(err);

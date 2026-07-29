@@ -29,6 +29,7 @@ import {
   StockHolding,
   StockSummary,
   StockSearchResult,
+  MarketIndexQuote,
   searchStocks,
   fetchStockHoldings,
   createStockHolding,
@@ -38,6 +39,7 @@ import {
   fetchStockSummary,
   fetchAccounts,
   fetchExchangeRate,
+  fetchMarketIndices,
   fetchUserSettings,
   formatAmount,
   inferCurrencyFromTicker,
@@ -101,9 +103,9 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const [editShares, setEditShares] = useState("");
   const [editPrice, setEditPrice] = useState("");
 
-  // Indices (NASDAQ & KOSPI mock / live loaders)
-  const [nasdaqPrice, setNasdaqPrice] = useState("25,873.17");
-  const [nasdaqChange, setNasdaqChange] = useState("-1.5%");
+  // Indices + FX rotating strip
+  const [marketIndices, setMarketIndices] = useState<MarketIndexQuote[]>([]);
+  const [tickerIndex, setTickerIndex] = useState(0);
 
   // Fetch initial data
   const loadData = useCallback(async () => {
@@ -111,17 +113,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     try {
       const accId =
         selectedAccountIdFilter === "ALL" ? undefined : selectedAccountIdFilter;
-      // Holdings first so Yahoo prices warm the cache; summary then hits cache.
-      const [holdingsData, accountsData, ratesData] = await Promise.all([
-        fetchStockHoldings(accountType),
-        fetchAccounts({ accountType }),
-        fetchExchangeRate(),
-      ]);
-      const summaryData = await fetchStockSummary(
-        accountType,
-        displayCurrency,
-        accId
-      );
+      const [holdingsData, accountsData, ratesData, indicesData, summaryData] =
+        await Promise.all([
+          fetchStockHoldings(accountType),
+          fetchAccounts({ accountType }),
+          fetchExchangeRate(),
+          fetchMarketIndices().catch(() => [] as MarketIndexQuote[]),
+          fetchStockSummary(accountType, displayCurrency, accId),
+        ]);
 
       setHoldings(holdingsData);
       setSummary(summaryData);
@@ -129,11 +128,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         accountsData.filter((a) => a.kind === "investment" && a.is_active)
       );
       setRates(ratesData);
-      
-      // Update NASDAQ mock status randomly for high-fidelity feel
-      const changes = ["-1.5%", "+0.82%", "+1.25%", "-0.45%", "+0.12%"];
-      const randomChange = changes[Math.floor(Math.random() * changes.length)];
-      setNasdaqChange(randomChange);
+      setMarketIndices(indicesData);
     } catch (err) {
       console.error("Failed to load stocks data", err);
     } finally {
@@ -239,6 +234,94 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     () => new Set(visibleAccounts.map((a) => a.id)),
     [visibleAccounts]
   );
+
+  useEffect(() => {
+    if (selectedAccountIdFilter === "ALL") return;
+    if (!visibleAccountIds.has(selectedAccountIdFilter)) {
+      setSelectedAccountIdFilter("ALL");
+    }
+  }, [visibleAccountIds, selectedAccountIdFilter]);
+
+  const allAccountsLabel =
+    ledgerScope === "ALL"
+      ? t("allAccountsIntegrated")
+      : ledgerScope === "CAD"
+        ? t("allAccountsCanada")
+        : t("allAccountsKorea");
+
+  type TickerItem = {
+    key: string;
+    label: string;
+    value: string;
+    change?: string;
+    positive?: boolean;
+  };
+
+  const tickerItems = useMemo((): TickerItem[] => {
+    const byId = new Map(marketIndices.map((i) => [i.id, i]));
+    const indexIds =
+      ledgerScope === "CAD"
+        ? ["nasdaq", "sp500", "dow", "tsx"]
+        : ledgerScope === "KRW"
+          ? ["nasdaq", "sp500", "dow", "kospi"]
+          : ["nasdaq", "sp500", "dow", "kospi", "tsx"];
+
+    const items: TickerItem[] = [];
+    for (const id of indexIds) {
+      const quote = byId.get(id);
+      if (!quote) continue;
+      const pct = quote.change_percent;
+      items.push({
+        key: id,
+        label: t(id as "nasdaq" | "sp500" | "dow" | "kospi" | "tsx"),
+        value: quote.price.toLocaleString(undefined, {
+          maximumFractionDigits: quote.price >= 1000 ? 2 : 2,
+        }),
+        change: `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
+        positive: pct >= 0,
+      });
+    }
+
+    if (ledgerScope === "KRW" || ledgerScope === "ALL") {
+      const usdKrw = rates?.usd_krw;
+      if (usdKrw) {
+        items.push({
+          key: "fx-usd-krw",
+          label: t("fxUsdKrw"),
+          value: usdKrw.toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+          }),
+        });
+      }
+    }
+    if (ledgerScope === "CAD" || ledgerScope === "ALL") {
+      const usdCad = rates?.usd_cad;
+      if (usdCad) {
+        items.push({
+          key: "fx-usd-cad",
+          label: t("fxUsdCad"),
+          value: usdCad.toLocaleString(undefined, {
+            maximumFractionDigits: 4,
+          }),
+        });
+      }
+    }
+    return items;
+  }, [marketIndices, rates, ledgerScope, t]);
+
+  useEffect(() => {
+    setTickerIndex(0);
+  }, [ledgerScope, tickerItems.length]);
+
+  useEffect(() => {
+    if (tickerItems.length <= 1) return;
+    const id = window.setInterval(() => {
+      setTickerIndex((i) => (i + 1) % tickerItems.length);
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [tickerItems.length]);
+
+  const activeTicker = tickerItems[tickerIndex] ?? tickerItems[0] ?? null;
 
   // Sort and group holdings
   const sortedHoldings = useMemo(() => {
@@ -540,7 +623,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const totalStats = useMemo(() => {
     let val = 0;
     let inv = 0;
-    visibleAccounts.forEach(acc => {
+    visibleAccounts.forEach((acc) => {
       const stats = accountStatsMap[acc.id];
       if (stats) {
         val += stats.valuation;
@@ -551,21 +634,65 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     });
     const profit = val - inv;
     const y = inv > 0 ? (profit / inv) * 100 : 0;
-    return { valuation: val, profit, yield: y };
+    return { valuation: val, profit, yield: y, invested: inv };
   }, [visibleAccounts, accountStatsMap, cashBalanceMap, convertNativeToDisplay]);
+
+  /** Scope-aware totals for the hero card (never mix KR+CA on a country tab). */
+  const headerStats = useMemo(() => {
+    if (selectedAccountIdFilter === "ALL") return totalStats;
+    const acc = investmentAccounts.find((a) => a.id === selectedAccountIdFilter);
+    const stats = accountStatsMap[selectedAccountIdFilter] || {
+      valuation: 0,
+      invested: 0,
+      profit: 0,
+      yield: 0,
+    };
+    const cashNative = cashBalanceMap[selectedAccountIdFilter] ?? 0;
+    const cash = acc
+      ? convertNativeToDisplay(cashNative, acc.currency)
+      : cashNative;
+    const valuation = stats.valuation + cash;
+    const profit = valuation - stats.invested;
+    const y = stats.invested > 0 ? (profit / stats.invested) * 100 : 0;
+    return { valuation, profit, yield: y, invested: stats.invested };
+  }, [
+    selectedAccountIdFilter,
+    totalStats,
+    investmentAccounts,
+    accountStatsMap,
+    cashBalanceMap,
+    convertNativeToDisplay,
+  ]);
 
   return (
     <div className="space-y-4">
-      {/* 1. Market Index Header */}
+      {/* 1. Market Index Header (rotates indices + FX) */}
       <div className="flex items-center justify-between px-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
-        <div className="flex items-center gap-1.5">
-          <span>{t("nasdaq")}</span>
-          <span className="text-gray-800 dark:text-gray-200">{nasdaqPrice}</span>
-          <span className={nasdaqChange.startsWith("+") ? "text-red-500" : "text-blue-500"}>
-            {nasdaqChange}
-          </span>
+        <div className="flex min-w-0 items-center gap-1.5 transition-opacity duration-300">
+          {activeTicker ? (
+            <>
+              <span className="shrink-0">{activeTicker.label}</span>
+              <span className="truncate text-gray-800 dark:text-gray-200 tabular-nums">
+                {activeTicker.value}
+              </span>
+              {activeTicker.change != null && (
+                <span
+                  className={
+                    activeTicker.positive ? "text-red-500" : "text-blue-500"
+                  }
+                >
+                  {activeTicker.change}
+                </span>
+              )}
+            </>
+          ) : (
+            <span>{t("liveSync")}</span>
+          )}
         </div>
-        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" title={t("liveSync")} />
+        <div
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 animate-pulse"
+          title={t("liveSync")}
+        />
       </div>
 
       {/* 2. 내 투자 계좌 (My Investment Accounts) */}
@@ -604,7 +731,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             }`}
           >
             <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap">
-              {t("allAccountsTotal")}
+              {allAccountsLabel}
             </div>
             <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
               {formatAmount(totalStats.valuation, displayCurrency)}
@@ -705,20 +832,20 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         ) : (
           <div>
             <div className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mt-1">
-              {formatAmount(summary?.total_valuation ?? 0, displayCurrency)}
+              {formatAmount(headerStats.valuation, displayCurrency)}
             </div>
             
             <div className="flex items-center gap-1.5 mt-1.5">
               <span className={`text-sm font-bold flex items-center gap-0.5 ${
-                (summary?.total_profit ?? 0) >= 0 ? "text-red-500" : "text-blue-500"
+                headerStats.profit >= 0 ? "text-red-500" : "text-blue-500"
               }`}>
-                {(summary?.total_profit ?? 0) >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                {formatAmount(summary?.total_profit ?? 0, displayCurrency)} (
-                {((summary?.total_yield ?? 0)).toFixed(2)}%)
+                {headerStats.profit >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                {formatAmount(headerStats.profit, displayCurrency)} (
+                {headerStats.yield.toFixed(2)}%)
               </span>
             </div>
             <div className="text-[10px] text-gray-400 mt-2">
-              {t("totalInvestedLabel", { amount: formatAmount(summary?.total_invested ?? 0, displayCurrency) })}
+              {t("totalInvestedLabel", { amount: formatAmount(headerStats.invested, displayCurrency) })}
             </div>
           </div>
         )}
@@ -731,7 +858,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           {/* Active Account Filter Badge */}
           <div className="flex items-center gap-1.5 bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm border border-blue-100/50 dark:border-blue-900/40 select-none">
             {selectedAccountIdFilter === "ALL" ? (
-              <span className="truncate max-w-[10rem] sm:max-w-none">{t("allAccountsIntegrated")}</span>
+              <span className="truncate max-w-[10rem] sm:max-w-none">{allAccountsLabel}</span>
             ) : (
               <div className="flex items-center gap-1">
                 <span>
@@ -777,7 +904,8 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
           </div>
 
-          {/* Won / Dollar Toggle */}
+          {/* CAD / KRW toggle only on ALL tab */}
+          {ledgerScope === "ALL" && (
           <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
               onClick={() => setDisplayCurrency("CAD")}
@@ -800,6 +928,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               {t("displayKrw")}
             </button>
           </div>
+          )}
         </div>
 
         {/* Sort selector & Add Button */}

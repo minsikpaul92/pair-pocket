@@ -40,3 +40,4 @@ class StockPriceCache(BaseModel):
     currency: str             # Asset currency (e.g., "USD", "KRW", "CAD")
     name: str                 # Stock display name
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    checked_at: datetime | None = None  # last Yahoo verify (may match price)

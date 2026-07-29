@@ -1,5 +1,6 @@
 from datetime import datetime
 from bson import ObjectId
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -47,8 +48,7 @@ async def get_holdings(
         "account_type": account_type
     })
     holdings_docs = await cursor.to_list(length=None)
-    
-    holdings = []
+
     # Batch-load accounts once (avoid N+1).
     account_ids = {
         h["account_id"] for h in holdings_docs if ObjectId.is_valid(h.get("account_id", ""))
@@ -61,7 +61,7 @@ async def get_holdings(
         async for acc in cursor_acc:
             accounts_by_id[str(acc["_id"])] = acc
 
-    for h in holdings_docs:
+    async def resolve_one(h: dict):
         ticker = h["ticker"]
         holding_currency = h.get("currency") or "USD"
         hint = h.get("avg_price")
@@ -71,6 +71,14 @@ async def get_holdings(
             preferred_currency=holding_currency,
             hint_price=float(hint) if hint is not None else None,
         )
+        return h, price_info
+
+    resolved = await asyncio.gather(*[resolve_one(h) for h in holdings_docs])
+
+    holdings = []
+    for h, price_info in resolved:
+        ticker = h["ticker"]
+        holding_currency = h.get("currency") or "USD"
 
         # Persist resolved Yahoo symbol when bare US ticker was wrong for CAD/KRW.
         resolved_ticker = (
@@ -327,11 +335,12 @@ async def get_portfolio_summary(
 
     total_invested = 0.0
     total_valuation = 0.0
-    
-    for h in holdings_docs:
-        ticker = h["ticker"]
-        price_info = await get_or_update_stock_price(db, ticker)
-        
+
+    price_infos = await asyncio.gather(
+        *[get_or_update_stock_price(db, h["ticker"]) for h in holdings_docs]
+    )
+
+    for h, price_info in zip(holdings_docs, price_infos):
         price = price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
         currency = price_info.get("currency", h["currency"]) if price_info else h["currency"]
         
@@ -357,8 +366,13 @@ async def get_portfolio_summary(
     investment_accounts = await accounts_cursor.to_list(length=None)
     
     cash_balances = []
-    for acc in investment_accounts:
-        bal = await compute_account_balance(db, account_doc=acc, owner_ids=owner_ids)
+    balances = await asyncio.gather(
+        *[
+            compute_account_balance(db, account_doc=acc, owner_ids=owner_ids)
+            for acc in investment_accounts
+        ]
+    )
+    for acc, bal in zip(investment_accounts, balances):
         cash_balances.append({
             "account_id": str(acc["_id"]),
             "name": acc["name"],
@@ -375,6 +389,45 @@ async def get_portfolio_summary(
         "total_yield": total_yield,
         "cash_balances": cash_balances
     }
+
+
+# Yahoo index symbols for the stocks tab rotating ticker strip.
+_MARKET_INDICES = [
+    {"id": "nasdaq", "symbol": "^IXIC"},
+    {"id": "sp500", "symbol": "^GSPC"},
+    {"id": "dow", "symbol": "^DJI"},
+    {"id": "kospi", "symbol": "^KS11"},
+    {"id": "tsx", "symbol": "^GSPTSE"},
+]
+
+
+@router.get("/market-indices")
+async def market_indices(
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    _: UserOut = Depends(get_current_user),
+) -> dict:
+    """Return major index quotes (cached via stock_prices, session TTL)."""
+    docs = await asyncio.gather(
+        *[get_or_update_stock_price(db, meta["symbol"]) for meta in _MARKET_INDICES]
+    )
+    items: list[dict] = []
+    for meta, doc in zip(_MARKET_INDICES, docs):
+        if not doc or doc.get("price") is None:
+            continue
+        price = float(doc["price"])
+        prev = float(doc.get("prev_close") or price)
+        change_pct = ((price - prev) / prev * 100.0) if prev else 0.0
+        items.append(
+            {
+                "id": meta["id"],
+                "symbol": meta["symbol"],
+                "price": price,
+                "prev_close": prev,
+                "change_percent": round(change_pct, 2),
+                "currency": doc.get("currency") or "USD",
+            }
+        )
+    return {"indices": items}
 
 
 @router.post("/update-prices")
