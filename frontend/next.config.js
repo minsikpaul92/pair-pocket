@@ -6,8 +6,10 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
   register: true,
-  // Disable PWA in development to avoid noisy service-worker caching while iterating.
-  disable: process.env.NODE_ENV === "development",
+  // Disable PWA in development and on Vercel until Edge middleware is stable.
+  // (next-pwa + middleware has caused MIDDLEWARE_INVOCATION_FAILED on some deploys.)
+  disable:
+    process.env.NODE_ENV === "development" || Boolean(process.env.VERCEL),
   workboxOptions: {
     skipWaiting: true,
   },
