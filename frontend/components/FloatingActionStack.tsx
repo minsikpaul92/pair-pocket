@@ -50,7 +50,7 @@ export default function FloatingActionStack({
     "flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-colors disabled:opacity-50";
 
   return (
-    <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col items-end gap-3">
+    <div className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] md:bottom-8 right-5 z-40 flex flex-col items-end gap-3">
       <div className="hidden md:flex flex-col gap-3">
         <button
           type="button"

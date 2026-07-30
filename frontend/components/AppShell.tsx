@@ -671,7 +671,7 @@ export default function AppShell({ user, onLogout }: Props) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-28 md:pb-10">
+        <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-32 md:pb-10">
           {view === "settings" ? (
             <div className="mb-4">
               <div className="flex md:hidden items-center gap-2.5">
@@ -1034,7 +1034,7 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
       )}
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 glass-bar border-t">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 glass-bar border-t pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <div className="flex">
           {MOBILE_NAV.map((item) => (
             <button
