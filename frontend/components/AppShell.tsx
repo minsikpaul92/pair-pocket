@@ -96,7 +96,7 @@ const NAV: {
   { id: "settings", labelKey: "settings", icon: Settings },
 ];
 
-/** Mobile bottom tabs omit smart import & settings (avatar opens settings). */
+/** Mobile bottom tabs omit smart import & settings (gear icon toggles settings). */
 const MOBILE_NAV = NAV.filter(
   (item) => item.id !== "import" && item.id !== "settings"
 );
@@ -145,6 +145,7 @@ export default function AppShell({ user, onLogout }: Props) {
     const stored = window.sessionStorage.getItem(ACTIVE_VIEW_KEY);
     return isView(stored) ? stored : "calendar";
   });
+  const [previousView, setPreviousView] = useState<View>("calendar");
   const [scope, setScope] = useState<LedgerScope>("CAD");
   const [accountType, setAccountType] = useState<AccountType>("personal");
   const [currentUser, setCurrentUser] = useState(user);
@@ -334,6 +335,24 @@ export default function AppShell({ user, onLogout }: Props) {
     window.sessionStorage.setItem(ACTIVE_VIEW_KEY, view);
   }, [view]);
 
+  function toggleSettings() {
+    if (view === "settings") {
+      setView(previousView === "settings" ? "calendar" : previousView);
+    } else {
+      setPreviousView(view);
+      setView("settings");
+    }
+  }
+
+  function openView(next: View) {
+    if (next === "settings") {
+      if (view !== "settings") setPreviousView(view);
+      setView("settings");
+      return;
+    }
+    setView(next);
+  }
+
   // Materialize due subscriptions when ledger type changes (not on every data bump).
   useEffect(() => {
     syncSubscriptions(accountType).catch(() => {
@@ -521,7 +540,7 @@ export default function AppShell({ user, onLogout }: Props) {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setView(item.id)}
+                onClick={() => openView(item.id)}
                 title={navCollapsed ? label : undefined}
                 className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors ${
                   navCollapsed ? "justify-center px-2" : "px-3"
@@ -645,22 +664,16 @@ export default function AppShell({ user, onLogout }: Props) {
               </div>
               <button
                 type="button"
-                onClick={() => setView("settings")}
+                onClick={toggleSettings}
                 aria-label={tNav("settings")}
-                className="md:hidden shrink-0 rounded-full ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                aria-pressed={view === "settings"}
+                className={`md:hidden shrink-0 rounded-xl p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  view === "settings"
+                    ? "bg-blue-500 text-white"
+                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-white"
+                }`}
               >
-                {currentUser.picture ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={currentUser.picture}
-                    alt={currentUser.name}
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold">
-                    {(currentUser.name || "?").slice(0, 1)}
-                  </span>
-                )}
+                <Settings className="h-5 w-5" />
               </button>
             </div>
 
@@ -682,6 +695,42 @@ export default function AppShell({ user, onLogout }: Props) {
                 <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white whitespace-nowrap">
                   {tCommon("appName")}
                 </h1>
+                <div className="ml-auto flex items-center -space-x-2">
+                  {partner && (
+                    partner.picture ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={partner.picture}
+                        alt={partner.name}
+                        title={partner.name}
+                        className="h-9 w-9 rounded-full object-cover ring-2 ring-white dark:ring-gray-900"
+                      />
+                    ) : (
+                      <span
+                        title={partner.name}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold ring-2 ring-white dark:ring-gray-900"
+                      >
+                        {(partner.name || "?").slice(0, 1)}
+                      </span>
+                    )
+                  )}
+                  {currentUser.picture ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={currentUser.picture}
+                      alt={currentUser.name}
+                      title={currentUser.name}
+                      className="h-9 w-9 rounded-full object-cover ring-2 ring-white dark:ring-gray-900"
+                    />
+                  ) : (
+                    <span
+                      title={currentUser.name}
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold ring-2 ring-white dark:ring-gray-900"
+                    >
+                      {(currentUser.name || "?").slice(0, 1)}
+                    </span>
+                  )}
+                </div>
               </div>
               <h1 className="hidden md:block text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                 {tNav("settings")}
@@ -1040,7 +1089,7 @@ export default function AppShell({ user, onLogout }: Props) {
             <button
               key={item.id}
               type="button"
-              onClick={() => setView(item.id)}
+              onClick={() => openView(item.id)}
               className={`flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors ${
                 view === item.id
                   ? "text-blue-500"
