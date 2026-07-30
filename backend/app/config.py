@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # If empty, a key is derived from SECRET_KEY (fine for local/dev).
     settings_encryption_key: str = ""
 
+    # --- Local / preview login without Google OAuth ---
+    # When true AND Google OAuth is not configured, /api/auth/login issues a
+    # demo JWT and redirects to the frontend. Never enable in production.
+    allow_dev_login: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property

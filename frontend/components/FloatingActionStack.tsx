@@ -103,7 +103,7 @@ export default function FloatingActionStack({
               type="button"
               onClick={() => setExpandedPersist(false)}
               aria-label={t("collapseActions")}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-900/70 dark:bg-gray-100/80 text-white dark:text-gray-900 shadow-md backdrop-blur-sm"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 text-gray-700 dark:bg-gray-900 dark:text-gray-200 shadow-md border border-gray-300/80 dark:border-gray-700"
             >
               <ChevronDown className="h-4 w-4" />
             </button>
@@ -114,7 +114,7 @@ export default function FloatingActionStack({
             type="button"
             onClick={() => setExpandedPersist(true)}
             aria-label={t("expandActions")}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-900/75 dark:bg-gray-100/85 text-white dark:text-gray-900 shadow-lg backdrop-blur-sm"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-200 text-gray-700 dark:bg-gray-900 dark:text-gray-200 shadow-lg border border-gray-300/80 dark:border-gray-700"
           >
             <ChevronUp className="h-5 w-5" />
           </button>

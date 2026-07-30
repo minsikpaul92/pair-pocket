@@ -8,10 +8,9 @@ import {
   CheckCircle2,
   Loader2,
   Sparkles,
-  Languages,
   LogOut,
   UserPlus,
-  Moon,
+  Settings,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -211,7 +210,7 @@ export default function SettingsView({
       {/* Mobile-only: controls removed from the compact top bar */}
       <section className="card-inset p-5 space-y-1 md:hidden">
         <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3 mb-1">
-          <Moon className="h-5 w-5 text-blue-500" />
+          <Settings className="h-5 w-5 text-blue-500" />
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">
             {t("preferencesTitle")}
           </h2>
@@ -318,18 +317,6 @@ export default function SettingsView({
             )}
           </button>
         </form>
-      </section>
-
-      <section className="card-inset p-5 space-y-3">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <Languages className="h-5 w-5 text-indigo-500" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("i18nTitle")}
-          </h2>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("i18nDescription")}
-        </p>
       </section>
 
       <section className="card-inset p-5 space-y-4 border border-red-200/50 dark:border-red-950/30">

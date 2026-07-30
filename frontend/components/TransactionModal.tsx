@@ -1,12 +1,13 @@
 "use client";
 
-import { CalendarDays, SkipForward, Trash2, X, Plus } from "lucide-react";
+import { SkipForward, Trash2, X, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import CategorySelect from "@/components/CategorySelect";
+import DayPicker from "@/components/DayPicker";
 import InstitutionSelect from "@/components/InstitutionSelect";
 import MerchantSelect from "@/components/MerchantSelect";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
@@ -62,7 +63,7 @@ import {
   TransactionItem,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
-import { dayKey, formatDayLabel } from "@/lib/date";
+import { dayKey } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
@@ -196,7 +197,6 @@ export default function TransactionModal({
   const [showItems, setShowItems] = useState(false);
   const [tipPercent, setTipPercent] = useState("");
   const [tipAmount, setTipAmount] = useState("");
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const dateStr = dayKey(defaultDate);
 
@@ -1173,39 +1173,11 @@ export default function TransactionModal({
           )}
         </div>
 
-        <div className="mt-4 relative">
-          <button
-            type="button"
-            onClick={() => {
-              const input = dateInputRef.current;
-              if (!input) return;
-              if (typeof input.showPicker === "function") input.showPicker();
-              else input.click();
-            }}
-            className="w-full flex items-center gap-3 rounded-2xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3 text-left hover:bg-blue-100/80 dark:hover:bg-blue-500/20 transition-colors"
-          >
-            <CalendarDays className="h-5 w-5 text-blue-500 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                {formatDayLabel(defaultDate, locale)}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {tTx("dateHint")}
-              </p>
-            </div>
-          </button>
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={dateStr}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              const [y, m, d] = e.target.value.split("-").map(Number);
-              onDateChange(new Date(y, m - 1, d));
-            }}
-            className="sr-only"
-            tabIndex={-1}
-            aria-label={tTx("transactionDate")}
+        <div className="mt-4">
+          <DayPicker
+            value={defaultDate}
+            onChange={onDateChange}
+            locale={locale}
           />
         </div>
 
