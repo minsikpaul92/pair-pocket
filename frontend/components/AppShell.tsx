@@ -607,11 +607,9 @@ export default function AppShell({ user, onLogout }: Props) {
         <header className="sticky top-0 z-40 glass-bar border-b">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center gap-2 flex-nowrap">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/icons/logo.svg"
-                alt=""
-                className="md:hidden h-6 w-6 shrink-0"
+              <Wallet
+                className="md:hidden h-6 w-6 text-blue-500 shrink-0"
+                aria-hidden
               />
               <div className="flex flex-1 min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                 {(["personal", "shared"] as AccountType[]).map((type) => (
@@ -677,12 +675,9 @@ export default function AppShell({ user, onLogout }: Props) {
           {view === "settings" ? (
             <div className="mb-4">
               <div className="flex md:hidden items-center gap-2.5">
-                {/* Brand SVG — transparent, no baked-in plate */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/icons/logo.svg"
-                  alt=""
-                  className="h-7 w-7 shrink-0"
+                <Wallet
+                  className="h-7 w-7 text-blue-500 shrink-0"
+                  aria-hidden
                 />
                 <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white whitespace-nowrap">
                   {tCommon("appName")}
