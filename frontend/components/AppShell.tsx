@@ -101,10 +101,10 @@ const MOBILE_NAV = NAV.filter(
   (item) => item.id !== "import" && item.id !== "settings"
 );
 
-const LEDGERS: { scope: LedgerScope; labelKey: "all" | "canada" | "korea"; flag?: string }[] = [
+const LEDGERS: { scope: LedgerScope; labelKey: "all" | "canada" | "korea" }[] = [
   { scope: "ALL", labelKey: "all" },
-  { scope: "CAD", labelKey: "canada", flag: "🇨🇦" },
-  { scope: "KRW", labelKey: "korea", flag: "🇰🇷" },
+  { scope: "CAD", labelKey: "canada" },
+  { scope: "KRW", labelKey: "korea" },
 ];
 
 const SCOPE_LABEL_KEY: Record<LedgerScope, "allLedger" | "canadaLedger" | "koreaLedger"> = {
@@ -607,6 +607,12 @@ export default function AppShell({ user, onLogout }: Props) {
         <header className="sticky top-0 z-40 glass-bar border-b">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center gap-2 flex-nowrap">
             <div className="flex items-center gap-2 min-w-0 flex-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/logo.svg"
+                alt=""
+                className="md:hidden h-6 w-6 shrink-0"
+              />
               <div className="flex flex-1 min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                 {(["personal", "shared"] as AccountType[]).map((type) => (
                   <button
@@ -635,7 +641,6 @@ export default function AppShell({ user, onLogout }: Props) {
                         : "text-gray-500 dark:text-gray-400"
                     }`}
                   >
-                    {l.flag && <span className="mr-1">{l.flag}</span>}
                     {ledgerTabLabel(l.labelKey, tLedger, tCommon)}
                   </button>
                 ))}
@@ -669,6 +674,25 @@ export default function AppShell({ user, onLogout }: Props) {
         </header>
 
         <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-28 md:pb-10">
+          {view === "settings" ? (
+            <div className="mb-4">
+              <div className="flex md:hidden items-center gap-2.5">
+                {/* Brand SVG — transparent, no baked-in plate */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/icons/logo.svg"
+                  alt=""
+                  className="h-7 w-7 shrink-0"
+                />
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white whitespace-nowrap">
+                  {tCommon("appName")}
+                </h1>
+              </div>
+              <h1 className="hidden md:block text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                {tNav("settings")}
+              </h1>
+            </div>
+          ) : (
           <div className="mb-4 flex items-center justify-between">
             <div>
               {view === "calendar" ||
@@ -721,6 +745,7 @@ export default function AppShell({ user, onLogout }: Props) {
               </button>
             </div>
           </div>
+          )}
 
           {accountType === "shared" && !currentUser.shared_group_id ? (
             <div className="card-inset p-6 text-center space-y-4">
