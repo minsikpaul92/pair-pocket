@@ -392,9 +392,16 @@ export interface UserSettings {
   };
   category_colors: Record<string, string>;
   has_gemini_key?: boolean;
+  has_effective_gemini_key?: boolean;
+  partner_has_gemini_key?: boolean;
+  partner_using_my_key?: boolean;
+  using_partner_key?: boolean;
+  share_gemini_api_key?: boolean;
   preferred_locale?: string | null;
   preferred_locales?: string[];
   ledger_start_date?: string | null;
+  shared_ledger_start_date?: string | null;
+  ledger_start_date_locked?: boolean;
   onboarding_personal_completed?: boolean;
   onboarding_personal_step?: number;
 }
@@ -1383,6 +1390,7 @@ export interface InvitationOut {
   expires_at: string;
   email_sent?: boolean;
   accept_url?: string | null;
+  shared_ledger_start_date?: string | null;
 }
 
 export interface InvitationMe {
@@ -1400,12 +1408,16 @@ export async function fetchInvitationMe(): Promise<InvitationMe> {
 }
 
 export async function createInvitation(
-  inviteeEmail: string
+  inviteeEmail: string,
+  sharedLedgerStartDate: string
 ): Promise<InvitationOut> {
   const res = await fetch(`${API_BASE_URL}/api/invitations`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ invitee_email: inviteeEmail }),
+    body: JSON.stringify({
+      invitee_email: inviteeEmail,
+      shared_ledger_start_date: sharedLedgerStartDate,
+    }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
@@ -1649,6 +1661,40 @@ export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {
   return (await res.json()) as UserSettings;
 }
 
+export async function setShareGeminiApiKey(
+  share: boolean
+): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/ai/share`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ share }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Failed to update API key sharing");
+  }
+  return (await res.json()) as UserSettings;
+}
+
+export async function updateLedgerStartDate(
+  ledgerStartDate: string,
+  kind: "personal" | "shared" = "personal"
+): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/ledger-start-date`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      ledger_start_date: ledgerStartDate,
+      kind,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Failed to update ledger start date");
+  }
+  return (await res.json()) as UserSettings;
+}
+
 export async function saveOnboardingBasics(payload: {
   preferred_locales: string[];
   ledger_start_date: string;
@@ -1885,12 +1931,18 @@ export async function fetchKoreaSubscriptions(): Promise<{
 }
 
 export type ResetScope = "all" | "ledger" | "subscriptions" | "stocks";
+export type ResetAccountType = "all" | "personal" | "shared";
 
 export async function resetUserData(
-  scope: ResetScope = "all"
+  scope: ResetScope = "all",
+  accountType: ResetAccountType = "all"
 ): Promise<{ status: string; scope: string; detail: string }> {
+  const params = new URLSearchParams({
+    scope,
+    account_type: accountType,
+  });
   const res = await fetch(
-    `${API_BASE_URL}/api/settings/reset?scope=${encodeURIComponent(scope)}`,
+    `${API_BASE_URL}/api/settings/reset?${params.toString()}`,
     {
       method: "POST",
       headers: authHeaders(),

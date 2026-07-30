@@ -1,9 +1,10 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
+import DayPicker from "@/components/DayPicker";
 import {
   InvitationMe,
   createInvitation,
@@ -11,6 +12,7 @@ import {
   revokePendingInvitation,
   unlinkPartnership,
 } from "@/lib/api";
+import { dayKey } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 
 interface Props {
@@ -19,11 +21,18 @@ interface Props {
   onUnlinked?: () => void;
 }
 
+function todayDate() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
 export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
   const t = useTranslations("invite");
   const tErrors = useTranslations("errors");
+  const locale = useLocale();
   const [status, setStatus] = useState<InvitationMe | null>(null);
   const [email, setEmail] = useState("");
+  const [sharedStart, setSharedStart] = useState(todayDate);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +48,11 @@ export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
       setStatus(me);
       if (me.pending_invite?.accept_url) {
         setManualUrl(me.pending_invite.accept_url);
+      }
+      if (me.pending_invite?.shared_ledger_start_date) {
+        const raw = me.pending_invite.shared_ledger_start_date;
+        const [y, m, d] = raw.split("-").map(Number);
+        if (y && m && d) setSharedStart(new Date(y, m - 1, d));
       }
       if (me.partner) onLinked?.();
     } catch (err) {
@@ -60,7 +74,7 @@ export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
     setSuccess(null);
     setCopied(false);
     try {
-      const created = await createInvitation(email.trim());
+      const created = await createInvitation(email.trim(), dayKey(sharedStart));
       if (created.email_sent) {
         setSuccess(t("sent"));
         setManualUrl(null);
@@ -132,7 +146,7 @@ export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white dark:bg-gray-900 shadow-xl p-5 sm:p-6">
+      <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white dark:bg-gray-900 shadow-xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between gap-3 mb-4">
           <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white truncate">
             {t("title")}
@@ -196,6 +210,12 @@ export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   {t("pending", { email: status.pending_invite.invitee_email })}
                 </p>
+                {status.pending_invite.shared_ledger_start_date && (
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    {t("sharedStartDateLabel")}:{" "}
+                    {status.pending_invite.shared_ledger_start_date}
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={handleRevoke}
@@ -208,8 +228,10 @@ export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
             )}
 
             <form onSubmit={handleInvite} className="space-y-3">
-              <label className="block">
-                <span className="sr-only">{t("emailLabel")}</span>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {t("emailLabel")}
+                </span>
                 <input
                   type="email"
                   required
@@ -219,6 +241,19 @@ export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
                   className="w-full bg-gray-50 dark:bg-gray-900 border-0 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
                 />
               </label>
+              <div className="space-y-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {t("sharedStartDateLabel")}
+                </span>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {t("sharedStartDateHelp")}
+                </p>
+                <DayPicker
+                  value={sharedStart}
+                  onChange={setSharedStart}
+                  locale={locale}
+                />
+              </div>
               <button
                 type="submit"
                 disabled={submitting || !email.trim()}

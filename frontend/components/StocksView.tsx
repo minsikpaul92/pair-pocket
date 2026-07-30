@@ -151,7 +151,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   useEffect(() => {
     if (!showAddModal) return;
     fetchUserSettings()
-      .then((s) => setHasGeminiKey(Boolean(s.has_gemini_key)))
+      .then((s) => setHasGeminiKey(Boolean(s.has_effective_gemini_key ?? s.has_gemini_key)))
       .catch(() => setHasGeminiKey(false));
   }, [showAddModal]);
 

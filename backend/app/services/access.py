@@ -34,6 +34,25 @@ async def resolve_owner_ids(
     return [str(doc["_id"]) for doc in docs]
 
 
+async def get_partner_owner_id(
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+) -> str | None:
+    """Return the partner's user id when linked via shared_group_id."""
+    oid = _as_object_id(owner_id)
+    if not oid:
+        return None
+    user = await db[USERS_COL].find_one({"_id": oid}, {"shared_group_id": 1})
+    group_id = user.get("shared_group_id") if user else None
+    if not group_id:
+        return None
+    partner = await db[USERS_COL].find_one(
+        {"shared_group_id": group_id, "_id": {"$ne": oid}},
+        {"_id": 1},
+    )
+    return str(partner["_id"]) if partner else None
+
+
 def owner_match(owner_ids: list[str]) -> dict:
     """Mongo filter fragment for owner_id given a resolved id list."""
     if not owner_ids:

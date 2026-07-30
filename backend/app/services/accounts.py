@@ -39,20 +39,45 @@ def _serialize_account(doc: dict) -> dict:
 
 
 async def _ledger_start_date_for_owners(
-    db: AsyncIOMotorDatabase, owner_ids: list[str]
+    db: AsyncIOMotorDatabase,
+    owner_ids: list[str],
+    *,
+    account_type: AccountType | None = None,
 ) -> str | None:
-    """Use the earliest personal ledger_start_date among owners when present."""
+    """Resolve ledger start date for balance math.
+
+    - personal: each owner's ledger_start_date (earliest among owners)
+    - shared: shared_ledger_start_date (earliest among owners; usually identical)
+    """
     if not owner_ids:
         return None
+    field = (
+        "shared_ledger_start_date"
+        if account_type == AccountType.SHARED
+        else "ledger_start_date"
+    )
     cursor = db["user_settings"].find(
-        {"owner_id": {"$in": owner_ids}, "ledger_start_date": {"$type": "string"}},
-        {"ledger_start_date": 1},
+        {"owner_id": {"$in": owner_ids}, field: {"$type": "string"}},
+        {field: 1},
     )
     dates: list[str] = []
     async for doc in cursor:
-        value = doc.get("ledger_start_date")
+        value = doc.get(field)
         if isinstance(value, str) and len(value) >= 10:
             dates.append(value[:10])
+    # Shared books: also fall back to legacy personal start if shared not set.
+    if account_type == AccountType.SHARED and not dates:
+        cursor = db["user_settings"].find(
+            {
+                "owner_id": {"$in": owner_ids},
+                "ledger_start_date": {"$type": "string"},
+            },
+            {"ledger_start_date": 1},
+        )
+        async for doc in cursor:
+            value = doc.get("ledger_start_date")
+            if isinstance(value, str) and len(value) >= 10:
+                dates.append(value[:10])
     return min(dates) if dates else None
 
 
@@ -92,7 +117,11 @@ async def compute_account_balance(
 
     start = ledger_start_date
     if start is None:
-        start = await _ledger_start_date_for_owners(db, ids)
+        raw_type = account_doc.get("account_type")
+        acc_type = None
+        if raw_type in (AccountType.PERSONAL.value, AccountType.SHARED.value):
+            acc_type = AccountType(raw_type)
+        start = await _ledger_start_date_for_owners(db, ids, account_type=acc_type)
 
     query: dict = {
         **owner_clause,

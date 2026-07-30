@@ -695,25 +695,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white whitespace-nowrap">
                   {tCommon("appName")}
                 </h1>
-                <div className="ml-auto flex items-center -space-x-2">
-                  {partner && (
-                    partner.picture ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={partner.picture}
-                        alt={partner.name}
-                        title={partner.name}
-                        className="h-9 w-9 rounded-full object-cover ring-2 ring-white dark:ring-gray-900"
-                      />
-                    ) : (
-                      <span
-                        title={partner.name}
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold ring-2 ring-white dark:ring-gray-900"
-                      >
-                        {(partner.name || "?").slice(0, 1)}
-                      </span>
-                    )
-                  )}
+                <div className="ml-auto flex items-center">
                   {currentUser.picture ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -859,6 +841,7 @@ export default function AppShell({ user, onLogout }: Props) {
               onChanged={bumpVersion}
               onInvite={handleInvite}
               onLogout={handleLogout}
+              partner={partner}
             />
           ) : (
             <DashboardView

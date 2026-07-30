@@ -16,9 +16,11 @@ class UserSettingsBase(BaseModel):
     default_expense_account_id: str | None = None
     default_income_account_id: str | None = None
     gemini_api_key: str | None = None
+    share_gemini_api_key: bool = False
     preferred_locale: str | None = None
     preferred_locales: list[str] = Field(default_factory=list)
     ledger_start_date: str | None = None
+    shared_ledger_start_date: str | None = None
     onboarding_personal_completed: bool = False
     onboarding_personal_step: int = 0
 
@@ -30,6 +32,20 @@ class UserSettingsInDB(UserSettingsBase):
 class UserSettingsOut(UserSettingsBase):
     gemini_api_key: str | None = Field(default=None, exclude=True)
     has_gemini_key: bool = False
+    has_effective_gemini_key: bool = False
+    partner_has_gemini_key: bool = False
+    partner_using_my_key: bool = False
+    using_partner_key: bool = False
+    ledger_start_date_locked: bool = False
+
+
+class ShareGeminiKeyBody(BaseModel):
+    share: bool
+
+
+class LedgerStartDateBody(BaseModel):
+    ledger_start_date: str = Field(min_length=10, max_length=10)
+    kind: str = Field(default="personal", pattern="^(personal|shared)$")
 
 
 class AddInstitutionBody(BaseModel):

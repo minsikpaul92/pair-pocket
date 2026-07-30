@@ -30,6 +30,8 @@ type Props = {
   triggerClassName?: string;
   /** Show calendar icon to the left of the date label. */
   showIcon?: boolean;
+  /** Disable opening the calendar (locked / read-only). */
+  disabled?: boolean;
 };
 
 /**
@@ -42,6 +44,7 @@ export default function DayPicker({
   locale = "ko",
   triggerClassName,
   showIcon = true,
+  disabled = false,
 }: Props) {
   const t = useTranslations("common");
   const tCal = useTranslations("calendar");
@@ -69,13 +72,19 @@ export default function DayPicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={disabled ? false : open}
+      onOpenChange={(next) => {
+        if (!disabled) setOpen(next);
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
+          disabled={disabled}
           aria-label={t("selectDate")}
           className={cn(
-            "w-full flex items-center gap-3 rounded-2xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3 text-left hover:bg-blue-100/80 dark:hover:bg-blue-500/20 transition-colors",
+            "w-full flex items-center gap-3 rounded-2xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3 text-left hover:bg-blue-100/80 dark:hover:bg-blue-500/20 transition-colors disabled:opacity-60 disabled:pointer-events-none",
             triggerClassName
           )}
         >
