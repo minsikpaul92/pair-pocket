@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { 
   Briefcase, 
   Camera,
+  ChevronDown,
   Filter,
   GripVertical,
   Loader2,
@@ -881,7 +882,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             className={`text-left p-3.5 rounded-2xl transition-all border shrink-0 w-[148px] sm:w-[160px] snap-start ${
               selectedAccountIdFilter === "ALL"
                 ? "bg-blue-50/60 dark:bg-blue-950/30 border-blue-500 dark:border-blue-700 shadow-md ring-1 ring-blue-500"
-                : "bg-gray-50/50 dark:bg-gray-850 border-transparent hover:border-gray-200 dark:hover:border-gray-800"
+                : "bg-gray-50 dark:bg-gray-900 border-transparent hover:border-gray-200 dark:hover:border-gray-700"
             }`}
           >
             <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap">
@@ -979,7 +980,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   className={`text-left p-3.5 rounded-2xl transition-all border w-full cursor-pointer ${
                     isSelected
                       ? "bg-blue-50/60 dark:bg-blue-950/30 border-blue-500 dark:border-blue-700 shadow-md ring-1 ring-blue-500"
-                      : "bg-gray-50/50 dark:bg-gray-850 border-transparent hover:border-gray-200 dark:hover:border-gray-800"
+                      : "bg-gray-50 dark:bg-gray-900 border-transparent hover:border-gray-200 dark:hover:border-gray-700"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1 min-w-0">
@@ -1214,15 +1215,22 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
 
         {/* Sort selector & Add Button */}
         <div className="flex items-center justify-between sm:justify-end gap-3">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-transparent border-0 outline-none focus:ring-0 cursor-pointer"
-          >
-            <option value="valuation" className="bg-white dark:bg-gray-900">{t("sortValuation")}</option>
-            <option value="yield" className="bg-white dark:bg-gray-900">{t("sortYield")}</option>
-            <option value="shares" className="bg-white dark:bg-gray-900">{t("sortShares")}</option>
-          </select>
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              aria-label={t("sortLabel")}
+              className="appearance-none cursor-pointer rounded-lg bg-transparent border-0 outline-none focus:ring-0 pr-5 text-xs font-bold text-gray-500 dark:text-gray-400"
+            >
+              <option value="valuation" className="bg-white dark:bg-gray-900">{t("sortValuation")}</option>
+              <option value="yield" className="bg-white dark:bg-gray-900">{t("sortYield")}</option>
+              <option value="shares" className="bg-white dark:bg-gray-900">{t("sortShares")}</option>
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400"
+              aria-hidden
+            />
+          </div>
 
           <button
             onClick={() => {
