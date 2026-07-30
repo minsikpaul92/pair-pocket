@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
+import FloatingActionStack from "@/components/FloatingActionStack";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 
 import {
@@ -1684,32 +1685,19 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         onChange={(e) => void handleStockCameraFiles(e)}
       />
 
-      <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col gap-3">
-        <button
-          type="button"
-          onClick={() => stockCameraRef.current?.click()}
-          disabled={scanning}
-          aria-label={t("scanPhoto")}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 active:bg-indigo-700 transition-colors disabled:opacity-50"
-        >
-          {scanning ? (
-            <Loader2 className="h-6 w-6 animate-spin" />
-          ) : (
-            <Camera className="h-6 w-6" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            resetAddForm();
-            setShowAddModal(true);
-          }}
-          aria-label={t("addHolding")}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      </div>
+      <FloatingActionStack
+        onCamera={() => stockCameraRef.current?.click()}
+        onAdd={() => {
+          resetAddForm();
+          setShowAddModal(true);
+        }}
+        cameraLabel={t("scanPhoto")}
+        addLabel={t("addHolding")}
+        cameraBusy={scanning}
+        CameraIcon={Camera}
+        AddIcon={Plus}
+        cameraBusyIcon={<Loader2 className="h-6 w-6 animate-spin" />}
+      />
     </div>
   );
 }

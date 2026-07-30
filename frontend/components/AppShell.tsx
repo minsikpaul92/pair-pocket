@@ -37,6 +37,7 @@ import StocksView from "@/components/StocksView";
 import SettingsView from "@/components/SettingsView";
 import ImportView from "@/components/ImportView";
 import MonthPicker from "@/components/MonthPicker";
+import FloatingActionStack from "@/components/FloatingActionStack";
 import { LineChart, Sparkles } from "lucide-react";
 import {
   AccountType,
@@ -86,14 +87,19 @@ const NAV: {
   labelKey: "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings" | "smartImport";
   icon: any;
 }[] = [
+  { id: "dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { id: "calendar", labelKey: "calendar", icon: CalendarDays },
   { id: "list", labelKey: "list", icon: ListOrdered },
-  { id: "dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { id: "subscriptions", labelKey: "subscriptions", icon: Repeat },
   { id: "stocks", labelKey: "stocks", icon: LineChart },
   { id: "import", labelKey: "smartImport", icon: Sparkles },
   { id: "settings", labelKey: "settings", icon: Settings },
 ];
+
+/** Mobile bottom tabs omit smart import & settings (avatar opens settings). */
+const MOBILE_NAV = NAV.filter(
+  (item) => item.id !== "import" && item.id !== "settings"
+);
 
 const LEDGERS: { scope: LedgerScope; labelKey: "all" | "canada" | "korea"; flag?: string }[] = [
   { scope: "ALL", labelKey: "all" },
@@ -599,15 +605,15 @@ export default function AppShell({ user, onLogout }: Props) {
 
       <div className={`${mainPad} transition-all duration-200`}>
         <header className="sticky top-0 z-40 glass-bar border-b">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center gap-2 flex-nowrap">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex flex-1 min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                 {(["personal", "shared"] as AccountType[]).map((type) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => setAccountType(type)}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`flex-1 rounded-lg px-2.5 sm:px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
                       accountType === type
                         ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                         : "text-gray-500 dark:text-gray-400"
@@ -617,13 +623,13 @@ export default function AppShell({ user, onLogout }: Props) {
                   </button>
                 ))}
               </div>
-              <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+              <div className="flex flex-[1.4] min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                 {LEDGERS.map((l) => (
                   <button
                     key={l.scope}
                     type="button"
                     onClick={() => setScope(l.scope)}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`flex-1 rounded-lg px-1.5 sm:px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
                       scope === l.scope
                         ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                         : "text-gray-500 dark:text-gray-400"
@@ -634,37 +640,30 @@ export default function AppShell({ user, onLogout }: Props) {
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={() => setView("settings")}
+                aria-label={tNav("settings")}
+                className="md:hidden shrink-0 rounded-full ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                {currentUser.picture ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={currentUser.picture}
+                    alt={currentUser.name}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold">
+                    {(currentUser.name || "?").slice(0, 1)}
+                  </span>
+                )}
+              </button>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden md:flex items-center gap-2 shrink-0">
               <LocaleToggle />
               <ThemeToggle />
-              <div className="flex items-center gap-3 md:hidden">
-              <button
-                type="button"
-                onClick={handleInvite}
-                aria-label={tNav("invite")}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <UserPlus className="h-5 w-5" />
-              </button>
-              {currentUser.picture && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={currentUser.picture}
-                  alt={currentUser.name}
-                  className="h-8 w-8 rounded-full"
-                />
-              )}
-              <button
-                type="button"
-                onClick={handleLogout}
-                aria-label={tNav("logout")}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
-            </div>
             </div>
           </div>
         </header>
@@ -787,7 +786,11 @@ export default function AppShell({ user, onLogout }: Props) {
               onChanged={bumpVersion}
             />
           ) : view === "settings" ? (
-            <SettingsView onChanged={bumpVersion} />
+            <SettingsView
+              onChanged={bumpVersion}
+              onInvite={handleInvite}
+              onLogout={handleLogout}
+            />
           ) : (
             <DashboardView
               month={month}
@@ -990,27 +993,14 @@ export default function AppShell({ user, onLogout }: Props) {
 
       {/* Floating Buttons Group — hidden on stocks/subscriptions (view-specific FAB) */}
       {view !== "stocks" && view !== "subscriptions" && (
-      <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col gap-3">
-        {/* Floating Camera Button (Scan) */}
-        <button
-          type="button"
-          onClick={() => setScanMenuOpen((o) => !o)}
-          aria-label="스캔 및 영수증 분석"
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 active:bg-indigo-700 transition-colors"
-        >
-          <Camera className="h-6 w-6" />
-        </button>
-
-        {/* Floating Plus Button (Manual Add) */}
-        <button
-          type="button"
-          onClick={() => openModal(new Date())}
-          aria-label={tNav("addTransaction")}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      </div>
+        <FloatingActionStack
+          onCamera={() => setScanMenuOpen((o) => !o)}
+          onAdd={() => openModal(new Date())}
+          cameraLabel={tNav("scanReceipt")}
+          addLabel={tNav("addTransaction")}
+          CameraIcon={Camera}
+          AddIcon={Plus}
+        />
       )}
       {aiParsing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -1026,19 +1016,21 @@ export default function AppShell({ user, onLogout }: Props) {
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 glass-bar border-t">
         <div className="flex">
-          {NAV.map((item) => (
+          {MOBILE_NAV.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setView(item.id)}
-              className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
+              className={`flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors ${
                 view === item.id
                   ? "text-blue-500"
                   : "text-gray-400 dark:text-gray-500"
               }`}
             >
-              <item.icon className="h-5 w-5" />
-              {tNav(item.labelKey)}
+              <item.icon className="h-6 w-6" />
+              <span className="whitespace-nowrap truncate max-w-full px-0.5">
+                {tNav(item.labelKey)}
+              </span>
             </button>
           ))}
         </div>

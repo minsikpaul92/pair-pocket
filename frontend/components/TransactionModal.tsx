@@ -1112,58 +1112,65 @@ export default function TransactionModal({
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold tracking-tight">
-              {isEditing ? tTx("edit") : tTx("new")}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-              {currency === "CAD"
-                ? tLedger("canadaLedgerShort")
-                : tLedger("koreaLedgerShort")}{" "}
-              · {currency}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {allowCurrencyPick && onCurrencyChange && (
-              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
-                {(["CAD", "KRW"] as Currency[]).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => onCurrencyChange(c)}
-                    className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
-                      currency === c
-                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            )}
-            {!isTransfer && !isStock && (
-              <AccountSelect
-                accounts={accounts}
-                value={accountId}
-                onChange={setAccountId}
-                onRegister={() => {
-                  setAccountRegisterTarget("primary");
-                  setShowAccountRegister(true);
-                }}
-                disabled={accountsLoading}
-              />
-            )}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold tracking-tight whitespace-nowrap">
+                {isEditing ? tTx("edit") : tTx("new")}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                {currency === "CAD"
+                  ? tLedger("canadaLedgerShort")
+                  : tLedger("koreaLedgerShort")}{" "}
+                · {currency}
+              </p>
+            </div>
             <button
               type="button"
               onClick={onClose}
               aria-label={tCommon("close")}
-              className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+              className="shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
+          {(allowCurrencyPick || (!isTransfer && !isStock)) && (
+            <div className="flex items-center gap-2 min-w-0">
+              {allowCurrencyPick && onCurrencyChange && (
+                <div className="flex shrink-0 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+                  {(["CAD", "KRW"] as Currency[]).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => onCurrencyChange(c)}
+                      className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
+                        currency === c
+                          ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!isTransfer && !isStock && (
+                <div className="min-w-0 flex-1">
+                  <AccountSelect
+                    accounts={accounts}
+                    value={accountId}
+                    onChange={setAccountId}
+                    onRegister={() => {
+                      setAccountRegisterTarget("primary");
+                      setShowAccountRegister(true);
+                    }}
+                    disabled={accountsLoading}
+                    triggerClassName="w-full flex items-center justify-between gap-2 rounded-lg bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-4 relative">
