@@ -35,7 +35,7 @@ export default function LoginLanding() {
 
   return (
     <main className="min-h-dvh bg-gray-50 dark:bg-black">
-      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0 z-50">
+      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto max-w-2xl px-5 py-4 flex items-center gap-2">
           <Wallet className="h-6 w-6 text-blue-500" />
           <span className="text-lg font-semibold tracking-tight">
