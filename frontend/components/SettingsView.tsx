@@ -12,6 +12,7 @@ import {
   UserPlus,
   Settings,
   CalendarDays,
+  Coffee,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -30,6 +31,7 @@ import {
   PartnerSummary,
 } from "@/lib/api";
 import { dayKey } from "@/lib/date";
+import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
 import type { AppLocale } from "@/i18n/locales";
 
 interface Props {
@@ -540,6 +542,27 @@ export default function SettingsView({
           />
         </section>
       )}
+
+      <section className="card-inset p-5 space-y-3">
+        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+          <Coffee className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {t("supportTitle")}
+          </h2>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+          {t("supportDescription")}
+        </p>
+        <a
+          href={BUY_ME_A_COFFEE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-semibold py-2.5 text-sm transition-colors border border-amber-200/80 dark:border-amber-800/50"
+        >
+          <Coffee className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t("supportCta")}</span>
+        </a>
+      </section>
 
       <section className="card-inset p-5 space-y-4 border border-red-200/50 dark:border-red-950/30">
         <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">

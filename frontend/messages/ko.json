@@ -713,7 +713,10 @@
     "themeLabel": "화면 모드",
     "invitePartner": "파트너 초대",
     "invitePartnerDone": "파트너 초대 완료",
-    "accountSection": "계정"
+    "accountSection": "계정",
+    "supportTitle": "후원",
+    "supportDescription": "PairPocket이 도움이 됐다면 커피 한 잔으로 응원할 수 있어요. 광고는 없습니다.",
+    "supportCta": "Buy me a coffee"
   },
   "onboarding": {
     "title": "시작하기",
