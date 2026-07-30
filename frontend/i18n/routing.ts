@@ -8,7 +8,7 @@ export { locales };
 export const routing = defineRouting({
   locales,
   defaultLocale: "ko",
-  localePrefix: "as-needed",
-  // Edge middleware does negotiation itself via rewrite; skip Accept-Language.
+  // Always show /ko, /en, ... in the URL (no Edge middleware rewrite).
+  localePrefix: "always",
   localeDetection: false,
 });
