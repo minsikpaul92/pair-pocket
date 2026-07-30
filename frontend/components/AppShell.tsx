@@ -604,7 +604,7 @@ export default function AppShell({ user, onLogout }: Props) {
       </aside>
 
       <div className={`${mainPad} transition-all duration-200`}>
-        <header className="sticky top-0 z-40 glass-bar border-b">
+        <header className="sticky top-0 z-40 glass-bar border-b pt-[env(safe-area-inset-top)]">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center gap-2 flex-nowrap">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <Wallet
