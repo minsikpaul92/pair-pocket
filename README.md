@@ -1,9 +1,12 @@
 # PairPocket
 
+> "A budget is telling your money where to go instead of wondering where it went."
+> — John C. Maxwell
+
 [![Live demo](https://img.shields.io/badge/Live-pair--pocket.vercel.app-2563eb?style=flat-square)](https://pair-pocket.vercel.app/en)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/minsikpaul92)
 
-A dual-currency (KRW / CAD) household ledger for couples: **personal** books stay private, **shared** books stay in sync, and AI helps turn screenshots into structured data.
+A dual-currency household ledger anyone can use: personal and shared books, subscriptions and stocks in one place, with AI screenshot import tuned so scanned numbers stay trustworthy.
 
 **Live app:** [https://pair-pocket.vercel.app/en](https://pair-pocket.vercel.app/en)
 
@@ -13,11 +16,22 @@ A dual-currency (KRW / CAD) household ledger for couples: **personal** books sta
 
 ---
 
-## Why this exists
+## Why I built this
 
-Immigrant couples often juggle two currencies, two countries, and a mix of “mine / yours / ours.” Spreadsheets break down once you add credit cards, subscriptions, brokerage holdings, and a partner who needs the same shared numbers.
+I immigrated to Canada and still hold assets in more than one country. Existing money apps were either built for a single local market or too shallow for how a couple actually lives: mine, yours, and ours, across currencies, banks, subscriptions, and brokerage accounts.
 
-PairPocket is a production PWA I built end-to-end (product, UI, API, auth, deploy) so two people can run that reality in one app without mixing private ledgers.
+I could not find a couple-ready product that kept **personal** ledgers private while syncing a **shared** household book, and still covered the detail I needed (subscriptions, stocks, onboarding without guessing where to start). So I built PairPocket end-to-end as a production PWA.
+
+That origin story is personal, but **the app is not limited to couples or immigrants**. Solo users can run a full personal ledger (including subscriptions and stocks). Sharing with a partner is optional when you want a household book.
+
+What matters most in practice:
+
+- **One place for the whole picture** — shared household ledger plus personal ledgers, personal subscriptions, and personal stocks, without mixing private data into the partner view.
+- **AI screenshot fill with careful prompting** — brokerage and setup screens become structured fields. The hard part is not “call an OCR API”; it is prompt engineering so tickers, quantities, and balances do not get inventively wrong.
+- **Low-friction start** — first-time and couple setup can lean on AI instead of a blank spreadsheet. You bring your own Gemini key; the app does not force a paid AI plan to try the flow.
+- **Depth over generic finance UI** — many apps show balances; fewer ship the dual-ledger rules, invite + shared start date, and import paths this life actually needs.
+
+Today the product is tuned for **KRW / CAD** (Korea–Canada). The same pattern applies to many people managing money across borders; expanding currency and country support is on the roadmap, along with stronger daily stock price refresh.
 
 ---
 
@@ -25,7 +39,7 @@ PairPocket is a production PWA I built end-to-end (product, UI, API, auth, deplo
 
 ### Personal ↔ Shared ledger toggle
 
-Switch context instantly. Shared data is scoped by partnership; personal data never leaks to the partner.
+Switch context instantly. Shared data is scoped by partnership; personal data never leaks to the partner. Solo use stays on the personal ledger.
 
 ![Personal and Shared toggle](docs/demo/01-personal-shared-toggle.gif)
 
@@ -37,13 +51,13 @@ Quick entry with the shared day picker and floating actions (camera for scan, pl
 
 ### Invite a partner
 
-Send a Google-email invite with a **shared ledger start date** so both sides align from day one.
+Optional: send a Google-email invite with a **shared ledger start date** so both sides align from day one.
 
 ![Partner invite modal](docs/demo/03-partner-invite.jpg)
 
 ### AI screenshot fill (stocks / onboarding)
 
-Upload brokerage (or onboarding) screenshots; Gemini fills structured fields so you are not retyping tickers and balances.
+Upload brokerage (or onboarding) screenshots; Gemini fills structured fields with prompt-tuned parsing so tickers and balances stay accurate.
 
 ![AI screenshot scan](docs/demo/04-ai-scan.gif)
 
@@ -54,10 +68,10 @@ Upload brokerage (or onboarding) screenshots; Gemini fills structured fields so 
 | Area | What shipped |
 |------|----------------|
 | Auth | Google OAuth (Authlib) + app JWT, invite accept while logged out / logged in |
-| Dual ledger | `personal` vs `shared` with group-scoped queries (`shared_group_id`) |
+| Dual ledger | `personal` vs `shared` with group-scoped queries (`shared_group_id`); solo-friendly |
 | Multi-currency | CAD / KRW / ALL with FX for combined views |
 | Product surface | Calendar, list, dashboard analytics, subscriptions, stocks, smart import |
-| AI | User-supplied Gemini key, model fallback chain, partner key borrow / share |
+| AI | Prompt-tuned screenshot parse, user Gemini key, model fallback chain, partner key borrow / share |
 | Mobile | PWA, safe-area chrome, Apple HIG-inspired Tailwind UI (light / dark) |
 | Deploy | Frontend on **Vercel**, API on **Heroku**, MongoDB Atlas |
 
