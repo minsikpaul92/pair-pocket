@@ -766,7 +766,7 @@ export default function DashboardView({
       </section>
 
       <section className="card-inset p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-2.5">
+        <div className="flex flex-col gap-2.5 border-b border-gray-100 dark:border-gray-800 pb-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
               {tDashboard("stockAccounts")}
@@ -774,14 +774,14 @@ export default function DashboardView({
             <button
               type="button"
               onClick={() => setCreatingKind("investment")}
-              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 whitespace-nowrap"
             >
               <Plus className="h-3.5 w-3.5" />
               {tDashboard("addGeneric")}
             </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+          <div className="flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between sm:justify-end sm:gap-2">
+            <div className="flex w-full min-[400px]:w-auto rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
               {(
                 [
                   ["all", tDashboard("stockTotalAll")],
@@ -794,7 +794,7 @@ export default function DashboardView({
                   key={mode}
                   type="button"
                   onClick={() => setStockTotalMode(mode)}
-                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors whitespace-nowrap ${
+                  className={`flex-1 min-[400px]:flex-none rounded-md px-2 py-1 text-[10px] font-semibold transition-colors whitespace-nowrap ${
                     stockTotalMode === mode
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500"
@@ -804,7 +804,7 @@ export default function DashboardView({
                 </button>
               ))}
             </div>
-            <div className="text-sm font-black text-blue-600 dark:text-blue-400 tabular-nums">
+            <div className="text-sm font-black text-blue-600 dark:text-blue-400 tabular-nums self-end min-[400px]:self-auto">
               {stockTotalMode === "all" ? (
                 <div className="flex flex-col items-end gap-0.5">
                   {stockAccountsStats.nativeLines.length === 0 ? (
@@ -866,37 +866,45 @@ export default function DashboardView({
                       className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 text-left hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-all border border-gray-100 dark:border-gray-800/80"
                     >
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="flex items-center gap-1 min-w-0 text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate">
+                        <span className="flex items-center gap-1 min-w-0 text-[11px] font-bold text-gray-700 dark:text-gray-300">
                           <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-grab" />
                           <span className="truncate">
                             {inst ? `[${inst}] ` : ""}
                             {label}
                           </span>
                         </span>
-                        <span className="text-[9px] bg-gray-200 dark:bg-gray-850 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                        <span className="shrink-0 text-[9px] bg-gray-200 dark:bg-gray-850 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
                           {account.currency}
                         </span>
                       </div>
-                      <div className="mt-2.5 flex items-baseline justify-between">
-                        <span className="text-[10px] text-gray-400">
+                      <div className="mt-2.5 flex items-baseline justify-between gap-2 min-w-0">
+                        <span className="text-[10px] text-gray-400 shrink-0">
                           {tDashboard("stockPlusCash")}
                         </span>
-                        <span className="text-base font-black text-gray-900 dark:text-white tabular-nums">
+                        <span className="text-base font-black text-gray-900 dark:text-white tabular-nums truncate text-right">
                           {fmt(total, account.currency as Currency)}
                         </span>
                       </div>
-                      <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
-                        <span>
-                          {tDashboard("stocksLabel")}:{" "}
-                          {fmt(
-                            stockValuation,
-                            account.currency as Currency
-                          )}
-                        </span>
-                        <span>
-                          {tDashboard("cashLabel")}:{" "}
-                          {fmt(cash, account.currency as Currency)}
-                        </span>
+                      <div className="mt-1.5 space-y-0.5 text-[10px] text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <span className="shrink-0">
+                            {tDashboard("stocksLabel")}
+                          </span>
+                          <span className="tabular-nums truncate text-right">
+                            {fmt(
+                              stockValuation,
+                              account.currency as Currency
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <span className="shrink-0">
+                            {tDashboard("cashLabel")}
+                          </span>
+                          <span className="tabular-nums truncate text-right">
+                            {fmt(cash, account.currency as Currency)}
+                          </span>
+                        </div>
                       </div>
                     </button>
                   </li>

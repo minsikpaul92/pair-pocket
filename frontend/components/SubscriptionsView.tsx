@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import SubscriptionRegisterModal from "@/components/SubscriptionRegisterModal";
+import FloatingActionStack from "@/components/FloatingActionStack";
 import {
   AccountType,
   CategoryPresets,
@@ -553,19 +554,19 @@ export default function SubscriptionsView({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold tracking-tight">{t("title")}</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
             {t("subtitle")}
           </p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 text-sm font-semibold transition-colors"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 text-sm font-semibold transition-colors whitespace-nowrap"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4 shrink-0" />
           {t("add")}
         </button>
       </div>
@@ -646,29 +647,16 @@ export default function SubscriptionsView({
         onChange={(e) => void handleSubCameraFiles(e)}
       />
 
-      <div className="fixed bottom-24 md:bottom-8 right-5 z-40 flex flex-col gap-3">
-        <button
-          type="button"
-          onClick={() => subCameraRef.current?.click()}
-          disabled={scanning}
-          aria-label={t("scanPhoto")}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 active:bg-indigo-700 transition-colors disabled:opacity-50"
-        >
-          {scanning ? (
-            <Loader2 className="h-6 w-6 animate-spin" />
-          ) : (
-            <Camera className="h-6 w-6" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={openCreate}
-          aria-label={t("add")}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      </div>
+      <FloatingActionStack
+        onCamera={() => subCameraRef.current?.click()}
+        onAdd={openCreate}
+        cameraLabel={t("scanPhoto")}
+        addLabel={t("add")}
+        cameraBusy={scanning}
+        CameraIcon={Camera}
+        AddIcon={Plus}
+        cameraBusyIcon={<Loader2 className="h-6 w-6 animate-spin" />}
+      />
     </div>
   );
 }

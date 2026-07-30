@@ -26,6 +26,8 @@
     "thisMonth": "이번달",
     "previousMonth": "이전 달",
     "nextMonth": "다음 달",
+    "expandActions": "빠른 실행 펼치기",
+    "collapseActions": "빠른 실행 접기",
     "selectMonth": "년/월 선택",
     "previousYear": "이전 해",
     "nextYear": "다음 해",
@@ -50,7 +52,7 @@
     "calendar": "달력",
     "list": "목록",
     "dashboard": "대시보드",
-    "subscriptions": "구독/고정지출",
+    "subscriptions": "고정지출",
     "stocks": "주식",
     "settings": "설정",
     "smartImport": "스마트 가져오기",
@@ -58,7 +60,8 @@
     "logout": "로그아웃",
     "expandSidebar": "사이드바 펼치기",
     "collapseSidebar": "사이드바 접기",
-    "addTransaction": "거래 추가"
+    "addTransaction": "거래 추가",
+    "scanReceipt": "스캔 및 영수증 분석"
   },
   "ledger": {
     "all": "전체",
@@ -336,7 +339,7 @@
     "taxRefund": "정부 환급금(HST/Tax Refund)"
   },
   "subscriptions": {
-    "title": "구독 / 고정지출",
+    "title": "고정지출",
     "subtitle": "결제일이 되면 자동 지출로 기록됩니다 · 항목을 눌러 수정/삭제",
     "monthlySubscriptionTotal": "이번 달 총 구독",
     "monthlyInstallmentTotal": "이번 달 총 할부",
@@ -677,7 +680,12 @@
     "resetSuccessAll": "모든 데이터가 초기화되었습니다. 온보딩으로 이동합니다.",
     "resetSuccessLedger": "가계부 거래 내역이 초기화되었습니다.",
     "resetSuccessSubscriptions": "구독 데이터가 초기화되었습니다.",
-    "resetSuccessStocks": "주식 데이터가 초기화되었습니다."
+    "resetSuccessStocks": "주식 데이터가 초기화되었습니다.",
+    "preferencesTitle": "앱 설정",
+    "languageLabel": "언어",
+    "themeLabel": "화면 모드",
+    "invitePartner": "파트너 초대",
+    "accountSection": "계정"
   },
   "onboarding": {
     "title": "시작하기",

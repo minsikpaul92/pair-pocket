@@ -26,6 +26,8 @@
     "thisMonth": "This month",
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
+    "expandActions": "Show quick actions",
+    "collapseActions": "Hide quick actions",
     "selectMonth": "Select year and month",
     "previousYear": "Previous year",
     "nextYear": "Next year",
@@ -50,7 +52,7 @@
     "calendar": "Calendar",
     "list": "List",
     "dashboard": "Dashboard",
-    "subscriptions": "Subscriptions / Bills",
+    "subscriptions": "Fixed expenses",
     "stocks": "Stock",
     "settings": "Settings",
     "smartImport": "Smart Import",
@@ -58,7 +60,8 @@
     "logout": "Log out",
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
-    "addTransaction": "Add transaction"
+    "addTransaction": "Add transaction",
+    "scanReceipt": "Scan receipt"
   },
   "ledger": {
     "all": "All",
@@ -336,7 +339,7 @@
     "taxRefund": "Government refund (HST/Tax)"
   },
   "subscriptions": {
-    "title": "Subscriptions / Bills",
+    "title": "Fixed expenses",
     "subtitle": "Charges are recorded automatically on due dates · Tap to edit or delete",
     "monthlySubscriptionTotal": "Monthly subscriptions",
     "monthlyInstallmentTotal": "Monthly installments",
@@ -677,7 +680,12 @@
     "resetSuccessAll": "All data was reset. Opening onboarding…",
     "resetSuccessLedger": "Ledger transactions were reset.",
     "resetSuccessSubscriptions": "Subscriptions were reset.",
-    "resetSuccessStocks": "Stock data was reset."
+    "resetSuccessStocks": "Stock data was reset.",
+    "preferencesTitle": "App preferences",
+    "languageLabel": "Language",
+    "themeLabel": "Appearance",
+    "invitePartner": "Invite partner",
+    "accountSection": "Account"
   },
   "onboarding": {
     "title": "Get started",

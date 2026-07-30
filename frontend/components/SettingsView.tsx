@@ -9,9 +9,14 @@ import {
   Loader2,
   Sparkles,
   Languages,
+  LogOut,
+  UserPlus,
+  Moon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
+import LocaleToggle from "@/components/LocaleToggle";
+import ThemeToggle from "@/components/ThemeToggle";
 import {
   fetchUserSettings,
   saveGeminiApiKey,
@@ -23,6 +28,8 @@ import type { AppLocale } from "@/i18n/locales";
 
 interface Props {
   onChanged: () => void;
+  onInvite?: () => void;
+  onLogout?: () => void;
 }
 
 const RESET_SCOPES: ResetScope[] = [
@@ -48,9 +55,14 @@ function clearOnboardingSession() {
   sessionStorage.removeItem(ONBOARDING_HOLDINGS_KEY);
 }
 
-export default function SettingsView({ onChanged }: Props) {
+export default function SettingsView({
+  onChanged,
+  onInvite,
+  onLogout,
+}: Props) {
   const t = useTranslations("settingsPage");
   const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const locale = useLocale() as AppLocale;
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -195,6 +207,57 @@ export default function SettingsView({ onChanged }: Props) {
           <span>{errorMsg}</span>
         </div>
       )}
+
+      {/* Mobile-only: controls removed from the compact top bar */}
+      <section className="card-inset p-5 space-y-1 md:hidden">
+        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3 mb-1">
+          <Moon className="h-5 w-5 text-blue-500" />
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {t("preferencesTitle")}
+          </h2>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 py-3">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+            {t("languageLabel")}
+          </span>
+          <LocaleToggle />
+        </div>
+        <div className="flex items-center justify-between gap-3 py-3 border-t border-gray-100 dark:border-gray-800">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+            {t("themeLabel")}
+          </span>
+          <ThemeToggle />
+        </div>
+
+        {(onInvite || onLogout) && (
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-1 mt-1">
+            <p className="pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              {t("accountSection")}
+            </p>
+            {onInvite && (
+              <button
+                type="button"
+                onClick={onInvite}
+                className="w-full flex items-center gap-3 rounded-xl py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+              >
+                <UserPlus className="h-5 w-5 text-blue-500 shrink-0" />
+                <span className="truncate">{t("invitePartner")}</span>
+              </button>
+            )}
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="w-full flex items-center gap-3 rounded-xl py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+              >
+                <LogOut className="h-5 w-5 shrink-0" />
+                <span className="truncate">{tNav("logout")}</span>
+              </button>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="card-inset p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
