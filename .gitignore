@@ -171,3 +171,5 @@ pip-log.txt
 .idea/
 .cursor/
 *.swp
+.vercel
+.env*

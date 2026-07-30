@@ -18,8 +18,21 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 const nextConfig = {
   reactStrictMode: true,
   async redirects() {
-    // Without Edge middleware: send bare "/" to default locale.
-    return [{ source: "/", destination: "/ko", permanent: false }];
+    // Without Edge middleware: bare paths must land under default locale.
+    // Backend OAuth / invite emails omit the locale prefix.
+    return [
+      { source: "/", destination: "/ko", permanent: false },
+      {
+        source: "/auth/callback",
+        destination: "/ko/auth/callback",
+        permanent: false,
+      },
+      {
+        source: "/invite/:token",
+        destination: "/ko/invite/:token",
+        permanent: false,
+      },
+    ];
   },
   webpack: (config, { dev }) => {
     // Avoid corrupted on-disk webpack cache when disk space is low (ENOSPC).
