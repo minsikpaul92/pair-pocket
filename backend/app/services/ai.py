@@ -67,6 +67,57 @@ async def get_user_gemini_api_key(db: AsyncIOMotorDatabase, owner_id: str) -> st
     return plaintext
 
 
+async def resolve_gemini_api_key_chain(
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+) -> list[dict[str, str]]:
+    """Ordered Gemini keys for a request.
+
+    - Own key first when present.
+    - Partner key when the user has no key (borrow while linked).
+    - Partner key as fallback when the *partner* enabled share_gemini_api_key
+      (they offered their key after the requester's free-tier models are exhausted).
+    """
+    from app.services.access import get_partner_owner_id
+
+    chain: list[dict[str, str]] = []
+    own_key = await get_user_gemini_api_key(db, owner_id)
+
+    if own_key:
+        chain.append(
+            {"api_key": own_key, "key_owner_id": owner_id, "source": "own"}
+        )
+
+    partner_id = await get_partner_owner_id(db, owner_id)
+    if not partner_id:
+        return chain
+
+    partner_key = await get_user_gemini_api_key(db, partner_id)
+    if not partner_key:
+        return chain
+
+    partner_doc = await db["user_settings"].find_one({"owner_id": partner_id}) or {}
+    partner_shares = bool(partner_doc.get("share_gemini_api_key"))
+
+    # No own key → borrow partner's. Own key + partner shares → fallback.
+    if not own_key or partner_shares:
+        chain.append(
+            {
+                "api_key": partner_key,
+                "key_owner_id": partner_id,
+                "source": "partner",
+            }
+        )
+    return chain
+
+
+async def has_effective_gemini_key(
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+) -> bool:
+    return bool(await resolve_gemini_api_key_chain(db, owner_id))
+
+
 def iter_batches(items: Sequence[T], size: int = IMAGE_BATCH_SIZE) -> Iterable[list[T]]:
     """Yield consecutive batches of `size` (default 3) for import/onboarding uploads."""
     if size < 1:
@@ -411,23 +462,22 @@ def _build_single_file_payload(file_bytes: bytes, mime_type: str) -> dict[str, A
     }
 
 
-async def generate_content_with_routing(
+async def _generate_with_single_key(
     db: AsyncIOMotorDatabase,
-    owner_id: str,
+    requester_id: str,
+    key_owner_id: str,
     api_key: str,
     payload: dict[str, Any],
+    *,
+    key_source: str,
 ) -> AsyncIterator[dict[str, Any]]:
-    """
-    Quota-aware Gemini router.
-    Yields trying / failed / quota_fallback / success / error style events (no OCR log writes).
-    """
-    state = await _load_model_state(db, owner_id)
+    """Try the model chain with one API key. Cooldown state is keyed by key owner."""
+    state = await _load_model_state(db, key_owner_id)
     models, skip_info = build_model_chain(state)
 
-    # Expired cooldown: clear so next call starts clean.
     resume_at = _parse_iso(state.get("resume_at"))
     if resume_at and _utc_now() >= resume_at and state.get("cooldown_model"):
-        await _save_model_state(db, owner_id, None)
+        await _save_model_state(db, key_owner_id, None)
         state = {}
         models, skip_info = build_model_chain(state)
 
@@ -437,6 +487,7 @@ async def generate_content_with_routing(
             "model": skip_info["skipped_model"],
             "fallback_model": skip_info["fallback_model"],
             "resume_at": skip_info["resume_at"],
+            "key_source": key_source,
             "message": (
                 f"Free-tier limit for {skip_info['skipped_model']}; "
                 f"using {skip_info['fallback_model']} until {skip_info['resume_at']}."
@@ -444,10 +495,15 @@ async def generate_content_with_routing(
         }
 
     last_error: str | None = None
+    had_success = False
 
     async with httpx.AsyncClient(timeout=45.0) as client:
         for model in models:
-            yield {"event": "trying", "model": model}
+            yield {
+                "event": "trying",
+                "model": model,
+                "key_source": key_source,
+            }
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/models/"
                 f"{model}:generateContent?key={api_key}"
@@ -458,15 +514,23 @@ async def generate_content_with_routing(
                     data = resp.json()
                     text = data["candidates"][0]["content"]["parts"][0]["text"]
                     parsed_json = json.loads(text)
-                    await _clear_cooldown_if_primary_ok(db, owner_id, model, state)
+                    await _clear_cooldown_if_primary_ok(
+                        db, key_owner_id, model, state
+                    )
                     logger.info(
-                        "gemini_success owner=%s model=%s", owner_id, model
+                        "gemini_success requester=%s key_owner=%s source=%s model=%s",
+                        requester_id,
+                        key_owner_id,
+                        key_source,
+                        model,
                     )
                     yield {
                         "event": "success",
                         "model": model,
                         "result": parsed_json,
+                        "key_source": key_source,
                     }
+                    had_success = True
                     return
 
                 error_text = _extract_error_message(resp)
@@ -476,12 +540,13 @@ async def generate_content_with_routing(
                     "model": model,
                     "error": error_text,
                     "status_code": resp.status_code,
+                    "key_source": key_source,
                 }
 
                 if _is_quota_status(resp.status_code, error_text):
                     resume = compute_resume_at(resp, error_text)
                     new_state = await _mark_model_cooldown(
-                        db, owner_id, model, resume
+                        db, key_owner_id, model, resume
                     )
                     state = new_state
                     idx = models.index(model)
@@ -492,6 +557,7 @@ async def generate_content_with_routing(
                             "model": model,
                             "fallback_model": next_models[0],
                             "resume_at": new_state["resume_at"],
+                            "key_source": key_source,
                             "message": (
                                 f"Quota/rate limit on {model}; "
                                 f"retrying with {next_models[0]}."
@@ -503,7 +569,76 @@ async def generate_content_with_routing(
                     "event": "failed",
                     "model": model,
                     "error": str(e),
+                    "key_source": key_source,
                 }
+
+    if not had_success:
+        yield {
+            "event": "key_exhausted",
+            "key_source": key_source,
+            "error": last_error or "All models failed for this key",
+        }
+
+
+async def generate_content_with_routing(
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+    api_key: str | None,
+    payload: dict[str, Any],
+) -> AsyncIterator[dict[str, Any]]:
+    """
+    Quota-aware Gemini router with optional partner-key fallback.
+    Yields trying / failed / quota_fallback / success / error style events.
+    """
+    chain = await resolve_gemini_api_key_chain(db, owner_id)
+    if api_key and not chain:
+        chain = [
+            {"api_key": api_key, "key_owner_id": owner_id, "source": "own"}
+        ]
+    elif api_key and chain and chain[0]["api_key"] != api_key:
+        # Prefer explicitly provided key first (legacy callers).
+        chain = [
+            {"api_key": api_key, "key_owner_id": owner_id, "source": "own"},
+            *[c for c in chain if c["api_key"] != api_key],
+        ]
+
+    if not chain:
+        yield {
+            "event": "error",
+            "error": (
+                "Gemini API Key가 등록되어 있지 않습니다. "
+                "설정에서 키를 먼저 등록해 주세요."
+            ),
+        }
+        return
+
+    last_error: str | None = None
+    for index, entry in enumerate(chain):
+        if index > 0:
+            yield {
+                "event": "quota_fallback",
+                "model": PRIMARY_MODEL,
+                "fallback_model": PRIMARY_MODEL,
+                "key_source": entry["source"],
+                "message": (
+                    f"Switching to partner Gemini key after exhausting "
+                    f"{chain[index - 1]['source']} key free-tier models."
+                ),
+            }
+        async for event in _generate_with_single_key(
+            db,
+            owner_id,
+            entry["key_owner_id"],
+            entry["api_key"],
+            payload,
+            key_source=entry["source"],
+        ):
+            if event["event"] == "key_exhausted":
+                last_error = event.get("error", last_error)
+                continue
+            yield event
+            if event["event"] == "success":
+                return
 
     yield {
         "event": "error",
@@ -527,7 +662,8 @@ async def parse_receipt_or_statement_stream(
     - {"event": "success", "model": str, "result": dict, "log_id": str}
     - {"event": "error", "error": str, "log_id": str}
     """
-    api_key = await get_user_gemini_api_key(db, owner_id)
+    chain = await resolve_gemini_api_key_chain(db, owner_id)
+    api_key = chain[0]["api_key"] if chain else None
     log_id = ObjectId()
 
     if not api_key:
@@ -950,7 +1086,8 @@ async def parse_onboarding_screenshots_stream(
         return
 
     try:
-        api_key = await get_user_gemini_api_key(db, owner_id)
+        chain = await resolve_gemini_api_key_chain(db, owner_id)
+        api_key = chain[0]["api_key"] if chain else None
     except Exception as e:
         yield {"event": "error", "error": str(e)}
         return

@@ -21,6 +21,7 @@ import { useLocale, useTranslations } from "next-intl";
 import LanguagePicker from "@/components/LanguagePicker";
 import OnboardingField from "@/components/OnboardingField";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
+import DayPicker from "@/components/DayPicker";
 import AccountSelect from "@/components/AccountSelect";
 import BankPicker from "@/components/BankPicker";
 import AccountRegisterModal from "@/components/AccountRegisterModal";
@@ -79,6 +80,7 @@ import {
   type StockHolding,
   type UserSettings,
 } from "@/lib/api";
+import { dayKey } from "@/lib/date";
 
 type Step = 0 | 1 | 2 | 3;
 
@@ -435,6 +437,7 @@ export default function OnboardingWizard() {
   const [presets, setPresets] = useState<CategoryPresets | null>(null);
 
   const [startDate, setStartDate] = useState(todayISO());
+  const [sharedStartDate, setSharedStartDate] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [selectedLocales, setSelectedLocales] = useState<AppLocale[]>([]);
 
@@ -484,6 +487,7 @@ export default function OnboardingWizard() {
         if (categoryPresets) setPresets(categoryPresets);
         setCustomInstitutions(s.institutions || []);
         if (s.ledger_start_date) setStartDate(s.ledger_start_date);
+        setSharedStartDate(s.shared_ledger_start_date || null);
 
         const savedStep = Math.min(
           Math.max(s.onboarding_personal_step ?? 0, 0),
@@ -1409,15 +1413,29 @@ export default function OnboardingWizard() {
                 </h2>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t("startDateHelp")}
+                {sharedStartDate ? t("startDateLockedHelp") : t("startDateHelp")}
               </p>
+              {sharedStartDate && (
+                <div className="rounded-xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3 space-y-1">
+                  <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                    {t("sharedStartDateTitle")}
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {sharedStartDate}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {t("sharedStartDateReadOnly")}
+                  </p>
+                </div>
+              )}
               <OnboardingField label={t("startDateTitle")}>
-                <input
-                  type="date"
-                  required
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className={inputClass}
+                <DayPicker
+                  value={(() => {
+                    const [y, m, d] = startDate.split("-").map(Number);
+                    return new Date(y, (m || 1) - 1, d || 1);
+                  })()}
+                  onChange={(next) => setStartDate(dayKey(next))}
+                  locale={locale}
                 />
               </OnboardingField>
             </section>
@@ -1502,7 +1520,9 @@ export default function OnboardingWizard() {
 
             <OnboardingScreenshotScan
               step="assets"
-              hasApiKey={Boolean(settings?.has_gemini_key)}
+              hasApiKey={Boolean(
+                settings?.has_effective_gemini_key ?? settings?.has_gemini_key
+              )}
               disabled={saving}
               onParsed={applyScreenshotResult}
             />
@@ -1902,7 +1922,9 @@ export default function OnboardingWizard() {
 
             <OnboardingScreenshotScan
               step="subscriptions"
-              hasApiKey={Boolean(settings?.has_gemini_key)}
+              hasApiKey={Boolean(
+                settings?.has_effective_gemini_key ?? settings?.has_gemini_key
+              )}
               disabled={saving}
               onParsed={applyScreenshotResult}
             />
@@ -2527,7 +2549,9 @@ export default function OnboardingWizard() {
 
             <OnboardingScreenshotScan
               step="brokerage"
-              hasApiKey={Boolean(settings?.has_gemini_key)}
+              hasApiKey={Boolean(
+                settings?.has_effective_gemini_key ?? settings?.has_gemini_key
+              )}
               disabled={saving}
               onParsed={applyScreenshotResult}
             />

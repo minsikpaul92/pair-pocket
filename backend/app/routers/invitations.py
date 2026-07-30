@@ -42,12 +42,26 @@ def _serialize_invite(
         "expires_at": doc["expires_at"],
         "email_sent": email_sent,
         "accept_url": accept_url,
+        "shared_ledger_start_date": doc.get("shared_ledger_start_date"),
     }
 
 
-def _invite_email_body(*, inviter_name: str, accept_url: str) -> str:
+def _valid_start(value: str) -> bool:
+    return len(value) == 10 and value[4] == "-" and value[7] == "-"
+
+
+def _invite_email_body(
+    *,
+    inviter_name: str,
+    accept_url: str,
+    shared_start: str | None = None,
+) -> str:
+    start_line = (
+        f"공유 가계부 시작일: {shared_start}\n\n" if shared_start else ""
+    )
     return (
         f"{inviter_name}님이 PairPocket 공유 가계부에 초대했습니다.\n\n"
+        f"{start_line}"
         f"아래 링크를 열고 Google로 로그인한 뒤 초대를 수락하세요.\n"
         f"(초대받은 Google 계정 이메일과 초대 이메일이 같아야 합니다.)\n\n"
         f"{accept_url}\n\n"
@@ -118,6 +132,13 @@ async def create_invitation(
             detail="자기 자신은 초대할 수 없습니다.",
         )
 
+    shared_start = payload.shared_ledger_start_date.strip()
+    if not _valid_start(shared_start):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="shared_ledger_start_date must be YYYY-MM-DD",
+        )
+
     existing_user = await db[USERS_COL].find_one({"email": invitee_email})
     if existing_user and existing_user.get("shared_group_id"):
         raise HTTPException(
@@ -143,6 +164,7 @@ async def create_invitation(
         "status": InvitationStatus.PENDING.value,
         "created_at": now,
         "expires_at": now + timedelta(days=INVITE_TTL_DAYS),
+        "shared_ledger_start_date": shared_start,
     }
     result = await db[COLLECTION].insert_one(doc)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
@@ -157,6 +179,7 @@ async def create_invitation(
             body=_invite_email_body(
                 inviter_name=current_user.name,
                 accept_url=accept_url,
+                shared_start=shared_start,
             ),
         )
         if not email_sent:
@@ -243,6 +266,25 @@ async def accept_invitation(
         {"_id": ObjectId(current_user.id)},
         {"$set": {"shared_group_id": group_id}},
     )
+    # Apply shared ledger start date from the invite to both partners.
+    shared_start = invite.get("shared_ledger_start_date")
+    if isinstance(shared_start, str) and _valid_start(shared_start):
+        for oid in (invite["inviter_id"], current_user.id):
+            await db["user_settings"].update_one(
+                {"owner_id": oid},
+                {
+                    "$set": {"shared_ledger_start_date": shared_start},
+                    "$setOnInsert": {
+                        "merchants": [],
+                        "institutions": [],
+                        "custom_categories": {"expense": {}, "income": {}},
+                        "category_colors": {},
+                        "onboarding_personal_completed": False,
+                        "onboarding_personal_step": 0,
+                    },
+                },
+                upsert=True,
+            )
     await db[COLLECTION].update_one(
         {"_id": invite["_id"]},
         {

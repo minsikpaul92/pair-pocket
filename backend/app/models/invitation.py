@@ -15,6 +15,7 @@ class InvitationStatus(str, Enum):
 
 class InvitationCreate(BaseModel):
     invitee_email: EmailStr
+    shared_ledger_start_date: str = Field(min_length=10, max_length=10)
 
 
 class InvitationAccept(BaseModel):
@@ -36,6 +37,7 @@ class InvitationOut(BaseModel):
     expires_at: datetime
     email_sent: bool = False
     accept_url: str | None = None
+    shared_ledger_start_date: str | None = None
 
 
 class InvitationMeOut(BaseModel):
