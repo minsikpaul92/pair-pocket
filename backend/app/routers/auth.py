@@ -24,7 +24,7 @@ oauth.register(
 )
 
 DEV_GOOGLE_ID = "dev-local-preview"
-DEV_EMAIL = "dev@localhost"
+DEV_EMAIL = "dev@example.com"
 DEV_NAME = "Dev Preview"
 
 
