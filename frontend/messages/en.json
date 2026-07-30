@@ -713,7 +713,10 @@
     "themeLabel": "Appearance",
     "invitePartner": "Invite partner",
     "invitePartnerDone": "Partner invite complete",
-    "accountSection": "Account"
+    "accountSection": "Account",
+    "supportTitle": "Support",
+    "supportDescription": "If PairPocket helps you, you can buy me a coffee. No ads in the app.",
+    "supportCta": "Buy me a coffee"
   },
   "onboarding": {
     "title": "Get started",
