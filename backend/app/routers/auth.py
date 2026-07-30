@@ -1,7 +1,7 @@
 from urllib.parse import urlencode
 
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -23,16 +23,70 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
+DEV_GOOGLE_ID = "dev-local-preview"
+DEV_EMAIL = "dev@localhost"
+DEV_NAME = "Dev Preview"
+
 
 @router.get("/login")
-async def login(request: Request):
-    """Kick off the Google OAuth flow by redirecting to the consent screen."""
-    if not settings.google_client_id:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Google OAuth is not configured. Set GOOGLE_CLIENT_ID/SECRET.",
+async def login(
+    request: Request, db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Kick off Google OAuth, or local preview login when OAuth is unset."""
+    if settings.google_client_id:
+        return await oauth.google.authorize_redirect(
+            request, settings.oauth_redirect_uri
         )
-    return await oauth.google.authorize_redirect(request, settings.oauth_redirect_uri)
+
+    if settings.allow_dev_login:
+        return await _dev_login_redirect(db)
+
+    # Prefer a frontend redirect over a raw JSON 503 in the browser.
+    return _redirect_to_frontend(error="oauth_not_configured")
+
+
+async def _dev_login_redirect(db: AsyncIOMotorDatabase) -> RedirectResponse:
+    """Upsert a stable local preview user and redirect with a JWT."""
+    await db["users"].update_one(
+        {"google_id": DEV_GOOGLE_ID},
+        {
+            "$set": {
+                "email": DEV_EMAIL,
+                "name": DEV_NAME,
+                "picture": None,
+                "google_tokens": {},
+            },
+            "$setOnInsert": {
+                "google_id": DEV_GOOGLE_ID,
+                "shared_group_id": None,
+            },
+        },
+        upsert=True,
+    )
+
+    document = await db["users"].find_one({"google_id": DEV_GOOGLE_ID})
+    user_id = str(document["_id"])
+
+    await db["user_settings"].update_one(
+        {"owner_id": user_id},
+        {
+            "$set": {
+                "onboarding_personal_completed": True,
+            },
+            "$setOnInsert": {
+                "owner_id": user_id,
+                "merchants": [],
+                "institutions": [],
+                "custom_categories": {"expense": {}, "income": {}},
+                "category_colors": {},
+                "onboarding_personal_step": 0,
+            },
+        },
+        upsert=True,
+    )
+
+    access_token = create_access_token(subject=user_id)
+    return _redirect_to_frontend(token=access_token)
 
 
 @router.get("/callback")

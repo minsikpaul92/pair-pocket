@@ -18,8 +18,10 @@ function CallbackHandler() {
     const error = searchParams.get("error");
 
     if (error) {
-      setMessage(t("failed"));
-      const timer = setTimeout(() => router.replace("/"), 2000);
+      setMessage(
+        error === "oauth_not_configured" ? t("oauthNotConfigured") : t("failed")
+      );
+      const timer = setTimeout(() => router.replace("/"), 2500);
       return () => clearTimeout(timer);
     }
 
