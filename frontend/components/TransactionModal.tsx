@@ -1,8 +1,8 @@
 "use client";
 
-import { SkipForward, Trash2, X, Plus } from "lucide-react";
+import { Camera, Loader2, SkipForward, Trash2, X, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
@@ -61,6 +61,7 @@ import {
   ExchangeRate,
   ParsedTransaction,
   TransactionItem,
+  parseReceiptsOrStatements,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey } from "@/lib/date";
@@ -197,6 +198,9 @@ export default function TransactionModal({
   const [showItems, setShowItems] = useState(false);
   const [tipPercent, setTipPercent] = useState("");
   const [tipAmount, setTipAmount] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanHint, setScanHint] = useState<string | null>(null);
+  const scanInputRef = useRef<HTMLInputElement>(null);
 
   const dateStr = dayKey(defaultDate);
 
@@ -408,6 +412,48 @@ export default function TransactionModal({
       onDateChange(new Date(parsedTransaction.date));
     }
   }, [parsedTransaction, currency, onDateChange]);
+
+  async function handleModalScan(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setScanning(true);
+    setScanHint(null);
+    setError(null);
+    try {
+      const results = await parseReceiptsOrStatements(Array.from(files), {
+        flowType: type,
+      });
+      const flat: ParsedTransaction[] = [];
+      for (const r of results as Array<ParsedTransaction & { transactions?: ParsedTransaction[] }>) {
+        if (Array.isArray((r as { transactions?: ParsedTransaction[] }).transactions)) {
+          for (const tx of (r as { transactions: ParsedTransaction[] }).transactions) {
+            flat.push({ ...tx, file_name: r.file_name, items: tx.items || [] });
+          }
+        } else if (r?.date != null) {
+          flat.push(r);
+        }
+      }
+      const parsed = flat[0];
+      if (!parsed) {
+        setError(tTx("scanEmpty"));
+        return;
+      }
+      setAmount(amountToInput(parsed.amount, parsed.currency));
+      setMerchant(parsed.merchant || "");
+      setTxCurrency(parsed.currency);
+      setCategory(parsed.category || "");
+      setSubCategory(parsed.sub_category || "");
+      setItems(parsed.items || []);
+      setShowItems((parsed.items || []).length > 0);
+      if (parsed.date) onDateChange(new Date(parsed.date));
+      setScanHint(tTx("scanFilled"));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : tTx("scanFailed"));
+    } finally {
+      setScanning(false);
+      if (scanInputRef.current) scanInputRef.current.value = "";
+    }
+  }
 
   useEffect(() => {
     if (isEditing || isTransfer) return;
@@ -1338,6 +1384,42 @@ export default function TransactionModal({
               {tCommon("income")}
             </button>
           </div>
+
+          {!isEditing && (
+            <div className="space-y-1.5">
+              <input
+                ref={scanInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={handleModalScan}
+              />
+              <button
+                type="button"
+                disabled={scanning || submitting}
+                onClick={() => scanInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-violet-300 dark:border-violet-700 bg-violet-50/60 dark:bg-violet-950/20 hover:bg-violet-50 dark:hover:bg-violet-950/40 text-violet-700 dark:text-violet-300 text-sm font-semibold py-2.5 transition-colors disabled:opacity-60"
+              >
+                {scanning ? (
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                ) : (
+                  <Camera className="h-4 w-4 shrink-0" />
+                )}
+                <span className="truncate">
+                  {scanning
+                    ? tTx("scanning")
+                    : type === "income"
+                      ? tTx("scanIncome")
+                      : tTx("scanExpense")}
+                </span>
+              </button>
+              {scanHint && (
+                <p className="text-xs text-violet-600 dark:text-violet-400">
+                  {scanHint}
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">

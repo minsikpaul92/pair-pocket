@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD) : PairPocket
 
-> **Last updated:** 2026-07-15 — Stock tab, real-time prices, dashboard stock asset section, and ledger-scope integration implemented (PR #9).
+> **Last updated:** 2026-07-30 — Contextual AI scan (per-tab + / camera), remove Smart Import AI scanner, List add entry, stocks CAD/USD display, dashboard currency toggle cleanup.
 
 ## 1. Project Overview
 * **Project Name:** PairPocket
@@ -52,17 +52,22 @@
 * **Ledger Scope Filtering:** Stock tab filters match the global navigation scope (CAD/KRW/ALL).
 * **Sell via Owned Holdings Dropdown:** When recording a stock sale (income tab → 주식 판매수익), users select from their currently owned holdings — with auto-populated ticker, account, and currency — plus a guide badge showing owned shares and average cost.
 
-### E. AI Receipt & Statement Parser
-* **Camera Floating Quick Action:** A floating camera button above the '+' button on the main view.
-* **Scan Options:** Clicking the camera button triggers a sheet or popover with:
-  * **Take Photo (사진촬영)**: Access native camera to capture receipt images.
-  * **Upload Photos (사진올리기)**: Select multiple receipt images from device photo gallery.
-  * **Upload File (파일올리기)**: Select PDF bank statements or raw files.
-* **Gemini Parsing Engine:**
-  * Uses the user's custom Gemini API key (e.g., `gemini-3.5-flash` or `gemini-3.1-flash-lite`).
-  * Supports bulk image OCR/parsing in a single prompt or parallel API calls.
-  * Extracts transaction date, total amount, currency (CAD/KRW), merchant, category, and lists individual items.
-  * Opens the `TransactionModal` pre-populated with these values for confirmation before saving.
+### E. Contextual AI Scan (per-tab entry, not a global dump)
+AI photo/file scan must open the **same create flow as that tab’s `+` button**, with a prompt scoped to that domain. Do **not** use a generic Smart Import AI scanner that leaves “where does this parse to?” ambiguous.
+
+| View | `+` opens | Camera / in-modal photo scan opens / fills |
+|------|-----------|--------------------------------------------|
+| **Dashboard / Calendar / List** | New transaction (`TransactionModal`) | Same modal; **Expense** tab → expense-only parse; **Income** tab → income-only parse. Receipts also fill **sub-category** and line items when present. |
+| **List (header)** | Explicit **Add** control (same as FAB `+`) | Same as above |
+| **Calendar day click** | New transaction for that date | Same modal; optional photo analyze inside the modal |
+| **Subscriptions** | Subscription register modal | Subscription-oriented screenshot parse (same family as onboarding) |
+| **Stocks** | Add holding / brokerage flow | Brokerage holdings screenshot parse (same family as onboarding) |
+| **Dashboard section `+ 추가`** (cards, stock accounts, bank/assets) | `AccountRegisterModal` for that kind | Account/asset screenshot parse (reuse onboarding assets/brokerage scan) |
+
+* **Floating actions:** Camera sits above `+` where the view already has a view-specific FAB (subscriptions, stocks). On dashboard / calendar / list, FAB `+` and camera both target **transactions**; camera may open the modal with scan, or scan into the open modal.
+* **Scan options (when offered):** Take photo, upload photos, upload PDF/file (as applicable to that flow).
+* **Gemini parsing:** User-supplied Gemini API key; model fallback chain. Extract fields appropriate to the active flow (transaction vs subscription vs holding vs account). Always confirm in the matching modal before save.
+* **Smart Import view:** Keep **CSV import/export** and **OCR/import logs** only. **Remove the AI File Scanner sub-tab** from Smart Import / File Management (context-free parse is out of product scope).
 
 ### F. Dynamic Translation & Custom AI Settings
 * **User-Provided API Key:** Users can input and save their Gemini API Key in the settings page. It is stored securely in `user_settings`.
@@ -151,13 +156,20 @@
 ## 6. Current App Views
 | View | Description |
 |------|-------------|
-| **Calendar** | Monthly calendar with daily income/expense totals and pending subscription markers |
-| **List** | Sortable, filterable transaction list |
-| **Dashboard** | Net worth (cash + stocks), monthly cash flow, account balances, stock account status section |
-| **Subscriptions** | Recurring bills and installment management |
-| **Stocks** | Brokerage accounts with real-time holdings, performance cards (profit/loss/yield), and per-ticker P&L |
+| **Calendar** | Monthly calendar with daily income/expense totals and pending subscription markers; day click → new transaction |
+| **List** | Sortable, filterable transaction list; must expose an **Add** control (same create path as FAB `+`) in addition to the floating `+` / camera |
+| **Dashboard** | Net worth (cash + stocks), monthly cash flow, account balances, stock account status; section `+` for accounts; FAB for new transactions |
+| **Subscriptions** | Recurring bills and installment management; own FAB (`+` / camera → subscription flows) |
+| **Stocks** | Brokerage accounts with real-time holdings; own FAB (`+` / camera → holdings); Canada tab supports CAD / USD / native-all display (CAD as `$`, USD as `US$`) |
+| **Smart Import** | CSV bulk import/export + import logs only (no standalone AI file scanner) |
+| **Settings** | Partner, Gemini key, theme, support, data reset |
 
 Navigation: sidebar (desktop) + bottom tab bar (mobile). Header filters: **Shared | Personal** + ALL / CAD / KRW.
+
+### Product decisions (2026-07-30)
+* **Contextual scan only:** Camera/`+` behavior is view-specific (see §3.E). Global AI dump in Smart Import is removed.
+* **Dashboard ALL currency UI:** Keep CAD/KRW toggle on **net worth** only; remove the duplicate toggle on the monthly net-flow card (same `display` state).
+* **Stocks Canada:** Distinguish CAD `$` vs USD `US$`; allow CAD↔USD rollup toggle and an “all / native” mode so mixed wallets can coexist (mirror Korea KRW/USD pattern).
 
 ## 7. Remaining Work (Priority Order)
 
@@ -171,16 +183,21 @@ Navigation: sidebar (desktop) + bottom tab bar (mobile). Header filters: **Share
 5. **Category breakdown UI** — Done
 6. **Stock tab + real-time prices** — Done (PR #9)
 
-### P2 — AI input (Phase 3)
-7. **PDF statement parsing** — Groq + pdfplumber endpoint
-8. **Receipt OCR** — Gemini 1.5 Flash batch upload (multi-image → JSON array)
-9. **CSV bulk upload** — web UI + backend import
+### P2 — AI input & contextual entry (active)
+7. **Remove Smart Import AI File Scanner** — keep CSV + logs only
+8. **Contextual transaction scan** — photo analyze inside / into `TransactionModal`; expense vs income scoped; sub-category + line items on receipts
+9. **List Add button** — header/primary Add that opens the same new-transaction path as FAB `+`
+10. **Dashboard account `+` scan** — reuse onboarding-style screenshot fill on `AccountRegisterModal`
+11. **Stocks Canada CAD/USD/`US$` + native-all** — display and rollup parity with Korea tab
+12. **Dashboard duplicate currency toggle** — keep net-worth toggle only
+13. **CSV bulk upload** — already in Smart Import; keep polishing as needed
 
 ### P3 — Polish
-10. **PWA icons** — add `frontend/public/icons/icon-192x192.png` and `icon-512x512.png`
-11. **Email settings UI** — expose reminder preferences (backend email infra exists)
-12. **Deploy pipeline** — Vercel (frontend) + Heroku (backend) production config
-13. **Leave shared group / unlink partners** — not in P0
+14. **PWA icons** — add `frontend/public/icons/icon-192x192.png` and `icon-512x512.png`
+15. **Email settings UI** — expose reminder preferences (backend email infra exists)
+16. **Deploy pipeline** — Vercel (frontend) + Heroku (backend) production config
+17. **Public OAuth open** — after soak test; consent + rate limits (see GitHub #35)
+18. **EN i18n gaps** — hard-coded Korean hints in scan/FAB/modals
 
 ## 8. Suggested Next Task
-Start **P2** AI/CSV input features, or continue polishing the stock tab (e.g., portfolio history chart, price change alerts, stock detail view with buy/sell history timeline).
+Ship the **contextual AI scan + List Add + stocks CAD/USD + dashboard toggle cleanup** package above (P2 items 7–12), then continue soak testing before public OAuth Publish (#35).

@@ -302,35 +302,73 @@ def _extract_error_message(resp: httpx.Response) -> str:
     return error_text
 
 
-def _receipt_prompt() -> str:
+def _receipt_prompt(flow_type: str = "expense") -> str:
+    flow = (flow_type or "expense").strip().lower()
+    if flow not in ("expense", "income"):
+        flow = "expense"
+
+    if flow == "income":
+        role = "income"
+        pairs = (
+            "For category and sub_category, map them STRICTLY to one of the following valid income pairs:\n"
+            "- Category: '급여' -> sub_category must be exactly one of: '급여', '주급(Bi-weekly)'\n"
+            "- Category: '부수입' -> sub_category must be exactly one of: '파트타임', '부업', '중고거래', '팁(Tip)'\n"
+            "- Category: '정산' -> sub_category must be exactly: 'N빵 정산/환급'\n"
+            "- Category: '금융/기타' -> sub_category must be exactly one of: "
+            "'주식 판매수익', '투자 배당금', '은행 이자', '정부 환급금(HST/Tax Refund)'\n"
+            "Ignore expense receipts; only extract income / deposit / payroll / refund style amounts.\n"
+        )
+        merchant_hint = (
+            "If the payer/source cannot be identified, set merchant to a logical fallback "
+            "like '급여', '환급', or '이자'.\n"
+        )
+        items_hint = (
+            "For income slips, items may be empty. Only include line items when the document "
+            "clearly lists income line components.\n"
+        )
+    else:
+        role = "expense"
+        pairs = (
+            "For category and sub_category, map them STRICTLY to one of the following valid expense pairs:\n"
+            "- Category: '식비' -> sub_category must be exactly one of: '식재료/장보기', '외식/배달', '카페/간식'\n"
+            "- Category: '주거/통신' -> sub_category must be exactly one of: '월세/모기지', '관리비/공과금', '통신비', '가정 정비'\n"
+            "- Category: '교통/차량' -> sub_category must be exactly one of: '대중교통', '택시/우버', '유류비/충전', '차량 유지'\n"
+            "- Category: '생활/쇼핑' -> sub_category must be exactly one of: '생필품', '의류/잡화', '미용/뷰티', '반려동물'\n"
+            "- Category: '건강/의료' -> sub_category must be exactly one of: '병원/약국', '운동/헬스', '영양제'\n"
+            "- Category: '문화/취미' -> sub_category must be exactly one of: '문화 생활', '취미/엔터', '정기 구독', '여행/숙박'\n"
+            "- Category: '경조사/선물' -> sub_category must be exactly one of: '경조사비', '선물/기념일', '모임/회비'\n"
+            "- Category: '투자/저축' -> sub_category must be exactly one of: '주식 매수', 'FHSA 납입', 'TFSA 납입', '저축성 예금'\n"
+            "- Category: '세금' -> sub_category must be exactly: '세금'\n"
+            "- Category: '금융/기타' -> sub_category must be exactly: '기타'\n"
+            "Ignore income/payroll documents; only extract purchase / bill / payment expenses.\n"
+        )
+        merchant_hint = (
+            "If the merchant/business name cannot be identified from the document, set the merchant field "
+            "to a logical category-based fallback name like '외식' (for restaurants), '장보기' (for groceries), "
+            "or '쇼핑' (for retail/shopping).\n"
+        )
+        items_hint = (
+            "If it is a single receipt, extract all individual items (sub-items/line items) from the receipt, "
+            "including original item name, standardized Korean item name (e.g. 수박, 소고기, 우유, 화장지) for price tracking, "
+            "quantity, unit (e.g. 개, lb, kg, bag) or null, unit_price, and total_price.\n"
+            "For Canadian receipts: extract subtotal (pre-tax), tax_amount (HST/GST/PST), tip_amount if shown, "
+            "and amount as the final total paid. Line item unit_price should be pre-tax when the receipt shows it; "
+            "otherwise use the printed line total divided by quantity.\n"
+            "Line item parsing rules: each row must align to columns name | standardized_name | quantity | unit | unit_price | total_price. "
+            "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores)."
+        )
+
     return (
-        "You are an expert expense parser for PairPocket. Analyze the provided receipt image or financial statement PDF.\n"
+        f"You are an expert {role} parser for PairPocket. Analyze the provided receipt image or financial statement PDF.\n"
         "Determine if the document is a single receipt or a statement containing multiple transactions.\n"
         "For dates, look for candidate patterns. Note that North American, European, and Asian formats vary (e.g. MM/DD/YY, DD/MM/YY, DD-MM-YYYY).\n"
         "Compare with current reference year 2026 and surrounding timestamps/contexts to resolve date ambiguities (like MM vs DD).\n"
         "Extract the transaction details and return them in JSON format matching the response schema.\n"
         "For currency, determine if it is Canadian Dollars (CAD), South Korean Won (KRW) or US Dollars (USD). Default to CAD if unsure.\n"
-        "If the merchant/business name cannot be identified from the document, set the merchant field to a logical category-based fallback name like '외식' (for restaurants), '장보기' (for groceries), or '쇼핑' (for retail/shopping).\n"
-        "For category and sub_category, map them STRICTLY to one of the following valid pairs:\n"
-        "- Category: '식비' -> sub_category must be exactly one of: '식재료/장보기', '외식/배달', '카페/간식'\n"
-        "- Category: '주거/통신' -> sub_category must be exactly one of: '월세/모기지', '관리비/공과금', '통신비', '가정 정비'\n"
-        "- Category: '교통/차량' -> sub_category must be exactly one of: '대중교통', '택시/우버', '유류비/충전', '차량 유지'\n"
-        "- Category: '생활/쇼핑' -> sub_category must be exactly one of: '생필품', '의류/잡화', '미용/뷰티', '반려동물'\n"
-        "- Category: '건강/의료' -> sub_category must be exactly one of: '병원/약국', '운동/헬스', '영양제'\n"
-        "- Category: '문화/취미' -> sub_category must be exactly one of: '문화 생활', '취미/엔터', '정기 구독', '여행/숙박'\n"
-        "- Category: '경조사/선물' -> sub_category must be exactly one of: '경조사비', '선물/기념일', '모임/회비'\n"
-        "- Category: '투자/저축' -> sub_category must be exactly one of: '주식 매수', 'FHSA 납입', 'TFSA 납입', '저축성 예금'\n"
-        "- Category: '세금' -> sub_category must be exactly: '세금'\n"
-        "- Category: '금융/기타' -> sub_category must be exactly: '기타'\n"
+        f"{merchant_hint}"
+        f"{pairs}"
         "Do NOT use any other categories or sub_categories.\n"
-        "If it is a single receipt, extract all individual items (sub-items/line items) from the receipt, "
-        "including original item name, standardized Korean item name (e.g. 수박, 소고기, 우유, 화장지) for price tracking, "
-        "quantity, unit (e.g. 개, lb, kg, bag) or null, unit_price, and total_price.\n"
-        "For Canadian receipts: extract subtotal (pre-tax), tax_amount (HST/GST/PST), tip_amount if shown, "
-        "and amount as the final total paid. Line item unit_price should be pre-tax when the receipt shows it; "
-        "otherwise use the printed line total divided by quantity.\n"
-        "Line item parsing rules: each row must align to columns name | standardized_name | quantity | unit | unit_price | total_price. "
-        "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores)."
+        f"{items_hint}"
     )
 
 
@@ -439,13 +477,15 @@ def _receipt_response_schema() -> dict[str, Any]:
     }
 
 
-def _build_single_file_payload(file_bytes: bytes, mime_type: str) -> dict[str, Any]:
+def _build_single_file_payload(
+    file_bytes: bytes, mime_type: str, *, flow_type: str = "expense"
+) -> dict[str, Any]:
     base64_data = base64.b64encode(file_bytes).decode("utf-8")
     return {
         "contents": [
             {
                 "parts": [
-                    {"text": _receipt_prompt()},
+                    {"text": _receipt_prompt(flow_type)},
                     {
                         "inlineData": {
                             "mimeType": mime_type,
@@ -652,6 +692,8 @@ async def parse_receipt_or_statement_stream(
     file_bytes: bytes,
     mime_type: str,
     file_name: str,
+    *,
+    flow_type: str = "expense",
 ):
     """
     Stream parsing status and results using SSE format.
@@ -686,7 +728,7 @@ async def parse_receipt_or_statement_stream(
         }
         return
 
-    payload = _build_single_file_payload(file_bytes, mime_type)
+    payload = _build_single_file_payload(file_bytes, mime_type, flow_type=flow_type)
     last_error: str | None = None
 
     async for event in generate_content_with_routing(db, owner_id, api_key, payload):
@@ -745,11 +787,13 @@ async def parse_receipt_or_statement(
     file_bytes: bytes,
     mime_type: str,
     file_name: str = "file",
+    *,
+    flow_type: str = "expense",
 ) -> dict:
     """Consume the SSE stream to return the final successful result or raise an error."""
     last_error = "Unknown error"
     async for event in parse_receipt_or_statement_stream(
-        db, owner_id, file_bytes, mime_type, file_name
+        db, owner_id, file_bytes, mime_type, file_name, flow_type=flow_type
     ):
         if event["event"] == "success":
             return event["result"]
@@ -767,6 +811,7 @@ async def parse_files_in_batches(
     *,
     batch_size: int = IMAGE_BATCH_SIZE,
     delay_seconds: float = BATCH_DELAY_SECONDS,
+    flow_type: str = "expense",
 ) -> list[dict[str, Any]]:
     """
     Parse multiple files in batches of `batch_size` (default 3).
@@ -780,7 +825,12 @@ async def parse_files_in_batches(
         for file_bytes, mime_type, file_name in batch:
             try:
                 result = await parse_receipt_or_statement(
-                    db, owner_id, file_bytes, mime_type, file_name
+                    db,
+                    owner_id,
+                    file_bytes,
+                    mime_type,
+                    file_name,
+                    flow_type=flow_type,
                 )
                 outcomes.append({"file_name": file_name, "result": result})
             except Exception as e:
