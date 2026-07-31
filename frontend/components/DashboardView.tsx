@@ -607,22 +607,6 @@ export default function DashboardView({
               scope: scopeLabel,
             })}
           </p>
-          {showCombinedToggle && (
-            <div className="flex rounded-lg bg-white/20 p-0.5">
-              {(["CAD", "KRW"] as Currency[]).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setDisplay(c)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                    display === c ? "bg-white text-blue-600" : "text-blue-50"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <p className="mt-2 text-3xl font-bold tracking-tight">
           {flow ? formatAmount(flow.netCashflow, flow.currency) : "—"}

@@ -64,6 +64,8 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
 
   // State controls
   const [displayCurrency, setDisplayCurrency] = useState<Currency>("CAD");
+  /** Canada tab: ALL = native per holding; CAD/USD = FX rollup. */
+  const [cadViewMode, setCadViewMode] = useState<"ALL" | "CAD" | "USD">("ALL");
   const [viewMode, setViewMode] = useState<ViewMode>("valuation");
   const [sortBy, setSortBy] = useState<SortOption>("valuation");
   const [showAccountRegister, setShowAccountRegister] = useState(false);
@@ -72,6 +74,16 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const [dragAccountId, setDragAccountId] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const stockCameraRef = useRef<HTMLInputElement>(null);
+
+  /** ALL / Korea always roll up; Canada rolls up only when CAD or USD is selected (not 전체). */
+  const useFxRollup =
+    ledgerScope === "ALL" ||
+    ledgerScope === "KRW" ||
+    (ledgerScope === "CAD" && cadViewMode !== "ALL");
+  const rollupCurrency: Currency =
+    ledgerScope === "CAD" && cadViewMode !== "ALL"
+      ? cadViewMode
+      : displayCurrency;
 
   // Data states
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
@@ -121,7 +133,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           fetchAccounts({ accountType }),
           fetchExchangeRate(),
           fetchMarketIndices().catch(() => [] as MarketIndexQuote[]),
-          fetchStockSummary(accountType, displayCurrency, accId),
+          fetchStockSummary(accountType, rollupCurrency, accId),
         ]);
 
       setHoldings(holdingsData);
@@ -136,7 +148,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     } finally {
       setLoading(false);
     }
-  }, [accountType, displayCurrency, selectedAccountIdFilter]);
+  }, [accountType, rollupCurrency, selectedAccountIdFilter]);
 
   useEffect(() => {
     if (ledgerScope !== "ALL") {
@@ -404,7 +416,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   );
 
   function formatStockAmount(amount: number, currency: Currency) {
-    return formatAmount(amount, currency, { plainUsd: currency === "USD" });
+    return formatAmount(amount, currency);
   }
 
   // Per-account stats in the account's own currency (USD wallet stays $).
@@ -682,10 +694,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       });
   }, [visibleAccounts, accountStatsMap]);
 
-  /** Korea + All tabs: roll holdings into displayCurrency. Canada keeps native wallets. */
-  const useFxRollup = ledgerScope === "ALL" || ledgerScope === "KRW";
-
-  // Stock-only rollup (no cash) into displayCurrency.
+  // Stock-only rollup (no cash) into rollupCurrency.
   const totalStats = useMemo(() => {
     let val = 0;
     let inv = 0;
@@ -693,8 +702,8 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       const stats = accountStatsMap[acc.id];
       if (!stats) return;
       if (useFxRollup) {
-        val += convertBetween(stats.valuation, stats.currency, displayCurrency);
-        inv += convertBetween(stats.invested, stats.currency, displayCurrency);
+        val += convertBetween(stats.valuation, stats.currency, rollupCurrency);
+        inv += convertBetween(stats.invested, stats.currency, rollupCurrency);
       } else {
         val += stats.valuation;
         inv += stats.invested;
@@ -708,14 +717,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       yield: y,
       invested: inv,
       currency: useFxRollup
-        ? displayCurrency
-        : ((totalsByCurrency[0]?.currency ?? displayCurrency) as Currency),
+        ? rollupCurrency
+        : ((totalsByCurrency[0]?.currency ?? rollupCurrency) as Currency),
     };
   }, [
     visibleAccounts,
     accountStatsMap,
     useFxRollup,
-    displayCurrency,
+    rollupCurrency,
     convertBetween,
     totalsByCurrency,
   ]);
@@ -730,23 +739,23 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         invested: 0,
         profit: 0,
         yield: 0,
-        currency: (acc?.currency ?? displayCurrency) as Currency,
+        currency: (acc?.currency ?? rollupCurrency) as Currency,
       };
       if (useFxRollup) {
         const valuation = convertBetween(
           stats.valuation,
           stats.currency,
-          displayCurrency
+          rollupCurrency
         );
         const invested = convertBetween(
           stats.invested,
           stats.currency,
-          displayCurrency
+          rollupCurrency
         );
         const profit = valuation - invested;
         return [
           {
-            currency: displayCurrency,
+            currency: rollupCurrency,
             valuation,
             invested,
             profit,
@@ -767,7 +776,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     if (useFxRollup) {
       return [
         {
-          currency: displayCurrency,
+          currency: rollupCurrency,
           valuation: totalStats.valuation,
           invested: totalStats.invested,
           profit: totalStats.profit,
@@ -781,7 +790,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     investmentAccounts,
     accountStatsMap,
     useFxRollup,
-    displayCurrency,
+    rollupCurrency,
     convertBetween,
     totalStats,
     totalsByCurrency,
@@ -797,10 +806,10 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       const cash = cashBalanceMap[acc.id] ?? 0;
       if (Math.abs(cash) < 0.0001) return;
       if (useFxRollup) {
-        const converted = convertBetween(cash, acc.currency, displayCurrency);
+        const converted = convertBetween(cash, acc.currency, rollupCurrency);
         map.set(
-          displayCurrency,
-          (map.get(displayCurrency) ?? 0) + converted
+          rollupCurrency,
+          (map.get(rollupCurrency) ?? 0) + converted
         );
       } else {
         map.set(acc.currency, (map.get(acc.currency) ?? 0) + cash);
@@ -815,7 +824,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     visibleAccounts,
     cashBalanceMap,
     useFxRollup,
-    displayCurrency,
+    rollupCurrency,
     convertBetween,
   ]);
 
@@ -891,7 +900,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             {useFxRollup ? (
               <>
                 <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
-                  {formatStockAmount(totalStats.valuation, displayCurrency)}
+                  {formatStockAmount(totalStats.valuation, rollupCurrency)}
                 </div>
                 <div
                   className={`text-[11px] font-bold mt-1.5 ${
@@ -899,7 +908,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   }`}
                 >
                   {totalStats.profit >= 0 ? "+" : ""}
-                  {formatStockAmount(totalStats.profit, displayCurrency)} (
+                  {formatStockAmount(totalStats.profit, rollupCurrency)} (
                   {totalStats.yield.toFixed(1)}%)
                 </div>
               </>
@@ -941,18 +950,18 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               currency: acc.currency,
             };
             const cash = cashBalanceMap[acc.id] ?? 0;
-            const cardCurrency = useFxRollup ? displayCurrency : acc.currency;
+            const cardCurrency = useFxRollup ? rollupCurrency : acc.currency;
             const cardValuation = useFxRollup
-              ? convertBetween(stats.valuation, stats.currency, displayCurrency)
+              ? convertBetween(stats.valuation, stats.currency, rollupCurrency)
               : stats.valuation;
             const cardInvested = useFxRollup
-              ? convertBetween(stats.invested, stats.currency, displayCurrency)
+              ? convertBetween(stats.invested, stats.currency, rollupCurrency)
               : stats.invested;
             const cardProfit = cardValuation - cardInvested;
             const cardYield =
               cardInvested > 0 ? (cardProfit / cardInvested) * 100 : 0;
             const cashDisplay = useFxRollup
-              ? convertBetween(cash, acc.currency, displayCurrency)
+              ? convertBetween(cash, acc.currency, rollupCurrency)
               : cash;
             const isProfit = cardProfit >= 0;
             const isDragging = dragAccountId === acc.id;
@@ -1008,8 +1017,8 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   </div>
                   <div className="text-[9px] font-black uppercase tracking-wider text-gray-400 mt-0.5">
                     {acc.currency}
-                    {useFxRollup && acc.currency !== displayCurrency
-                      ? ` → ${displayCurrency}`
+                    {useFxRollup && acc.currency !== rollupCurrency
+                      ? ` → ${rollupCurrency}`
                       : ""}
                   </div>
                   <div className="text-base font-black text-gray-900 dark:text-white mt-0.5 tabular-nums">
@@ -1054,6 +1063,43 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   onClick={() => setDisplayCurrency("USD")}
                   className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
                     displayCurrency === "USD"
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {t("displayUsd")}
+                </button>
+              </div>
+            )}
+            {ledgerScope === "CAD" && (
+              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setCadViewMode("ALL")}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                    cadViewMode === "ALL"
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {t("displayNativeAll")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCadViewMode("CAD")}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                    cadViewMode === "CAD"
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {t("displayCad")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCadViewMode("USD")}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                    cadViewMode === "USD"
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500"
                   }`}
@@ -1162,7 +1208,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
           </div>
 
-          {/* CAD / KRW on ALL; KRW / USD on Korea */}
+          {/* CAD / KRW on ALL; KRW / USD on Korea; CAD / USD / native on Canada (header card) */}
           {ledgerScope === "ALL" && (
           <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
@@ -1203,6 +1249,40 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               onClick={() => setDisplayCurrency("USD")}
               className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 displayCurrency === "USD"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("displayUsd")}
+            </button>
+          </div>
+          )}
+          {ledgerScope === "CAD" && (
+          <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
+            <button
+              onClick={() => setCadViewMode("ALL")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                cadViewMode === "ALL"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("displayNativeAll")}
+            </button>
+            <button
+              onClick={() => setCadViewMode("CAD")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                cadViewMode === "CAD"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("displayCad")}
+            </button>
+            <button
+              onClick={() => setCadViewMode("USD")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                cadViewMode === "USD"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
               }`}
@@ -1267,18 +1347,18 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           {sortedHoldings.map((row) => {
             const isProfit = row.profit >= 0;
             const rowCurrency = row.currency as Currency;
-            const listCurrency = useFxRollup ? displayCurrency : rowCurrency;
+            const listCurrency = useFxRollup ? rollupCurrency : rowCurrency;
             const listValuation = useFxRollup
-              ? convertBetween(row.valuation, rowCurrency, displayCurrency)
+              ? convertBetween(row.valuation, rowCurrency, rollupCurrency)
               : row.valuation;
             const listPrice = useFxRollup
-              ? convertBetween(row.price, rowCurrency, displayCurrency)
+              ? convertBetween(row.price, rowCurrency, rollupCurrency)
               : row.price;
             const listProfit = useFxRollup
-              ? convertBetween(row.profit, rowCurrency, displayCurrency)
+              ? convertBetween(row.profit, rowCurrency, rollupCurrency)
               : row.profit;
             const listAvg = useFxRollup
-              ? convertBetween(row.avg_price, rowCurrency, displayCurrency)
+              ? convertBetween(row.avg_price, rowCurrency, rollupCurrency)
               : row.avg_price;
             return (
               <div

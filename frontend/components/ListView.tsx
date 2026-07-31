@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
@@ -31,6 +31,7 @@ interface Props {
   presets: CategoryPresets | null;
   transactions: Transaction[];
   onEditTransaction?: (tx: Transaction) => void;
+  onAddTransaction?: () => void;
   onDeleted?: () => void;
 }
 
@@ -61,6 +62,7 @@ export default function ListView({
   presets,
   transactions,
   onEditTransaction,
+  onAddTransaction,
   onDeleted,
 }: Props) {
   const locale = useLocale();
@@ -306,6 +308,17 @@ export default function ListView({
             className="input-field pl-9 py-2 text-sm"
           />
         </div>
+
+        {onAddTransaction && (
+          <button
+            type="button"
+            onClick={onAddTransaction}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold px-3.5 py-2 transition-colors shrink-0"
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className="whitespace-nowrap">{tList("add")}</span>
+          </button>
+        )}
       </div>
 
       <div className="mt-4 card-inset overflow-hidden">

@@ -803,6 +803,7 @@ export default function AppShell({ user, onLogout }: Props) {
               presets={presets}
               transactions={transactions}
               onEditTransaction={openEdit}
+              onAddTransaction={() => openModal(new Date())}
               onDeleted={bumpVersion}
             />
           ) : view === "subscriptions" ? (

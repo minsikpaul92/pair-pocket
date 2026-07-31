@@ -1102,20 +1102,31 @@ export function formatAmount(
   currency: Currency,
   options?: { plainUsd?: boolean }
 ): string {
-  if (options?.plainUsd && currency === "USD") {
+  // CAD → $… ; USD → US$… so Canada holdings never look identical.
+  // `plainUsd` kept for call-site compat but USD always uses the US$ prefix.
+  void options?.plainUsd;
+  if (currency === "USD") {
     return (
-      "$" +
+      "US$" +
       amount.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })
     );
   }
-  const locale = currency === "KRW" ? "ko-KR" : "en-CA";
-  return new Intl.NumberFormat(locale, {
+  if (currency === "CAD") {
+    return (
+      "$" +
+      amount.toLocaleString("en-CA", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
+  }
+  return new Intl.NumberFormat("ko-KR", {
     style: "currency",
-    currency,
-    maximumFractionDigits: currency === "KRW" ? 0 : 2,
+    currency: "KRW",
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 
@@ -1630,19 +1641,26 @@ export interface ParsedTransaction {
   items?: TransactionItem[];
 }
 
-export async function parseReceiptsOrStatements(files: File[]): Promise<ParsedTransaction[]> {
+export async function parseReceiptsOrStatements(
+  files: File[],
+  options?: { flowType?: "expense" | "income" }
+): Promise<ParsedTransaction[]> {
   const formData = new FormData();
   files.forEach((file) => {
     formData.append("files", file);
   });
-  const res = await fetch(`${API_BASE_URL}/api/ai/parse`, {
-    method: "POST",
-    headers: { ...authHeaders() },
-    body: formData,
-  });
+  const flowType = options?.flowType ?? "expense";
+  const res = await fetch(
+    `${API_BASE_URL}/api/ai/parse?flow_type=${encodeURIComponent(flowType)}`,
+    {
+      method: "POST",
+      headers: { ...authHeaders() },
+      body: formData,
+    }
+  );
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "AI 분석에 실패했습니다.");
+    throw new Error(err?.detail || "AI analysis failed");
   }
   const data = await res.json();
   return data.results as ParsedTransaction[];

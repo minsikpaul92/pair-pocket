@@ -22,11 +22,18 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 @router.post("/parse")
 async def parse_receipts_or_statements(
     files: list[UploadFile] = File(...),
+    flow_type: str = Query("expense", description="expense | income"),
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
     prepared: list[tuple[bytes, str, str]] = []
     errors: list[str] = []
+    normalized_flow = flow_type.strip().lower()
+    if normalized_flow not in ("expense", "income"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="flow_type must be expense or income",
+        )
 
     for file in files:
         content_type = file.content_type or "image/jpeg"
@@ -36,7 +43,9 @@ async def parse_receipts_or_statements(
         content = await file.read()
         prepared.append((content, content_type, file.filename or "file"))
 
-    outcomes = await parse_files_in_batches(db, current_user.id, prepared)
+    outcomes = await parse_files_in_batches(
+        db, current_user.id, prepared, flow_type=normalized_flow
+    )
     results = []
     for item in outcomes:
         if "error" in item:
@@ -61,6 +70,7 @@ async def parse_receipts_or_statements(
 @router.post("/parse-stream")
 async def parse_receipts_or_statements_stream(
     file: UploadFile = File(...),
+    flow_type: str = Query("expense", description="expense | income"),
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
@@ -70,12 +80,23 @@ async def parse_receipts_or_statements_stream(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"지원하지 않는 파일 형식입니다: {content_type}"
         )
+    normalized_flow = flow_type.strip().lower()
+    if normalized_flow not in ("expense", "income"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="flow_type must be expense or income",
+        )
     content = await file.read()
     
     async def sse_generator():
         try:
             async for update in parse_receipt_or_statement_stream(
-                db, current_user.id, content, content_type, file.filename
+                db,
+                current_user.id,
+                content,
+                content_type,
+                file.filename,
+                flow_type=normalized_flow,
             ):
                 yield f"data: {json.dumps(update)}\n\n"
         except Exception as e:

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import BankPicker from "@/components/BankPicker";
+import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import {
   ACCOUNT_KIND_KEYS,
   AccountType,
@@ -12,6 +13,7 @@ import {
   FinancialAccount,
   FinancialAccountKind,
   NewFinancialAccount,
+  OnboardingParseResult,
   TransactionType,
   addInstitution,
   createAccount,
@@ -97,17 +99,75 @@ export default function AccountRegisterModal({
   const [isActive, setIsActive] = useState(account?.is_active ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [aiHint, setAiHint] = useState<string | null>(null);
 
   const isCreditCard = kind === "credit_card";
   const isCash = kind === "cash";
   const isInvestment = kind === "investment";
   const displayCurrency = account?.currency ?? selectedCurrency;
+  const scanStep = isInvestment || initialKind === "investment" ? "brokerage" : "assets";
 
   useEffect(() => {
     fetchUserSettings()
-      .then((s) => setCustomInstitutions(s.institutions || []))
-      .catch(() => setCustomInstitutions([]));
+      .then((s) => {
+        setCustomInstitutions(s.institutions || []);
+        setHasGeminiKey(Boolean(s.has_effective_gemini_key ?? s.has_gemini_key));
+      })
+      .catch(() => {
+        setCustomInstitutions([]);
+        setHasGeminiKey(false);
+      });
   }, []);
+
+  function applyAiParse(result: OnboardingParseResult) {
+    const accounts = result.data.accounts || [];
+    const brokerage = result.data.brokerage;
+    const first =
+      accounts[0] ||
+      (brokerage
+        ? {
+            name: brokerage.name,
+            currency: brokerage.currency,
+            kind: "investment",
+            opening_balance: brokerage.cash_balance,
+          }
+        : null);
+    if (!first) {
+      setAiHint(t("aiEmpty"));
+      return;
+    }
+    if (first.name) setName(String(first.name));
+    if (first.institution) setInstitution(String(first.institution));
+    const cur = String(first.currency || "").toUpperCase();
+    if (cur === "CAD" || cur === "KRW" || cur === "USD") {
+      setSelectedCurrency(cur);
+    }
+    const kindRaw = String(first.kind || "").toLowerCase();
+    if (
+      kindRaw === "checking" ||
+      kindRaw === "savings" ||
+      kindRaw === "credit_card" ||
+      kindRaw === "investment" ||
+      kindRaw === "cash"
+    ) {
+      setKind(kindRaw);
+    }
+    if (first.opening_balance != null) {
+      const balCur =
+        cur === "CAD" || cur === "KRW" || cur === "USD"
+          ? cur
+          : selectedCurrency;
+      setOpeningBalance(
+        formatAmountInput(String(first.opening_balance), balCur)
+      );
+    }
+    if (first.last_four) setLastFour(String(first.last_four).slice(-4));
+    if (first.account_number) setAccountNumber(String(first.account_number));
+    setAiHint(
+      accounts.length > 1 ? t("aiFilledMany", { count: accounts.length }) : t("aiFilled")
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -230,6 +290,20 @@ export default function AccountRegisterModal({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {!isEdit && (
+            <div className="space-y-2">
+              <OnboardingScreenshotScan
+                step={scanStep}
+                hasApiKey={hasGeminiKey}
+                disabled={submitting}
+                onParsed={applyAiParse}
+              />
+              {aiHint && (
+                <p className="text-xs text-blue-600 dark:text-blue-400">{aiHint}</p>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
               {tCommon("name")}
@@ -265,7 +339,7 @@ export default function AccountRegisterModal({
           {!isEdit && (
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                통화 (Currency)
+                {tCommon("currency")}
               </label>
               <select
                 value={selectedCurrency}
