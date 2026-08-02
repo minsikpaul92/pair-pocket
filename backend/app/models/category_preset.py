@@ -17,7 +17,14 @@ from app.models.ledger import (
     TRANSFER_CATEGORY_LEGACY,
     TRANSFER_SUB_ACCOUNT_TRANSFER,
     TRANSFER_SUB_CARD_REPAYMENT,
+    TRANSFER_SUB_ETRANSFER,
     TRANSFER_SUB_INVESTMENT_FUNDING,
+    TRANSFER_SUB_SHARED_FUNDING,
+    is_cashflow_transfer_sub,
+    is_internal_transfer_sub,
+    is_shared_funding_sub,
+    normalize_transfer_category,
+    normalize_transfer_sub_category,
 )
 
 EXPENSE_CATEGORY_INVESTMENT = "투자/저축"
@@ -46,6 +53,8 @@ EXPENSE_PRESETS: dict[str, list[str]] = {
         TRANSFER_SUB_CARD_REPAYMENT,
         TRANSFER_SUB_ACCOUNT_TRANSFER,
         TRANSFER_SUB_INVESTMENT_FUNDING,
+        TRANSFER_SUB_SHARED_FUNDING,
+        TRANSFER_SUB_ETRANSFER,
     ],
 }
 
@@ -59,6 +68,8 @@ INCOME_PRESETS: dict[str, list[str]] = {
         "은행 이자",
         "정부 환급금(HST/Tax Refund)",
     ],
+    # Mirror of personal→shared funding (server-created income twin).
+    TRANSFER_CATEGORY: [TRANSFER_SUB_SHARED_FUNDING],
 }
 
 PRESETS_BY_TYPE: dict[TransactionType, dict[str, list[str]]] = {
@@ -97,12 +108,22 @@ def get_sub_categories(
 ) -> list[str] | None:
     """Return sub-categories for a category, or None if category is unknown."""
     presets = PRESETS_BY_TYPE.get(tx_type, {})
-    return presets.get(category)
+    cat = normalize_transfer_category(category)
+    return presets.get(cat)
 
 
 def is_valid_pair(tx_type: TransactionType, category: str, sub_category: str) -> bool:
-    subs = get_sub_categories(tx_type, category)
-    return subs is not None and sub_category in subs
+    cat = normalize_transfer_category(category)
+    sub = normalize_transfer_sub_category(sub_category)
+    # Accept legacy internal-transfer sub name as valid for expense presets.
+    if (
+        tx_type == TransactionType.EXPENSE
+        and cat == TRANSFER_CATEGORY
+        and sub == TRANSFER_SUB_ACCOUNT_TRANSFER
+    ):
+        return True
+    subs = get_sub_categories(tx_type, cat)
+    return subs is not None and sub in subs
 
 
 def requires_institution(category: str) -> bool:
@@ -121,13 +142,32 @@ def is_investment_expense(category: str) -> bool:
 
 
 def is_transfer_expense(category: str) -> bool:
-    return category in (TRANSFER_CATEGORY, TRANSFER_CATEGORY_LEGACY)
+    return normalize_transfer_category(category) in (
+        TRANSFER_CATEGORY,
+        TRANSFER_CATEGORY_LEGACY,
+    )
+
+
+def is_internal_asset_move(category: str, sub_category: str) -> bool:
+    """Balance-only moves under 자산 이동/카드 (excluded from cashflow stats)."""
+    return is_transfer_expense(category) and is_internal_transfer_sub(sub_category)
+
+
+def is_non_cashflow_transfer(category: str, sub_category: str = "") -> bool:
+    """True for internal asset moves; false for e-Transfer / shared funding."""
+    if not is_transfer_expense(category):
+        return False
+    if not sub_category:
+        # Legacy rows without a known cashflow sub — treat as non-cashflow.
+        return True
+    return not is_cashflow_transfer_sub(sub_category)
 
 
 def is_card_repayment(category: str, sub_category: str) -> bool:
     return (
-        category in (TRANSFER_CATEGORY, TRANSFER_CATEGORY_LEGACY)
-        and sub_category == TRANSFER_SUB_CARD_REPAYMENT
+        is_transfer_expense(category)
+        and normalize_transfer_sub_category(sub_category)
+        == TRANSFER_SUB_CARD_REPAYMENT
     )
 
 
@@ -138,3 +178,30 @@ def requires_settlement_link(
         tx_type == TransactionType.INCOME
         and is_settlement_income(category, sub_category)
     )
+
+
+# Re-export helpers used by routers/services.
+__all__ = [
+    "EXPENSE_CATEGORY_INVESTMENT",
+    "INCOME_CATEGORY_SETTLEMENT",
+    "SUB_CATEGORY_SETTLEMENT",
+    "EXPENSE_PRESETS",
+    "INCOME_PRESETS",
+    "CategoryGroup",
+    "CategoryPresetsOut",
+    "build_presets_response",
+    "get_sub_categories",
+    "is_valid_pair",
+    "requires_institution",
+    "is_settlement_income",
+    "is_investment_expense",
+    "is_transfer_expense",
+    "is_internal_asset_move",
+    "is_non_cashflow_transfer",
+    "is_card_repayment",
+    "requires_settlement_link",
+    "is_cashflow_transfer_sub",
+    "is_shared_funding_sub",
+    "normalize_transfer_category",
+    "normalize_transfer_sub_category",
+]

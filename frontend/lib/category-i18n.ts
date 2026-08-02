@@ -56,8 +56,11 @@ export const SUB_CATEGORY_KEY_BY_VALUE: Record<string, string> = {
   "저축성 예금": "savingsDeposit",
   세금: "taxPayment",
   "카드 대금 상환": "cardRepayment",
-  "계좌 이체": "accountTransfer",
+  "내 계좌 이동": "accountTransfer",
+  "계좌 이체": "accountTransferLegacy",
   "투자 계좌 입금": "investmentFunding",
+  "공용 계좌 입금": "sharedFunding",
+  "e-Transfer/계좌이체": "etransfer",
   급여: "salaryMain",
   "주급(Bi-weekly)": "biweeklyPay",
   파트타임: "partTime",
@@ -148,8 +151,12 @@ const SUB_CATEGORY_VALUE_BY_ENGLISH: Record<string, string> = {
   "TFSA contribution": "TFSA 납입",
   "Savings deposit": "저축성 예금",
   "Card repayment": "카드 대금 상환",
-  "Account transfer": "계좌 이체",
+  "Move between my accounts": "내 계좌 이동",
+  "Account transfer": "내 계좌 이동",
   "Investment account funding": "투자 계좌 입금",
+  "Shared account funding": "공용 계좌 입금",
+  "e-Transfer / bank transfer": "e-Transfer/계좌이체",
+  "e-Transfer/계좌이체": "e-Transfer/계좌이체",
   Salary: "급여",
   Tax: "세금",
   "Bi-weekly pay": "주급(Bi-weekly)",
@@ -176,6 +183,7 @@ export function canonicalizeCategory(value: string): string {
 export function canonicalizeSubCategory(value: string): string {
   const v = value.trim();
   if (!v) return v;
+  if (v === "계좌 이체" || v === "Account transfer") return "내 계좌 이동";
   if (SUB_CATEGORY_KEY_BY_VALUE[v]) return v;
   return SUB_CATEGORY_VALUE_BY_ENGLISH[v] ?? v;
 }

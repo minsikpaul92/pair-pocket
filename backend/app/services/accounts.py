@@ -5,7 +5,7 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.account import AccountBalanceOut, FinancialAccountKind, NetWorthSummary
-from app.models.category_preset import is_card_repayment, is_transfer_expense
+from app.models.category_preset import is_card_repayment, is_non_cashflow_transfer
 from app.models.ledger import TransactionKind
 from app.models.transaction import AccountType, Currency, TransactionType
 
@@ -156,8 +156,11 @@ async def compute_account_balance(
                 balance += amount
             continue
 
-        # Asset account
-        if kind == TransactionKind.TRANSFER.value or is_transfer_expense(category):
+        # Asset account — internal transfers move between accounts;
+        # cashflow transfer subs (e-Transfer, shared funding) use income/expense paths.
+        if kind == TransactionKind.TRANSFER.value or is_non_cashflow_transfer(
+            category, sub_category
+        ):
             if primary:
                 balance -= amount
             elif counter:

@@ -59,8 +59,10 @@ class TransactionBase(BaseModel):
 
     # Financial account this movement touches (card, bank, etc.)
     account_id: str | None = None
-    # For TRANSFER: the counterpart account (e.g. checking → credit card repayment)
+    # For TRANSFER / shared funding: the counterpart account
     counter_account_id: str | None = None
+    # Links personal expense ↔ shared income for 공용 계좌 입금
+    linked_transaction_id: str | None = None
     kind: TransactionKind = TransactionKind.NORMAL
 
     # Populated by stats layer — effective spend after N빵 settlements (read-only)
