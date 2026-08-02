@@ -10,23 +10,57 @@ export const EXPENSE_CATEGORY_INVESTMENT = "투자/저축";
 export const TRANSFER_CATEGORY = "자산 이동/카드";
 export const TRANSFER_CATEGORY_LEGACY = "자산 이동";
 export const TRANSFER_SUB_CARD_REPAYMENT = "카드 대금 상환";
-export const TRANSFER_SUB_ACCOUNT_TRANSFER = "계좌 이체";
+export const TRANSFER_SUB_ACCOUNT_TRANSFER = "내 계좌 이동";
+export const TRANSFER_SUB_ACCOUNT_TRANSFER_LEGACY = "계좌 이체";
 export const TRANSFER_SUB_INVESTMENT_FUNDING = "투자 계좌 입금";
+export const TRANSFER_SUB_SHARED_FUNDING = "공용 계좌 입금";
+export const TRANSFER_SUB_ETRANSFER = "e-Transfer/계좌이체";
 export const INCOME_CATEGORY_SETTLEMENT = "정산";
 export const SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급";
+
+const CASHFLOW_TRANSFER_SUBS = new Set([
+  TRANSFER_SUB_SHARED_FUNDING,
+  TRANSFER_SUB_ETRANSFER,
+]);
 
 export function normalizeTransferCategory(category: string): string {
   return category === TRANSFER_CATEGORY_LEGACY ? TRANSFER_CATEGORY : category;
 }
 
+export function normalizeTransferSubCategory(subCategory: string): string {
+  return subCategory === TRANSFER_SUB_ACCOUNT_TRANSFER_LEGACY
+    ? TRANSFER_SUB_ACCOUNT_TRANSFER
+    : subCategory;
+}
+
+export function isCashflowTransferSub(subCategory: string): boolean {
+  return CASHFLOW_TRANSFER_SUBS.has(normalizeTransferSubCategory(subCategory));
+}
+
+export function isSharedFundingSub(subCategory: string): boolean {
+  return (
+    normalizeTransferSubCategory(subCategory) === TRANSFER_SUB_SHARED_FUNDING
+  );
+}
+
+export function isEtransferSub(subCategory: string): boolean {
+  return normalizeTransferSubCategory(subCategory) === TRANSFER_SUB_ETRANSFER;
+}
+
+/** Internal balance-only moves (grey / excluded from cashflow totals). */
 export function isTransferTransaction(tx: {
   kind?: TransactionKind | null;
   category: string;
+  sub_category?: string | null;
 }): boolean {
+  const cat = normalizeTransferCategory(tx.category);
+  const isTransferCat =
+    cat === TRANSFER_CATEGORY || tx.category === TRANSFER_CATEGORY_LEGACY;
+  if (!isTransferCat && tx.kind !== "transfer") return false;
+  if (tx.sub_category && isCashflowTransferSub(tx.sub_category)) return false;
   return (
     tx.kind === "transfer" ||
-    tx.category === TRANSFER_CATEGORY ||
-    tx.category === TRANSFER_CATEGORY_LEGACY
+    isTransferCat
   );
 }
 
@@ -40,7 +74,7 @@ export function isSettlementTransaction(tx: {
   );
 }
 
-/** Transfers and N빵 settlements — shown grey, excluded from income/expense totals. */
+/** Internal transfers and N빵 settlements — grey, excluded from income/expense totals. */
 export function isNonCashflowTransaction(tx: {
   kind?: TransactionKind | null;
   category: string;
@@ -174,6 +208,7 @@ export interface Transaction {
   settles_expense_id: string | null;
   account_id?: string | null;
   counter_account_id?: string | null;
+  linked_transaction_id?: string | null;
   kind?: TransactionKind;
   owner_id: string;
   settled_amount?: number;
@@ -215,6 +250,7 @@ export interface NewTransaction {
   settles_expense_id?: string | null;
   account_id?: string | null;
   counter_account_id?: string | null;
+  linked_transaction_id?: string | null;
   kind?: TransactionKind;
   is_stock_trade?: boolean;
   trade_type?: "buy" | "sell";

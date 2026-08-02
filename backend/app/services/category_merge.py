@@ -61,5 +61,16 @@ def is_valid_merged_pair(
     category: str,
     sub_category: str,
 ) -> bool:
-    subs = get_merged_sub_categories(custom, tx_type, category)
-    return subs is not None and sub_category in subs
+    from app.models.ledger import (
+        TRANSFER_CATEGORY,
+        TRANSFER_CATEGORY_LEGACY,
+        normalize_transfer_category,
+        normalize_transfer_sub_category,
+    )
+
+    cat = normalize_transfer_category(category)
+    sub = normalize_transfer_sub_category(sub_category)
+    subs = get_merged_sub_categories(custom, tx_type, cat)
+    if subs is None and category == TRANSFER_CATEGORY_LEGACY:
+        subs = get_merged_sub_categories(custom, tx_type, TRANSFER_CATEGORY)
+    return subs is not None and sub in subs

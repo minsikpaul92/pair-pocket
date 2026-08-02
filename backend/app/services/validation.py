@@ -12,10 +12,16 @@ from app.models.ledger import (
     TRANSFER_SUB_ACCOUNT_TRANSFER,
     TRANSFER_SUB_INVESTMENT_FUNDING,
     TransactionKind,
+    is_cashflow_transfer_sub,
+    is_etransfer_sub,
+    is_shared_funding_sub,
     normalize_transfer_category,
+    normalize_transfer_sub_category,
 )
-from app.models.transaction import TransactionCreate, TransactionType
+from app.models.transaction import AccountType, TransactionCreate, TransactionType
+from app.models.user import UserOut
 from app.routers.settings import _get_or_create, _parse_custom
+from app.services.access import resolve_owner_ids
 from app.services.category_merge import is_valid_merged_pair
 from app.services.settlement import get_remaining_settlement
 
@@ -59,18 +65,32 @@ async def _load_owned_account(
     return account
 
 
-def _assert_account_matches_payload(
-    account: dict, payload: TransactionCreate, label: str
-) -> None:
+def _assert_currency(account: dict, payload: TransactionCreate, label: str) -> None:
     if account.get("currency") != payload.currency.value:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"{label} 통화와 거래 통화가 일치하지 않습니다.",
         )
+
+
+def _assert_account_matches_payload(
+    account: dict, payload: TransactionCreate, label: str
+) -> None:
+    _assert_currency(account, payload, label)
     if account.get("account_type") != payload.account_type.value:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"{label}의 공용/개인 구분이 거래와 일치하지 않습니다.",
+        )
+
+
+def _assert_account_type(
+    account: dict, expected: AccountType, label: str
+) -> None:
+    if account.get("account_type") != expected.value:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{label}는 {expected.value} 계좌여야 합니다.",
         )
 
 
@@ -81,23 +101,41 @@ async def validate_transaction_payload(
     *,
     owner_ids: list[str] | None = None,
     exclude_settlement_id: str | None = None,
+    current_user: UserOut | None = None,
 ) -> None:
     doc = await _get_or_create(db, owner_id)
     custom = _parse_custom(doc)
     account_owner_ids = owner_ids if owner_ids is not None else [owner_id]
 
-    # Normalize legacy "자산 이동" → "자산 이동/카드" before validation.
+    # Normalize legacy transfer names before validation.
     normalized_category = normalize_transfer_category(payload.category)
     if normalized_category != payload.category:
         payload.category = normalized_category
+    normalized_sub = normalize_transfer_sub_category(payload.sub_category)
+    if normalized_sub != payload.sub_category:
+        payload.sub_category = normalized_sub
 
     is_transfer = is_transfer_expense(payload.category)
+    is_shared_funding = is_transfer and is_shared_funding_sub(payload.sub_category)
+    is_etransfer = is_transfer and is_etransfer_sub(payload.sub_category)
+    is_cashflow = is_transfer and is_cashflow_transfer_sub(payload.sub_category)
 
+    # Shared-funding income twin is allowed; other transfer cats are expense-only.
     if is_transfer and payload.type != TransactionType.EXPENSE:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="[자산 이동/카드]는 지출(type=expense)로만 등록할 수 있습니다.",
-        )
+        if not (
+            is_shared_funding and payload.type == TransactionType.INCOME
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="[자산 이동/카드]는 지출(type=expense)로만 등록할 수 있습니다.",
+            )
+
+    if is_shared_funding and payload.type == TransactionType.EXPENSE:
+        if payload.account_type != AccountType.PERSONAL:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="공용 계좌 입금은 개인 장부에서만 등록할 수 있습니다.",
+            )
 
     if not is_valid_merged_pair(
         custom, payload.type, payload.category, payload.sub_category
@@ -152,7 +190,100 @@ async def validate_transaction_payload(
             detail="settles_expense_id는 [N빵 정산/환급] 수입에서만 사용할 수 있습니다.",
         )
 
-    if is_transfer:
+    if is_etransfer:
+        if not payload.account_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="e-Transfer는 출금 계좌가 필요합니다.",
+            )
+        if payload.counter_account_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="e-Transfer는 입금 계좌를 사용하지 않습니다.",
+            )
+        from_account = await _load_owned_account(
+            db,
+            account_id=payload.account_id,
+            owner_ids=account_owner_ids,
+            label="출금 계좌",
+        )
+        _assert_account_matches_payload(from_account, payload, "출금 계좌")
+        if from_account.get("is_liability"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="e-Transfer의 출금 계좌는 자산 계좌여야 합니다.",
+            )
+        return
+
+    if is_shared_funding:
+        if not payload.account_id or not payload.counter_account_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="공용 계좌 입금은 출금(개인)과 입금(공용) 계좌가 모두 필요합니다.",
+            )
+        if payload.account_id == payload.counter_account_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="출금 계좌와 입금 계좌는 서로 달라야 합니다.",
+            )
+        if current_user is None or not current_user.shared_group_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="공용 계좌 입금을 쓰려면 먼저 파트너를 초대해야 합니다.",
+            )
+        personal_ids = await resolve_owner_ids(
+            db, current_user, AccountType.PERSONAL
+        )
+        shared_ids = await resolve_owner_ids(db, current_user, AccountType.SHARED)
+        if not shared_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="공용 계좌 입금을 쓰려면 먼저 파트너를 초대해야 합니다.",
+            )
+
+        if payload.type == TransactionType.EXPENSE:
+            # Personal expense: account_id=personal, counter=shared
+            from_account = await _load_owned_account(
+                db,
+                account_id=payload.account_id,
+                owner_ids=personal_ids,
+                label="출금 계좌",
+            )
+            to_account = await _load_owned_account(
+                db,
+                account_id=payload.counter_account_id,
+                owner_ids=shared_ids,
+                label="입금 계좌",
+            )
+            _assert_account_type(from_account, AccountType.PERSONAL, "출금 계좌")
+            _assert_account_type(to_account, AccountType.SHARED, "입금 계좌")
+        else:
+            # Shared income twin: account_id=shared, counter=personal
+            to_account = await _load_owned_account(
+                db,
+                account_id=payload.account_id,
+                owner_ids=shared_ids,
+                label="입금 계좌",
+            )
+            from_account = await _load_owned_account(
+                db,
+                account_id=payload.counter_account_id,
+                owner_ids=personal_ids,
+                label="출금 계좌",
+            )
+            _assert_account_type(to_account, AccountType.SHARED, "입금 계좌")
+            _assert_account_type(from_account, AccountType.PERSONAL, "출금 계좌")
+
+        _assert_currency(from_account, payload, "출금 계좌")
+        _assert_currency(to_account, payload, "입금 계좌")
+        if from_account.get("is_liability") or to_account.get("is_liability"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="공용 계좌 입금은 자산 계좌 간에만 가능합니다.",
+            )
+        return
+
+    if is_transfer and not is_cashflow:
         if not payload.account_id or not payload.counter_account_id:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -202,7 +333,7 @@ async def validate_transaction_payload(
             if from_account.get("is_liability") or to_account.get("is_liability"):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="계좌 이체는 자산 계좌 간에만 가능합니다.",
+                    detail="내 계좌 이동은 자산 계좌 간에만 가능합니다.",
                 )
         elif payload.sub_category == TRANSFER_SUB_INVESTMENT_FUNDING:
             if from_account.get("is_liability"):

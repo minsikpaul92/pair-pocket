@@ -9,8 +9,8 @@ from app.models.category_preset import (
     INCOME_CATEGORY_SETTLEMENT,
     SUB_CATEGORY_SETTLEMENT,
     is_investment_expense,
+    is_non_cashflow_transfer,
     is_settlement_income,
-    is_transfer_expense,
 )
 from app.models.ledger import TransactionKind
 from app.models.transaction import AccountType, Currency, TransactionType
@@ -175,7 +175,8 @@ async def compute_stats(
     settlement_details: list[dict] = []
     for doc in expense_docs:
         cat = doc.get("category", "")
-        if is_transfer_expense(cat):
+        sub = doc.get("sub_category", "")
+        if is_non_cashflow_transfer(cat, sub):
             continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)

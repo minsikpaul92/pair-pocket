@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
@@ -57,6 +58,7 @@ def _serialize(document: dict) -> dict:
         "settles_expense_id": document.get("settles_expense_id"),
         "account_id": document.get("account_id"),
         "counter_account_id": document.get("counter_account_id"),
+        "linked_transaction_id": document.get("linked_transaction_id"),
         "kind": document.get("kind", TransactionKind.NORMAL.value),
         "owner_id": document["owner_id"],
         "subscription_billing_cycle": document.get("subscription_billing_cycle"),
@@ -68,6 +70,10 @@ def _serialize(document: dict) -> dict:
         "price": document.get("price"),
         "fee": document.get("fee"),
         "items": document.get("items"),
+        "tip_amount": document.get("tip_amount"),
+        "tip_percent": document.get("tip_percent"),
+        "subtotal": document.get("subtotal"),
+        "tax_amount": document.get("tax_amount"),
     }
 
 
@@ -226,9 +232,7 @@ async def list_settleable_expenses(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[dict]:
     """Expenses with remaining balance that can still be N빵-settled."""
-    from bson import ObjectId
-
-    from app.models.category_preset import is_transfer_expense
+    from app.models.category_preset import is_non_cashflow_transfer
     from app.models.ledger import TransactionKind
 
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
@@ -260,7 +264,9 @@ async def list_settleable_expenses(
     for doc in expenses:
         if (
             doc.get("kind") == TransactionKind.TRANSFER.value
-            or is_transfer_expense(doc.get("category", ""))
+            or is_non_cashflow_transfer(
+                doc.get("category", ""), doc.get("sub_category", "")
+            )
         ):
             continue
         exp_id = str(doc["_id"])
@@ -288,24 +294,111 @@ async def list_settleable_expenses(
 def _document_from_payload(
     payload: TransactionCreate, *, owner_id: str
 ) -> dict:
+    from app.models.ledger import (
+        TransactionKind,
+        is_cashflow_transfer_sub,
+        is_shared_funding_sub,
+        normalize_transfer_category,
+        normalize_transfer_sub_category,
+    )
     from app.models.category_preset import is_transfer_expense
-    from app.models.ledger import TransactionKind, normalize_transfer_category
 
     document = payload.model_dump(exclude={"effective_amount", "settled_amount"})
     document["category"] = normalize_transfer_category(payload.category)
+    document["sub_category"] = normalize_transfer_sub_category(payload.sub_category)
     document["currency"] = payload.currency.value
     document["type"] = payload.type.value
     document["account_type"] = payload.account_type.value
-    # Asset moves always store kind=transfer so stats/balance logic stay consistent.
-    if is_transfer_expense(document["category"]):
+
+    cat = document["category"]
+    sub = document["sub_category"]
+    if is_transfer_expense(cat) and not is_cashflow_transfer_sub(sub):
         document["kind"] = TransactionKind.TRANSFER.value
     else:
         document["kind"] = TransactionKind.NORMAL.value
-        document["counter_account_id"] = None
+        if not is_shared_funding_sub(sub):
+            document["counter_account_id"] = None
+
     document["owner_id"] = owner_id
     if not document.get("merchant"):
         document["merchant"] = "미지정"
     return document
+
+
+def _shared_funding_income_doc(
+    expense_doc: dict, *, linked_expense_id: str
+) -> dict:
+    """Build the shared-ledger income twin for 공용 계좌 입금."""
+    from app.models.ledger import TransactionKind
+
+    return {
+        "date": expense_doc["date"],
+        "amount": expense_doc["amount"],
+        "currency": expense_doc["currency"],
+        "type": TransactionType.INCOME.value,
+        "account_type": AccountType.SHARED.value,
+        "category": expense_doc["category"],
+        "sub_category": expense_doc["sub_category"],
+        "merchant": expense_doc.get("merchant") or "미지정",
+        "institution": None,
+        "settles_expense_id": None,
+        "account_id": expense_doc.get("counter_account_id"),
+        "counter_account_id": expense_doc.get("account_id"),
+        "linked_transaction_id": linked_expense_id,
+        "kind": TransactionKind.NORMAL.value,
+        "owner_id": expense_doc["owner_id"],
+        "subscription_billing_cycle": None,
+        "subscription_id": None,
+        "is_stock_trade": False,
+        "trade_type": None,
+        "ticker": None,
+        "shares": None,
+        "price": None,
+        "fee": None,
+        "items": None,
+    }
+
+
+def _shared_funding_expense_fields_from_income(
+    income_doc: dict,
+) -> dict:
+    """Map shared income edit back onto the personal expense twin."""
+    return {
+        "date": income_doc["date"],
+        "amount": income_doc["amount"],
+        "currency": income_doc["currency"],
+        "merchant": income_doc.get("merchant") or "미지정",
+        # income.account_id = shared; income.counter = personal
+        "account_id": income_doc.get("counter_account_id"),
+        "counter_account_id": income_doc.get("account_id"),
+    }
+
+
+async def _link_pair(
+    db: AsyncIOMotorDatabase, expense_id: ObjectId, income_id: ObjectId
+) -> None:
+    await db[COLLECTION].update_one(
+        {"_id": expense_id},
+        {"$set": {"linked_transaction_id": str(income_id)}},
+    )
+    await db[COLLECTION].update_one(
+        {"_id": income_id},
+        {"$set": {"linked_transaction_id": str(expense_id)}},
+    )
+
+
+async def _sync_stock_holding(db: AsyncIOMotorDatabase, doc: dict | None) -> None:
+    if not doc:
+        return
+    if doc.get("is_stock_trade") and doc.get("account_id") and doc.get("ticker"):
+        from app.services.stocks import sync_holding_from_transactions
+
+        await sync_holding_from_transactions(
+            db,
+            owner_id=doc["owner_id"],
+            account_id=doc["account_id"],
+            ticker=doc["ticker"],
+        )
 
 
 @router.post("", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)
@@ -314,24 +407,38 @@ async def create_transaction(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
+    from app.models.ledger import is_shared_funding_sub
+
     require_shared_group_for_write(current_user, payload.account_type)
     owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
     await validate_transaction_payload(
-        payload, db, current_user.id, owner_ids=owner_ids
+        payload,
+        db,
+        current_user.id,
+        owner_ids=owner_ids,
+        current_user=current_user,
     )
     document = _document_from_payload(payload, owner_id=current_user.id)
+
+    if (
+        is_shared_funding_sub(document["sub_category"])
+        and document["type"] == TransactionType.EXPENSE.value
+    ):
+        require_shared_group_for_write(current_user, AccountType.SHARED)
+        result = await db[COLLECTION].insert_one(document)
+        expense_id = result.inserted_id
+        income_doc = _shared_funding_income_doc(
+            {**document, "_id": expense_id},
+            linked_expense_id=str(expense_id),
+        )
+        income_result = await db[COLLECTION].insert_one(income_doc)
+        await _link_pair(db, expense_id, income_result.inserted_id)
+        created = await db[COLLECTION].find_one({"_id": expense_id})
+        return _serialize(created)
+
     result = await db[COLLECTION].insert_one(document)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
-
-    if created.get("is_stock_trade") and created.get("account_id") and created.get("ticker"):
-        from app.services.stocks import sync_holding_from_transactions
-        await sync_holding_from_transactions(
-            db,
-            owner_id=created["owner_id"],
-            account_id=created["account_id"],
-            ticker=created["ticker"]
-        )
-
+    await _sync_stock_holding(db, created)
     return _serialize(created)
 
 
@@ -342,7 +449,7 @@ async def update_transaction(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    from bson import ObjectId
+    from app.models.ledger import is_shared_funding_sub
 
     if not ObjectId.is_valid(transaction_id):
         raise HTTPException(status_code=404, detail="Transaction not found.")
@@ -360,31 +467,63 @@ async def update_transaction(
         current_user.id,
         owner_ids=owner_ids,
         exclude_settlement_id=transaction_id,
+        current_user=current_user,
     )
     # Keep original owner so partner edits don't reassign ownership.
     document = _document_from_payload(payload, owner_id=existing["owner_id"])
+    # Preserve link unless this is no longer shared funding.
+    if is_shared_funding_sub(document["sub_category"]) and existing.get(
+        "linked_transaction_id"
+    ):
+        document["linked_transaction_id"] = existing["linked_transaction_id"]
+    elif not is_shared_funding_sub(document["sub_category"]):
+        document["linked_transaction_id"] = None
+
     await db[COLLECTION].update_one(
         {"_id": ObjectId(transaction_id)}, {"$set": document}
     )
     updated = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
 
-    # Trigger stock sync for old state and new state
-    from app.services.stocks import sync_holding_from_transactions
-    if existing.get("is_stock_trade") and existing.get("account_id") and existing.get("ticker"):
-        await sync_holding_from_transactions(
-            db,
-            owner_id=existing["owner_id"],
-            account_id=existing["account_id"],
-            ticker=existing["ticker"]
-        )
-    if updated.get("is_stock_trade") and updated.get("account_id") and updated.get("ticker"):
-        await sync_holding_from_transactions(
-            db,
-            owner_id=updated["owner_id"],
-            account_id=updated["account_id"],
-            ticker=updated["ticker"]
-        )
+    # Sync linked twin for 공용 계좌 입금.
+    linked_id = existing.get("linked_transaction_id") or (
+        updated.get("linked_transaction_id") if updated else None
+    )
+    if (
+        linked_id
+        and ObjectId.is_valid(linked_id)
+        and is_shared_funding_sub(document["sub_category"])
+    ):
+        twin = await db[COLLECTION].find_one({"_id": ObjectId(linked_id)})
+        if twin:
+            if updated.get("type") == TransactionType.EXPENSE.value:
+                twin_patch = _shared_funding_income_doc(
+                    updated, linked_expense_id=transaction_id
+                )
+                # Don't overwrite twin owner_id / linked id incorrectly
+                twin_patch["linked_transaction_id"] = transaction_id
+                twin_patch["owner_id"] = twin.get("owner_id", updated["owner_id"])
+                await db[COLLECTION].update_one(
+                    {"_id": ObjectId(linked_id)}, {"$set": twin_patch}
+                )
+            elif updated.get("type") == TransactionType.INCOME.value:
+                expense_patch = _shared_funding_expense_fields_from_income(updated)
+                expense_patch["category"] = updated["category"]
+                expense_patch["sub_category"] = updated["sub_category"]
+                expense_patch["kind"] = updated["kind"]
+                expense_patch["type"] = TransactionType.EXPENSE.value
+                expense_patch["account_type"] = AccountType.PERSONAL.value
+                expense_patch["linked_transaction_id"] = transaction_id
+                await db[COLLECTION].update_one(
+                    {"_id": ObjectId(linked_id)}, {"$set": expense_patch}
+                )
+    elif linked_id and ObjectId.is_valid(linked_id) and not is_shared_funding_sub(
+        document["sub_category"]
+    ):
+        # Category changed away from shared funding — drop the orphan twin.
+        await db[COLLECTION].delete_one({"_id": ObjectId(linked_id)})
 
+    await _sync_stock_holding(db, existing)
+    await _sync_stock_holding(db, updated)
     return _serialize(updated)
 
 
@@ -394,8 +533,6 @@ async def delete_transaction(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> None:
-    from bson import ObjectId
-
     if not ObjectId.is_valid(transaction_id):
         raise HTTPException(status_code=404, detail="Transaction not found.")
 
@@ -421,15 +558,13 @@ async def delete_transaction(
                 detail="이 지출에 연결된 N빵 정산이 있어 삭제할 수 없습니다. 정산을 먼저 삭제해 주세요.",
             )
 
+    # Cascade-delete 공용 계좌 입금 twin.
+    twin_id = existing.get("linked_transaction_id")
+    if twin_id and ObjectId.is_valid(twin_id):
+        await db[COLLECTION].delete_one({"_id": ObjectId(twin_id)})
+
     result = await db[COLLECTION].delete_one({"_id": ObjectId(transaction_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transaction not found.")
 
-    if existing.get("is_stock_trade") and existing.get("account_id") and existing.get("ticker"):
-        from app.services.stocks import sync_holding_from_transactions
-        await sync_holding_from_transactions(
-            db,
-            owner_id=existing["owner_id"],
-            account_id=existing["account_id"],
-            ticker=existing["ticker"]
-        )
+    await _sync_stock_holding(db, existing)
