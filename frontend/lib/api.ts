@@ -442,6 +442,25 @@ export interface UserSettings {
   onboarding_personal_step?: number;
 }
 
+/** Preferred UI languages from settings (primary first). */
+export function preferredLocalesList(
+  settings: Pick<UserSettings, "preferred_locales" | "preferred_locale"> | null | undefined
+): string[] {
+  if (!settings) return [];
+  if (settings.preferred_locales?.length) {
+    return settings.preferred_locales.slice(0, 2);
+  }
+  if (settings.preferred_locale) return [settings.preferred_locale];
+  return [];
+}
+
+/** KO/EN chrome toggle only when the user opted into 2 languages at onboarding. */
+export function shouldShowLocaleToggle(
+  settings: Pick<UserSettings, "preferred_locales" | "preferred_locale"> | null | undefined
+): boolean {
+  return preferredLocalesList(settings).length >= 2;
+}
+
 export async function fetchUserSettings(): Promise<UserSettings> {
   const res = await fetch(`${API_BASE_URL}/api/settings`, {
     headers: authHeaders(),

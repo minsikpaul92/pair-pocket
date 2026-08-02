@@ -23,7 +23,7 @@ import {
   ImagePlus,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
@@ -56,6 +56,8 @@ import {
   fetchInvitationMe,
   fetchPendingOccurrences,
   fetchTransactions,
+  fetchUserSettings,
+  preferredLocalesList,
   skipSubscriptionOccurrence,
   syncSubscriptions,
   parseReceiptsOrStatements,
@@ -63,6 +65,10 @@ import {
 import { addMonths, dayKey, isoDayKey, monthKey, monthLabel } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
+import {
+  countriesForLocales,
+  ledgerScopesForCountries,
+} from "@/lib/locale-countries";
 
 type View = "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings" | "import";
 
@@ -147,6 +153,15 @@ export default function AppShell({ user, onLogout }: Props) {
   });
   const [previousView, setPreviousView] = useState<View>("calendar");
   const [scope, setScope] = useState<LedgerScope>("CAD");
+  const [enabledScopes, setEnabledScopes] = useState<LedgerScope[]>([
+    "ALL",
+    "CAD",
+    "KRW",
+  ]);
+  const visibleLedgers = useMemo(
+    () => LEDGERS.filter((l) => enabledScopes.includes(l.scope)),
+    [enabledScopes]
+  );
   const [accountType, setAccountType] = useState<AccountType>("personal");
   const [currentUser, setCurrentUser] = useState(user);
   const [partner, setPartner] = useState<PartnerSummary | null>(null);
@@ -313,6 +328,30 @@ export default function AppShell({ user, onLogout }: Props) {
       .then(setPresets)
       .catch(() => setPresets(null));
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetchUserSettings()
+      .then((s) => {
+        if (!active) return;
+        const countries = countriesForLocales(preferredLocalesList(s));
+        const scopes = ledgerScopesForCountries(countries);
+        setEnabledScopes(scopes);
+        setScope((prev) => (scopes.includes(prev) ? prev : scopes[0]));
+        if (scopes[0] === "CAD" || scopes[0] === "KRW") {
+          const firstCurrency: Currency = scopes[0];
+          setModalCurrency((prev) =>
+            scopes.includes(prev) ? prev : firstCurrency
+          );
+        }
+      })
+      .catch(() => {
+        /* keep defaults */
+      });
+    return () => {
+      active = false;
+    };
+  }, [version]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -646,22 +685,24 @@ export default function AppShell({ user, onLogout }: Props) {
                   </button>
                 ))}
               </div>
-              <div className="flex flex-[1.4] min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
-                {LEDGERS.map((l) => (
-                  <button
-                    key={l.scope}
-                    type="button"
-                    onClick={() => setScope(l.scope)}
-                    className={`flex-1 rounded-lg px-1.5 sm:px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                      scope === l.scope
-                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                        : "text-gray-500 dark:text-gray-400"
-                    }`}
-                  >
-                    {ledgerTabLabel(l.labelKey, tLedger, tCommon)}
-                  </button>
-                ))}
-              </div>
+              {visibleLedgers.length > 1 && (
+                <div className="flex flex-[1.4] min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+                  {visibleLedgers.map((l) => (
+                    <button
+                      key={l.scope}
+                      type="button"
+                      onClick={() => setScope(l.scope)}
+                      className={`flex-1 rounded-lg px-1.5 sm:px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                        scope === l.scope
+                          ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                    >
+                      {ledgerTabLabel(l.labelKey, tLedger, tCommon)}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={toggleSettings}

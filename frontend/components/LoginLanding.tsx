@@ -42,7 +42,7 @@ export default function LoginLanding() {
             {tCommon("appName")}
           </span>
           <div className="ml-auto">
-            <LocaleToggle />
+            <LocaleToggle forceVisible />
           </div>
         </div>
       </header>

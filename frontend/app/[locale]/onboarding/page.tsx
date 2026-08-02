@@ -8,6 +8,21 @@ import { useRouter } from "@/i18n/navigation";
 import type { AppLocale } from "@/i18n/locales";
 import { fetchCurrentUser, fetchUserSettings } from "@/lib/api";
 
+const ONBOARDING_LOCALES_KEY = "pairpocket_onboarding_locales";
+
+function readSessionLocales(): AppLocale[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(ONBOARDING_LOCALES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || !parsed.length) return [];
+    return parsed.filter((x): x is AppLocale => typeof x === "string");
+  } catch {
+    return [];
+  }
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const locale = useLocale() as AppLocale;
@@ -26,11 +41,26 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Only sync a *saved* preferred locale. Do not force English here —
-      // that fought LanguagePicker and snapped the UI back to EN.
-      const preferred = settings?.preferred_locale;
-      if (preferred && preferred !== locale) {
+      // In-progress LanguagePicker picks (session) beat a previously saved
+      // preferred_locale — otherwise EN from an earlier Continue snaps the UI
+      // back when the user re-picks Korean as Primary on step 0.
+      const sessionLocales = readSessionLocales();
+      const sessionPrimary = sessionLocales[0] ?? null;
+      if (sessionPrimary && sessionPrimary !== locale) {
+        router.replace("/onboarding", { locale: sessionPrimary });
+        return;
+      }
+
+      const preferred =
+        settings?.preferred_locales?.[0] || settings?.preferred_locale || null;
+      if (!sessionPrimary && preferred && preferred !== locale) {
         router.replace("/onboarding", { locale: preferred as AppLocale });
+        return;
+      }
+
+      // First visit with no pick yet → default UI to English.
+      if (!sessionPrimary && !preferred && locale !== "en") {
+        router.replace("/onboarding", { locale: "en" });
         return;
       }
 

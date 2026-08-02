@@ -23,8 +23,10 @@ import { cn } from "@/lib/utils";
 const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 type Props = {
-  value: Date;
+  value: Date | null;
   onChange: (next: Date) => void;
+  /** Clear selection (optional dates). */
+  onClear?: () => void;
   locale?: string;
   /** Extra classes for the trigger button. */
   triggerClassName?: string;
@@ -41,6 +43,7 @@ type Props = {
 export default function DayPicker({
   value,
   onChange,
+  onClear,
   locale = "ko",
   triggerClassName,
   showIcon = true,
@@ -49,8 +52,9 @@ export default function DayPicker({
   const t = useTranslations("common");
   const tCal = useTranslations("calendar");
   const [open, setOpen] = useState(false);
+  const anchor = value ?? new Date();
   const [viewMonth, setViewMonth] = useState(
-    () => new Date(value.getFullYear(), value.getMonth(), 1)
+    () => new Date(anchor.getFullYear(), anchor.getMonth(), 1)
   );
 
   const weekdays = useMemo(
@@ -62,7 +66,8 @@ export default function DayPicker({
 
   useEffect(() => {
     if (open) {
-      setViewMonth(new Date(value.getFullYear(), value.getMonth(), 1));
+      const base = value ?? new Date();
+      setViewMonth(new Date(base.getFullYear(), base.getMonth(), 1));
     }
   }, [open, value]);
 
@@ -91,8 +96,15 @@ export default function DayPicker({
           {showIcon && (
             <CalendarDays className="h-5 w-5 text-blue-500 shrink-0" />
           )}
-          <p className="min-w-0 flex-1 text-sm font-semibold text-gray-900 dark:text-white truncate">
-            {formatDayLabel(value, locale)}
+          <p
+            className={cn(
+              "min-w-0 flex-1 text-sm font-semibold truncate",
+              value
+                ? "text-gray-900 dark:text-white"
+                : "text-gray-400 dark:text-gray-500"
+            )}
+          >
+            {value ? formatDayLabel(value, locale) : t("selectDate")}
           </p>
         </button>
       </PopoverTrigger>
@@ -142,7 +154,7 @@ export default function DayPicker({
         <div className="grid grid-cols-7 gap-0.5">
           {cells.map((cell) => {
             const inMonth = isSameMonth(cell, viewMonth);
-            const selected = isSameDay(cell, value);
+            const selected = value ? isSameDay(cell, value) : false;
             const isToday = isSameDay(cell, today);
             return (
               <button
@@ -164,6 +176,19 @@ export default function DayPicker({
             );
           })}
         </div>
+
+        {onClear && value && (
+          <button
+            type="button"
+            onClick={() => {
+              onClear();
+              setOpen(false);
+            }}
+            className="mt-2 w-full rounded-lg py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400"
+          >
+            {t("clear")}
+          </button>
+        )}
       </PopoverContent>
     </Popover>
   );
