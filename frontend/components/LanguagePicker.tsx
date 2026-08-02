@@ -18,7 +18,7 @@ interface Props {
   /** Larger selectable list for onboarding / settings. */
   variant?: "toggle" | "list";
   /**
-   * Multi-select mode (onboarding): up to 2 languages.
+   * Multi-select mode (onboarding): 1 required, up to 2 languages.
    * Order: [primary, secondary?]. First tap = primary, second = secondary.
    */
   selectedLocales?: AppLocale[];

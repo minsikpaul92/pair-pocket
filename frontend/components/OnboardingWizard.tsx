@@ -19,6 +19,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 
 import LanguagePicker from "@/components/LanguagePicker";
+import CountryToggle from "@/components/CountryToggle";
 import OnboardingField from "@/components/OnboardingField";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import DayPicker from "@/components/DayPicker";
@@ -35,6 +36,10 @@ import {
   currencySymbol,
   type BankCountry,
 } from "@/lib/banks";
+import {
+  countriesForLocales,
+  defaultCountry,
+} from "@/lib/locale-countries";
 import {
   CanadaSubscriptionChip,
   CategoryPresets,
@@ -62,6 +67,7 @@ import {
   normalizeLastFour,
   OnboardingParseResult,
   parseAmountInput,
+  preferredLocalesList,
   removeInstitution,
   resolveAccountCountry,
   saveOnboardingBasics,
@@ -125,11 +131,31 @@ type DraftSub = {
 };
 
 const FIXED_BILL_OPTIONS = [
-  { name: "월세", category: "주거/통신", sub_category: "월세/모기지" },
-  { name: "인터넷", category: "주거/통신", sub_category: "인터넷" },
-  { name: "핸드폰", category: "주거/통신", sub_category: "휴대폰" },
-  { name: "유틸리티", category: "주거/통신", sub_category: "관리비/공과금" },
-  { name: "학원비", category: "문화/취미", sub_category: "학원/교육" },
+  {
+    id: "rent",
+    category: "주거/통신",
+    sub_category: "월세/모기지",
+  },
+  {
+    id: "internet",
+    category: "주거/통신",
+    sub_category: "인터넷",
+  },
+  {
+    id: "mobile",
+    category: "주거/통신",
+    sub_category: "휴대폰",
+  },
+  {
+    id: "utilities",
+    category: "주거/통신",
+    sub_category: "관리비/공과금",
+  },
+  {
+    id: "academy",
+    category: "문화/취미",
+    sub_category: "학원/교육",
+  },
 ] as const;
 
 function emptyDraftSub(
@@ -199,6 +225,14 @@ function normalizeIsoDate(raw?: string | null): string {
     return `${dotted[1]}-${dotted[2].padStart(2, "0")}-${dotted[3].padStart(2, "0")}`;
   }
   return "";
+}
+
+function parseDayKey(iso?: string | null): Date | null {
+  const raw = normalizeIsoDate(iso);
+  if (!raw) return null;
+  const [y, m, d] = raw.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
 }
 
 function installmentTotalFromDates(start: string, end: string): string {
@@ -445,6 +479,22 @@ export default function OnboardingWizard() {
   const [assetCountry, setAssetCountry] = useState<BankCountry>("CA");
   const [subsCountry, setSubsCountry] = useState<BankCountry>("CA");
   const [brokerCountry, setBrokerCountry] = useState<BankCountry>("CA");
+
+  const enabledCountries = useMemo(() => {
+    const locales =
+      selectedLocales.length > 0
+        ? selectedLocales
+        : preferredLocalesList(settings);
+    return countriesForLocales(locales);
+  }, [selectedLocales, settings]);
+
+  useEffect(() => {
+    const fallback = defaultCountry(enabledCountries);
+    if (!enabledCountries.includes(assetCountry)) setAssetCountry(fallback);
+    if (!enabledCountries.includes(subsCountry)) setSubsCountry(fallback);
+    if (!enabledCountries.includes(brokerCountry)) setBrokerCountry(fallback);
+  }, [enabledCountries, assetCountry, subsCountry, brokerCountry]);
+
   const [customInstitutions, setCustomInstitutions] = useState<string[]>([]);
   const [subs, setSubs] = useState<DraftSub[]>([]);
   const [paymentAccounts, setPaymentAccounts] = useState<FinancialAccount[]>(
@@ -497,19 +547,29 @@ export default function OnboardingWizard() {
           s.ledger_start_date &&
             (s.preferred_locales?.length || s.preferred_locale)
         );
+        // Locale switch remounts this page. Keep in-progress session picks
+        // (e.g. primary language) instead of treating every step-0 visit as a
+        // full data reset.
+        const sessionStep = readStoredStep();
+        const storedLocalesEarly = readStoredLocales();
+        const midOnboardingSession = Boolean(
+          (sessionStep != null && sessionStep > 0) ||
+            (storedLocalesEarly && storedLocalesEarly.length > 0)
+        );
         const freshStart =
           !s.onboarding_personal_completed &&
           !basicsDone &&
-          savedStep === 0;
+          savedStep === 0 &&
+          !midOnboardingSession;
 
-        // After full data reset, ignore stale session and start at step 0.
+        // After full data reset (no mid-session drafts), ignore stale session.
         if (freshStart) {
           clearStoredStep();
           clearStoredLocales();
           clearDraftStorage();
         }
 
-        const storedLocales = freshStart ? null : readStoredLocales();
+        const storedLocales = freshStart ? null : storedLocalesEarly;
         const fromSettings = (s.preferred_locales?.length
           ? s.preferred_locales
           : s.preferred_locale
@@ -539,9 +599,8 @@ export default function OnboardingWizard() {
 
         // Locale switch remounts this page; prefer in-session step so the
         // wizard does not jump ahead from stale server progress.
-        const sessionStep = freshStart ? null : readStoredStep();
         let initial: Step = 0;
-        if (sessionStep != null) {
+        if (!freshStart && sessionStep != null) {
           initial = sessionStep;
         } else if (basicsDone) {
           initial = savedStep >= 1 ? savedStep : 1;
@@ -1091,16 +1150,32 @@ export default function OnboardingWizard() {
     window.open(chip.url, "_blank", "noopener,noreferrer");
   }
 
+  function fixedBillLabel(id: (typeof FIXED_BILL_OPTIONS)[number]["id"]): string {
+    switch (id) {
+      case "rent":
+        return t("fixedBillRent");
+      case "internet":
+        return t("fixedBillInternet");
+      case "mobile":
+        return t("fixedBillMobile");
+      case "utilities":
+        return t("fixedBillUtilities");
+      case "academy":
+        return t("fixedBillAcademy");
+    }
+  }
+
   function addFixedBillOption(opt: (typeof FIXED_BILL_OPTIONS)[number]) {
     const currency = currencyForCountry(subsCountry);
     const accountId = paymentAccountForCurrency(currency);
+    const label = fixedBillLabel(opt.id);
     setSubs((prev) => {
       if (
         prev.some(
           (s) =>
-            s.name === opt.name &&
             s.sub_kind === "fixed" &&
-            s.currency === currency
+            s.currency === currency &&
+            s.sub_category === opt.sub_category
         )
       ) {
         return prev;
@@ -1108,11 +1183,11 @@ export default function OnboardingWizard() {
       return [
         {
           ...emptyDraftSub(startDate, currency, accountId),
-          name: opt.name,
+          name: label,
           sub_kind: "fixed",
           category: opt.category,
           sub_category: opt.sub_category,
-          merchant: opt.name,
+          merchant: label,
         },
         ...prev,
       ];
@@ -1222,9 +1297,7 @@ export default function OnboardingWizard() {
               ? Number(s.amount)
               : regular;
           const fixedMatch = FIXED_BILL_OPTIONS.find(
-            (o) =>
-              o.name === s.name ||
-              (s.sub_category && o.sub_category === s.sub_category)
+            (o) => s.sub_category && o.sub_category === s.sub_category
           );
           const category =
             s.category ||
@@ -1430,10 +1503,7 @@ export default function OnboardingWizard() {
               )}
               <OnboardingField label={t("startDateTitle")}>
                 <DayPicker
-                  value={(() => {
-                    const [y, m, d] = startDate.split("-").map(Number);
-                    return new Date(y, (m || 1) - 1, d || 1);
-                  })()}
+                  value={parseDayKey(startDate) ?? new Date()}
                   onChange={(next) => setStartDate(dayKey(next))}
                   locale={locale}
                 />
@@ -1501,22 +1571,11 @@ export default function OnboardingWizard() {
               <p className="text-xs text-gray-500 dark:text-gray-400">{t("assetsSkipHelp")}</p>
             </div>
 
-            <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5">
-              {(["CA", "KR"] as BankCountry[]).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setAssetCountry(c)}
-                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                    assetCountry === c
-                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {c === "CA" ? t("countryCanada") : t("countryKorea")}
-                </button>
-              ))}
-            </div>
+            <CountryToggle
+              value={assetCountry}
+              onChange={setAssetCountry}
+              countries={enabledCountries}
+            />
 
             <OnboardingScreenshotScan
               step="assets"
@@ -1900,25 +1959,14 @@ export default function OnboardingWizard() {
               <p className="text-xs text-blue-600 dark:text-blue-400">{t("subsChipHint")}</p>
             </div>
 
-            <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5">
-              {(["CA", "KR"] as BankCountry[]).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => {
-                    setSubsCountry(c);
-                    setShowMoreChips(false);
-                  }}
-                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                    subsCountry === c
-                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {c === "CA" ? t("countryCanada") : t("countryKorea")}
-                </button>
-              ))}
-            </div>
+            <CountryToggle
+              value={subsCountry}
+              onChange={(c) => {
+                setSubsCountry(c);
+                setShowMoreChips(false);
+              }}
+              countries={enabledCountries}
+            />
 
             <OnboardingScreenshotScan
               step="subscriptions"
@@ -1974,12 +2022,12 @@ export default function OnboardingWizard() {
               <div className="flex flex-wrap gap-2">
                 {FIXED_BILL_OPTIONS.map((opt) => (
                   <button
-                    key={opt.name}
+                    key={opt.id}
                     type="button"
                     onClick={() => addFixedBillOption(opt)}
                     className="rounded-full bg-gray-100 dark:bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200"
                   >
-                    {opt.name}
+                    {fixedBillLabel(opt.id)}
                   </button>
                 ))}
               </div>
@@ -2130,23 +2178,22 @@ export default function OnboardingWizard() {
                     />
                   </OnboardingField>
                 )}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <OnboardingField label={t("subStartDate")}>
-                    <input
-                      type="date"
-                      value={s.start_date}
-                      onChange={(e) =>
+                    <DayPicker
+                      value={parseDayKey(s.start_date) ?? parseDayKey(startDate)}
+                      onChange={(next) =>
                         setSubs((prev) =>
                           prev.map((x) => {
                             if (x.key !== s.key) return x;
                             return syncInstallmentFields(
-                              { ...x, start_date: e.target.value },
+                              { ...x, start_date: dayKey(next) },
                               "start_date"
                             );
                           })
                         )
                       }
-                      className={inputClass}
+                      locale={locale}
                     />
                   </OnboardingField>
                   {(s.sub_kind === "subscription" ||
@@ -2158,21 +2205,32 @@ export default function OnboardingWizard() {
                           : t("subEndDateOptional")
                       }
                     >
-                      <input
-                        type="date"
-                        value={s.end_date}
-                        onChange={(e) =>
+                      <DayPicker
+                        value={parseDayKey(s.end_date)}
+                        onChange={(next) =>
                           setSubs((prev) =>
                             prev.map((x) => {
                               if (x.key !== s.key) return x;
                               return syncInstallmentFields(
-                                { ...x, end_date: e.target.value },
+                                { ...x, end_date: dayKey(next) },
                                 "end_date"
                               );
                             })
                           )
                         }
-                        className={inputClass}
+                        onClear={
+                          s.sub_kind === "subscription"
+                            ? () =>
+                                setSubs((prev) =>
+                                  prev.map((x) =>
+                                    x.key === s.key
+                                      ? { ...x, end_date: "" }
+                                      : x
+                                  )
+                                )
+                            : undefined
+                        }
+                        locale={locale}
                       />
                     </OnboardingField>
                   )}
@@ -2432,19 +2490,27 @@ export default function OnboardingWizard() {
                           </div>
                         </OnboardingField>
                         <OnboardingField label={t("promoEndDate")}>
-                          <input
-                            type="date"
-                            value={s.promo_end_date}
-                            onChange={(e) =>
+                          <DayPicker
+                            value={parseDayKey(s.promo_end_date)}
+                            onChange={(next) =>
                               setSubs((prev) =>
                                 prev.map((x) =>
                                   x.key === s.key
-                                    ? { ...x, promo_end_date: e.target.value }
+                                    ? { ...x, promo_end_date: dayKey(next) }
                                     : x
                                 )
                               )
                             }
-                            className={inputClass}
+                            onClear={() =>
+                              setSubs((prev) =>
+                                prev.map((x) =>
+                                  x.key === s.key
+                                    ? { ...x, promo_end_date: "" }
+                                    : x
+                                )
+                              )
+                            }
+                            locale={locale}
                           />
                           <p className="mt-1 text-[11px] text-gray-400">
                             {t("promoEndOptionalHint")}
@@ -2530,22 +2596,11 @@ export default function OnboardingWizard() {
               </p>
             </div>
 
-            <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5">
-              {(["CA", "KR"] as BankCountry[]).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setBrokerCountry(c)}
-                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                    brokerCountry === c
-                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                      : "text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {c === "CA" ? t("countryCanada") : t("countryKorea")}
-                </button>
-              ))}
-            </div>
+            <CountryToggle
+              value={brokerCountry}
+              onChange={setBrokerCountry}
+              countries={enabledCountries}
+            />
 
             <OnboardingScreenshotScan
               step="brokerage"

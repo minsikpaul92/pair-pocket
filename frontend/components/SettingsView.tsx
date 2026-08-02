@@ -29,6 +29,7 @@ import {
   ResetAccountType,
   UserSettings,
   PartnerSummary,
+  shouldShowLocaleToggle,
 } from "@/lib/api";
 import { dayKey } from "@/lib/date";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
@@ -324,13 +325,21 @@ export default function SettingsView({
           </h2>
         </div>
 
-        <div className="flex items-center justify-between gap-3 py-3">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-            {t("languageLabel")}
-          </span>
-          <LocaleToggle />
-        </div>
-        <div className="flex items-center justify-between gap-3 py-3 border-t border-gray-100 dark:border-gray-800">
+        {shouldShowLocaleToggle(settings) && (
+          <div className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+              {t("languageLabel")}
+            </span>
+            <LocaleToggle />
+          </div>
+        )}
+        <div
+          className={`flex items-center justify-between gap-3 py-3 ${
+            shouldShowLocaleToggle(settings)
+              ? "border-t border-gray-100 dark:border-gray-800"
+              : ""
+          }`}
+        >
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
             {t("themeLabel")}
           </span>
