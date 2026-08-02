@@ -339,8 +339,9 @@ export default function AppShell({ user, onLogout }: Props) {
         setEnabledScopes(scopes);
         setScope((prev) => (scopes.includes(prev) ? prev : scopes[0]));
         if (scopes[0] === "CAD" || scopes[0] === "KRW") {
+          const firstCurrency: Currency = scopes[0];
           setModalCurrency((prev) =>
-            scopes.includes(prev as LedgerScope) ? prev : scopes[0]
+            scopes.includes(prev) ? prev : firstCurrency
           );
         }
       })
