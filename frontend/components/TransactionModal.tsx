@@ -204,6 +204,8 @@ export default function TransactionModal({
   const [hydratedEditId, setHydratedEditId] = useState<string | null>(null);
   const [items, setItems] = useState<TransactionItem[]>([]);
   const [showItems, setShowItems] = useState(false);
+  const [subtotal, setSubtotal] = useState("");
+  const [taxAmount, setTaxAmount] = useState("");
   const [tipPercent, setTipPercent] = useState("");
   const [tipAmount, setTipAmount] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -274,10 +276,135 @@ export default function TransactionModal({
   const isStockBuy = type === "expense" && category === "투자/저축" && subCategory === "주식 매수";
   const isStockSell = type === "income" && category === "금융/기타" && subCategory === "주식 판매수익";
   const isStock = isStockBuy || isStockSell;
+
+  const TAX_EXEMPT_SUB_CATEGORIES = useMemo(
+    () =>
+      new Set([
+        "월세/모기지",
+        "대중교통",
+        "경조사비",
+        "주식 매수",
+        "FHSA 납입",
+        "TFSA 납입",
+        "저축성 예금",
+        "세금",
+        "카드 대금 결제",
+        "계좌 이체",
+        "투자 계좌 이체",
+        "공용 계좌 입금",
+        "e-Transfer",
+      ]),
+    []
+  );
+
+  const isTaxExemptCategory =
+    category === "투자/저축" ||
+    category === "세금" ||
+    category === TRANSFER_CATEGORY ||
+    TAX_EXEMPT_SUB_CATEGORIES.has(subCategory);
+
+  const showTax =
+    type === "expense" &&
+    transactionCurrency !== "KRW" &&
+    !isTaxExemptCategory;
+
+  const ALL_TIP_SUB_CATEGORIES = useMemo(
+    () => new Set(["외식/배달", "카페/간식", "택시/우버", "미용/뷰티"]),
+    []
+  );
+
   const showTip =
     type === "expense" &&
-    TIP_SUB_CATEGORIES.has(subCategory) &&
+    transactionCurrency !== "KRW" &&
+    ALL_TIP_SUB_CATEGORIES.has(subCategory) &&
     !isTransferCategory;
+
+  const HST_RATE = 0.13;
+
+  function round2(val: number): number {
+    return Math.round((val + Number.EPSILON) * 100) / 100;
+  }
+
+  function handleSubtotalChange(raw: string) {
+    const formatted = formatAmountInput(raw, transactionCurrency);
+    setSubtotal(formatted);
+    const sub = parseAmountInput(formatted);
+    if (sub > 0 && showTax) {
+      const tax = round2(sub * HST_RATE);
+      setTaxAmount(amountToInput(tax, transactionCurrency));
+      const preTip = sub + tax;
+      const pct = parseFloat(tipPercent) || 0;
+      let tip = parseAmountInput(tipAmount) || 0;
+      if (pct > 0) {
+        tip = round2(preTip * (pct / 100));
+        setTipAmount(amountToInput(tip, transactionCurrency));
+      }
+      const tot = round2(preTip + tip);
+      setAmount(amountToInput(tot, transactionCurrency));
+    }
+  }
+
+  function handleTaxChange(raw: string) {
+    const formatted = formatAmountInput(raw, transactionCurrency);
+    setTaxAmount(formatted);
+    const tax = parseAmountInput(formatted);
+    const sub = parseAmountInput(subtotal);
+    const tip = parseAmountInput(tipAmount);
+    if (sub > 0) {
+      const tot = round2(sub + tax + tip);
+      setAmount(amountToInput(tot, transactionCurrency));
+    }
+  }
+
+  function handleTipPercentChange(pctStr: string) {
+    const cleanPct = pctStr.replace(/[^\d.]/g, "");
+    setTipPercent(cleanPct);
+    const pct = parseFloat(cleanPct) || 0;
+    const sub = parseAmountInput(subtotal);
+    const tax = parseAmountInput(taxAmount);
+    const preTip = sub + tax;
+    if (preTip > 0 && pct > 0) {
+      const tip = round2(preTip * (pct / 100));
+      setTipAmount(amountToInput(tip, transactionCurrency));
+      setAmount(amountToInput(round2(preTip + tip), transactionCurrency));
+    } else if (pct === 0) {
+      setTipAmount("");
+      setAmount(amountToInput(round2(preTip), transactionCurrency));
+    }
+  }
+
+  function handleTipAmountChange(raw: string) {
+    const formatted = formatAmountInput(raw, transactionCurrency);
+    setTipAmount(formatted);
+    const tip = parseAmountInput(formatted);
+    const sub = parseAmountInput(subtotal);
+    const tax = parseAmountInput(taxAmount);
+    const preTip = sub + tax;
+    if (preTip > 0) {
+      const pct = round2((tip / preTip) * 100);
+      setTipPercent(pct > 0 ? String(pct) : "");
+      setAmount(amountToInput(round2(preTip + tip), transactionCurrency));
+    }
+  }
+
+  function handleTotalChange(raw: string) {
+    const formatted = formatAmountInput(raw, transactionCurrency);
+    setAmount(formatted);
+    const tot = parseAmountInput(formatted);
+    if (tot > 0 && showTax) {
+      const pct = parseFloat(tipPercent) || 0;
+      const tipRate = pct > 0 ? pct / 100 : 0;
+      const preTip = round2(tot / (1 + tipRate));
+      const sub = round2(preTip / 1.13);
+      const tax = round2(preTip - sub);
+      const tip = round2(tot - preTip);
+      setSubtotal(amountToInput(sub, transactionCurrency));
+      setTaxAmount(amountToInput(tax, transactionCurrency));
+      if (pct > 0) {
+        setTipAmount(amountToInput(tip, transactionCurrency));
+      }
+    }
+  }
 
   // Filter owned holdings by active ledger currency scope and payment account
   const visibleHoldings = useMemo(() => {
@@ -441,6 +568,8 @@ export default function TransactionModal({
         setTxCurrency(currency);
         setItems([]);
         setShowItems(false);
+        setSubtotal("");
+        setTaxAmount("");
         setTipPercent("");
         setTipAmount("");
         setError(null);
@@ -470,6 +599,16 @@ export default function TransactionModal({
     setTxCurrency(tx.currency);
     setItems(tx.items || []);
     setShowItems((tx.items || []).length > 0);
+    setSubtotal(
+      tx.subtotal != null && tx.subtotal > 0
+        ? amountToInput(tx.subtotal, tx.currency)
+        : ""
+    );
+    setTaxAmount(
+      tx.tax_amount != null && tx.tax_amount > 0
+        ? amountToInput(tx.tax_amount, tx.currency)
+        : ""
+    );
     setTipPercent(
       tx.tip_percent != null && tx.tip_percent > 0
         ? String(tx.tip_percent)
@@ -493,6 +632,26 @@ export default function TransactionModal({
     setSubCategory(parsedTransaction.sub_category || "");
     setItems(parsedTransaction.items || []);
     setShowItems((parsedTransaction.items || []).length > 0);
+    setSubtotal(
+      parsedTransaction.subtotal != null && parsedTransaction.subtotal > 0
+        ? amountToInput(parsedTransaction.subtotal, parsedTransaction.currency)
+        : ""
+    );
+    setTaxAmount(
+      parsedTransaction.tax_amount != null && parsedTransaction.tax_amount > 0
+        ? amountToInput(parsedTransaction.tax_amount, parsedTransaction.currency)
+        : ""
+    );
+    setTipAmount(
+      parsedTransaction.tip_amount != null && parsedTransaction.tip_amount > 0
+        ? amountToInput(parsedTransaction.tip_amount, parsedTransaction.currency)
+        : ""
+    );
+    setTipPercent(
+      parsedTransaction.tip_percent != null && parsedTransaction.tip_percent > 0
+        ? String(parsedTransaction.tip_percent)
+        : ""
+    );
     if (parsedTransaction.date) {
       onDateChange(new Date(parsedTransaction.date));
     }
@@ -839,8 +998,9 @@ export default function TransactionModal({
       ticker: isStock ? finalTicker.toUpperCase() : undefined,
       shares: isStock ? parseFloat(shares) : undefined,
       price: isStock ? parseFloat(price) : undefined,
-      fee: undefined,
       items: showItems ? items : undefined,
+      subtotal: showTax && subtotal ? parseAmountInput(subtotal) || null : null,
+      tax_amount: showTax && taxAmount ? parseAmountInput(taxAmount) || null : null,
       tip_percent: showTip && tipPercent
         ? parseFloat(tipPercent) || null
         : null,
@@ -1576,19 +1736,92 @@ export default function TransactionModal({
 
           {detailFields()}
 
+          {showTax && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {tTx("subtotalLabel")}
+                </label>
+                <input
+                  inputMode="decimal"
+                  value={subtotal}
+                  onChange={(e) => handleSubtotalChange(e.target.value)}
+                  placeholder="0.00"
+                  className={`input-field ${NO_SPIN}`}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {tTx("taxLabel")}
+                </label>
+                <input
+                  inputMode="decimal"
+                  value={taxAmount}
+                  onChange={(e) => handleTaxChange(e.target.value)}
+                  placeholder="0.00"
+                  className={`input-field ${NO_SPIN}`}
+                />
+              </div>
+            </div>
+          )}
+
+          {showTip && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {tTx("tipLabel")}
+                </label>
+                <div className="flex items-center gap-1.5">
+                  {["15", "18", "20"].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => handleTipPercentChange(pct)}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors ${
+                        tipPercent === pct
+                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <input
+                    inputMode="decimal"
+                    value={tipPercent}
+                    onChange={(e) => handleTipPercentChange(e.target.value)}
+                    placeholder={tTx("tipPercent")}
+                    className={`input-field ${NO_SPIN}`}
+                  />
+                </div>
+                <div>
+                  <input
+                    inputMode="decimal"
+                    value={tipAmount}
+                    onChange={(e) => handleTipAmountChange(e.target.value)}
+                    placeholder={tTx("tipAmount")}
+                    className={`input-field ${NO_SPIN}`}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {tCommon("amount")}
+              {tTx("totalLabel")}
             </label>
             <div className="relative">
               <input
                 inputMode="decimal"
                 value={amount}
-                onChange={(e) =>
-                  setAmount(formatAmountInput(e.target.value, transactionCurrency))
-                }
+                onChange={(e) => handleTotalChange(e.target.value)}
                 placeholder="0"
-                className="input-field pr-20 text-lg font-semibold"
+                className="input-field pr-20 text-lg font-bold"
               />
               {isStock ? (
                 <select
@@ -1607,41 +1840,6 @@ export default function TransactionModal({
               )}
             </div>
           </div>
-
-          {showTip && (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {tTx("tipLabel")}
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <input
-                    inputMode="decimal"
-                    value={tipPercent}
-                    onChange={(e) =>
-                      setTipPercent(e.target.value.replace(/[^\d.]/g, ""))
-                    }
-                    placeholder={tTx("tipPercent")}
-                    className={`input-field ${NO_SPIN}`}
-                  />
-                </div>
-                <div>
-                  <input
-                    inputMode="decimal"
-                    value={tipAmount}
-                    onChange={(e) =>
-                      setTipAmount(
-                        formatAmountInput(e.target.value, transactionCurrency)
-                      )
-                    }
-                    placeholder={tTx("tipAmount")}
-                    className={`input-field ${NO_SPIN}`}
-                  />
-                </div>
-              </div>
-              <p className="mt-1 text-[10px] text-gray-400">{tTx("tipHint")}</p>
-            </div>
-          )}
 
           {/* Sub-items (소분류 세부항목) Expandable Section */}
           <div className="border-t border-gray-100 dark:border-gray-800/80 pt-4 mt-2">

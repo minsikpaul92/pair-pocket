@@ -351,11 +351,13 @@ def _receipt_prompt(flow_type: str = "expense") -> str:
             "If it is a single receipt, extract all individual items (sub-items/line items) from the receipt, "
             "including original item name, standardized Korean item name (e.g. 수박, 소고기, 우유, 화장지) for price tracking, "
             "quantity, unit (e.g. 개, lb, kg, bag) or null, unit_price, and total_price.\n"
-            "For Canadian receipts: extract subtotal (pre-tax), tax_amount (HST/GST/PST), tip_amount if shown, "
+            "For Canadian receipts: extract subtotal (pre-tax), tax_amount (HST/GST/PST), tip_amount if shown, tip_percent if shown, "
             "and amount as the final total paid. Line item unit_price should be pre-tax when the receipt shows it; "
             "otherwise use the printed line total divided by quantity.\n"
             "Line item parsing rules: each row must align to columns name | standardized_name | quantity | unit | unit_price | total_price. "
-            "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores)."
+            "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores).\n"
+            "VISIBLE-ONLY FALLBACK RULE: If the receipt or card slip does NOT explicitly list subtotal, tax, or tip line items (e.g. only a single total amount is printed), "
+            "extract ONLY what is visibly printed on the document. Do NOT invent, hallucinate, or force estimated tax/tip amounts if they are not printed."
         )
 
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -419,6 +421,10 @@ def _receipt_response_schema() -> dict[str, Any]:
                         "tip_amount": {
                             "type": "NUMBER",
                             "description": "Tip/gratuity when shown.",
+                        },
+                        "tip_percent": {
+                            "type": "NUMBER",
+                            "description": "Tip percentage when shown.",
                         },
                         "currency": {
                             "type": "STRING",

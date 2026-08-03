@@ -1697,6 +1697,10 @@ export interface ParsedTransaction {
   sub_category: string;
   file_name: string;
   items?: TransactionItem[];
+  subtotal?: number | null;
+  tax_amount?: number | null;
+  tip_amount?: number | null;
+  tip_percent?: number | null;
 }
 
 export async function parseReceiptsOrStatements(
