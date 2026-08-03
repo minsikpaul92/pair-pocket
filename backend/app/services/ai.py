@@ -351,18 +351,34 @@ def _receipt_prompt(flow_type: str = "expense") -> str:
             "If it is a single receipt, extract all individual items (sub-items/line items) from the receipt, "
             "including original item name, standardized Korean item name (e.g. 수박, 소고기, 우유, 화장지) for price tracking, "
             "quantity, unit (e.g. 개, lb, kg, bag) or null, unit_price, and total_price.\n"
-            "For Canadian receipts: extract subtotal (pre-tax), tax_amount (HST/GST/PST), tip_amount if shown, "
+            "For Canadian receipts: extract subtotal (pre-tax), tax_amount (HST/GST/PST), tip_amount if shown, tip_percent if shown, "
             "and amount as the final total paid. Line item unit_price should be pre-tax when the receipt shows it; "
             "otherwise use the printed line total divided by quantity.\n"
             "Line item parsing rules: each row must align to columns name | standardized_name | quantity | unit | unit_price | total_price. "
-            "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores)."
+            "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores).\n"
+            "VISIBLE-ONLY FALLBACK RULE: If the receipt or card slip does NOT explicitly list subtotal, tax, or tip line items (e.g. only a single total amount is printed), "
+            "extract ONLY what is visibly printed on the document. Do NOT invent, hallucinate, or force estimated tax/tip amounts if they are not printed."
         )
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    current_year = datetime.now().year
+
+    date_instruction = (
+        f"FLEXIBLE & CONTEXTUAL DATE PARSING INSTRUCTIONS:\n"
+        f"- Always output transaction date in standard ISO format YYYY-MM-DD.\n"
+        f"- Read the receipt document holistically. Use printed date headers, transaction timestamps, payment approval lines, and month names (e.g. JAN, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP, OCT, NOV, DEC, or 01..12) to deduce the exact date.\n"
+        f"- ALWAYS preserve the actual year printed on the receipt (e.g. 2024, 2025, 2026, or 2-digit 24, 25, 26). Do NOT override explicit printed years with the current year.\n"
+        f"- Disambiguate Month vs Day intelligently using visual and numerical context:\n"
+        f"  * Any number greater than 12 must be the Day or Year (e.g., in '07/15/2025', 15 is Day -> 2025-07-15; in '25.11.07', 25 is Year 2025 -> 2025-11-07).\n"
+        f"  * Pay attention to text month names (e.g., 'NOV 07, 2025' or '07-NOV-2025' -> 2025-11-07).\n"
+        f"  * Separate date from timestamps (e.g. '2025-11-07 14:32:05' -> date is 2025-11-07).\n"
+        f"- Only if NO year is printed on the receipt at all (e.g., 'AUG 02 14:30'), infer the year using current reference date {today_str}.\n"
+    )
 
     return (
         f"You are an expert {role} parser for PairPocket. Analyze the provided receipt image or financial statement PDF.\n"
         "Determine if the document is a single receipt or a statement containing multiple transactions.\n"
-        "For dates, look for candidate patterns. Note that North American, European, and Asian formats vary (e.g. MM/DD/YY, DD/MM/YY, DD-MM-YYYY).\n"
-        "Compare with current reference year 2026 and surrounding timestamps/contexts to resolve date ambiguities (like MM vs DD).\n"
+        f"{date_instruction}\n"
         "Extract the transaction details and return them in JSON format matching the response schema.\n"
         "For currency, determine if it is Canadian Dollars (CAD), South Korean Won (KRW) or US Dollars (USD). Default to CAD if unsure.\n"
         f"{merchant_hint}"
@@ -388,7 +404,7 @@ def _receipt_response_schema() -> dict[str, Any]:
                     "properties": {
                         "date": {
                             "type": "STRING",
-                            "description": "Transaction date in YYYY-MM-DD format. Infer correctly using 2026 reference year.",
+                            "description": "Transaction date in YYYY-MM-DD format based on critical date parsing rules.",
                         },
                         "amount": {
                             "type": "NUMBER",
@@ -405,6 +421,10 @@ def _receipt_response_schema() -> dict[str, Any]:
                         "tip_amount": {
                             "type": "NUMBER",
                             "description": "Tip/gratuity when shown.",
+                        },
+                        "tip_percent": {
+                            "type": "NUMBER",
+                            "description": "Tip percentage when shown.",
                         },
                         "currency": {
                             "type": "STRING",

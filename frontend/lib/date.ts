@@ -11,9 +11,18 @@ export function dayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+export function parseDate(iso: string | Date | null | undefined): Date {
+  if (!iso) return new Date();
+  if (iso instanceof Date) return iso;
+  const str = String(iso);
+  const normalized = str.includes(" ") && !str.includes("T") ? str.replace(" ", "T") : str;
+  const d = new Date(normalized);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
 export function isoDayKey(iso: string): string {
   // Transaction dates come back as ISO strings; take the local day key.
-  return dayKey(new Date(iso));
+  return dayKey(parseDate(iso));
 }
 
 export function monthLabel(date: Date, locale = "ko"): string {

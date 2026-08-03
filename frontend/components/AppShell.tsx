@@ -62,7 +62,7 @@ import {
   syncSubscriptions,
   parseReceiptsOrStatements,
 } from "@/lib/api";
-import { addMonths, dayKey, isoDayKey, monthKey, monthLabel } from "@/lib/date";
+import { addMonths, dayKey, isoDayKey, monthKey, monthLabel, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 import {
@@ -415,16 +415,11 @@ export default function AppShell({ user, onLogout }: Props) {
         ? fetchAllPendingOccurrences(pendingFilters)
         : fetchPendingOccurrences({ ...pendingFilters, currency: scope });
 
-    Promise.all([txLoader, pendingLoader])
-      .then(([txs, pending]) => {
+    Promise.allSettled([txLoader, pendingLoader])
+      .then(([txRes, pendingRes]) => {
         if (!active) return;
-        setTransactions(txs);
-        setPendingOccurrences(pending);
-      })
-      .catch(() => {
-        if (!active) return;
-        setTransactions([]);
-        setPendingOccurrences([]);
+        setTransactions(txRes.status === "fulfilled" ? txRes.value : []);
+        setPendingOccurrences(pendingRes.status === "fulfilled" ? pendingRes.value : []);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -500,13 +495,9 @@ export default function AppShell({ user, onLogout }: Props) {
   }
 
   function openEdit(tx: Transaction) {
-    if (tx.subscription_id) {
-      openSubscriptionById(tx.subscription_id, tx.currency);
-      return;
-    }
     setEditingTransaction(tx);
     setModalCurrency(tx.currency);
-    setModalDate(new Date(tx.date));
+    setModalDate(parseDate(tx.date));
   }
 
   function openSubscriptionFromPending(occ: SubscriptionOccurrence) {
@@ -529,7 +520,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
   const modalDayTransactions = modalDate
     ? transactions.filter(
-        (tx) => dayKey(new Date(tx.date)) === dayKey(modalDate)
+        (tx) => dayKey(parseDate(tx.date)) === dayKey(modalDate)
       )
     : [];
 
@@ -843,9 +834,11 @@ export default function AppShell({ user, onLogout }: Props) {
               scope={scope}
               presets={presets}
               transactions={transactions}
+              pendingOccurrences={pendingOccurrences}
               onEditTransaction={openEdit}
               onAddTransaction={() => openModal(new Date())}
               onDeleted={bumpVersion}
+              onPendingClick={openSubscriptionFromPending}
             />
           ) : view === "subscriptions" ? (
             <SubscriptionsView

@@ -756,6 +756,9 @@ export interface SubscriptionOccurrence {
   transaction_id: string | null;
   subscription_name: string | null;
   subscription_billing_cycle?: BillingCycle | null;
+  category?: string | null;
+  sub_category?: string | null;
+  merchant?: string | null;
 }
 
 export const BILLING_CYCLE_LABEL: Record<BillingCycle, string> = {
@@ -1694,6 +1697,10 @@ export interface ParsedTransaction {
   sub_category: string;
   file_name: string;
   items?: TransactionItem[];
+  subtotal?: number | null;
+  tax_amount?: number | null;
+  tip_amount?: number | null;
+  tip_percent?: number | null;
 }
 
 export async function parseReceiptsOrStatements(

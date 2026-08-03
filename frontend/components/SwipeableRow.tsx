@@ -76,6 +76,13 @@ export default function SwipeableRow({
       applyOffset(openRef.current ? -REVEAL : 0);
       return;
     }
+    if (Math.abs(dx) > 5 && pointerId.current !== null && rowRef.current) {
+      try {
+        rowRef.current.setPointerCapture(pointerId.current);
+      } catch {
+        /* ignore */
+      }
+    }
     const base = openRef.current ? -REVEAL : 0;
     const next = Math.min(0, Math.max(-maxSlide(), dx + base));
     applyOffset(next);
@@ -116,7 +123,6 @@ export default function SwipeableRow({
     if (disabled || e.button !== 0) return;
     pointerId.current = e.pointerId;
     beginDrag(e.clientX, e.clientY);
-    e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent) {
