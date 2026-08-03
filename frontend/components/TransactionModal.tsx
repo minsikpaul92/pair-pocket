@@ -2,7 +2,7 @@
 
 import { Camera, Loader2, SkipForward, Trash2, X, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
@@ -68,7 +68,7 @@ import {
   parseReceiptsOrStatements,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
-import { dayKey } from "@/lib/date";
+import { dayKey, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
@@ -623,39 +623,77 @@ export default function TransactionModal({
     setHydratedEditId(tx.id);
   }, [editingTransaction, hydratedEditId, currency]);
 
+  const applyParsedTransaction = useCallback(
+    (parsed: ParsedTransaction) => {
+      const txCurr = parsed.currency || transactionCurrency || currency;
+      const totAmount = parsed.amount || 0;
+      setAmount(totAmount > 0 ? amountToInput(totAmount, txCurr) : "");
+      setMerchant(parsed.merchant || "");
+      setTxCurrency(txCurr);
+      setCategory(parsed.category || "");
+      setSubCategory(parsed.sub_category || "");
+      setItems(parsed.items || []);
+      setShowItems((parsed.items || []).length > 0);
+
+      const parsedSub = parsed.subtotal;
+      const parsedTax = parsed.tax_amount;
+      const parsedTipAmt = parsed.tip_amount;
+      const parsedTipPct = parsed.tip_percent;
+
+      if (parsedSub != null && parsedSub > 0) {
+        setSubtotal(amountToInput(parsedSub, txCurr));
+        setTaxAmount(
+          parsedTax != null && parsedTax > 0
+            ? amountToInput(parsedTax, txCurr)
+            : amountToInput(round2(parsedSub * HST_RATE), txCurr)
+        );
+        setTipAmount(
+          parsedTipAmt != null && parsedTipAmt > 0
+            ? amountToInput(parsedTipAmt, txCurr)
+            : ""
+        );
+        setTipPercent(
+          parsedTipPct != null && parsedTipPct > 0
+            ? String(parsedTipPct)
+            : ""
+        );
+      } else if (totAmount > 0 && txCurr !== "KRW") {
+        // Auto-calculate Subtotal, Tax (and Tip if tip_percent is provided) from parsed Total Amount
+        const tipPctNum = parsedTipPct || 0;
+        const tipRate = tipPctNum > 0 ? tipPctNum / 100 : 0;
+        const preTip = round2(totAmount / (1 + tipRate));
+        const sub = round2(preTip / 1.13);
+        const tax = round2(preTip - sub);
+        const tip = round2(totAmount - preTip);
+
+        setSubtotal(amountToInput(sub, txCurr));
+        setTaxAmount(amountToInput(tax, txCurr));
+        setTipAmount(
+          parsedTipAmt != null && parsedTipAmt > 0
+            ? amountToInput(parsedTipAmt, txCurr)
+            : tip > 0
+            ? amountToInput(tip, txCurr)
+            : ""
+        );
+        setTipPercent(tipPctNum > 0 ? String(tipPctNum) : "");
+      } else {
+        setSubtotal("");
+        setTaxAmount("");
+        setTipAmount("");
+        setTipPercent("");
+      }
+
+      if (parsed.date) {
+        onDateChange(parseDate(parsed.date));
+      }
+    },
+    [transactionCurrency, currency, onDateChange]
+  );
+
   useEffect(() => {
     if (!parsedTransaction) return;
-    setAmount(amountToInput(parsedTransaction.amount, parsedTransaction.currency));
-    setMerchant(parsedTransaction.merchant || "");
-    setTxCurrency(parsedTransaction.currency);
-    setCategory(parsedTransaction.category || "");
-    setSubCategory(parsedTransaction.sub_category || "");
-    setItems(parsedTransaction.items || []);
-    setShowItems((parsedTransaction.items || []).length > 0);
-    setSubtotal(
-      parsedTransaction.subtotal != null && parsedTransaction.subtotal > 0
-        ? amountToInput(parsedTransaction.subtotal, parsedTransaction.currency)
-        : ""
-    );
-    setTaxAmount(
-      parsedTransaction.tax_amount != null && parsedTransaction.tax_amount > 0
-        ? amountToInput(parsedTransaction.tax_amount, parsedTransaction.currency)
-        : ""
-    );
-    setTipAmount(
-      parsedTransaction.tip_amount != null && parsedTransaction.tip_amount > 0
-        ? amountToInput(parsedTransaction.tip_amount, parsedTransaction.currency)
-        : ""
-    );
-    setTipPercent(
-      parsedTransaction.tip_percent != null && parsedTransaction.tip_percent > 0
-        ? String(parsedTransaction.tip_percent)
-        : ""
-    );
-    if (parsedTransaction.date) {
-      onDateChange(new Date(parsedTransaction.date));
-    }
-  }, [parsedTransaction, currency, onDateChange]);
+    applyParsedTransaction(parsedTransaction);
+  }, [parsedTransaction, applyParsedTransaction]);
 
   async function handleModalScan(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -682,14 +720,7 @@ export default function TransactionModal({
         setError(tTx("scanEmpty"));
         return;
       }
-      setAmount(amountToInput(parsed.amount, parsed.currency));
-      setMerchant(parsed.merchant || "");
-      setTxCurrency(parsed.currency);
-      setCategory(parsed.category || "");
-      setSubCategory(parsed.sub_category || "");
-      setItems(parsed.items || []);
-      setShowItems((parsed.items || []).length > 0);
-      if (parsed.date) onDateChange(new Date(parsed.date));
+      applyParsedTransaction(parsed);
       setScanHint(tTx("scanFilled"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : tTx("scanFailed"));
