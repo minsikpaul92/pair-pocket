@@ -39,7 +39,7 @@ class TransactionBase(BaseModel):
     """
 
     date: datetime
-    amount: float = Field(gt=0)
+    amount: float = Field(ge=0)
     currency: Currency
     type: TransactionType
     account_type: AccountType = AccountType.PERSONAL

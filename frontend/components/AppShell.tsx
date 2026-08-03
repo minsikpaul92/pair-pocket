@@ -415,16 +415,11 @@ export default function AppShell({ user, onLogout }: Props) {
         ? fetchAllPendingOccurrences(pendingFilters)
         : fetchPendingOccurrences({ ...pendingFilters, currency: scope });
 
-    Promise.all([txLoader, pendingLoader])
-      .then(([txs, pending]) => {
+    Promise.allSettled([txLoader, pendingLoader])
+      .then(([txRes, pendingRes]) => {
         if (!active) return;
-        setTransactions(txs);
-        setPendingOccurrences(pending);
-      })
-      .catch(() => {
-        if (!active) return;
-        setTransactions([]);
-        setPendingOccurrences([]);
+        setTransactions(txRes.status === "fulfilled" ? txRes.value : []);
+        setPendingOccurrences(pendingRes.status === "fulfilled" ? pendingRes.value : []);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -843,9 +838,11 @@ export default function AppShell({ user, onLogout }: Props) {
               scope={scope}
               presets={presets}
               transactions={transactions}
+              pendingOccurrences={pendingOccurrences}
               onEditTransaction={openEdit}
               onAddTransaction={() => openModal(new Date())}
               onDeleted={bumpVersion}
+              onPendingClick={openSubscriptionFromPending}
             />
           ) : view === "subscriptions" ? (
             <SubscriptionsView

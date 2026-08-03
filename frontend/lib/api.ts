@@ -756,6 +756,9 @@ export interface SubscriptionOccurrence {
   transaction_id: string | null;
   subscription_name: string | null;
   subscription_billing_cycle?: BillingCycle | null;
+  category?: string | null;
+  sub_category?: string | null;
+  merchant?: string | null;
 }
 
 export const BILLING_CYCLE_LABEL: Record<BillingCycle, string> = {

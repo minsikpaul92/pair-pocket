@@ -211,6 +211,9 @@ async def pending_occurrences(
                 "subscription_billing_cycle": (
                     BillingCycle(sub["cycle"]) if sub else None
                 ),
+                "category": sub.get("category") if sub else "Subscriptions",
+                "sub_category": sub.get("sub_category") if sub else None,
+                "merchant": sub.get("merchant") or (sub["name"] if sub else None),
             }
         )
     return out
@@ -504,6 +507,24 @@ async def update_subscription(
                             "amount": amount_for_due_date(updated, due),
                         }
                     },
+                )
+
+        # Keep already-materialized transactions in sync when category/merchant changes.
+        category_fields_changed = any(
+            k in updates for k in ("category", "sub_category", "merchant", "name")
+        )
+        if category_fields_changed:
+            tx_updates = {}
+            if "category" in updates:
+                tx_updates["category"] = updates["category"]
+            if "sub_category" in updates:
+                tx_updates["sub_category"] = updates["sub_category"]
+            if "merchant" in updates or "name" in updates:
+                tx_updates["merchant"] = updates.get("merchant") or updates.get("name")
+            if tx_updates:
+                await db[TX_COL].update_many(
+                    {"subscription_id": subscription_id},
+                    {"$set": tx_updates},
                 )
 
         # Keep already-materialized transactions in sync when price/promo changes

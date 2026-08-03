@@ -112,6 +112,9 @@ class SubscriptionOccurrenceOut(BaseModel):
     transaction_id: str | None = None
     subscription_name: str | None = None
     subscription_billing_cycle: BillingCycle | None = None
+    category: str | None = None
+    sub_category: str | None = None
+    merchant: str | None = None
 
 
 class SubscriptionHistoryOut(BaseModel):

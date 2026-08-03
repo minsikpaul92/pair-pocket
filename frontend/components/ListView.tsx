@@ -11,6 +11,7 @@ import {
   EXPENSE_CATEGORY_INVESTMENT,
   INCOME_CATEGORY_SETTLEMENT,
   LedgerScope,
+  SubscriptionOccurrence,
   Transaction,
   TransactionType,
   categoriesForType,
@@ -19,6 +20,7 @@ import {
   formatAmount,
   hasSettlement,
   isNonCashflowTransaction,
+  isSubscriptionDueOrPast,
   isSubscriptionTransaction,
   subCategoriesFor,
 } from "@/lib/api";
@@ -30,10 +32,41 @@ interface Props {
   scope: LedgerScope;
   presets: CategoryPresets | null;
   transactions: Transaction[];
+  pendingOccurrences?: SubscriptionOccurrence[];
   onEditTransaction?: (tx: Transaction) => void;
   onAddTransaction?: () => void;
   onDeleted?: () => void;
+  onPendingClick?: (occ: SubscriptionOccurrence) => void;
 }
+
+export type UnifiedListItem =
+  | {
+      id: string;
+      kind: "transaction";
+      date: string;
+      currency: Currency;
+      category: string;
+      sub_category?: string | null;
+      merchant: string;
+      type: TransactionType;
+      amount: number;
+      effectiveAmount: number;
+      tx: Transaction;
+    }
+  | {
+      id: string;
+      kind: "pending";
+      date: string;
+      currency: Currency;
+      category: string;
+      sub_category?: string | null;
+      merchant: string;
+      type: TransactionType;
+      amount: number;
+      effectiveAmount: number;
+      isDueOrPast: boolean;
+      occ: SubscriptionOccurrence;
+    };
 
 type TypeFilter = "all" | TransactionType;
 type SortKey =
@@ -61,9 +94,11 @@ export default function ListView({
   scope,
   presets,
   transactions,
+  pendingOccurrences = [],
   onEditTransaction,
   onAddTransaction,
   onDeleted,
+  onPendingClick,
 }: Props) {
   const locale = useLocale();
   const tList = useTranslations("list");
@@ -102,18 +137,61 @@ export default function ListView({
     }
   }
 
+  const combinedItems = useMemo<UnifiedListItem[]>(() => {
+    const items: UnifiedListItem[] = [];
+    for (const tx of visibleTxs) {
+      items.push({
+        id: tx.id,
+        kind: "transaction",
+        date: tx.date,
+        currency: tx.currency,
+        category: tx.category,
+        sub_category: tx.sub_category,
+        merchant: tx.merchant,
+        type: tx.type,
+        amount: tx.amount,
+        effectiveAmount: displayAmount(tx),
+        tx,
+      });
+    }
+    for (const occ of pendingOccurrences) {
+      const merchantName =
+        occ.subscription_name || occ.merchant || tSub("defaultName");
+      const categoryName = occ.category || "Subscriptions";
+      items.push({
+        id: `pending-${occ.id}`,
+        kind: "pending",
+        date: occ.due_date,
+        currency: occ.currency,
+        category: categoryName,
+        sub_category: occ.sub_category,
+        merchant: merchantName,
+        type: "expense",
+        amount: occ.amount,
+        effectiveAmount: occ.amount,
+        isDueOrPast: isSubscriptionDueOrPast(occ.due_date),
+        occ,
+      });
+    }
+    return items;
+  }, [visibleTxs, pendingOccurrences, tSub]);
+
   const allCategories = useMemo(() => {
     if (!presets) return [];
     const set = new Set<string>();
-    for (const tx of transactions) set.add(tx.category);
+    for (const item of combinedItems) set.add(item.category);
     const expense = categoriesForType(presets, "expense");
     const income = categoriesForType(presets, "income");
     return [...expense, ...income].filter((c) => set.has(c));
-  }, [presets, transactions]);
+  }, [presets, combinedItems]);
 
   const subCategoryOptions = useMemo(() => {
     if (categoryFilter === "all") {
-      const set = new Set(transactions.map((t) => t.sub_category).filter(Boolean));
+      const set = new Set<string>(
+        combinedItems
+          .map((t) => t.sub_category)
+          .filter((s): s is string => Boolean(s))
+      );
       return [...set].sort((a, b) =>
         translateSubCategory(a, tSubCategories).localeCompare(
           translateSubCategory(b, tSubCategories),
@@ -121,11 +199,11 @@ export default function ListView({
         )
       );
     }
-    const set = new Set(
-      transactions
+    const set = new Set<string>(
+      combinedItems
         .filter((t) => t.category === categoryFilter)
         .map((t) => t.sub_category)
-        .filter(Boolean)
+        .filter((s): s is string => Boolean(s))
     );
     if (presets) {
       const expenseSubs = subCategoriesFor(presets, "expense", categoryFilter);
@@ -140,19 +218,29 @@ export default function ListView({
         locale
       )
     );
-  }, [transactions, categoryFilter, presets, locale, tSubCategories]);
+  }, [combinedItems, categoryFilter, presets, locale, tSubCategories]);
 
   const filtered = useMemo(() => {
     const q = merchantQuery.trim().toLowerCase();
-    return visibleTxs.filter((tx) => {
-      if (typeFilter !== "all" && tx.type !== typeFilter) return false;
-      if (categoryFilter !== "all" && tx.category !== categoryFilter) return false;
-      if (subCategoryFilter !== "all" && tx.sub_category !== subCategoryFilter)
+    return combinedItems.filter((item) => {
+      if (typeFilter !== "all" && item.type !== typeFilter) return false;
+      if (categoryFilter !== "all" && item.category !== categoryFilter)
         return false;
-      if (q && !tx.merchant.toLowerCase().includes(q)) return false;
+      if (
+        subCategoryFilter !== "all" &&
+        item.sub_category !== subCategoryFilter
+      )
+        return false;
+      if (q && !item.merchant.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [visibleTxs, typeFilter, categoryFilter, subCategoryFilter, merchantQuery]);
+  }, [
+    combinedItems,
+    typeFilter,
+    categoryFilter,
+    subCategoryFilter,
+    merchantQuery,
+  ]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
@@ -166,7 +254,7 @@ export default function ListView({
           cmp = a.currency.localeCompare(b.currency);
           break;
         case "amount":
-          cmp = displayAmount(a) - displayAmount(b);
+          cmp = a.effectiveAmount - b.effectiveAmount;
           break;
         case "category":
           cmp = translateCategory(a.category, tCategories).localeCompare(
@@ -212,12 +300,16 @@ export default function ListView({
       KRW: { income: 0, expense: 0, count: 0 },
       USD: { income: 0, expense: 0, count: 0 },
     };
-    for (const tx of sorted) {
-      const bucket = byCurrency[tx.currency];
+    for (const item of sorted) {
+      const bucket = byCurrency[item.currency];
       bucket.count += 1;
-      if (isNonCashflowTransaction(tx)) continue;
-      if (tx.type === "income") bucket.income += tx.amount;
-      else bucket.expense += effectiveExpenseAmount(tx);
+      if (item.kind === "transaction") {
+        if (isNonCashflowTransaction(item.tx)) continue;
+        if (item.tx.type === "income") bucket.income += item.tx.amount;
+        else bucket.expense += effectiveExpenseAmount(item.tx);
+      } else {
+        bucket.expense += item.amount;
+      }
     }
     return byCurrency;
   }, [sorted]);
@@ -328,11 +420,79 @@ export default function ListView({
               {tList("noTransactions")}
             </li>
           ) : (
-            sorted.map((tx) => {
+            sorted.map((item) => {
+              if (item.kind === "pending") {
+                const occ = item.occ;
+                const isOverdue = item.isDueOrPast;
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => onPendingClick?.(occ)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-amber-50/40 dark:hover:bg-amber-500/5 transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                          {showCurrencyCol &&
+                            (item.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
+                          <span>
+                            {translateCategory(item.category, tCategories)}
+                          </span>
+                          {item.sub_category && (
+                            <span className="text-gray-400">
+                              ›{" "}
+                              {translateSubCategory(
+                                item.sub_category,
+                                tSubCategories
+                              )}
+                            </span>
+                          )}
+                          <span
+                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                              isOverdue
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                            }`}
+                          >
+                            결제예정
+                          </span>
+                        </p>
+                        <p className="text-[11px] text-gray-400 truncate">
+                          {formatDay(item.date)} · {item.merchant}
+                          {translateSubscriptionSource(
+                            occ.subscription_billing_cycle,
+                            tSub
+                          ) && (
+                            <span className="ml-1 text-gray-400 font-normal">
+                              (
+                              {translateSubscriptionSource(
+                                occ.subscription_billing_cycle,
+                                tSub
+                              )}
+                              )
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <p
+                        className={`shrink-0 text-sm font-semibold tabular-nums ${
+                          isOverdue
+                            ? "text-red-500"
+                            : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        {formatAmount(item.amount, item.currency)}
+                      </p>
+                    </button>
+                  </li>
+                );
+              }
+
+              const tx = item.tx;
               const settled = hasSettlement(tx);
               const transfer = isNonCashflowTransaction(tx);
               const subscription = isSubscriptionTransaction(tx);
-              const effective = displayAmount(tx);
+              const effective = item.effectiveAmount;
               return (
                 <li key={tx.id}>
                   <SwipeableRow
@@ -379,192 +539,6 @@ export default function ListView({
             })
           )}
         </ul>
-        <div className="hidden overflow-x-auto max-h-[28rem] overflow-y-auto">
-          <table className="min-w-full text-sm border-collapse">
-            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900/95 backdrop-blur-sm">
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className={thClass} onClick={() => toggleSort("date")}>
-                  {tCommon("date")} <SortIcon col="date" />
-                </th>
-                {showCurrencyCol && (
-                  <th className={thClass} onClick={() => toggleSort("currency")}>
-                    {tCommon("currency")} <SortIcon col="currency" />
-                  </th>
-                )}
-                <th className={thClass} onClick={() => toggleSort("category")}>
-                  {tList("category")} <SortIcon col="category" />
-                </th>
-                <th className={thClass} onClick={() => toggleSort("sub_category")}>
-                  {tList("subCategory")} <SortIcon col="sub_category" />
-                </th>
-                <th className={thClass} onClick={() => toggleSort("merchant")}>
-                  {tList("merchant")} <SortIcon col="merchant" />
-                </th>
-                <th className={thClass} onClick={() => toggleSort("type")}>
-                  {tList("type")} <SortIcon col="type" />
-                </th>
-                <th
-                  className={`${thClass} text-right`}
-                  onClick={() => toggleSort("amount")}
-                >
-                  {tCommon("amount")} <SortIcon col="amount" />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={colSpan}
-                    className="px-4 py-12 text-center text-gray-400"
-                  >
-                    {tList("noTransactions")}
-                  </td>
-                </tr>
-              ) : (
-                sorted.map((tx, i) => {
-                  const settled = hasSettlement(tx);
-                  const transfer = isNonCashflowTransaction(tx);
-                  const subscription = isSubscriptionTransaction(tx);
-                  const effective = displayAmount(tx);
-                  return (
-                    <tr
-                      key={tx.id}
-                      onClick={() => onEditTransaction?.(tx)}
-                      className={`border-b border-gray-100 dark:border-gray-700/60 hover:bg-blue-50/50 dark:hover:bg-blue-500/5 transition-colors ${
-                        onEditTransaction ? "cursor-pointer" : ""
-                      } ${
-                        i % 2 === 0
-                          ? "bg-white dark:bg-gray-800"
-                          : "bg-gray-50/50 dark:bg-gray-800/60"
-                      }`}
-                    >
-                      <td className="px-3 py-2.5 whitespace-nowrap text-gray-500 dark:text-gray-400 tabular-nums">
-                        {formatDay(tx.date)}
-                      </td>
-                      {showCurrencyCol && (
-                        <td className="px-3 py-2.5 whitespace-nowrap text-xs font-medium text-gray-500">
-                          {tx.currency === "CAD" ? "🇨🇦" : "🇰🇷"} {tx.currency}
-                        </td>
-                      )}
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        {translateCategory(tx.category, tCategories)}
-                      </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap max-w-[7rem] truncate">
-                        {tx.sub_category
-                          ? translateSubCategory(tx.sub_category, tSubCategories)
-                          : tCommon("none")}
-                      </td>
-                      <td className="px-3 py-2.5 max-w-[8rem] truncate">
-                        {tx.merchant}
-                        {translateSubscriptionSource(tx.subscription_billing_cycle, tSub) && (
-                          <span className="ml-1 text-[10px] text-gray-400 font-normal">
-                            {translateSubscriptionSource(tx.subscription_billing_cycle, tSub)}
-                          </span>
-                        )}
-                        {tx.category === EXPENSE_CATEGORY_INVESTMENT &&
-                          tx.institution && (
-                            <span className="block text-xs text-gray-400 truncate">
-                              {tx.institution}
-                            </span>
-                          )}
-                      </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        <span
-                          className={`text-xs font-medium ${
-                            transfer
-                              ? "text-gray-500"
-                              : tx.type === "income"
-                                ? "text-blue-500"
-                                : "text-gray-500"
-                          }`}
-                        >
-                          {transfer
-                            ? tx.category === INCOME_CATEGORY_SETTLEMENT
-                              ? tCommon("settlement")
-                              : tCommon("transfer")
-                            : tx.type === "income"
-                              ? tCommon("income")
-                              : tCommon("expense")}
-                        </span>
-                      </td>
-                      <td
-                        className={`px-3 py-2.5 whitespace-nowrap text-right tabular-nums ${
-                          transfer
-                            ? "text-gray-500 dark:text-gray-400 font-semibold"
-                            : tx.type === "income"
-                              ? "text-blue-500 font-semibold"
-                              : subscription
-                                ? "text-red-500 font-semibold"
-                                : "text-gray-900 dark:text-white font-semibold"
-                        }`}
-                      >
-                        {settled ? (
-                          <div className="flex flex-col items-end gap-0.5">
-                            <span className="text-xs text-gray-400 line-through font-normal">
-                              {formatAmount(tx.amount, tx.currency)}
-                            </span>
-                            <span className="text-red-500">
-                              {formatAmount(effective, tx.currency)}
-                            </span>
-                          </div>
-                        ) : (
-                          <>
-                            {transfer
-                              ? ""
-                              : tx.type === "income"
-                                ? "+"
-                                : ""}
-                            {formatAmount(effective, tx.currency)}
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-            {sorted.length > 0 && (
-              <tfoot className="sticky bottom-0 bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-200 dark:border-gray-600">
-                {activeCurrencies.map((cur) => {
-                  const t = totals[cur];
-                  const net = t.income - t.expense;
-                  return (
-                    <tr key={cur}>
-                      <td
-                        colSpan={showCurrencyCol ? 5 : 4}
-                        className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400"
-                      >
-                        {tCommon("totalCount", { count: t.count })}
-                        {showCurrencyCol && (
-                          <span className="ml-1">
-                            {cur === "CAD" ? "🇨🇦" : "🇰🇷"} {cur}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-xs whitespace-nowrap">
-                        <span className="text-blue-500">
-                          +{formatAmount(t.income, cur)}
-                        </span>
-                        <span className="mx-1 text-gray-300">/</span>
-                        <span className="text-red-500">
-                          -{formatAmount(t.expense, cur)}
-                        </span>
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-right font-bold whitespace-nowrap tabular-nums text-xs ${
-                          net < 0 ? "text-red-500" : "text-gray-900 dark:text-white"
-                        }`}
-                      >
-                        {formatAmount(net, cur)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tfoot>
-            )}
-          </table>
-        </div>
       </div>
     </div>
   );

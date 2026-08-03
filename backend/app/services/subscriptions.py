@@ -639,20 +639,33 @@ async def generate_occurrences(
             {"subscription_id": sub_id, "due_date": due}
         )
         if not exists:
-            await db[OCC_COL].insert_one(
+            month_start = datetime(due.year, due.month, 1)
+            month_end = (
+                datetime(due.year + 1, 1, 1)
+                if due.month == 12
+                else datetime(due.year, due.month + 1, 1)
+            )
+            exists_tx = await db[TX_COL].find_one(
                 {
                     "subscription_id": sub_id,
-                    "owner_id": subscription["owner_id"],
-                    "account_type": subscription["account_type"],
-                    "due_date": due,
-                    "amount": amount_for_due_date(subscription, due),
-                    "currency": subscription["currency"],
-                    "status": OccurrenceStatus.PENDING.value,
-                    "transaction_id": None,
-                    "created_at": datetime.utcnow(),
+                    "date": {"$gte": month_start, "$lt": month_end},
                 }
             )
-            created += 1
+            if not exists_tx:
+                await db[OCC_COL].insert_one(
+                    {
+                        "subscription_id": sub_id,
+                        "owner_id": subscription["owner_id"],
+                        "account_type": subscription["account_type"],
+                        "due_date": due,
+                        "amount": amount_for_due_date(subscription, due),
+                        "currency": subscription["currency"],
+                        "status": OccurrenceStatus.PENDING.value,
+                        "transaction_id": None,
+                        "created_at": datetime.utcnow(),
+                    }
+                )
+                created += 1
 
         due = _next_due(due, cycle)
 
@@ -845,14 +858,13 @@ async def list_pending_occurrences(
     if currency:
         query["currency"] = currency
 
-    date_filter: dict[str, datetime] = {"$gte": today}
     if month:
         year, mon = (int(p) for p in month.split("-"))
         start = datetime(year, mon, 1)
         end = datetime(year + 1, 1, 1) if mon == 12 else datetime(year, mon + 1, 1)
-        date_filter["$gte"] = max(today, start)
-        date_filter["$lt"] = end
-    query["due_date"] = date_filter
+        query["due_date"] = {"$gte": start, "$lt": end}
+    else:
+        query["due_date"] = {"$gte": today}
 
     docs = await db[OCC_COL].find(query).sort("due_date", 1).to_list(length=100)
     return docs
