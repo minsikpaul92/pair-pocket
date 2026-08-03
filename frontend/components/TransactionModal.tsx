@@ -1585,21 +1585,6 @@ export default function TransactionModal({
                     <button
                       type="button"
                       onClick={() => {
-                        if (tx.subscription_id && onSelectPendingOccurrence) {
-                          onSelectPendingOccurrence({
-                            id: tx.id,
-                            subscription_id: tx.subscription_id,
-                            due_date: tx.date,
-                            amount: tx.amount,
-                            currency: tx.currency,
-                            status: "completed",
-                            transaction_id: tx.id,
-                            subscription_name: tx.merchant,
-                            subscription_billing_cycle:
-                              tx.subscription_billing_cycle,
-                          });
-                          return;
-                        }
                         onSelectTransaction?.(tx);
                       }}
                       className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors ${

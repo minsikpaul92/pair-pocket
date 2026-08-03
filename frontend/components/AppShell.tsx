@@ -62,7 +62,7 @@ import {
   syncSubscriptions,
   parseReceiptsOrStatements,
 } from "@/lib/api";
-import { addMonths, dayKey, isoDayKey, monthKey, monthLabel } from "@/lib/date";
+import { addMonths, dayKey, isoDayKey, monthKey, monthLabel, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 import {
@@ -495,13 +495,9 @@ export default function AppShell({ user, onLogout }: Props) {
   }
 
   function openEdit(tx: Transaction) {
-    if (tx.subscription_id) {
-      openSubscriptionById(tx.subscription_id, tx.currency);
-      return;
-    }
     setEditingTransaction(tx);
     setModalCurrency(tx.currency);
-    setModalDate(new Date(tx.date));
+    setModalDate(parseDate(tx.date));
   }
 
   function openSubscriptionFromPending(occ: SubscriptionOccurrence) {
@@ -524,7 +520,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
   const modalDayTransactions = modalDate
     ? transactions.filter(
-        (tx) => dayKey(new Date(tx.date)) === dayKey(modalDate)
+        (tx) => dayKey(parseDate(tx.date)) === dayKey(modalDate)
       )
     : [];
 
