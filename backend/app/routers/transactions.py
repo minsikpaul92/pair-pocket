@@ -189,8 +189,14 @@ async def all_merchants(
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     pipeline = [
         {"$match": {**owner_match(owner_ids), "merchant": {"$nin": [None, "", "미지정"]}}},
-        {"$group": {"_id": "$merchant", "last_used": {"$max": "$date"}}},
-        {"$sort": {"last_used": -1}},
+        {
+            "$group": {
+                "_id": "$merchant",
+                "count": {"$sum": 1},
+                "last_used": {"$max": "$date"},
+            }
+        },
+        {"$sort": {"count": -1, "last_used": -1}},
         {"$limit": 100},
     ]
     docs = await db[COLLECTION].aggregate(pipeline).to_list(length=100)
