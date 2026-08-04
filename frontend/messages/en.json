@@ -215,6 +215,8 @@
     "selectMerchant": "Select merchant",
     "selectSubCategoryForMerchant": "Select a sub-category first",
     "addMerchant": "Add merchant",
+    "note": "Note / Description",
+    "notePlaceholder": "Enter brief note or items (e.g. Groceries, Dinner)",
     "institution": "Institution / account",
     "settlementExpense": "Expense to settle",
     "selectSettlementExpense": "Select expense to settle",

@@ -215,6 +215,8 @@
     "selectMerchant": "사용처 선택",
     "selectSubCategoryForMerchant": "먼저 중분류를 선택하세요",
     "addMerchant": "새 사용처 추가",
+    "note": "내용 (Note)",
+    "notePlaceholder": "간단한 메모나 구매 품목 입력 (예: 장보기, 회식)",
     "institution": "금융기관 / 계좌명",
     "settlementExpense": "정산 대상 지출",
     "selectSettlementExpense": "정산 대상 지출 선택",

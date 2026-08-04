@@ -90,8 +90,11 @@ class TransactionBase(BaseModel):
     subtotal: float | None = None
     tax_amount: float | None = None
 
+    # Free-text memo / note
+    note: str | None = None
+
     @field_validator(
-        "category", "sub_category", "merchant", "institution", "ticker", mode="before"
+        "category", "sub_category", "merchant", "institution", "ticker", "note", mode="before"
     )
     @classmethod
     def strip_strings(cls, v):

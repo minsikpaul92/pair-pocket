@@ -68,6 +68,8 @@ import {
   TransactionItem,
   parseReceiptsOrStatements,
   parseReceiptItems,
+  fetchAllMerchants,
+  lookupMerchant,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, parseDate } from "@/lib/date";
@@ -165,7 +167,24 @@ export default function TransactionModal({
   const [subCategory, setSubCategory] = useState("");
   const [settlesExpenseId, setSettlesExpenseId] = useState("");
   const [merchant, setMerchant] = useState("");
+  const [note, setNote] = useState("");
   const [institution, setInstitution] = useState("");
+  const [allMerchants, setAllMerchants] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchAllMerchants(accountType).then(setAllMerchants);
+  }, [accountType]);
+
+  async function handleMerchantChange(val: string) {
+    setMerchant(val);
+    if (val && val.trim()) {
+      const res = await lookupMerchant(val, accountType);
+      if (res.found && res.category && res.sub_category) {
+        setCategory(res.category);
+        setSubCategory(res.sub_category);
+      }
+    }
+  }
 
   // Stock trading states
   const [isStockTrade, setIsStockTrade] = useState(false);
@@ -720,6 +739,7 @@ export default function TransactionModal({
         setSubCategory("");
         setSettlesExpenseId("");
         setMerchant("");
+        setNote("");
         setInstitution("");
         setAccountId(ACCOUNT_NONE);
         setCounterAccountId(ACCOUNT_NONE);
@@ -752,6 +772,7 @@ export default function TransactionModal({
     setSubCategory(normalizeTransferSubCategory(tx.sub_category || ""));
     setSettlesExpenseId(tx.settles_expense_id || "");
     setMerchant(tx.merchant || "");
+    setNote(tx.note || "");
     setInstitution(tx.institution || "");
     setAccountId(tx.account_id || ACCOUNT_NONE);
     setCounterAccountId(tx.counter_account_id || ACCOUNT_NONE);
@@ -1042,11 +1063,10 @@ export default function TransactionModal({
   async function handleAddMerchant(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setMerchantHints((prev) => [
-      trimmed,
-      ...prev.filter((m) => m !== trimmed),
-    ]);
-    setMerchant(trimmed);
+    if (!allMerchants.includes(trimmed)) {
+      setAllMerchants((prev) => [trimmed, ...prev]);
+    }
+    await handleMerchantChange(trimmed);
   }
 
   async function handleAddCategory(name: string) {
@@ -1204,6 +1224,7 @@ export default function TransactionModal({
       tip_amount: showTip && tipAmount
         ? parseAmountInput(tipAmount)
         : null,
+      note: note.trim() || undefined,
     };
 
     setSubmitting(true);
@@ -1294,18 +1315,14 @@ export default function TransactionModal({
   ) : (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-        {tTx("merchant")}
+        {tTx("note")}
       </label>
-      <MerchantSelect
-        options={merchantHints}
-        value={merchant}
-        onChange={setMerchant}
-        onAdd={handleAddMerchant}
-        disabled={!subCategory}
-        placeholder={
-          subCategory ? tTx("selectMerchant") : tTx("selectSubCategoryForMerchant")
-        }
-        addLabel={tTx("addMerchant")}
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder={tTx("notePlaceholder")}
+        className="input-field text-sm"
       />
     </div>
   );
@@ -1992,6 +2009,23 @@ export default function TransactionModal({
                   {scanHint}
                 </p>
               )}
+            </div>
+          )}
+
+          {!isTransfer && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("merchant")}
+              </label>
+              <MerchantSelect
+                options={allMerchants}
+                value={merchant}
+                onChange={handleMerchantChange}
+                onAdd={handleAddMerchant}
+                disabled={false}
+                placeholder={tTx("selectMerchant")}
+                addLabel={tTx("addMerchant")}
+              />
             </div>
           )}
 
