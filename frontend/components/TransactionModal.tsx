@@ -2363,21 +2363,26 @@ export default function TransactionModal({
                               }
                               className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
                             />
-                            <AddableSelect
-                              options={availableUnits}
+                            <select
                               value={item.unit || "개"}
-                              onChange={(val) => updateItem("unit", val)}
-                              onAdd={async (name) => {
-                                if (!availableUnits.includes(name)) {
-                                  setAvailableUnits((prev) => [...prev, name]);
+                              onChange={(e) => {
+                                if (e.target.value === "__add__") {
+                                  handleAddCustomUnit(itemIdx);
+                                } else {
+                                  updateItem("unit", e.target.value);
                                 }
                               }}
-                              placeholder="단위"
-                              addLabel="단위 추가"
-                              dropPosition="top"
-                              compact={true}
-                              triggerClassName="input-field py-1 px-2 text-xs flex items-center justify-between w-full"
-                            />
+                              className="input-field py-1.5 px-1 text-xs w-full cursor-pointer bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                            >
+                              {availableUnits.map((u) => (
+                                <option key={u} value={u} className="text-xs py-1">
+                                  {u}
+                                </option>
+                              ))}
+                              <option value="__add__" className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 py-1">
+                                + 단위 추가
+                              </option>
+                            </select>
                             <input
                               type="text"
                               inputMode="decimal"
