@@ -226,6 +226,32 @@ export default function TransactionModal({
   const [itemsScanning, setItemsScanning] = useState(false);
   const itemsScanInputRef = useRef<HTMLInputElement>(null);
 
+  const [availableUnits, setAvailableUnits] = useState<string[]>([
+    "개",
+    "g",
+    "kg",
+    "ml",
+    "L",
+    "lb",
+    "pack",
+    "ea",
+  ]);
+
+  function handleAddCustomUnit(itemIdx: number) {
+    const input = window.prompt(
+      "새로운 단위를 입력하세요 (예: 박스, 봉, 병, 캔, 롤):"
+    );
+    if (!input) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    if (!availableUnits.includes(trimmed)) {
+      setAvailableUnits((prev) => [...prev, trimmed]);
+    }
+    const newItems = [...items];
+    newItems[itemIdx] = { ...newItems[itemIdx], unit: trimmed };
+    setItems(newItems);
+  }
+
   function clearScanQueue() {
     setScanQueue((prev) => {
       prev.forEach((q) => {
@@ -2114,7 +2140,7 @@ export default function TransactionModal({
               className="hidden"
             />
             {!showItems ? (
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -2145,13 +2171,14 @@ export default function TransactionModal({
                       disabled={itemsScanning}
                       onClick={handleReParseItemsFromExisting}
                       className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+                      title="기존 스캔 영수증 사진으로 세부 품목 재추출"
                     >
                       {itemsScanning ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Camera className="h-3.5 w-3.5" />
                       )}
-                      기존 영수증으로 세부 품목 AI 분석
+                      기존 영수증 재분석
                     </button>
                   )}
                   <button
@@ -2159,6 +2186,7 @@ export default function TransactionModal({
                     disabled={itemsScanning}
                     onClick={() => itemsScanInputRef.current?.click()}
                     className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                    title="세부 품목 전용 새 사진 스캔"
                   >
                     {itemsScanning ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2171,8 +2199,8 @@ export default function TransactionModal({
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 shrink-0">
                     {tTx("itemsTitle")}
                   </span>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -2182,6 +2210,7 @@ export default function TransactionModal({
                         disabled={itemsScanning}
                         onClick={handleReParseItemsFromExisting}
                         className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
+                        title="기존 영수증 재분석"
                       >
                         {itemsScanning ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -2196,6 +2225,7 @@ export default function TransactionModal({
                       disabled={itemsScanning}
                       onClick={() => itemsScanInputRef.current?.click()}
                       className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                      title="새 영수증 스캔"
                     >
                       {itemsScanning ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -2234,18 +2264,18 @@ export default function TransactionModal({
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800">
-                  <div className="min-w-0">
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-x-auto">
+                  <div className="min-w-[540px]">
                     <div className={`${ITEM_GRID} bg-gray-50 dark:bg-gray-900/60 px-2 py-1.5 text-[10px] font-semibold text-gray-500`}>
                       <span>{tTx("itemName")}</span>
                       <span>{tTx("itemStandard")}</span>
                       <span className="text-right">{tTx("itemQty")}</span>
-                      <span>{tTx("itemUnit")}</span>
+                      <span className="text-center">{tTx("itemUnit")}</span>
                       <span className="text-right">{tTx("itemUnitPrice")}</span>
                       <span className="text-right">{tTx("itemTotal")}</span>
                       <span />
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                    <div className="max-h-[220px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
                       {items.map((item, itemIdx) => {
                         const updateItem = (
                           field: keyof TransactionItem,
@@ -2254,32 +2284,36 @@ export default function TransactionModal({
                           const newItems = [...items];
                           const updatedItem = {
                             ...newItems[itemIdx],
-                            [field]: val,
                           };
 
-                          if (field === "quantity" || field === "unit_price") {
-                            updatedItem.total_price = Number(
-                              (
-                                Number(updatedItem.quantity) *
-                                Number(updatedItem.unit_price)
-                              ).toFixed(2)
-                            );
+                          if (field === "unit_price") {
+                            const unitP = typeof val === "number" ? val : (parseFloat(String(val)) || 0);
+                            updatedItem.unit_price = unitP;
+                            const qty = Number(updatedItem.quantity) > 0 ? Number(updatedItem.quantity) : 1;
+                            updatedItem.total_price = Number((unitP * qty).toFixed(2));
                           } else if (field === "total_price") {
-                            if (Number(updatedItem.quantity) > 0) {
-                              updatedItem.unit_price = Number(
-                                (
-                                  Number(updatedItem.total_price) /
-                                  Number(updatedItem.quantity)
-                                ).toFixed(4)
-                              );
+                            const totalP = typeof val === "number" ? val : (parseFloat(String(val)) || 0);
+                            updatedItem.total_price = totalP;
+                            const qty = Number(updatedItem.quantity) > 0 ? Number(updatedItem.quantity) : 1;
+                            updatedItem.unit_price = Number((totalP / qty).toFixed(2));
+                          } else if (field === "quantity") {
+                            const qty = typeof val === "number" ? val : (parseFloat(String(val)) || 1);
+                            updatedItem.quantity = qty;
+                            const safeQty = qty > 0 ? qty : 1;
+                            if (Number(updatedItem.unit_price) > 0) {
+                              updatedItem.total_price = Number((Number(updatedItem.unit_price) * safeQty).toFixed(2));
+                            } else if (Number(updatedItem.total_price) > 0) {
+                              updatedItem.unit_price = Number((Number(updatedItem.total_price) / safeQty).toFixed(2));
                             }
+                          } else {
+                            (updatedItem as any)[field] = val;
                           }
 
                           newItems[itemIdx] = updatedItem;
                           setItems(newItems);
 
                           const sumTotal = newItems.reduce(
-                            (acc, it) => acc + it.total_price,
+                            (acc, it) => acc + (it.total_price || 0),
                             0
                           );
                           if (sumTotal > 0) {
@@ -2324,21 +2358,34 @@ export default function TransactionModal({
                               }
                               className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
                             />
-                            <select
-                              value={item.unit || "개"}
-                              onChange={(e) =>
-                                updateItem("unit", e.target.value)
-                              }
-                              className="input-field py-1.5 text-xs"
-                            >
-                              {["개", "g", "kg", "ml", "L", "lb", "pack", "ea"].map(
-                                (u) => (
+                            <div className="flex items-center gap-0.5 min-w-0">
+                              <select
+                                value={item.unit || "개"}
+                                onChange={(e) => {
+                                  if (e.target.value === "__add__") {
+                                    handleAddCustomUnit(itemIdx);
+                                  } else {
+                                    updateItem("unit", e.target.value);
+                                  }
+                                }}
+                                className="input-field py-1.5 px-1 text-xs shrink min-w-0"
+                              >
+                                {availableUnits.map((u) => (
                                   <option key={u} value={u}>
                                     {u}
                                   </option>
-                                )
-                              )}
-                            </select>
+                                ))}
+                                <option value="__add__">+ 단위 추가</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleAddCustomUnit(itemIdx)}
+                                className="p-0.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 shrink-0"
+                                title="단위 추가"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
                             <input
                               type="text"
                               inputMode="decimal"

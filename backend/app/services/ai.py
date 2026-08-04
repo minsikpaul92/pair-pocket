@@ -523,13 +523,14 @@ def _build_single_file_payload(
 def _items_only_prompt() -> str:
     return (
         "You are an expert receipt line-item parser for PairPocket.\n"
-        "Analyze the provided receipt image and extract EVERY single purchased item/dish/product into an array of line items.\n"
+        "Focus EXCLUSIVELY and deeply on extracting EVERY single purchased item, product, dish, or fee listed in the receipt or statement image for this transaction.\n"
+        "Do not miss any items, even if printed in small or faint text.\n"
         "For each line item:\n"
-        "- name: Original item name printed on receipt\n"
+        "- name: Original exact item name printed on receipt\n"
         "- standardized_name: Standardized simple Korean product label (e.g. 수박, 소고기, 우유, 계란, 라면, 아메리카노, 샌드위치) for price tracking\n"
         "- quantity: Quantity purchased (default to 1 if unlisted)\n"
-        "- unit: Unit of measurement (e.g. 개, lb, kg, bag) or null\n"
-        "- unit_price: Unit price (if unlisted, use total_price / quantity)\n"
+        "- unit: Unit of measurement (e.g. 개, lb, kg, bag, pack) or null\n"
+        "- unit_price: Unit price (if unlisted, compute total_price / quantity)\n"
         "- total_price: Line item total price\n"
         "Return a JSON object containing an 'items' array matching the response schema."
     )
