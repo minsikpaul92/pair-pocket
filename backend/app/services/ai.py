@@ -475,8 +475,6 @@ def _receipt_response_schema() -> dict[str, Any]:
                                 },
                                 "required": [
                                     "name",
-                                    "quantity",
-                                    "unit_price",
                                     "total_price",
                                 ],
                             },
@@ -520,6 +518,104 @@ def _build_single_file_payload(
             "responseSchema": _receipt_response_schema(),
         },
     }
+
+
+def _items_only_prompt() -> str:
+    return (
+        "You are an expert receipt line-item parser for PairPocket.\n"
+        "Analyze the provided receipt image and extract EVERY single purchased item/dish/product into an array of line items.\n"
+        "For each line item:\n"
+        "- name: Original item name printed on receipt\n"
+        "- standardized_name: Standardized simple Korean product label (e.g. 수박, 소고기, 우유, 계란, 라면, 아메리카노, 샌드위치) for price tracking\n"
+        "- quantity: Quantity purchased (default to 1 if unlisted)\n"
+        "- unit: Unit of measurement (e.g. 개, lb, kg, bag) or null\n"
+        "- unit_price: Unit price (if unlisted, use total_price / quantity)\n"
+        "- total_price: Line item total price\n"
+        "Return a JSON object containing an 'items' array matching the response schema."
+    )
+
+
+def _items_only_response_schema() -> dict[str, Any]:
+    return {
+        "type": "OBJECT",
+        "properties": {
+            "items": {
+                "type": "ARRAY",
+                "description": "Extracted list of line items from the receipt.",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "name": {"type": "STRING"},
+                        "standardized_name": {"type": "STRING"},
+                        "quantity": {"type": "NUMBER"},
+                        "unit": {"type": "STRING"},
+                        "unit_price": {"type": "NUMBER"},
+                        "total_price": {"type": "NUMBER"},
+                    },
+                    "required": ["name", "total_price"],
+                },
+            }
+        },
+        "required": ["items"],
+    }
+
+
+def _build_single_file_payload_items(
+    file_bytes: bytes, mime_type: str
+) -> dict[str, Any]:
+    base64_data = base64.b64encode(file_bytes).decode("utf-8")
+    return {
+        "contents": [
+            {
+                "parts": [
+                    {"text": _items_only_prompt()},
+                    {
+                        "inlineData": {
+                            "mimeType": mime_type,
+                            "data": base64_data,
+                        }
+                    },
+                ]
+            }
+        ],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": _items_only_response_schema(),
+        },
+    }
+
+
+async def parse_receipt_items(
+    db: AsyncIOMotorDatabase,
+    owner_id: str,
+    file_bytes: bytes,
+    mime_type: str,
+    file_name: str = "file",
+) -> list[dict[str, Any]]:
+    payload = _build_single_file_payload_items(file_bytes, mime_type)
+    api_key = await _get_user_gemini_key(db, owner_id)
+    async for event in generate_content_with_routing(db, owner_id, api_key, payload):
+        if event["event"] == "success":
+            res = event.get("result") or {}
+            raw_items = res.get("items", [])
+            cleaned = []
+            for it in raw_items:
+                name = str(it.get("name", "")).strip() if it.get("name") else ""
+                if not name:
+                    continue
+                tot = float(it.get("total_price") or 0)
+                qty = float(it.get("quantity") or 1)
+                u_price = float(it.get("unit_price") or (tot / qty if qty > 0 else tot))
+                cleaned.append({
+                    "name": name,
+                    "standardized_name": str(it.get("standardized_name") or name),
+                    "quantity": qty,
+                    "unit": it.get("unit") or None,
+                    "unit_price": u_price,
+                    "total_price": tot,
+                })
+            return cleaned
+    return []
 
 
 async def _generate_with_single_key(

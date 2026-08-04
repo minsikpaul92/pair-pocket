@@ -291,7 +291,7 @@ export default function AppShell({ user, onLogout }: Props) {
       if (flat.length > 0) {
         const parsed = flat[0];
         setParsedData(parsed);
-        const txDate = parsed.date ? new Date(parsed.date) : new Date();
+        const txDate = parseDate(parsed.date);
         setModalDate(txDate);
         setModalCurrency(parsed.currency || "CAD");
         setScanQueueOpen(false);

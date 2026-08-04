@@ -197,6 +197,7 @@
     "itemTotal": "합계",
     "itemNamePlaceholder": "예: 수박",
     "itemStandardPlaceholder": "표준명",
+    "itemsScanAi": "영수증으로 세부 품목 AI 분석",
     "subtotalLabel": "공급가액 (Subtotal)",
     "taxLabel": "세금 (HST 13%)",
     "totalLabel": "총 결제액 (Total)",
