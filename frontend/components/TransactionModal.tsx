@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Loader2, SkipForward, Trash2, X, Plus } from "lucide-react";
+import { Camera, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -207,6 +207,17 @@ export default function TransactionModal({
   const [showItems, setShowItems] = useState(false);
   const [subtotal, setSubtotal] = useState("");
   const [taxAmount, setTaxAmount] = useState("");
+  type QueuedScanImage = {
+    id: string;
+    file: File;
+    previewUrl: string;
+  };
+
+  const MAX_IMAGES = 15;
+  const [scanQueue, setScanQueue] = useState<QueuedScanImage[]>([]);
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
+  const [dragOverModal, setDragOverModal] = useState(false);
+  const dragDepthRef = useRef(0);
   const [tipPercent, setTipPercent] = useState("");
   const [tipAmount, setTipAmount] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -215,12 +226,97 @@ export default function TransactionModal({
   const [itemsScanning, setItemsScanning] = useState(false);
   const itemsScanInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleItemsScan(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  function clearScanQueue() {
+    setScanQueue((prev) => {
+      prev.forEach((q) => {
+        if (q.previewUrl) URL.revokeObjectURL(q.previewUrl);
+      });
+      return [];
+    });
+  }
+
+  function addScanQueueFiles(fileList: FileList | File[] | null) {
+    if (!fileList) return;
+    setError(null);
+    const list = Array.from(fileList as FileList | File[]);
+    const valid = list.filter(
+      (f) => f.type.startsWith("image/") || f.type === "application/pdf"
+    );
+    if (!valid.length) {
+      setError("지원되는 이미지 또는 PDF 파일을 선택하세요.");
+      return;
+    }
+
+    setScanQueue((prev) => {
+      const room = MAX_IMAGES - prev.length;
+      if (room <= 0) {
+        setError(`최대 ${MAX_IMAGES}장까지 채울 수 있습니다.`);
+        return prev;
+      }
+      const accepted = valid.slice(0, room);
+      if (valid.length > room) {
+        setError(`최대 ${MAX_IMAGES}장까지 채울 수 있습니다.`);
+      }
+      const next = accepted.map((file) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        previewUrl: file.type.startsWith("image/")
+          ? URL.createObjectURL(file)
+          : "",
+      }));
+      return [...prev, ...next];
+    });
+
+    if (scanInputRef.current) scanInputRef.current.value = "";
+  }
+
+  function removeQueuedScan(id: string) {
+    setScanQueue((prev) => {
+      const target = prev.find((q) => q.id === id);
+      if (target && target.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((q) => q.id !== id);
+    });
+    setError(null);
+  }
+
+  async function startBatchModalScan() {
+    if (scanning || scanQueue.length === 0) return;
+    setScanning(true);
+    setScanHint(null);
+    setError(null);
+    const files = scanQueue.map((q) => q.file);
+    try {
+      const results = await parseReceiptsOrStatements(files, { flowType: type });
+      const flat: ParsedTransaction[] = [];
+      for (const r of results as Array<ParsedTransaction & { transactions?: ParsedTransaction[] }>) {
+        if (Array.isArray((r as { transactions?: ParsedTransaction[] }).transactions)) {
+          for (const tx of (r as { transactions: ParsedTransaction[] }).transactions) {
+            flat.push({ ...tx, file_name: r.file_name, items: tx.items || [] });
+          }
+        } else if (r?.date != null) {
+          flat.push(r);
+        }
+      }
+      const parsed = flat[0];
+      if (!parsed) {
+        setError(tTx("scanEmpty"));
+        return;
+      }
+      setScannedFile(files[0] || null);
+      applyParsedTransaction(parsed);
+      setScanHint(tTx("scanFilled"));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : tTx("scanFailed"));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function handleItemsScan(file: File) {
     setItemsScanning(true);
     setError(null);
     try {
+      setScannedFile(file);
       const extracted = await parseReceiptItems(file);
       if (extracted && extracted.length > 0) {
         setItems(extracted);
@@ -233,6 +329,25 @@ export default function TransactionModal({
     } finally {
       setItemsScanning(false);
       if (itemsScanInputRef.current) itemsScanInputRef.current.value = "";
+    }
+  }
+
+  async function handleReParseItemsFromExisting() {
+    if (!scannedFile) return;
+    setItemsScanning(true);
+    setError(null);
+    try {
+      const extracted = await parseReceiptItems(scannedFile);
+      if (extracted && extracted.length > 0) {
+        setItems(extracted);
+        setShowItems(true);
+      } else {
+        setError("기존 영수증 사진에서 세부 품목을 인식하지 못했습니다.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "세부 품목 분석 중 오류가 발생했습니다.");
+    } finally {
+      setItemsScanning(false);
     }
   }
 
@@ -1711,35 +1826,140 @@ export default function TransactionModal({
           </div>
 
           {!isEditing && (
-            <div className="space-y-1.5">
+            <div
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current += 1;
+                setDragOverModal(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                if (dragDepthRef.current === 0) setDragOverModal(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current = 0;
+                setDragOverModal(false);
+                addScanQueueFiles(e.dataTransfer.files);
+              }}
+              className={`relative rounded-2xl border-2 border-dashed p-3 space-y-2.5 transition-all duration-150 ${
+                dragOverModal
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500/30 scale-[1.01]"
+                  : "border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/20"
+              }`}
+            >
+              {dragOverModal && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-blue-500/10 dark:bg-blue-400/10">
+                  <span className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
+                    영수증/명세서 이미지를 여기에 놓으세요
+                  </span>
+                </div>
+              )}
+
               <input
                 ref={scanInputRef}
                 type="file"
                 accept="image/*,application/pdf"
+                multiple
                 className="hidden"
-                onChange={handleModalScan}
+                onChange={(e) => addScanQueueFiles(e.target.files)}
               />
-              <button
-                type="button"
-                disabled={scanning || submitting}
-                onClick={() => scanInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-violet-300 dark:border-violet-700 bg-violet-50/60 dark:bg-violet-950/20 hover:bg-violet-50 dark:hover:bg-violet-950/40 text-violet-700 dark:text-violet-300 text-sm font-semibold py-2.5 transition-colors disabled:opacity-60"
-              >
-                {scanning ? (
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                ) : (
-                  <Camera className="h-4 w-4 shrink-0" />
-                )}
-                <span className="truncate">
-                  {scanning
-                    ? tTx("scanning")
-                    : type === "income"
-                      ? tTx("scanIncome")
-                      : tTx("scanExpense")}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Camera className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                    스크린샷 / 영수증으로 채우기
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                  {scanQueue.length} / {MAX_IMAGES}장
                 </span>
-              </button>
+              </div>
+
+              {scanQueue.length === 0 ? (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                  사진이나 PDF 명세서를 이곳으로 드래그하거나 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 15장)
+                </p>
+              ) : (
+                <ul className="grid grid-cols-5 gap-1.5 pt-1">
+                  {scanQueue.map((q) => (
+                    <li key={q.id} className="relative aspect-square">
+                      {q.previewUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={q.previewUrl}
+                          alt=""
+                          className="h-full w-full rounded-lg object-cover border border-purple-200 dark:border-purple-800"
+                        />
+                      ) : (
+                        <div className="h-full w-full rounded-lg bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                          PDF
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        disabled={scanning}
+                        onClick={() => removeQueuedScan(q.id)}
+                        className="absolute -top-1 -right-1 rounded-full bg-gray-900/80 text-white p-0.5 disabled:opacity-50"
+                        aria-label="삭제"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={scanning || scanQueue.length >= MAX_IMAGES}
+                  onClick={() => scanInputRef.current?.click()}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold py-2 transition-colors disabled:opacity-50"
+                >
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  사진 추가
+                </button>
+
+                <button
+                  type="button"
+                  disabled={scanning || scanQueue.length === 0}
+                  onClick={() => void startBatchModalScan()}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2 transition-colors disabled:opacity-50"
+                >
+                  {scanning ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                  {scanning ? tTx("scanning") : "분석 시작"}
+                </button>
+              </div>
+
+              {scanQueue.length > 0 && !scanning && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={clearScanQueue}
+                    className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-500"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    초기화
+                  </button>
+                </div>
+              )}
+
               {scanHint && (
-                <p className="text-xs text-violet-600 dark:text-violet-400">
+                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
                   {scanHint}
                 </p>
               )}
@@ -1887,11 +2107,14 @@ export default function TransactionModal({
               ref={itemsScanInputRef}
               type="file"
               accept="image/*,application/pdf"
-              onChange={handleItemsScan}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleItemsScan(f);
+              }}
               className="hidden"
             />
             {!showItems ? (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -1909,29 +2132,42 @@ export default function TransactionModal({
                       ]);
                     }
                   }}
-                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
+                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold shrink-0"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {tTx("itemsAdd")}
                 </button>
-                <button
-                  type="button"
-                  disabled={itemsScanning}
-                  onClick={() => itemsScanInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-                >
-                  {itemsScanning ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      AI 분석 중…
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="h-3.5 w-3.5" />
-                      {tTx("itemsScanAi")}
-                    </>
+
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  {scannedFile && (
+                    <button
+                      type="button"
+                      disabled={itemsScanning}
+                      onClick={handleReParseItemsFromExisting}
+                      className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+                    >
+                      {itemsScanning ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Camera className="h-3.5 w-3.5" />
+                      )}
+                      기존 영수증으로 세부 품목 AI 분석
+                    </button>
                   )}
-                </button>
+                  <button
+                    type="button"
+                    disabled={itemsScanning}
+                    onClick={() => itemsScanInputRef.current?.click()}
+                    className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                  >
+                    {itemsScanning ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ImagePlus className="h-3.5 w-3.5" />
+                    )}
+                    {scannedFile ? "새 영수증 사진 선택" : tTx("itemsScanAi")}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1939,7 +2175,22 @@ export default function TransactionModal({
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
                     {tTx("itemsTitle")}
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {scannedFile && (
+                      <button
+                        type="button"
+                        disabled={itemsScanning}
+                        onClick={handleReParseItemsFromExisting}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
+                      >
+                        {itemsScanning ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Camera className="h-3 w-3" />
+                        )}
+                        기존 영수증 재분석
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={itemsScanning}
@@ -1949,9 +2200,9 @@ export default function TransactionModal({
                       {itemsScanning ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <Camera className="h-3 w-3" />
+                        <ImagePlus className="h-3 w-3" />
                       )}
-                      {tTx("itemsScanAi")}
+                      {scannedFile ? "새 사진 선택" : tTx("itemsScanAi")}
                     </button>
                     <button
                       type="button"
