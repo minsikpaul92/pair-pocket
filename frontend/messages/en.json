@@ -197,6 +197,7 @@
     "itemTotal": "Total",
     "itemNamePlaceholder": "e.g. watermelon",
     "itemStandardPlaceholder": "Standard name",
+    "itemsScanAi": "Extract sub-items from receipt with AI",
     "subtotalLabel": "Subtotal",
     "taxLabel": "Tax (HST 13%)",
     "totalLabel": "Total",

@@ -15,6 +15,7 @@ from app.services.ai import (
     parse_onboarding_screenshots,
     parse_onboarding_screenshots_stream,
     parse_receipt_or_statement_stream,
+    parse_receipt_items,
 )
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -66,6 +67,24 @@ async def parse_receipts_or_statements(
         "results": results,
         "errors": errors if errors else None
     }
+
+@router.post("/parse-items")
+async def parse_items_endpoint(
+    file: UploadFile = File(...),
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    content_type = file.content_type or "image/jpeg"
+    if not (content_type.startswith("image/") or content_type == "application/pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"지원하지 않는 파일 형식입니다: {content_type}"
+        )
+    content = await file.read()
+    items = await parse_receipt_items(
+        db, current_user.id, content, content_type, file.filename or "file"
+    )
+    return {"status": "success", "items": items}
 
 @router.post("/parse-stream")
 async def parse_receipts_or_statements_stream(

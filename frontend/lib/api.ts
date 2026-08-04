@@ -1728,6 +1728,24 @@ export async function parseReceiptsOrStatements(
   return data.results as ParsedTransaction[];
 }
 
+export async function parseReceiptItems(
+  file: File
+): Promise<TransactionItem[]> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE_URL}/api/ai/parse-items`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Line items extraction failed");
+  }
+  const data = await res.json();
+  return (data.items || []) as TransactionItem[];
+}
+
 export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {
   const res = await fetch(`${API_BASE_URL}/api/settings/ai`, {
     method: "POST",

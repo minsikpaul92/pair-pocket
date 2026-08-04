@@ -66,6 +66,7 @@ import {
   ParsedTransaction,
   TransactionItem,
   parseReceiptsOrStatements,
+  parseReceiptItems,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, parseDate } from "@/lib/date";
@@ -211,6 +212,29 @@ export default function TransactionModal({
   const [scanning, setScanning] = useState(false);
   const [scanHint, setScanHint] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const [itemsScanning, setItemsScanning] = useState(false);
+  const itemsScanInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleItemsScan(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setItemsScanning(true);
+    setError(null);
+    try {
+      const extracted = await parseReceiptItems(file);
+      if (extracted && extracted.length > 0) {
+        setItems(extracted);
+        setShowItems(true);
+      } else {
+        setError("세부 품목을 인식하지 못했습니다.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "세부 품목 분석 중 오류가 발생했습니다.");
+    } finally {
+      setItemsScanning(false);
+      if (itemsScanInputRef.current) itemsScanInputRef.current.value = "";
+    }
+  }
 
   const dateStr = dayKey(defaultDate);
 
@@ -1029,7 +1053,7 @@ export default function TransactionModal({
       ticker: isStock ? finalTicker.toUpperCase() : undefined,
       shares: isStock ? parseFloat(shares) : undefined,
       price: isStock ? parseFloat(price) : undefined,
-      items: showItems ? items : undefined,
+      items: items && items.length > 0 ? items : undefined,
       subtotal: showTax && subtotal ? parseAmountInput(subtotal) || null : null,
       tax_amount: showTax && taxAmount ? parseAmountInput(taxAmount) || null : null,
       tip_percent: showTip && tipPercent
@@ -1859,36 +1883,76 @@ export default function TransactionModal({
 
           {/* Sub-items (소분류 세부항목) Expandable Section */}
           <div className="border-t border-gray-100 dark:border-gray-800/80 pt-4 mt-2">
+            <input
+              ref={itemsScanInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={handleItemsScan}
+              className="hidden"
+            />
             {!showItems ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowItems(true);
-                  if (items.length === 0) {
-                    setItems([
-                      {
-                        name: "",
-                        standardized_name: "",
-                        quantity: 1,
-                        unit: "개",
-                        unit_price: 0,
-                        total_price: 0,
-                      },
-                    ]);
-                  }
-                }}
-                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {tTx("itemsAdd")}
-              </button>
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowItems(true);
+                    if (items.length === 0) {
+                      setItems([
+                        {
+                          name: "",
+                          standardized_name: "",
+                          quantity: 1,
+                          unit: "개",
+                          unit_price: 0,
+                          total_price: 0,
+                        },
+                      ]);
+                    }
+                  }}
+                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {tTx("itemsAdd")}
+                </button>
+                <button
+                  type="button"
+                  disabled={itemsScanning}
+                  onClick={() => itemsScanInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                >
+                  {itemsScanning ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      AI 분석 중…
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="h-3.5 w-3.5" />
+                      {tTx("itemsScanAi")}
+                    </>
+                  )}
+                </button>
+              </div>
             ) : (
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
                     {tTx("itemsTitle")}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={itemsScanning}
+                      onClick={() => itemsScanInputRef.current?.click()}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      {itemsScanning ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Camera className="h-3 w-3" />
+                      )}
+                      {tTx("itemsScanAi")}
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
