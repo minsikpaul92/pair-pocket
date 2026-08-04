@@ -2374,6 +2374,8 @@ export default function TransactionModal({
                               }}
                               placeholder="단위"
                               addLabel="단위 추가"
+                              dropPosition="top"
+                              compact={true}
                               triggerClassName="input-field py-1 px-2 text-xs flex items-center justify-between w-full"
                             />
                             <input
