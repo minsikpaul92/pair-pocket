@@ -89,7 +89,7 @@ export default function AddableSelect({
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-full max-h-72 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10">
+        <div className="absolute z-30 mt-2 w-full min-w-[120px] max-h-72 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10">
           <ul className="py-1">
             {options.map((opt) => (
               <li key={opt}>
