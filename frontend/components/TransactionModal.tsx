@@ -1,11 +1,12 @@
 "use client";
 
-import { Camera, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play } from "lucide-react";
+import { Camera, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
+import AddableSelect from "@/components/AddableSelect";
 import CategorySelect from "@/components/CategorySelect";
 import DayPicker from "@/components/DayPicker";
 import InstitutionSelect from "@/components/InstitutionSelect";
@@ -1212,6 +1213,8 @@ export default function TransactionModal({
       } else {
         await createTransaction(payload);
       }
+      clearScanQueue();
+      setScannedFile(null);
       onSaved();
     } catch (err) {
       setError(
@@ -2140,7 +2143,7 @@ export default function TransactionModal({
               className="hidden"
             />
             {!showItems ? (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -2164,75 +2167,77 @@ export default function TransactionModal({
                   {tTx("itemsAdd")}
                 </button>
 
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  {scannedFile && (
-                    <button
-                      type="button"
-                      disabled={itemsScanning}
-                      onClick={handleReParseItemsFromExisting}
-                      className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
-                      title="기존 스캔 영수증 사진으로 세부 품목 재추출"
-                    >
-                      {itemsScanning ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Camera className="h-3.5 w-3.5" />
-                      )}
-                      기존 영수증 재분석
-                    </button>
-                  )}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    disabled={!scannedFile || itemsScanning}
+                    onClick={handleReParseItemsFromExisting}
+                    title="기존 사진 재분석"
+                    className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent transition-colors"
+                  >
+                    {itemsScanning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCw className="h-4 w-4" />
+                    )}
+                  </button>
                   <button
                     type="button"
                     disabled={itemsScanning}
                     onClick={() => itemsScanInputRef.current?.click()}
-                    className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-                    title="세부 품목 전용 새 사진 스캔"
+                    title="영수증 촬영"
+                    className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
                   >
-                    {itemsScanning ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <ImagePlus className="h-3.5 w-3.5" />
-                    )}
-                    {scannedFile ? "새 영수증 사진 선택" : tTx("itemsScanAi")}
+                    <Camera className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={itemsScanning}
+                    onClick={() => itemsScanInputRef.current?.click()}
+                    title="사진 선택"
+                    className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                  >
+                    <ImagePlus className="h-4 w-4" />
                   </button>
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div className="flex justify-between items-center gap-2">
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-300 shrink-0">
                     {tTx("itemsTitle")}
                   </span>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {scannedFile && (
-                      <button
-                        type="button"
-                        disabled={itemsScanning}
-                        onClick={handleReParseItemsFromExisting}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
-                        title="기존 영수증 재분석"
-                      >
-                        {itemsScanning ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Camera className="h-3 w-3" />
-                        )}
-                        기존 영수증 재분석
-                      </button>
-                    )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      disabled={!scannedFile || itemsScanning}
+                      onClick={handleReParseItemsFromExisting}
+                      title="기존 사진 재분석"
+                      className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent transition-colors"
+                    >
+                      {itemsScanning ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCw className="h-4 w-4" />
+                      )}
+                    </button>
                     <button
                       type="button"
                       disabled={itemsScanning}
                       onClick={() => itemsScanInputRef.current?.click()}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-                      title="새 영수증 스캔"
+                      title="영수증 촬영"
+                      className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
                     >
-                      {itemsScanning ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <ImagePlus className="h-3 w-3" />
-                      )}
-                      {scannedFile ? "새 사진 선택" : tTx("itemsScanAi")}
+                      <Camera className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={itemsScanning}
+                      onClick={() => itemsScanInputRef.current?.click()}
+                      title="사진 선택"
+                      className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                    >
+                      <ImagePlus className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
@@ -2249,15 +2254,15 @@ export default function TransactionModal({
                           },
                         ]);
                       }}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-0.5"
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-0.5 ml-1"
                     >
-                      <Plus className="h-3 w-3" />
+                      <Plus className="h-3.5 w-3.5" />
                       {tCommon("add")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowItems(false)}
-                      className="text-xs text-gray-500 hover:text-gray-700 font-semibold"
+                      className="text-xs text-gray-500 hover:text-gray-700 font-semibold ml-1"
                     >
                       {tTx("itemsHide")}
                     </button>
@@ -2358,34 +2363,19 @@ export default function TransactionModal({
                               }
                               className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
                             />
-                            <div className="flex items-center gap-0.5 min-w-0">
-                              <select
-                                value={item.unit || "개"}
-                                onChange={(e) => {
-                                  if (e.target.value === "__add__") {
-                                    handleAddCustomUnit(itemIdx);
-                                  } else {
-                                    updateItem("unit", e.target.value);
-                                  }
-                                }}
-                                className="input-field py-1.5 px-1 text-xs shrink min-w-0"
-                              >
-                                {availableUnits.map((u) => (
-                                  <option key={u} value={u}>
-                                    {u}
-                                  </option>
-                                ))}
-                                <option value="__add__">+ 단위 추가</option>
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => handleAddCustomUnit(itemIdx)}
-                                className="p-0.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 shrink-0"
-                                title="단위 추가"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            </div>
+                            <AddableSelect
+                              options={availableUnits}
+                              value={item.unit || "개"}
+                              onChange={(val) => updateItem("unit", val)}
+                              onAdd={async (name) => {
+                                if (!availableUnits.includes(name)) {
+                                  setAvailableUnits((prev) => [...prev, name]);
+                                }
+                              }}
+                              placeholder="단위"
+                              addLabel="단위 추가"
+                              triggerClassName="input-field py-1 px-2 text-xs flex items-center justify-between w-full"
+                            />
                             <input
                               type="text"
                               inputMode="decimal"
