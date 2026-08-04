@@ -13,11 +13,33 @@ export function dayKey(date: Date): string {
 
 export function parseDate(iso: string | Date | null | undefined): Date {
   if (!iso) return new Date();
-  if (iso instanceof Date) return iso;
-  const str = String(iso);
+  if (iso instanceof Date) return isNaN(iso.getTime()) ? new Date() : iso;
+  const str = String(iso).trim();
+  if (!str || str === "null" || str === "undefined") return new Date();
+
+  // Extract YYYY-MM-DD component to construct Date in local timezone without UTC shift
+  const dateMatch = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (dateMatch) {
+    const y = parseInt(dateMatch[1], 10);
+    const m = parseInt(dateMatch[2], 10) - 1;
+    const d = parseInt(dateMatch[3], 10);
+
+    const timeMatch = str.match(/T(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+    if (timeMatch) {
+      const hh = parseInt(timeMatch[1], 10);
+      const mm = parseInt(timeMatch[2], 10);
+      const ss = parseInt(timeMatch[3] || "0", 10);
+      const localWithTime = new Date(y, m, d, hh, mm, ss);
+      return isNaN(localWithTime.getTime()) ? new Date() : localWithTime;
+    }
+
+    const localDate = new Date(y, m, d);
+    return isNaN(localDate.getTime()) ? new Date() : localDate;
+  }
+
   const normalized = str.includes(" ") && !str.includes("T") ? str.replace(" ", "T") : str;
-  const d = new Date(normalized);
-  return isNaN(d.getTime()) ? new Date() : d;
+  const parsed = new Date(normalized);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
 export function isoDayKey(iso: string): string {
