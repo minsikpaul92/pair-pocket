@@ -77,7 +77,7 @@ const TIP_SUB_CATEGORIES = new Set(["외식/배달", "카페/간식"]);
 const NO_SPIN =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 const ITEM_GRID =
-  "grid grid-cols-[minmax(6rem,2fr)_minmax(5rem,1.5fr)_minmax(3rem,0.75fr)_minmax(4.5rem,1.1fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_2rem] gap-1.5 min-w-[540px]";
+  "grid grid-cols-[minmax(6rem,2fr)_minmax(5rem,1.5fr)_minmax(3.5rem,0.75fr)_minmax(3rem,0.65fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_2rem] gap-2";
 
 interface Props {
   currency: Currency;
@@ -2234,7 +2234,7 @@ export default function TransactionModal({
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-x-auto">
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800">
                   <div className="min-w-0">
                     <div className={`${ITEM_GRID} bg-gray-50 dark:bg-gray-900/60 px-2 py-1.5 text-[10px] font-semibold text-gray-500`}>
                       <span>{tTx("itemName")}</span>
@@ -2329,7 +2329,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("unit", e.target.value)
                               }
-                              className="input-field py-1.5 pl-1.5 pr-4 text-xs font-medium"
+                              className="input-field py-1.5 text-xs"
                             >
                               {["개", "g", "kg", "ml", "L", "lb", "pack", "ea"].map(
                                 (u) => (
