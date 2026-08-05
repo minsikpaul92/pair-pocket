@@ -622,7 +622,7 @@ export default function SubscriptionRegisterModal({
                 {[
                   { rule: "monthly", label: "매월" },
                   { rule: "yearly", label: "매년" },
-                  { rule: "every_x_days", label: "X일 마다" },
+                  { rule: "every_x_days", label: "N일 마다" },
                 ].map((r) => {
                   const active = recurrenceRule === r.rule;
                   return (
@@ -630,8 +630,18 @@ export default function SubscriptionRegisterModal({
                       key={r.rule}
                       type="button"
                       onClick={() => {
-                        setRecurrenceRule(r.rule as any);
-                        setCycle(r.rule as any);
+                        const nextRule = r.rule as any;
+                        setRecurrenceRule(nextRule);
+                        setCycle(nextRule);
+                        if (nextRule === "yearly") {
+                          const dObj = parseDate(startDate);
+                          const nextYear = new Date(
+                            dObj.getFullYear() + 1,
+                            dObj.getMonth(),
+                            dObj.getDate()
+                          );
+                          setNextDueDate(dayKey(nextYear));
+                        }
                       }}
                       className={`rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold transition-all border ${
                         active
@@ -710,46 +720,10 @@ export default function SubscriptionRegisterModal({
             </>
           ) : (
             <>
-              {recurrenceRule === "monthly" && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                    매월 결제일 지정
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {[1, 5, 10, 15, 20, 25, 30, 31].map((day) => {
-                      const isSelected = dayOfMonth === day;
-                      return (
-                        <button
-                          key={day}
-                          type="button"
-                          onClick={() => {
-                            setDayOfMonth(day);
-                            const now = parseDate(nextDueDate);
-                            const y = now.getFullYear();
-                            const m = now.getMonth();
-                            const lastDay = new Date(y, m + 1, 0).getDate();
-                            const targetD = Math.min(day, lastDay);
-                            const targetDate = new Date(y, m, targetD);
-                            setNextDueDate(dayKey(targetDate));
-                          }}
-                          className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                            isSelected
-                              ? "bg-blue-600 text-white font-bold"
-                              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
-                          }`}
-                        >
-                          {day === 31 ? "말일" : `${day}일`}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               {recurrenceRule === "every_x_days" && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                    결제 간격 (며칠 마다)
+                    결제/이체 주기 간격 (며칠 마다)
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -760,21 +734,26 @@ export default function SubscriptionRegisterModal({
                       placeholder="7"
                       className="input-field max-w-[120px]"
                     />
-                    <span className="text-xs font-medium text-gray-500">일 마다 자동 결제/이체</span>
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                      일 마다 자동 반복
+                    </span>
                   </div>
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    설정한 일수마다 자동으로 결제 및 계좌 이체가 반복됩니다 (예: 7일 = 매주, 14일 = 격주)
+                  </p>
                   <div className="flex gap-1.5 mt-2">
                     {[
                       { days: "7", label: "매주 (7일)" },
                       { days: "14", label: "격주 (14일)" },
-                      { days: "30", label: "30일" },
+                      { days: "30", label: "30일 마다" },
                     ].map((preset) => (
                       <button
                         key={preset.days}
                         type="button"
                         onClick={() => setIntervalDays(preset.days)}
-                        className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                        className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                           intervalDays === preset.days
-                            ? "bg-blue-500 text-white font-bold"
+                            ? "bg-blue-600 text-white font-bold"
                             : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200"
                         }`}
                       >
@@ -888,7 +867,14 @@ export default function SubscriptionRegisterModal({
                 onChange={(d) => {
                   const val = dayKey(d);
                   setStartDate(val);
-                  if (!isEditing && val > nextDueDate) {
+                  if (recurrenceRule === "yearly") {
+                    const nextYear = new Date(
+                      d.getFullYear() + 1,
+                      d.getMonth(),
+                      d.getDate()
+                    );
+                    setNextDueDate(dayKey(nextYear));
+                  } else if (!isEditing && val > nextDueDate) {
                     setNextDueDate(val);
                   }
                 }}
