@@ -800,6 +800,8 @@ export interface SubscriptionOccurrence {
 export const BILLING_CYCLE_LABEL: Record<BillingCycle, string> = {
   monthly: "매월",
   yearly: "매년",
+  weekly: "매주",
+  biweekly: "격주",
   installment: "할부",
 };
 
