@@ -147,30 +147,35 @@ function PieExpenseTooltip({
 
   const amountText = formatAmount(slice.amount, displayCurrency);
   const totalText = formatAmount(totalExpense, displayCurrency);
-  const percentText = slice.percent.toFixed(0);
+  const percentText = slice.percent.toFixed(1);
   const swatch =
     typeof payload[0]?.color === "string" ? payload[0].color : slice.color;
 
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 shadow-lg min-w-[11rem]">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700/80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md px-3.5 py-3 shadow-xl min-w-[13rem] transition-all">
       <div className="flex items-center gap-2 min-w-0">
         <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white dark:ring-gray-800"
           style={{ backgroundColor: swatch }}
         />
-        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
           {slice.name}
         </p>
       </div>
-      <p className="mt-1.5 text-sm font-bold tabular-nums text-gray-900 dark:text-white">
-        {amountText}
-      </p>
-      <p className="mt-0.5 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+      <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-gray-100 dark:border-gray-800 pt-2">
+        <span className="text-base font-black tabular-nums text-indigo-600 dark:text-indigo-400">
+          {amountText}
+        </span>
+        <span className="text-xs font-bold text-gray-600 dark:text-gray-300">
+          {percentText}%
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
         {ofTotalLabel(amountText, totalText)}
       </p>
-      <p className="mt-0.5 text-[11px] font-medium text-gray-600 dark:text-gray-300">
-        {shareLabel(percentText)}
-      </p>
+      <div className="mt-2 text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 flex items-center gap-1">
+        <span>🖱️ 클릭 시 목록 필터로 이동</span>
+      </div>
     </div>
   );
 }
@@ -184,6 +189,7 @@ interface Props {
   rate: ExchangeRate | null;
   cadStats: StatsSummary | null;
   krwStats: StatsSummary | null;
+  onCategoryClick?: (category: string) => void;
 }
 
 function convertAmount(
@@ -331,6 +337,7 @@ export default function DashboardAnalytics({
   rate,
   cadStats,
   krwStats,
+  onCategoryClick,
 }: Props) {
   const locale = useLocale();
   const t = useTranslations("dashboard");
@@ -447,8 +454,9 @@ export default function DashboardAnalytics({
     setTrendLoading(true);
 
     const months: string[] = [];
-    for (let i = trendRange - 1; i >= 0; i -= 1) {
-      months.push(monthKey(addMonths(month, -i)));
+    const offset = Math.floor(trendRange / 2);
+    for (let i = -offset; i < trendRange - offset; i += 1) {
+      months.push(monthKey(addMonths(month, i)));
     }
 
     async function loadMonth(monthStr: string): Promise<TrendPoint> {
@@ -567,7 +575,16 @@ export default function DashboardAnalytics({
           </p>
         ) : (
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-            <div className="h-56 w-full">
+            <div className="relative h-56 w-full flex items-center justify-center">
+              {/* Centered Total Summary */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
+                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                  총 지출
+                </span>
+                <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums mt-0.5">
+                  {formatAmount(pieTotalExpense, displayCurrency)}
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -576,11 +593,18 @@ export default function DashboardAnalytics({
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    innerRadius={48}
+                    innerRadius={52}
                     outerRadius={78}
-                    paddingAngle={2}
+                    paddingAngle={4}
+                    cornerRadius={4}
                     stroke="none"
                     labelLine={false}
+                    onClick={(entry) => {
+                      if (entry?.category && onCategoryClick) {
+                        onCategoryClick(entry.category);
+                      }
+                    }}
+                    cursor="pointer"
                     label={(props: {
                       cx: number;
                       cy: number;
@@ -708,9 +732,14 @@ export default function DashboardAnalytics({
                         </>
                       )}
 
-                      <span className="truncate text-sm text-gray-700 dark:text-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => onCategoryClick?.(row.category)}
+                        className="truncate text-sm text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium text-left transition-colors cursor-pointer"
+                        title={`${row.name} 지출 목록으로 이동`}
+                      >
                         {row.name}
-                      </span>
+                      </button>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-sm font-medium tabular-nums text-gray-900 dark:text-white">

@@ -177,6 +177,9 @@ export default function AppShell({ user, onLogout }: Props) {
   );
   const [subscriptionCancelAction, setSubscriptionCancelAction] =
     useState(false);
+  const [listCategoryFilter, setListCategoryFilter] = useState<string | undefined>(
+    undefined
+  );
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingOccurrences, setPendingOccurrences] = useState<
     SubscriptionOccurrence[]
@@ -839,6 +842,7 @@ export default function AppShell({ user, onLogout }: Props) {
               onAddTransaction={() => openModal(new Date())}
               onDeleted={bumpVersion}
               onPendingClick={openSubscriptionFromPending}
+              initialCategoryFilter={listCategoryFilter}
             />
           ) : view === "subscriptions" ? (
             <SubscriptionsView
@@ -885,6 +889,10 @@ export default function AppShell({ user, onLogout }: Props) {
               scope={scope}
               accountType={accountType}
               onChanged={bumpVersion}
+              onNavigateToList={(cat) => {
+                setListCategoryFilter(cat);
+                setView("list");
+              }}
             />
           )}
         </main>

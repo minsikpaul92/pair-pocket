@@ -38,6 +38,7 @@ interface Props {
   onAddTransaction?: () => void;
   onDeleted?: () => void;
   onPendingClick?: (occ: SubscriptionOccurrence) => void;
+  initialCategoryFilter?: string;
 }
 
 export type UnifiedListItem =
@@ -100,6 +101,7 @@ export default function ListView({
   onAddTransaction,
   onDeleted,
   onPendingClick,
+  initialCategoryFilter,
 }: Props) {
   const locale = useLocale();
   const tList = useTranslations("list");
@@ -111,7 +113,15 @@ export default function ListView({
   const tSub = useTranslations("subscriptions");
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>(
+    initialCategoryFilter || "all"
+  );
+
+  useEffect(() => {
+    if (initialCategoryFilter) {
+      setCategoryFilter(initialCategoryFilter);
+    }
+  }, [initialCategoryFilter]);
   const [subCategoryFilter, setSubCategoryFilter] = useState<string>("all");
   const [merchantQuery, setMerchantQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");

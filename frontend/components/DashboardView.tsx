@@ -47,6 +47,7 @@ interface Props {
   scope: LedgerScope;
   accountType?: AccountType;
   onChanged?: () => void;
+  onNavigateToList?: (category?: string) => void;
 }
 
 function KindIcon({ kind }: { kind: FinancialAccountKind }) {
@@ -65,6 +66,7 @@ export default function DashboardView({
   scope,
   accountType = "personal",
   onChanged,
+  onNavigateToList,
 }: Props) {
   const locale = useLocale();
   const tDashboard = useTranslations("dashboard");
@@ -664,6 +666,7 @@ export default function DashboardView({
         rate={rate}
         cadStats={cadStats}
         krwStats={krwStats}
+        onCategoryClick={onNavigateToList}
       />
 
       <section className="card-inset p-4">
@@ -791,9 +794,7 @@ export default function DashboardView({
             <div className="text-sm font-black text-blue-600 dark:text-blue-400 tabular-nums self-end min-[400px]:self-auto">
               {stockTotalMode === "all" ? (
                 <div className="flex flex-col items-end gap-0.5">
-                  {stockAccountsStats.nativeLines.length === 0 ? (
-                    <span>—</span>
-                  ) : (
+                  {stockAccountsStats.nativeLines.length === 0 ? null : (
                     stockAccountsStats.nativeLines.map((line) => (
                       <span key={line.currency}>
                         {fmt(line.amount, line.currency)}
@@ -801,7 +802,7 @@ export default function DashboardView({
                     ))
                   )}
                 </div>
-              ) : (
+              ) : stockAccountsStats.accounts.length === 0 ? null : (
                 fmt(stockAccountsStats.totals[stockTotalMode], stockTotalMode)
               )}
             </div>
