@@ -1,6 +1,7 @@
 """Account balance derivation from opening_balance + ledger movements."""
 
 import asyncio
+from datetime import datetime
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -125,13 +126,28 @@ async def compute_account_balance(
 
     query: dict = {
         **owner_clause,
-        "$or": [
-            {"account_id": account_id},
-            {"counter_account_id": account_id},
-        ],
     }
+    account_filter = [
+        {"account_id": account_id},
+        {"counter_account_id": account_id},
+    ]
     if start:
-        query["date"] = {"$gte": start}
+        start_str = start[:10] if isinstance(start, str) else start.strftime("%Y-%m-%d")
+        try:
+            start_dt = datetime.fromisoformat(start_str)
+        except ValueError:
+            start_dt = None
+
+        date_filter = [{"date": {"$gte": start_str}}]
+        if start_dt:
+            date_filter.append({"date": {"$gte": start_dt}})
+
+        query["$and"] = [
+            {"$or": account_filter},
+            {"$or": date_filter},
+        ]
+    else:
+        query["$or"] = account_filter
 
     cursor = db[TX_COL].find(query)
 
