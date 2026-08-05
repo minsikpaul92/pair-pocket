@@ -162,6 +162,20 @@ export default function SubscriptionRegisterModal({
     return monthsBetweenDates(new Date(instStart), new Date(startDate));
   }, [subType, cycle, installmentStartDate, startDate]);
 
+  const updateMonthlyNextDueDate = useCallback((day: number, startStr: string) => {
+    const start = parseDate(startStr);
+    const y = start.getFullYear();
+    const m = start.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const targetD = Math.min(day, lastDay);
+    let candidate = new Date(y, m, targetD);
+    if (candidate < start) {
+      const nextLastDay = new Date(y, m + 2, 0).getDate();
+      candidate = new Date(y, m + 1, Math.min(day, nextLastDay));
+    }
+    setNextDueDate(dayKey(candidate));
+  }, []);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -720,6 +734,40 @@ export default function SubscriptionRegisterModal({
             </>
           ) : (
             <>
+              {recurrenceRule === "monthly" && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                    매월 정기 결제일
+                  </label>
+                  <div className="flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/80 p-2.5 px-3 border border-gray-200 dark:border-gray-700">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      매월
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={dayOfMonth}
+                      onChange={(e) => {
+                        const val = Math.min(
+                          Math.max(parseInt(e.target.value, 10) || 1, 1),
+                          31
+                        );
+                        setDayOfMonth(val);
+                        updateMonthlyNextDueDate(val, startDate);
+                      }}
+                      className="input-field w-20 text-center font-bold text-blue-600 dark:text-blue-400 text-base py-1"
+                    />
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      일 결제 {dayOfMonth === 31 && "(말일)"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    1~31일 중 지정할 수 있으며, 31일은 해당 월의 말일로 자동 처리됩니다.
+                  </p>
+                </div>
+              )}
+
               {recurrenceRule === "every_x_days" && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -867,7 +915,9 @@ export default function SubscriptionRegisterModal({
                 onChange={(d) => {
                   const val = dayKey(d);
                   setStartDate(val);
-                  if (recurrenceRule === "yearly") {
+                  if (recurrenceRule === "monthly") {
+                    updateMonthlyNextDueDate(dayOfMonth, val);
+                  } else if (recurrenceRule === "yearly") {
                     const nextYear = new Date(
                       d.getFullYear() + 1,
                       d.getMonth(),
