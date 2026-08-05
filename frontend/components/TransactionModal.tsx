@@ -1,11 +1,12 @@
 "use client";
 
-import { Camera, Loader2, SkipForward, Trash2, X, Plus } from "lucide-react";
+import { Camera, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
+import AddableSelect from "@/components/AddableSelect";
 import CategorySelect from "@/components/CategorySelect";
 import DayPicker from "@/components/DayPicker";
 import InstitutionSelect from "@/components/InstitutionSelect";
@@ -66,6 +67,9 @@ import {
   ParsedTransaction,
   TransactionItem,
   parseReceiptsOrStatements,
+  parseReceiptItems,
+  fetchAllMerchants,
+  lookupMerchant,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, parseDate } from "@/lib/date";
@@ -76,7 +80,7 @@ const TIP_SUB_CATEGORIES = new Set(["외식/배달", "카페/간식"]);
 const NO_SPIN =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 const ITEM_GRID =
-  "grid grid-cols-[minmax(6rem,2fr)_minmax(5rem,1.5fr)_minmax(3.5rem,0.75fr)_minmax(3rem,0.65fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_2rem] gap-2";
+  "grid grid-cols-[minmax(6.5rem,2fr)_minmax(5.5rem,1.5fr)_minmax(3.5rem,0.8fr)_minmax(5.5rem,1.2fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_2rem] gap-2";
 
 interface Props {
   currency: Currency;
@@ -163,7 +167,24 @@ export default function TransactionModal({
   const [subCategory, setSubCategory] = useState("");
   const [settlesExpenseId, setSettlesExpenseId] = useState("");
   const [merchant, setMerchant] = useState("");
+  const [note, setNote] = useState("");
   const [institution, setInstitution] = useState("");
+  const [allMerchants, setAllMerchants] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchAllMerchants(accountType).then(setAllMerchants);
+  }, [accountType]);
+
+  async function handleMerchantChange(val: string) {
+    setMerchant(val);
+    if (val && val.trim()) {
+      const res = await lookupMerchant(val, accountType);
+      if (res.found && res.category && res.sub_category) {
+        setCategory(res.category);
+        setSubCategory(res.sub_category);
+      }
+    }
+  }
 
   // Stock trading states
   const [isStockTrade, setIsStockTrade] = useState(false);
@@ -206,11 +227,175 @@ export default function TransactionModal({
   const [showItems, setShowItems] = useState(false);
   const [subtotal, setSubtotal] = useState("");
   const [taxAmount, setTaxAmount] = useState("");
+  type QueuedScanImage = {
+    id: string;
+    file: File;
+    previewUrl: string;
+  };
+
+  const MAX_IMAGES = 15;
+  const [scanQueue, setScanQueue] = useState<QueuedScanImage[]>([]);
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
+  const [dragOverModal, setDragOverModal] = useState(false);
+  const dragDepthRef = useRef(0);
   const [tipPercent, setTipPercent] = useState("");
   const [tipAmount, setTipAmount] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanHint, setScanHint] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const [itemsScanning, setItemsScanning] = useState(false);
+  const itemsScanInputRef = useRef<HTMLInputElement>(null);
+
+  const [availableUnits, setAvailableUnits] = useState<string[]>([
+    "개",
+    "g",
+    "kg",
+    "ml",
+    "L",
+    "lb",
+    "pack",
+    "ea",
+  ]);
+
+  function handleAddCustomUnit(itemIdx: number) {
+    const input = window.prompt(
+      "새로운 단위를 입력하세요 (예: 박스, 봉, 병, 캔, 롤):"
+    );
+    if (!input) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    if (!availableUnits.includes(trimmed)) {
+      setAvailableUnits((prev) => [...prev, trimmed]);
+    }
+    const newItems = [...items];
+    newItems[itemIdx] = { ...newItems[itemIdx], unit: trimmed };
+    setItems(newItems);
+  }
+
+  function clearScanQueue() {
+    setScanQueue((prev) => {
+      prev.forEach((q) => {
+        if (q.previewUrl) URL.revokeObjectURL(q.previewUrl);
+      });
+      return [];
+    });
+  }
+
+  function addScanQueueFiles(fileList: FileList | File[] | null) {
+    if (!fileList) return;
+    setError(null);
+    const list = Array.from(fileList as FileList | File[]);
+    const valid = list.filter(
+      (f) => f.type.startsWith("image/") || f.type === "application/pdf"
+    );
+    if (!valid.length) {
+      setError("지원되는 이미지 또는 PDF 파일을 선택하세요.");
+      return;
+    }
+
+    setScanQueue((prev) => {
+      const room = MAX_IMAGES - prev.length;
+      if (room <= 0) {
+        setError(`최대 ${MAX_IMAGES}장까지 채울 수 있습니다.`);
+        return prev;
+      }
+      const accepted = valid.slice(0, room);
+      if (valid.length > room) {
+        setError(`최대 ${MAX_IMAGES}장까지 채울 수 있습니다.`);
+      }
+      const next = accepted.map((file) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        previewUrl: file.type.startsWith("image/")
+          ? URL.createObjectURL(file)
+          : "",
+      }));
+      return [...prev, ...next];
+    });
+
+    if (scanInputRef.current) scanInputRef.current.value = "";
+  }
+
+  function removeQueuedScan(id: string) {
+    setScanQueue((prev) => {
+      const target = prev.find((q) => q.id === id);
+      if (target && target.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((q) => q.id !== id);
+    });
+    setError(null);
+  }
+
+  async function startBatchModalScan() {
+    if (scanning || scanQueue.length === 0) return;
+    setScanning(true);
+    setScanHint(null);
+    setError(null);
+    const files = scanQueue.map((q) => q.file);
+    try {
+      const results = await parseReceiptsOrStatements(files, { flowType: type });
+      const flat: ParsedTransaction[] = [];
+      for (const r of results as Array<ParsedTransaction & { transactions?: ParsedTransaction[] }>) {
+        if (Array.isArray((r as { transactions?: ParsedTransaction[] }).transactions)) {
+          for (const tx of (r as { transactions: ParsedTransaction[] }).transactions) {
+            flat.push({ ...tx, file_name: r.file_name, items: tx.items || [] });
+          }
+        } else if (r?.date != null) {
+          flat.push(r);
+        }
+      }
+      const parsed = flat[0];
+      if (!parsed) {
+        setError(tTx("scanEmpty"));
+        return;
+      }
+      setScannedFile(files[0] || null);
+      applyParsedTransaction(parsed);
+      setScanHint(tTx("scanFilled"));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : tTx("scanFailed"));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function handleItemsScan(file: File) {
+    setItemsScanning(true);
+    setError(null);
+    try {
+      setScannedFile(file);
+      const extracted = await parseReceiptItems(file);
+      if (extracted && extracted.length > 0) {
+        setItems(extracted);
+        setShowItems(true);
+      } else {
+        setError("세부 품목을 인식하지 못했습니다.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "세부 품목 분석 중 오류가 발생했습니다.");
+    } finally {
+      setItemsScanning(false);
+      if (itemsScanInputRef.current) itemsScanInputRef.current.value = "";
+    }
+  }
+
+  async function handleReParseItemsFromExisting() {
+    if (!scannedFile) return;
+    setItemsScanning(true);
+    setError(null);
+    try {
+      const extracted = await parseReceiptItems(scannedFile);
+      if (extracted && extracted.length > 0) {
+        setItems(extracted);
+        setShowItems(true);
+      } else {
+        setError("기존 영수증 사진에서 세부 품목을 인식하지 못했습니다.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "세부 품목 분석 중 오류가 발생했습니다.");
+    } finally {
+      setItemsScanning(false);
+    }
+  }
 
   const dateStr = dayKey(defaultDate);
 
@@ -554,6 +739,7 @@ export default function TransactionModal({
         setSubCategory("");
         setSettlesExpenseId("");
         setMerchant("");
+        setNote("");
         setInstitution("");
         setAccountId(ACCOUNT_NONE);
         setCounterAccountId(ACCOUNT_NONE);
@@ -586,6 +772,7 @@ export default function TransactionModal({
     setSubCategory(normalizeTransferSubCategory(tx.sub_category || ""));
     setSettlesExpenseId(tx.settles_expense_id || "");
     setMerchant(tx.merchant || "");
+    setNote(tx.note || "");
     setInstitution(tx.institution || "");
     setAccountId(tx.account_id || ACCOUNT_NONE);
     setCounterAccountId(tx.counter_account_id || ACCOUNT_NONE);
@@ -876,11 +1063,10 @@ export default function TransactionModal({
   async function handleAddMerchant(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setMerchantHints((prev) => [
-      trimmed,
-      ...prev.filter((m) => m !== trimmed),
-    ]);
-    setMerchant(trimmed);
+    if (!allMerchants.includes(trimmed)) {
+      setAllMerchants((prev) => [trimmed, ...prev]);
+    }
+    await handleMerchantChange(trimmed);
   }
 
   async function handleAddCategory(name: string) {
@@ -1029,7 +1215,7 @@ export default function TransactionModal({
       ticker: isStock ? finalTicker.toUpperCase() : undefined,
       shares: isStock ? parseFloat(shares) : undefined,
       price: isStock ? parseFloat(price) : undefined,
-      items: showItems ? items : undefined,
+      items: items && items.length > 0 ? items : undefined,
       subtotal: showTax && subtotal ? parseAmountInput(subtotal) || null : null,
       tax_amount: showTax && taxAmount ? parseAmountInput(taxAmount) || null : null,
       tip_percent: showTip && tipPercent
@@ -1038,6 +1224,7 @@ export default function TransactionModal({
       tip_amount: showTip && tipAmount
         ? parseAmountInput(tipAmount)
         : null,
+      note: note.trim() || undefined,
     };
 
     setSubmitting(true);
@@ -1047,6 +1234,8 @@ export default function TransactionModal({
       } else {
         await createTransaction(payload);
       }
+      clearScanQueue();
+      setScannedFile(null);
       onSaved();
     } catch (err) {
       setError(
@@ -1126,18 +1315,14 @@ export default function TransactionModal({
   ) : (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-        {tTx("merchant")}
+        {tTx("note")}
       </label>
-      <MerchantSelect
-        options={merchantHints}
-        value={merchant}
-        onChange={setMerchant}
-        onAdd={handleAddMerchant}
-        disabled={!subCategory}
-        placeholder={
-          subCategory ? tTx("selectMerchant") : tTx("selectSubCategoryForMerchant")
-        }
-        addLabel={tTx("addMerchant")}
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder={tTx("notePlaceholder")}
+        className="input-field text-sm"
       />
     </div>
   );
@@ -1687,38 +1872,160 @@ export default function TransactionModal({
           </div>
 
           {!isEditing && (
-            <div className="space-y-1.5">
+            <div
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current += 1;
+                setDragOverModal(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                if (dragDepthRef.current === 0) setDragOverModal(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current = 0;
+                setDragOverModal(false);
+                addScanQueueFiles(e.dataTransfer.files);
+              }}
+              className={`relative rounded-2xl border-2 border-dashed p-3 space-y-2.5 transition-all duration-150 ${
+                dragOverModal
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500/30 scale-[1.01]"
+                  : "border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/20"
+              }`}
+            >
+              {dragOverModal && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-blue-500/10 dark:bg-blue-400/10">
+                  <span className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
+                    영수증/명세서 이미지를 여기에 놓으세요
+                  </span>
+                </div>
+              )}
+
               <input
                 ref={scanInputRef}
                 type="file"
                 accept="image/*,application/pdf"
+                multiple
                 className="hidden"
-                onChange={handleModalScan}
+                onChange={(e) => addScanQueueFiles(e.target.files)}
               />
-              <button
-                type="button"
-                disabled={scanning || submitting}
-                onClick={() => scanInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-violet-300 dark:border-violet-700 bg-violet-50/60 dark:bg-violet-950/20 hover:bg-violet-50 dark:hover:bg-violet-950/40 text-violet-700 dark:text-violet-300 text-sm font-semibold py-2.5 transition-colors disabled:opacity-60"
-              >
-                {scanning ? (
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                ) : (
-                  <Camera className="h-4 w-4 shrink-0" />
-                )}
-                <span className="truncate">
-                  {scanning
-                    ? tTx("scanning")
-                    : type === "income"
-                      ? tTx("scanIncome")
-                      : tTx("scanExpense")}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Camera className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                    스크린샷 / 영수증으로 채우기
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                  {scanQueue.length} / {MAX_IMAGES}장
                 </span>
-              </button>
+              </div>
+
+              {scanQueue.length === 0 ? (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                  사진이나 PDF 명세서를 이곳으로 드래그하거나 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 15장)
+                </p>
+              ) : (
+                <ul className="grid grid-cols-5 gap-1.5 pt-1">
+                  {scanQueue.map((q) => (
+                    <li key={q.id} className="relative aspect-square">
+                      {q.previewUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={q.previewUrl}
+                          alt=""
+                          className="h-full w-full rounded-lg object-cover border border-purple-200 dark:border-purple-800"
+                        />
+                      ) : (
+                        <div className="h-full w-full rounded-lg bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                          PDF
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        disabled={scanning}
+                        onClick={() => removeQueuedScan(q.id)}
+                        className="absolute -top-1 -right-1 rounded-full bg-gray-900/80 text-white p-0.5 disabled:opacity-50"
+                        aria-label="삭제"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={scanning || scanQueue.length >= MAX_IMAGES}
+                  onClick={() => scanInputRef.current?.click()}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold py-2 transition-colors disabled:opacity-50"
+                >
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  사진 추가
+                </button>
+
+                <button
+                  type="button"
+                  disabled={scanning || scanQueue.length === 0}
+                  onClick={() => void startBatchModalScan()}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2 transition-colors disabled:opacity-50"
+                >
+                  {scanning ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                  {scanning ? tTx("scanning") : "분석 시작"}
+                </button>
+              </div>
+
+              {scanQueue.length > 0 && !scanning && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={clearScanQueue}
+                    className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-500"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    초기화
+                  </button>
+                </div>
+              )}
+
               {scanHint && (
-                <p className="text-xs text-violet-600 dark:text-violet-400">
+                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
                   {scanHint}
                 </p>
               )}
+            </div>
+          )}
+
+          {!isTransfer && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("merchant")}
+              </label>
+              <MerchantSelect
+                options={allMerchants}
+                value={merchant}
+                onChange={handleMerchantChange}
+                onAdd={handleAddMerchant}
+                disabled={false}
+                placeholder={tTx("selectMerchant")}
+                addLabel={tTx("addMerchant")}
+              />
             </div>
           )}
 
@@ -1859,36 +2166,113 @@ export default function TransactionModal({
 
           {/* Sub-items (소분류 세부항목) Expandable Section */}
           <div className="border-t border-gray-100 dark:border-gray-800/80 pt-4 mt-2">
+            <input
+              ref={itemsScanInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleItemsScan(f);
+              }}
+              className="hidden"
+            />
             {!showItems ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowItems(true);
-                  if (items.length === 0) {
-                    setItems([
-                      {
-                        name: "",
-                        standardized_name: "",
-                        quantity: 1,
-                        unit: "개",
-                        unit_price: 0,
-                        total_price: 0,
-                      },
-                    ]);
-                  }
-                }}
-                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {tTx("itemsAdd")}
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowItems(true);
+                    if (items.length === 0) {
+                      setItems([
+                        {
+                          name: "",
+                          standardized_name: "",
+                          quantity: 1,
+                          unit: "개",
+                          unit_price: 0,
+                          total_price: 0,
+                        },
+                      ]);
+                    }
+                  }}
+                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {tTx("itemsAdd")}
+                </button>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    disabled={!scannedFile || itemsScanning}
+                    onClick={handleReParseItemsFromExisting}
+                    title="기존 사진 재분석"
+                    className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent transition-colors"
+                  >
+                    {itemsScanning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCw className="h-4 w-4" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={itemsScanning}
+                    onClick={() => itemsScanInputRef.current?.click()}
+                    title="영수증 촬영"
+                    className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={itemsScanning}
+                    onClick={() => itemsScanInputRef.current?.click()}
+                    title="사진 선택"
+                    className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 shrink-0">
                     {tTx("itemsTitle")}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      disabled={!scannedFile || itemsScanning}
+                      onClick={handleReParseItemsFromExisting}
+                      title="기존 사진 재분석"
+                      className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent transition-colors"
+                    >
+                      {itemsScanning ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCw className="h-4 w-4" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={itemsScanning}
+                      onClick={() => itemsScanInputRef.current?.click()}
+                      title="영수증 촬영"
+                      className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={itemsScanning}
+                      onClick={() => itemsScanInputRef.current?.click()}
+                      title="사진 선택"
+                      className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -1904,33 +2288,33 @@ export default function TransactionModal({
                           },
                         ]);
                       }}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-0.5"
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-0.5 ml-1"
                     >
-                      <Plus className="h-3 w-3" />
+                      <Plus className="h-3.5 w-3.5" />
                       {tCommon("add")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowItems(false)}
-                      className="text-xs text-gray-500 hover:text-gray-700 font-semibold"
+                      className="text-xs text-gray-500 hover:text-gray-700 font-semibold ml-1"
                     >
                       {tTx("itemsHide")}
                     </button>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-100 dark:border-gray-800">
-                  <div className="min-w-0">
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-x-auto">
+                  <div className="min-w-[620px]">
                     <div className={`${ITEM_GRID} bg-gray-50 dark:bg-gray-900/60 px-2 py-1.5 text-[10px] font-semibold text-gray-500`}>
                       <span>{tTx("itemName")}</span>
                       <span>{tTx("itemStandard")}</span>
                       <span className="text-right">{tTx("itemQty")}</span>
-                      <span>{tTx("itemUnit")}</span>
+                      <span className="text-center">{tTx("itemUnit")}</span>
                       <span className="text-right">{tTx("itemUnitPrice")}</span>
                       <span className="text-right">{tTx("itemTotal")}</span>
                       <span />
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                    <div className="max-h-[220px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
                       {items.map((item, itemIdx) => {
                         const updateItem = (
                           field: keyof TransactionItem,
@@ -1939,32 +2323,36 @@ export default function TransactionModal({
                           const newItems = [...items];
                           const updatedItem = {
                             ...newItems[itemIdx],
-                            [field]: val,
                           };
 
-                          if (field === "quantity" || field === "unit_price") {
-                            updatedItem.total_price = Number(
-                              (
-                                Number(updatedItem.quantity) *
-                                Number(updatedItem.unit_price)
-                              ).toFixed(2)
-                            );
+                          if (field === "unit_price") {
+                            const unitP = typeof val === "number" ? val : (parseFloat(String(val)) || 0);
+                            updatedItem.unit_price = unitP;
+                            const qty = Number(updatedItem.quantity) > 0 ? Number(updatedItem.quantity) : 1;
+                            updatedItem.total_price = Number((unitP * qty).toFixed(2));
                           } else if (field === "total_price") {
-                            if (Number(updatedItem.quantity) > 0) {
-                              updatedItem.unit_price = Number(
-                                (
-                                  Number(updatedItem.total_price) /
-                                  Number(updatedItem.quantity)
-                                ).toFixed(4)
-                              );
+                            const totalP = typeof val === "number" ? val : (parseFloat(String(val)) || 0);
+                            updatedItem.total_price = totalP;
+                            const qty = Number(updatedItem.quantity) > 0 ? Number(updatedItem.quantity) : 1;
+                            updatedItem.unit_price = Number((totalP / qty).toFixed(2));
+                          } else if (field === "quantity") {
+                            const qty = typeof val === "number" ? val : (parseFloat(String(val)) || 1);
+                            updatedItem.quantity = qty;
+                            const safeQty = qty > 0 ? qty : 1;
+                            if (Number(updatedItem.unit_price) > 0) {
+                              updatedItem.total_price = Number((Number(updatedItem.unit_price) * safeQty).toFixed(2));
+                            } else if (Number(updatedItem.total_price) > 0) {
+                              updatedItem.unit_price = Number((Number(updatedItem.total_price) / safeQty).toFixed(2));
                             }
+                          } else {
+                            (updatedItem as any)[field] = val;
                           }
 
                           newItems[itemIdx] = updatedItem;
                           setItems(newItems);
 
                           const sumTotal = newItems.reduce(
-                            (acc, it) => acc + it.total_price,
+                            (acc, it) => acc + (it.total_price || 0),
                             0
                           );
                           if (sumTotal > 0) {
@@ -2011,18 +2399,23 @@ export default function TransactionModal({
                             />
                             <select
                               value={item.unit || "개"}
-                              onChange={(e) =>
-                                updateItem("unit", e.target.value)
-                              }
-                              className="input-field py-1.5 text-xs"
+                              onChange={(e) => {
+                                if (e.target.value === "__add__") {
+                                  handleAddCustomUnit(itemIdx);
+                                } else {
+                                  updateItem("unit", e.target.value);
+                                }
+                              }}
+                              className="input-field py-1.5 px-1 text-xs w-full cursor-pointer bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                             >
-                              {["개", "g", "kg", "ml", "L", "lb", "pack", "ea"].map(
-                                (u) => (
-                                  <option key={u} value={u}>
-                                    {u}
-                                  </option>
-                                )
-                              )}
+                              {availableUnits.map((u) => (
+                                <option key={u} value={u} className="text-xs py-1">
+                                  {u}
+                                </option>
+                              ))}
+                              <option value="__add__" className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 py-1">
+                                + 단위 추가
+                              </option>
                             </select>
                             <input
                               type="text"

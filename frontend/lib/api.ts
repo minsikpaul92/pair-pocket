@@ -226,6 +226,7 @@ export interface Transaction {
   tip_percent?: number | null;
   subtotal?: number | null;
   tax_amount?: number | null;
+  note?: string | null;
 }
 
 export interface TransactionItem {
@@ -263,6 +264,7 @@ export interface NewTransaction {
   tip_percent?: number | null;
   subtotal?: number | null;
   tax_amount?: number | null;
+  note?: string | null;
 }
 
 export interface CategoryGroup {
@@ -525,6 +527,32 @@ export async function fetchMerchantSuggestions(
   );
   if (!res.ok) return [];
   return (await res.json()) as string[];
+}
+
+export async function fetchAllMerchants(
+  accountType: AccountType = "personal"
+): Promise<string[]> {
+  const params = new URLSearchParams({ account_type: accountType });
+  const res = await fetch(
+    `${API_BASE_URL}/api/transactions/merchants/all?${params.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as string[];
+}
+
+export async function lookupMerchant(
+  name: string,
+  accountType: AccountType = "personal"
+): Promise<{ found: boolean; category?: string; sub_category?: string }> {
+  if (!name.trim()) return { found: false };
+  const params = new URLSearchParams({ name: name.trim(), account_type: accountType });
+  const res = await fetch(
+    `${API_BASE_URL}/api/transactions/merchants/lookup?${params.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) return { found: false };
+  return await res.json();
 }
 
 export async function fetchInstitutionSuggestions(
@@ -1726,6 +1754,24 @@ export async function parseReceiptsOrStatements(
   }
   const data = await res.json();
   return data.results as ParsedTransaction[];
+}
+
+export async function parseReceiptItems(
+  file: File
+): Promise<TransactionItem[]> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE_URL}/api/ai/parse-items`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Line items extraction failed");
+  }
+  const data = await res.json();
+  return (data.items || []) as TransactionItem[];
 }
 
 export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {

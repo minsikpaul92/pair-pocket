@@ -61,5 +61,6 @@ app.include_router(ai_router.router)
 
 
 @app.get("/", tags=["health"])
+@app.get("/health", tags=["health"])
 async def health_check() -> dict:
     return {"status": "ok", "service": "PairPocket API"}

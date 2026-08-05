@@ -25,6 +25,7 @@ import {
   subCategoriesFor,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import { parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
@@ -80,7 +81,7 @@ type SortKey =
 type SortDir = "asc" | "desc";
 
 function formatDay(iso: string): string {
-  const d = new Date(iso);
+  const d = parseDate(iso);
   return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(
     d.getDate()
   ).padStart(2, "0")}`;

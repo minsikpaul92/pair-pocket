@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from bson import ObjectId
@@ -74,6 +75,7 @@ def _serialize(document: dict) -> dict:
         "tip_percent": document.get("tip_percent"),
         "subtotal": document.get("subtotal"),
         "tax_amount": document.get("tax_amount"),
+        "note": document.get("note"),
     }
 
 
@@ -175,6 +177,58 @@ async def merchant_suggestions(
     ]
     docs = await db[COLLECTION].aggregate(pipeline).to_list(length=30)
     return [d["_id"] for d in docs if d["_id"]]
+
+
+@router.get("/merchants/all", response_model=list[str])
+async def all_merchants(
+    account_type: AccountType = AccountType.PERSONAL,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> list[str]:
+    """Return all unique merchant names ever used by the user, most recent first."""
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
+    pipeline = [
+        {"$match": {**owner_match(owner_ids), "merchant": {"$nin": [None, "", "미지정"]}}},
+        {
+            "$group": {
+                "_id": "$merchant",
+                "count": {"$sum": 1},
+                "last_used": {"$max": "$date"},
+            }
+        },
+        {"$sort": {"count": -1, "last_used": -1}},
+        {"$limit": 100},
+    ]
+    docs = await db[COLLECTION].aggregate(pipeline).to_list(length=100)
+    return [d["_id"] for d in docs if d["_id"]]
+
+
+@router.get("/merchants/lookup")
+async def lookup_merchant(
+    name: str,
+    account_type: AccountType = AccountType.PERSONAL,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Lookup category and sub_category for a given merchant name from past transactions."""
+    if not name or not name.strip():
+        return {"found": False}
+    owner_ids = await resolve_owner_ids(db, current_user, account_type)
+    escaped_name = re.escape(name.strip())
+    doc = await db[COLLECTION].find_one(
+        {
+            **owner_match(owner_ids),
+            "merchant": {"$regex": f"^{escaped_name}$", "$options": "i"},
+        },
+        sort=[("date", -1)],
+    )
+    if doc and doc.get("category") and doc.get("sub_category"):
+        return {
+            "found": True,
+            "category": doc["category"],
+            "sub_category": doc["sub_category"],
+        }
+    return {"found": False}
 
 
 @router.get("/institutions", response_model=list[str])
