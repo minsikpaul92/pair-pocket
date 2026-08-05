@@ -843,6 +843,7 @@ export default function AppShell({ user, onLogout }: Props) {
               onDeleted={bumpVersion}
               onPendingClick={openSubscriptionFromPending}
               initialCategoryFilter={listCategoryFilter}
+              onBackToDashboard={() => setView("dashboard")}
             />
           ) : view === "subscriptions" ? (
             <SubscriptionsView
@@ -888,6 +889,7 @@ export default function AppShell({ user, onLogout }: Props) {
               version={version}
               scope={scope}
               accountType={accountType}
+              transactions={transactions}
               onChanged={bumpVersion}
               onNavigateToList={(cat) => {
                 setListCategoryFilter(cat);

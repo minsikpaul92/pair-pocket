@@ -25,6 +25,7 @@ import {
   NetWorthSummary,
   StatsSummary,
   TRANSFER_CATEGORY,
+  Transaction,
   fetchAccounts,
   fetchExchangeRate,
   fetchNetWorth,
@@ -46,6 +47,7 @@ interface Props {
   version: number;
   scope: LedgerScope;
   accountType?: AccountType;
+  transactions?: Transaction[];
   onChanged?: () => void;
   onNavigateToList?: (category?: string) => void;
 }
@@ -65,6 +67,7 @@ export default function DashboardView({
   version,
   scope,
   accountType = "personal",
+  transactions,
   onChanged,
   onNavigateToList,
 }: Props) {
@@ -666,6 +669,7 @@ export default function DashboardView({
         rate={rate}
         cadStats={cadStats}
         krwStats={krwStats}
+        transactions={transactions}
         onCategoryClick={onNavigateToList}
       />
 

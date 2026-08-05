@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Plus, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
@@ -39,6 +39,7 @@ interface Props {
   onDeleted?: () => void;
   onPendingClick?: (occ: SubscriptionOccurrence) => void;
   initialCategoryFilter?: string;
+  onBackToDashboard?: () => void;
 }
 
 export type UnifiedListItem =
@@ -102,6 +103,7 @@ export default function ListView({
   onDeleted,
   onPendingClick,
   initialCategoryFilter,
+  onBackToDashboard,
 }: Props) {
   const locale = useLocale();
   const tList = useTranslations("list");
@@ -354,6 +356,18 @@ export default function ListView({
 
   return (
     <div>
+      {onBackToDashboard && (
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={onBackToDashboard}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 px-3.5 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 transition-colors shadow-sm cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>대시보드로 돌아가기</span>
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
           {(["all", "expense", "income"] as TypeFilter[]).map((t) => (
