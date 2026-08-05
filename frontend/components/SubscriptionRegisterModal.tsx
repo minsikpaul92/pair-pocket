@@ -19,6 +19,9 @@ import {
   OnboardingParseResult,
   Subscription,
   SubscriptionHistory,
+  TRANSFER_CATEGORY,
+  TRANSFER_SUB_CARD_REPAYMENT,
+  TRANSFER_SUB_INVESTMENT_FUNDING,
   addCustomCategory,
   addCustomSubCategory,
   addMonthsToDateKey,
@@ -31,6 +34,7 @@ import {
   fetchUserSettings,
   formatAmount,
   formatAmountInput,
+  isEtransferSub,
   monthsBetweenDates,
   parseAmountInput,
   subCategoriesFor,
@@ -101,6 +105,7 @@ export default function SubscriptionRegisterModal({
   const [subCategory, setSubCategory] = useState("정기 구독");
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [accountId, setAccountId] = useState(ACCOUNT_NONE);
+  const [counterAccountId, setCounterAccountId] = useState(ACCOUNT_NONE);
   const [merchant, setMerchant] = useState("");
   const [showAccountRegister, setShowAccountRegister] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -108,6 +113,24 @@ export default function SubscriptionRegisterModal({
   const [error, setError] = useState<string | null>(null);
   const [hasGeminiKey, setHasGeminiKey] = useState(false);
   const [aiHint, setAiHint] = useState<string | null>(null);
+
+  const isEtransfer =
+    category === TRANSFER_CATEGORY && isEtransferSub(subCategory);
+  const isTransfer = category === TRANSFER_CATEGORY && !isEtransfer;
+
+  const transferFromAccounts = useMemo(() => {
+    return accounts.filter((a) => !a.is_liability);
+  }, [accounts]);
+
+  const transferToAccounts = useMemo(() => {
+    if (subCategory === TRANSFER_SUB_CARD_REPAYMENT) {
+      return accounts.filter((a) => a.is_liability);
+    }
+    if (subCategory === TRANSFER_SUB_INVESTMENT_FUNDING) {
+      return accounts.filter((a) => a.kind === "investment");
+    }
+    return accounts.filter((a) => !a.is_liability);
+  }, [accounts, subCategory]);
 
   const categoryOptions = useMemo(
     () => categoriesForType(presets, "expense"),
@@ -175,6 +198,7 @@ export default function SubscriptionRegisterModal({
     setSubCategory(editing.sub_category);
     setMerchant(editing.merchant || editing.name);
     setAccountId(editing.account_id);
+    setCounterAccountId(editing.counter_account_id || ACCOUNT_NONE);
   }, [editing]);
 
   useEffect(() => {
@@ -351,6 +375,7 @@ export default function SubscriptionRegisterModal({
       completed_installments:
         cycle === "installment" ? resolvedCompleted : undefined,
       account_id: accountId,
+      counter_account_id: isTransfer ? counterAccountId || null : null,
       category,
       sub_category: subCategory,
       merchant: merchant.trim() || trimmedName,
@@ -649,20 +674,53 @@ export default function SubscriptionRegisterModal({
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {t("paymentAccount")}
-            </label>
-            <AccountSelect
-              accounts={accounts}
-              value={accountId}
-              onChange={setAccountId}
-              onRegister={() => setShowAccountRegister(true)}
-              allowNone={false}
-              placeholder={t("selectPaymentAccount")}
-              variant="field"
-            />
-          </div>
+          {isTransfer ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {tTx("fromAccount") || "보내는 계좌 (출금)"}
+                </label>
+                <AccountSelect
+                  accounts={transferFromAccounts}
+                  value={accountId}
+                  onChange={setAccountId}
+                  onRegister={() => setShowAccountRegister(true)}
+                  allowNone={false}
+                  placeholder={tTx("selectFromAccount") || "출금 계좌 선택"}
+                  variant="field"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {tTx("toAccount") || "받는 계좌 (입금)"}
+                </label>
+                <AccountSelect
+                  accounts={transferToAccounts}
+                  value={counterAccountId}
+                  onChange={setCounterAccountId}
+                  onRegister={() => setShowAccountRegister(true)}
+                  allowNone={false}
+                  placeholder={tTx("selectToAccount") || "입금 계좌 선택"}
+                  variant="field"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t("paymentAccount")}
+              </label>
+              <AccountSelect
+                accounts={accounts}
+                value={accountId}
+                onChange={setAccountId}
+                onRegister={() => setShowAccountRegister(true)}
+                allowNone={false}
+                placeholder={t("selectPaymentAccount")}
+                variant="field"
+              />
+            </div>
+          )}
 
           <div>
             <div className="mb-1.5 flex items-end justify-between gap-2">

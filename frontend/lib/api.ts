@@ -722,6 +722,7 @@ export interface Subscription {
   end_reminder_enabled: boolean;
   is_fixed_bill?: boolean;
   account_id: string;
+  counter_account_id?: string | null;
   category: string;
   sub_category: string;
   merchant: string;
@@ -750,6 +751,7 @@ export interface NewSubscription {
   end_reminder_enabled?: boolean;
   is_fixed_bill?: boolean;
   account_id: string;
+  counter_account_id?: string | null;
   category: string;
   sub_category: string;
   merchant?: string;

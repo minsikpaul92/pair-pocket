@@ -783,6 +783,8 @@ async def materialize_due_occurrences(
             continue
 
         tx_owner = claimed.get("owner_id") or sub.get("owner_id") or ids[0]
+        counter_acc = sub.get("counter_account_id")
+        is_transfer_kind = bool(counter_acc) or sub.get("category") == "자산 이동/카드"
         tx_doc = {
             "date": claimed["due_date"],
             "amount": claimed["amount"],
@@ -795,8 +797,8 @@ async def materialize_due_occurrences(
             "institution": None,
             "settles_expense_id": None,
             "account_id": sub["account_id"],
-            "counter_account_id": None,
-            "kind": TransactionKind.NORMAL.value,
+            "counter_account_id": counter_acc,
+            "kind": TransactionKind.TRANSFER.value if is_transfer_kind else TransactionKind.NORMAL.value,
             "owner_id": tx_owner,
             "subscription_occurrence_id": str(claimed["_id"]),
             "subscription_id": str(sub["_id"]),

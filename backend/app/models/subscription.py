@@ -54,6 +54,7 @@ class SubscriptionBase(BaseModel):
     is_fixed_bill: bool = False
 
     account_id: str
+    counter_account_id: str | None = None
     category: str
     sub_category: str
     merchant: str = "미지정"
@@ -76,6 +77,7 @@ class SubscriptionUpdate(BaseModel):
     status: SubscriptionStatus | None = None
     end_date: datetime | None = None
     account_id: str | None = None
+    counter_account_id: str | None = None
     category: str | None = None
     sub_category: str | None = None
     merchant: str | None = None
