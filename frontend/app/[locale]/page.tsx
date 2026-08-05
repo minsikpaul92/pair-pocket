@@ -29,14 +29,40 @@ export default function Home() {
       try {
         const u = await fetchCurrentUser();
         setUser(u);
+        const storedLocal =
+          typeof window !== "undefined"
+            ? localStorage.getItem("pairpocket_user_locale")
+            : null;
+
         if (u) {
           const settings = await fetchUserSettings().catch(() => null);
           if (settings && !settings.onboarding_personal_completed) {
-            // Default wizard copy to English until the user picks a language.
-            router.replace("/onboarding", {
-              locale: asAppLocale(settings.preferred_locale),
-            });
+            const targetLocale = asAppLocale(
+              settings.preferred_locales?.[0] ||
+                settings.preferred_locale ||
+                storedLocal
+            );
+            router.replace("/onboarding", { locale: targetLocale });
             return;
+          }
+          if (settings && (settings.preferred_locale || settings.preferred_locales?.length)) {
+            const prefLocale = asAppLocale(
+              settings.preferred_locales?.[0] || settings.preferred_locale
+            );
+            if (typeof window !== "undefined") {
+              localStorage.setItem("pairpocket_user_locale", prefLocale);
+            }
+          }
+        } else {
+          if (
+            storedLocal &&
+            (locales as readonly string[]).includes(storedLocal)
+          ) {
+            const currentPath =
+              typeof window !== "undefined" ? window.location.pathname : "";
+            if (currentPath === "/" || currentPath.startsWith("/en")) {
+              router.replace("/", { locale: storedLocal as AppLocale });
+            }
           }
         }
       } finally {
