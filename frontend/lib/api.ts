@@ -695,7 +695,12 @@ async function readApiError(res: Response, fallbackCode: string): Promise<never>
   throw new ApiError(fallbackCode);
 }
 
-export type BillingCycle = "monthly" | "yearly" | "installment";
+export type BillingCycle =
+  | "monthly"
+  | "yearly"
+  | "weekly"
+  | "biweekly"
+  | "installment";
 export type SubscriptionStatus =
   | "active"
   | "paused"
@@ -741,6 +746,7 @@ export interface NewSubscription {
   account_type?: AccountType;
   cycle: BillingCycle;
   start_date: string;
+  next_due_date?: string | null;
   end_date?: string | null;
   installment_start_date?: string | null;
   total_installments?: number | null;

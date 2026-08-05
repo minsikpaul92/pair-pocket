@@ -403,6 +403,8 @@
     "cycle": {
       "monthly": "매월",
       "yearly": "매년",
+      "weekly": "매주",
+      "biweekly": "격주(2주)",
       "installment": "할부",
       "fixed": "고정지출"
     },

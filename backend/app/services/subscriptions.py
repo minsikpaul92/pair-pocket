@@ -67,6 +67,10 @@ def _add_months(dt: datetime, months: int) -> datetime:
 def _next_due(current: datetime, cycle: BillingCycle) -> datetime:
     if cycle == BillingCycle.YEARLY:
         return current.replace(year=current.year + 1)
+    if cycle == BillingCycle.WEEKLY:
+        return current + timedelta(days=7)
+    if cycle == BillingCycle.BIWEEKLY:
+        return current + timedelta(days=14)
     # monthly + installment both advance one month per charge
     return _add_months(current, 1)
 

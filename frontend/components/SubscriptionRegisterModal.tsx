@@ -59,7 +59,7 @@ interface Props {
   onPresetsChange: (presets: CategoryPresets) => void;
 }
 
-const CYCLES: BillingCycle[] = ["monthly", "yearly", "installment"];
+const CYCLES: BillingCycle[] = ["monthly", "yearly", "weekly", "biweekly", "installment"];
 
 function dateInputFromIso(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -89,6 +89,7 @@ export default function SubscriptionRegisterModal({
   const [amount, setAmount] = useState("");
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
   const [startDate, setStartDate] = useState(dayKey(new Date()));
+  const [nextDueDate, setNextDueDate] = useState(dayKey(new Date()));
   const [installmentStartDate, setInstallmentStartDate] = useState("");
   const [showEndDate, setShowEndDate] = useState(false);
   const [endDate, setEndDate] = useState("");
@@ -170,7 +171,10 @@ export default function SubscriptionRegisterModal({
     setAmount(formatAmountInput(String(editing.amount), editing.currency));
     setCycle(editing.cycle);
     setIsFixedBill(Boolean(editing.is_fixed_bill));
-    setStartDate(dateInputFromIso(editing.start_date));
+    const startIso = dateInputFromIso(editing.start_date);
+    const nextIso = dateInputFromIso(editing.next_due_date) || startIso;
+    setStartDate(startIso);
+    setNextDueDate(nextIso);
     setInstallmentStartDate(dateInputFromIso(editing.installment_start_date));
     setShowEndDate(Boolean(editing.end_date) && editing.cycle !== "installment");
     setEndDate(dateInputFromIso(editing.end_date));
@@ -359,6 +363,7 @@ export default function SubscriptionRegisterModal({
       account_type: accountType,
       cycle,
       start_date: `${startDate}T00:00:00`,
+      next_due_date: `${nextDueDate}T00:00:00`,
       end_date:
         cycle === "installment"
           ? computedInstallmentEnd
@@ -722,50 +727,67 @@ export default function SubscriptionRegisterModal({
             </div>
           )}
 
-          <div>
-            <div className="mb-1.5 flex items-end justify-between gap-2">
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {cycle === "installment"
-                  ? t("nextPaymentDate")
-                  : t("startNextPaymentDate")}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                구독/이체 시작일
               </label>
-              {cycle !== "installment" && (
-                <span className="text-[11px] font-medium text-gray-400 whitespace-nowrap">
-                  {t("endDateOptional")}
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2">
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="input-field flex-1 min-w-0"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setStartDate(val);
+                  if (!isEditing && val > nextDueDate) {
+                    setNextDueDate(val);
+                  }
+                }}
+                className="input-field"
               />
-              {cycle !== "installment" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEndDate((v) => {
-                      if (v) {
-                        setEndDate("");
-                        setEndReminderEnabled(false);
-                      }
-                      return !v;
-                    });
-                  }}
-                  className={`shrink-0 rounded-xl w-11 flex items-center justify-center text-lg font-semibold transition-colors ${
-                    showEndDate
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
-                  aria-label={showEndDate ? t("removeEndDate") : t("addEndDate")}
-                >
-                  {showEndDate ? "−" : "+"}
-                </button>
-              )}
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between gap-1">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {t("nextPaymentDate") || "다음 정기 결제일"}
+                </label>
+                {cycle !== "installment" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEndDate((v) => {
+                        if (v) {
+                          setEndDate("");
+                          setEndReminderEnabled(false);
+                        }
+                        return !v;
+                      });
+                    }}
+                    className="text-[11px] font-medium text-blue-500 hover:underline"
+                  >
+                    {showEndDate ? "종료일 취소" : "+ 종료일 지정"}
+                  </button>
+                )}
+              </div>
+              <input
+                type="date"
+                value={nextDueDate}
+                min={startDate}
+                onChange={(e) => setNextDueDate(e.target.value)}
+                className="input-field"
+              />
             </div>
           </div>
+
+          {nextDueDate && (
+            <div className="rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 p-2.5 px-3.5 text-xs flex items-center justify-between">
+              <span className="font-medium text-blue-800 dark:text-blue-200">
+                ✨ 다음 결제 예정일
+              </span>
+              <span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">
+                {formatSubscriptionDate(`${nextDueDate}T00:00:00`, locale)}
+              </span>
+            </div>
+          )}
 
           {cycle !== "installment" && showEndDate && (
             <div className="space-y-3">

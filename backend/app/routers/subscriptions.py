@@ -355,7 +355,7 @@ async def create_subscription(
     doc["cycle"] = payload.cycle.value
     doc["owner_id"] = current_user.id
     doc["status"] = SubscriptionStatus.ACTIVE.value
-    doc["next_due_date"] = payload.start_date
+    doc["next_due_date"] = payload.next_due_date or payload.start_date
     doc["promo_reminder_sent_at"] = None
     doc["end_reminder_sent_at"] = None
     if not doc.get("merchant"):

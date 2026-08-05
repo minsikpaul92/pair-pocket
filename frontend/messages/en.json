@@ -403,6 +403,8 @@
     "cycle": {
       "monthly": "Monthly",
       "yearly": "Yearly",
+      "weekly": "Weekly",
+      "biweekly": "Bi-weekly",
       "installment": "Installment",
       "fixed": "Fixed bill"
     },
