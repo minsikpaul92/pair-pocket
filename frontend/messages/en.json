@@ -403,6 +403,7 @@
     "cycle": {
       "monthly": "Monthly",
       "yearly": "Yearly",
+      "every_x_days": "Every X days",
       "weekly": "Weekly",
       "biweekly": "Bi-weekly",
       "installment": "Installment",

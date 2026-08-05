@@ -15,6 +15,7 @@ from app.models.transaction import AccountType, Currency
 class BillingCycle(str, Enum):
     MONTHLY = "monthly"
     YEARLY = "yearly"
+    EVERY_X_DAYS = "every_x_days"
     WEEKLY = "weekly"
     BIWEEKLY = "biweekly"
     INSTALLMENT = "installment"
@@ -61,6 +62,7 @@ class SubscriptionBase(BaseModel):
     sub_category: str
     merchant: str = "미지정"
     next_due_date: datetime | None = None
+    interval_days: int | None = Field(default=None, gt=0)
 
     @field_validator("name", "category", "sub_category", "merchant", mode="before")
     @classmethod
@@ -86,6 +88,7 @@ class SubscriptionUpdate(BaseModel):
     merchant: str | None = None
     start_date: datetime | None = None
     next_due_date: datetime | None = None
+    interval_days: int | None = Field(default=None, gt=0)
     installment_start_date: datetime | None = None
     total_installments: int | None = Field(default=None, gt=0)
     completed_installments: int | None = Field(default=None, ge=0)

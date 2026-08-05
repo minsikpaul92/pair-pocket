@@ -698,6 +698,7 @@ async function readApiError(res: Response, fallbackCode: string): Promise<never>
 export type BillingCycle =
   | "monthly"
   | "yearly"
+  | "every_x_days"
   | "weekly"
   | "biweekly"
   | "installment";
@@ -726,6 +727,7 @@ export interface Subscription {
   promo_reminder_enabled: boolean;
   end_reminder_enabled: boolean;
   is_fixed_bill?: boolean;
+  interval_days?: number | null;
   account_id: string;
   counter_account_id?: string | null;
   category: string;
@@ -756,6 +758,7 @@ export interface NewSubscription {
   promo_reminder_enabled?: boolean;
   end_reminder_enabled?: boolean;
   is_fixed_bill?: boolean;
+  interval_days?: number | null;
   account_id: string;
   counter_account_id?: string | null;
   category: string;
@@ -800,6 +803,7 @@ export interface SubscriptionOccurrence {
 export const BILLING_CYCLE_LABEL: Record<BillingCycle, string> = {
   monthly: "매월",
   yearly: "매년",
+  every_x_days: "X일 마다",
   weekly: "매주",
   biweekly: "격주",
   installment: "할부",

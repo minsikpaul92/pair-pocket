@@ -403,6 +403,7 @@
     "cycle": {
       "monthly": "매월",
       "yearly": "매년",
+      "every_x_days": "X일 마다",
       "weekly": "매주",
       "biweekly": "격주(2주)",
       "installment": "할부",

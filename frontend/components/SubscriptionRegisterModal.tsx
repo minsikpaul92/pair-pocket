@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import CategorySelect from "@/components/CategorySelect";
+import DayPicker from "@/components/DayPicker";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import {
@@ -40,7 +41,7 @@ import {
   subCategoriesFor,
   updateSubscription,
 } from "@/lib/api";
-import { dayKey } from "@/lib/date";
+import { dayKey, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import {
   formatSubscriptionDate,
@@ -88,6 +89,10 @@ export default function SubscriptionRegisterModal({
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
+  const [subType, setSubType] = useState<"subscription" | "installment" | "fixed">("subscription");
+  const [recurrenceRule, setRecurrenceRule] = useState<"monthly" | "yearly" | "every_x_days">("monthly");
+  const [intervalDays, setIntervalDays] = useState<string>("7");
+  const [dayOfMonth, setDayOfMonth] = useState<number>(new Date().getDate());
   const [startDate, setStartDate] = useState(dayKey(new Date()));
   const [nextDueDate, setNextDueDate] = useState(dayKey(new Date()));
   const [installmentStartDate, setInstallmentStartDate] = useState("");
@@ -143,19 +148,19 @@ export default function SubscriptionRegisterModal({
   );
 
   const computedInstallmentEnd = useMemo(() => {
-    if (cycle !== "installment") return null;
+    if (subType !== "installment" && cycle !== "installment") return null;
     const total = Number(totalInstallments);
     if (!total || total < 1) return null;
     const base = installmentStartDate || startDate;
     return addMonthsToDateKey(base, total - 1);
-  }, [cycle, totalInstallments, installmentStartDate, startDate]);
+  }, [subType, cycle, totalInstallments, installmentStartDate, startDate]);
 
   const autoCompletedInstallments = useMemo(() => {
-    if (cycle !== "installment") return 0;
+    if (subType !== "installment" && cycle !== "installment") return 0;
     const instStart = installmentStartDate || startDate;
     if (!instStart || startDate <= instStart) return 0;
     return monthsBetweenDates(new Date(instStart), new Date(startDate));
-  }, [cycle, installmentStartDate, startDate]);
+  }, [subType, cycle, installmentStartDate, startDate]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -171,10 +176,32 @@ export default function SubscriptionRegisterModal({
     setAmount(formatAmountInput(String(editing.amount), editing.currency));
     setCycle(editing.cycle);
     setIsFixedBill(Boolean(editing.is_fixed_bill));
+
+    if (editing.is_fixed_bill) {
+      setSubType("fixed");
+    } else if (editing.cycle === "installment") {
+      setSubType("installment");
+    } else {
+      setSubType("subscription");
+    }
+
+    if (editing.cycle === "every_x_days") {
+      setRecurrenceRule("every_x_days");
+      if (editing.interval_days) setIntervalDays(String(editing.interval_days));
+    } else if (editing.cycle === "yearly") {
+      setRecurrenceRule("yearly");
+    } else {
+      setRecurrenceRule("monthly");
+    }
+
     const startIso = dateInputFromIso(editing.start_date);
     const nextIso = dateInputFromIso(editing.next_due_date) || startIso;
     setStartDate(startIso);
     setNextDueDate(nextIso);
+    if (nextIso) {
+      const parsedNext = parseDate(nextIso);
+      setDayOfMonth(parsedNext.getDate());
+    }
     setInstallmentStartDate(dateInputFromIso(editing.installment_start_date));
     setShowEndDate(Boolean(editing.end_date) && editing.cycle !== "installment");
     setEndDate(dateInputFromIso(editing.end_date));
@@ -184,8 +211,7 @@ export default function SubscriptionRegisterModal({
         : "12"
     );
     setCompletedInstallments(String(editing.completed_installments));
-    const hasPromo =
-      editing.promo_amount != null;
+    const hasPromo = editing.promo_amount != null;
     setShowPromo(hasPromo);
     setPromoAmount(
       hasPromo
@@ -193,7 +219,6 @@ export default function SubscriptionRegisterModal({
         : ""
     );
     setPromoEndDate(dateInputFromIso(editing.promo_end_date));
-    // Reminder only makes sense with an end date; keep off otherwise.
     setPromoReminderEnabled(
       Boolean(editing.promo_end_date) && editing.promo_reminder_enabled
     );
@@ -356,16 +381,24 @@ export default function SubscriptionRegisterModal({
       return;
     }
 
+    const finalCycle: BillingCycle =
+      subType === "installment" ? "installment" : recurrenceRule;
+    const finalIntervalDays =
+      subType !== "installment" && recurrenceRule === "every_x_days"
+        ? Math.max(parseInt(intervalDays, 10) || 7, 1)
+        : null;
+
     const payload: NewSubscription = {
       name: trimmedName,
       amount: numericAmount,
       currency,
       account_type: accountType,
-      cycle,
+      cycle: finalCycle,
+      interval_days: finalIntervalDays,
       start_date: `${startDate}T00:00:00`,
       next_due_date: `${nextDueDate}T00:00:00`,
       end_date:
-        cycle === "installment"
+        subType === "installment"
           ? computedInstallmentEnd
             ? `${computedInstallmentEnd}T00:00:00`
             : null
@@ -373,12 +406,12 @@ export default function SubscriptionRegisterModal({
             ? `${endDate}T00:00:00`
             : null,
       installment_start_date:
-        cycle === "installment" && installmentStartDate
+        subType === "installment" && installmentStartDate
           ? `${installmentStartDate}T00:00:00`
           : null,
       total_installments: installments,
       completed_installments:
-        cycle === "installment" ? resolvedCompleted : undefined,
+        subType === "installment" ? resolvedCompleted : undefined,
       account_id: accountId,
       counter_account_id: isTransfer ? counterAccountId || null : null,
       category,
@@ -389,8 +422,8 @@ export default function SubscriptionRegisterModal({
       promo_reminder_enabled:
         showPromo && resolvedPromoEnd ? promoReminderEnabled : false,
       end_reminder_enabled:
-        cycle !== "installment" && showEndDate ? endReminderEnabled : false,
-      is_fixed_bill: isFixedBill && cycle === "monthly",
+        subType !== "installment" && showEndDate ? endReminderEnabled : false,
+      is_fixed_bill: subType === "fixed",
     };
 
     setSubmitting(true);
@@ -527,18 +560,22 @@ export default function SubscriptionRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {t("cycleLabel")}
+              구독/지출 유형
             </label>
             <div className="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
-              {([...CYCLES, "fixed"] as const).map((c) => {
-                const selected =
-                  c === "fixed" ? isFixedBill : cycle === c && !isFixedBill;
+              {[
+                { key: "subscription", label: "구독" },
+                { key: "installment", label: "할부" },
+                { key: "fixed", label: "고정지출" },
+              ].map((item) => {
+                const selected = subType === item.key;
                 return (
                   <button
-                    key={c}
+                    key={item.key}
                     type="button"
                     onClick={() => {
-                      if (c === "fixed") {
+                      setSubType(item.key as any);
+                      if (item.key === "fixed") {
                         setIsFixedBill(true);
                         setCycle("monthly");
                         setShowEndDate(false);
@@ -548,8 +585,12 @@ export default function SubscriptionRegisterModal({
                         }
                       } else {
                         setIsFixedBill(false);
-                        setCycle(c);
-                        if (c === "installment") setShowEndDate(false);
+                        if (item.key === "installment") {
+                          setCycle("installment");
+                          setShowEndDate(false);
+                        } else {
+                          setCycle(recurrenceRule);
+                        }
                         if (
                           (category === "주거/통신" || !category) &&
                           (subCategory === "관리비/공과금" || !subCategory)
@@ -559,30 +600,63 @@ export default function SubscriptionRegisterModal({
                         }
                       }
                     }}
-                    className={`flex-1 rounded-lg px-1.5 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                    className={`flex-1 rounded-lg px-2 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                       selected
-                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                        : "text-gray-500"
+                        ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400 font-bold"
+                        : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                     }`}
                   >
-                    {c === "fixed" ? t("cycle.fixed") : translateBillingCycle(c, t)}
+                    {item.label}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {cycle === "installment" && (
+          {subType !== "installment" && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                결제 주기 규칙
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { rule: "monthly", label: "매월" },
+                  { rule: "yearly", label: "매년" },
+                  { rule: "every_x_days", label: "X일 마다" },
+                ].map((r) => {
+                  const active = recurrenceRule === r.rule;
+                  return (
+                    <button
+                      key={r.rule}
+                      type="button"
+                      onClick={() => {
+                        setRecurrenceRule(r.rule as any);
+                        setCycle(r.rule as any);
+                      }}
+                      className={`rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold transition-all border ${
+                        active
+                          ? "bg-blue-50 dark:bg-blue-500/20 border-blue-500 text-blue-600 dark:text-blue-400 shadow-xs"
+                          : "bg-gray-50 dark:bg-gray-800 border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {subType === "installment" ? (
             <>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
                   {t("installmentStartDate")}
                 </label>
-                <input
-                  type="date"
-                  value={installmentStartDate}
-                  onChange={(e) => setInstallmentStartDate(e.target.value)}
-                  className="input-field"
+                <DayPicker
+                  value={parseDate(installmentStartDate || startDate)}
+                  onChange={(d) => setInstallmentStartDate(dayKey(d))}
+                  locale={locale}
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
                   {t("installmentStartHint")}
@@ -633,6 +707,83 @@ export default function SubscriptionRegisterModal({
                   {t("completedAutoHint", { count: autoCompletedInstallments })}
                 </p>
               </div>
+            </>
+          ) : (
+            <>
+              {recurrenceRule === "monthly" && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                    매월 결제일 지정
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[1, 5, 10, 15, 20, 25, 30, 31].map((day) => {
+                      const isSelected = dayOfMonth === day;
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            setDayOfMonth(day);
+                            const now = parseDate(nextDueDate);
+                            const y = now.getFullYear();
+                            const m = now.getMonth();
+                            const lastDay = new Date(y, m + 1, 0).getDate();
+                            const targetD = Math.min(day, lastDay);
+                            const targetDate = new Date(y, m, targetD);
+                            setNextDueDate(dayKey(targetDate));
+                          }}
+                          className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                            isSelected
+                              ? "bg-blue-600 text-white font-bold"
+                              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+                          }`}
+                        >
+                          {day === 31 ? "말일" : `${day}일`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {recurrenceRule === "every_x_days" && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                    결제 간격 (며칠 마다)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={intervalDays}
+                      onChange={(e) => setIntervalDays(e.target.value)}
+                      placeholder="7"
+                      className="input-field max-w-[120px]"
+                    />
+                    <span className="text-xs font-medium text-gray-500">일 마다 자동 결제/이체</span>
+                  </div>
+                  <div className="flex gap-1.5 mt-2">
+                    {[
+                      { days: "7", label: "매주 (7일)" },
+                      { days: "14", label: "격주 (14일)" },
+                      { days: "30", label: "30일" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.days}
+                        type="button"
+                        onClick={() => setIntervalDays(preset.days)}
+                        className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                          intervalDays === preset.days
+                            ? "bg-blue-500 text-white font-bold"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -730,19 +881,18 @@ export default function SubscriptionRegisterModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                구독/이체 시작일
+                구독/이체 시작일 (기준일)
               </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  const val = e.target.value;
+              <DayPicker
+                value={parseDate(startDate)}
+                onChange={(d) => {
+                  const val = dayKey(d);
                   setStartDate(val);
                   if (!isEditing && val > nextDueDate) {
                     setNextDueDate(val);
                   }
                 }}
-                className="input-field"
+                locale={locale}
               />
             </div>
             <div>
@@ -750,7 +900,7 @@ export default function SubscriptionRegisterModal({
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
                   {t("nextPaymentDate") || "다음 정기 결제일"}
                 </label>
-                {cycle !== "installment" && (
+                {subType !== "installment" && (
                   <button
                     type="button"
                     onClick={() => {
@@ -768,18 +918,20 @@ export default function SubscriptionRegisterModal({
                   </button>
                 )}
               </div>
-              <input
-                type="date"
-                value={nextDueDate}
-                min={startDate}
-                onChange={(e) => setNextDueDate(e.target.value)}
-                className="input-field"
+              <DayPicker
+                value={parseDate(nextDueDate)}
+                onChange={(d) => {
+                  const val = dayKey(d);
+                  setNextDueDate(val);
+                  setDayOfMonth(d.getDate());
+                }}
+                locale={locale}
               />
             </div>
           </div>
 
           {nextDueDate && (
-            <div className="rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 p-2.5 px-3.5 text-xs flex items-center justify-between">
+            <div className="rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 p-2.5 px-3.5 text-xs flex items-center justify-between">
               <span className="font-medium text-blue-800 dark:text-blue-200">
                 ✨ 다음 결제 예정일
               </span>
@@ -789,18 +941,16 @@ export default function SubscriptionRegisterModal({
             </div>
           )}
 
-          {cycle !== "installment" && showEndDate && (
+          {subType !== "installment" && showEndDate && (
             <div className="space-y-3">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
                   {t("endDate")}
                 </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  min={startDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="input-field"
+                <DayPicker
+                  value={parseDate(endDate || startDate)}
+                  onChange={(d) => setEndDate(dayKey(d))}
+                  locale={locale}
                 />
               </div>
               <label className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5 cursor-pointer">
