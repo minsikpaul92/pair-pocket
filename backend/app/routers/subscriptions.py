@@ -51,6 +51,7 @@ router = APIRouter(prefix="/api/subscriptions", tags=["subscriptions"])
 
 COLLECTION = "subscriptions"
 OCC_COL = "subscription_occurrences"
+TX_COL = "transactions"
 ACCOUNTS_COL = "accounts"
 
 
@@ -355,7 +356,7 @@ async def create_subscription(
     doc["cycle"] = payload.cycle.value
     doc["owner_id"] = current_user.id
     doc["status"] = SubscriptionStatus.ACTIVE.value
-    doc["next_due_date"] = payload.start_date
+    doc["next_due_date"] = payload.next_due_date or payload.start_date
     doc["promo_reminder_sent_at"] = None
     doc["end_reminder_sent_at"] = None
     if not doc.get("merchant"):
@@ -385,6 +386,9 @@ async def create_subscription(
     result = await db[COLLECTION].insert_one(doc)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
     await generate_occurrences(db, subscription=created)
+    await materialize_due_occurrences(
+        db, owner_ids=owner_ids, account_type=payload.account_type.value
+    )
     return _serialize_sub(created)
 
 
@@ -553,15 +557,18 @@ async def update_subscription(
                 )
                 tx_id = occ.get("transaction_id")
                 if tx_id and ObjectId.is_valid(str(tx_id)):
-                    await db.transactions.update_one(
+                    await db[TX_COL].update_one(
                         {"_id": ObjectId(str(tx_id))},
                         {"$set": {"amount": new_amt}},
                     )
                 else:
-                    await db.transactions.update_one(
+                    await db[TX_COL].update_one(
                         {"subscription_occurrence_id": str(occ["_id"])},
                         {"$set": {"amount": new_amt}},
                     )
+    await materialize_due_occurrences(
+        db, owner_ids=owner_ids, account_type=updated["account_type"]
+    )
     return _serialize_sub(updated)
 
 

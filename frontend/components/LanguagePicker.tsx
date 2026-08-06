@@ -43,6 +43,9 @@ export default function LanguagePicker({
 
   async function applyActiveLocale(next: AppLocale | null) {
     if (!next) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("pairpocket_user_locale", next);
+    }
     await onLocaleSelected?.(next);
     if (next !== locale) {
       router.replace(pathname, { locale: next });
@@ -51,6 +54,9 @@ export default function LanguagePicker({
 
   async function switchLocale(next: AppLocale) {
     if (next === locale) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("pairpocket_user_locale", next);
+    }
     await onLocaleSelected?.(next);
     router.replace(pathname, { locale: next });
   }

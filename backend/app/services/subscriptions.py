@@ -64,9 +64,19 @@ def _add_months(dt: datetime, months: int) -> datetime:
     return dt.replace(year=year, month=month, day=day)
 
 
-def _next_due(current: datetime, cycle: BillingCycle) -> datetime:
+def _next_due(
+    current: datetime,
+    cycle: BillingCycle,
+    interval_days: int | None = None,
+) -> datetime:
+    if cycle == BillingCycle.EVERY_X_DAYS or (interval_days and interval_days > 0):
+        return current + timedelta(days=interval_days or 7)
     if cycle == BillingCycle.YEARLY:
         return current.replace(year=current.year + 1)
+    if cycle == BillingCycle.WEEKLY:
+        return current + timedelta(days=7)
+    if cycle == BillingCycle.BIWEEKLY:
+        return current + timedelta(days=14)
     # monthly + installment both advance one month per charge
     return _add_months(current, 1)
 
@@ -256,7 +266,9 @@ async def schedule_subscription_cancel(
     """Mark 해지예정 — visible until day before next billing cycle after upcoming due."""
     cycle = BillingCycle(subscription["cycle"])
     next_due = subscription.get("next_due_date") or subscription["start_date"]
-    cancel_effective = _next_due(next_due, cycle)
+    cancel_effective = _next_due(
+        next_due, cycle, interval_days=subscription.get("interval_days")
+    )
     end_date = cancel_effective - timedelta(days=1)
     sub_id = str(subscription["_id"])
 
@@ -627,7 +639,9 @@ async def generate_occurrences(
 
     while due <= horizon_end:
         if _calendar_day(due) < schedule_start:
-            due = _next_due(due, cycle)
+            due = _next_due(
+                due, cycle, interval_days=subscription.get("interval_days")
+            )
             continue
         if end and due > end:
             break
@@ -667,7 +681,9 @@ async def generate_occurrences(
                 )
                 created += 1
 
-        due = _next_due(due, cycle)
+        due = _next_due(
+            due, cycle, interval_days=subscription.get("interval_days")
+        )
 
     return created
 
@@ -783,6 +799,8 @@ async def materialize_due_occurrences(
             continue
 
         tx_owner = claimed.get("owner_id") or sub.get("owner_id") or ids[0]
+        counter_acc = sub.get("counter_account_id")
+        is_transfer_kind = bool(counter_acc) or sub.get("category") == "자산 이동/카드"
         tx_doc = {
             "date": claimed["due_date"],
             "amount": claimed["amount"],
@@ -795,8 +813,8 @@ async def materialize_due_occurrences(
             "institution": None,
             "settles_expense_id": None,
             "account_id": sub["account_id"],
-            "counter_account_id": None,
-            "kind": TransactionKind.NORMAL.value,
+            "counter_account_id": counter_acc,
+            "kind": TransactionKind.TRANSFER.value if is_transfer_kind else TransactionKind.NORMAL.value,
             "owner_id": tx_owner,
             "subscription_occurrence_id": str(claimed["_id"]),
             "subscription_id": str(sub["_id"]),
@@ -813,7 +831,11 @@ async def materialize_due_occurrences(
         )
 
         completed = sub.get("completed_installments", 0) + 1
-        next_due = _next_due(claimed["due_date"], BillingCycle(sub["cycle"]))
+        next_due = _next_due(
+            claimed["due_date"],
+            BillingCycle(sub["cycle"]),
+            interval_days=sub.get("interval_days"),
+        )
         updates: dict = {
             "completed_installments": completed,
             "next_due_date": next_due,
@@ -908,7 +930,9 @@ async def skip_occurrence(
         return claimed
 
     cycle = BillingCycle(sub["cycle"])
-    next_due = _next_due(due, cycle)
+    next_due = _next_due(
+        due, cycle, interval_days=sub.get("interval_days")
+    )
     await db[SUBS_COL].update_one(
         {"_id": sub_oid},
         {

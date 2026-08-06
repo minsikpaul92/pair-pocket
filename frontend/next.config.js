@@ -21,15 +21,15 @@ const nextConfig = {
     // Without Edge middleware: bare paths must land under default locale.
     // Backend OAuth / invite emails omit the locale prefix.
     return [
-      { source: "/", destination: "/ko", permanent: false },
+      { source: "/", destination: "/en", permanent: false },
       {
         source: "/auth/callback",
-        destination: "/ko/auth/callback",
+        destination: "/en/auth/callback",
         permanent: false,
       },
       {
         source: "/invite/:token",
-        destination: "/ko/invite/:token",
+        destination: "/en/invite/:token",
         permanent: false,
       },
     ];

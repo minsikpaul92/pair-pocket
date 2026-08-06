@@ -453,9 +453,11 @@ export default function SubscriptionsView({
               {" · "}
               {translateCategory(sub.category, tCategories)} ›{" "}
               {translateSubCategory(sub.sub_category, tSubCategories)}
-              {accountNames[sub.account_id]
-                ? ` · ${accountNames[sub.account_id]}`
-                : ""}
+              {sub.counter_account_id && accountNames[sub.counter_account_id]
+                ? ` · ${accountNames[sub.account_id] || ""} → ${accountNames[sub.counter_account_id]}`
+                : accountNames[sub.account_id]
+                  ? ` · ${accountNames[sub.account_id]}`
+                  : ""}
             </p>
             {sub.next_due_date &&
               (sub.status === "active" ||

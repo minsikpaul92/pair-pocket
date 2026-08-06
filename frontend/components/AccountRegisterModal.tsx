@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
@@ -17,6 +17,7 @@ import {
   TransactionType,
   addInstitution,
   createAccount,
+  deleteAccount,
   fetchUserSettings,
   formatAmountInput,
   maskAccountNumber,
@@ -40,6 +41,7 @@ interface Props {
   onClose: () => void;
   onCreated: (account: FinancialAccount) => void;
   onUpdated?: (account: FinancialAccount) => void;
+  onDeleted?: (accountId: string) => void;
 }
 
 const KINDS: FinancialAccountKind[] = [
@@ -60,6 +62,7 @@ export default function AccountRegisterModal({
   onClose,
   onCreated,
   onUpdated,
+  onDeleted,
 }: Props) {
   const isEdit = Boolean(account);
   const t = useTranslations("account");
@@ -501,6 +504,32 @@ export default function AccountRegisterModal({
             <p className="text-sm text-red-500" role="alert">
               {error}
             </p>
+          )}
+
+          {isEdit && (
+            <div className="flex items-center justify-between gap-3 pt-1 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!account?.id) return;
+                  if (!window.confirm(t("confirmDelete"))) return;
+                  setSubmitting(true);
+                  try {
+                    await deleteAccount(account.id);
+                    onDeleted?.(account.id);
+                    onClose();
+                  } catch (err: unknown) {
+                    setError(translateError(err, t));
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+                {t("deleteButton")}
+              </button>
+            </div>
           )}
 
           <button

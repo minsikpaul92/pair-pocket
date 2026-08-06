@@ -1,6 +1,7 @@
 """Account balance derivation from opening_balance + ledger movements."""
 
 import asyncio
+from datetime import datetime
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -125,13 +126,28 @@ async def compute_account_balance(
 
     query: dict = {
         **owner_clause,
-        "$or": [
-            {"account_id": account_id},
-            {"counter_account_id": account_id},
-        ],
     }
+    account_filter = [
+        {"account_id": account_id},
+        {"counter_account_id": account_id},
+    ]
     if start:
-        query["date"] = {"$gte": start}
+        start_str = start[:10] if isinstance(start, str) else start.strftime("%Y-%m-%d")
+        try:
+            start_dt = datetime.fromisoformat(start_str)
+        except ValueError:
+            start_dt = None
+
+        date_filter = [{"date": {"$gte": start_str}}]
+        if start_dt:
+            date_filter.append({"date": {"$gte": start_dt}})
+
+        query["$and"] = [
+            {"$or": account_filter},
+            {"$or": date_filter},
+        ]
+    else:
+        query["$or"] = account_filter
 
     cursor = db[TX_COL].find(query)
 
@@ -175,6 +191,56 @@ async def compute_account_balance(
     return balance
 
 
+def resolve_account_country(doc: dict) -> str:
+    """Determine whether an account belongs to Canada (CA) or Korea (KR)."""
+    country = doc.get("country")
+    if country in ("CA", "KR"):
+        return country
+    name = (doc.get("name") or "").lower()
+    inst = (doc.get("institution") or "").lower()
+    hay = f"{inst} {name}"
+    if any(
+        k in hay
+        for k in [
+            "toss",
+            "토스",
+            "키움",
+            "미래에셋",
+            "삼성증권",
+            "한국투자",
+            "kb증권",
+            "nh투자",
+            "나무",
+            "한투",
+            "신한",
+            "국민",
+            "우리",
+            "하나",
+            "카카오",
+        ]
+    ):
+        return "KR"
+    if any(
+        k in hay
+        for k in [
+            "wealthsimple",
+            "questrade",
+            "td",
+            "rbc",
+            "cibc",
+            "scotiabank",
+            "bmo",
+        ]
+    ):
+        return "CA"
+    curr = doc.get("currency")
+    if curr == "KRW":
+        return "KR"
+    if curr == "CAD":
+        return "CA"
+    return "KR" if ("토스" in hay or "kb" in hay) else "CA"
+
+
 async def compute_net_worth(
     db: AsyncIOMotorDatabase,
     *,
@@ -183,7 +249,7 @@ async def compute_net_worth(
     account_type: AccountType,
     currency: Currency | None = None,
 ) -> NetWorthSummary:
-    """Aggregate per-account balances into net worth."""
+    """Aggregate per-account balances into net worth for the requested country tab (KR vs CA)."""
     ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
     if not ids:
         return NetWorthSummary(
@@ -202,26 +268,65 @@ async def compute_net_worth(
         "account_type": account_type.value,
         "is_active": True,
     }
-    if currency is not None:
-        query["currency"] = currency.value
 
-    docs = await db[ACCOUNTS_COL].find(query).sort("name", 1).to_list(length=100)
+    all_docs = await db[ACCOUNTS_COL].find(query).sort("name", 1).to_list(length=100)
+
+    target_currency = currency if currency else Currency.CAD
+    target_country = "KR" if target_currency == Currency.KRW else "CA"
+
+    # Filter accounts by target country tab (KR for KRW, CA for CAD)
+    docs = [d for d in all_docs if resolve_account_country(d) == target_country]
+
+    from app.services.exchange import get_cad_krw_rate
+    from app.services.stocks import get_or_update_stock_price
+
+    rates_info = await get_cad_krw_rate()
+    cad_krw = rates_info["cad_krw"]
+    krw_cad = rates_info["krw_cad"]
+    usd_krw = rates_info["usd_krw"]
+    usd_cad = rates_info["usd_cad"]
+
+    def convert_amount(amount: float, from_curr: str, to_curr: str) -> float:
+        if from_curr == to_curr:
+            return amount
+        if to_curr == "KRW":
+            if from_curr == "CAD":
+                return amount * cad_krw
+            if from_curr == "USD":
+                return amount * usd_krw
+        elif to_curr == "CAD":
+            if from_curr == "KRW":
+                return amount * krw_cad
+            if from_curr == "USD":
+                return amount * usd_cad
+        elif to_curr == "USD":
+            if from_curr == "KRW":
+                return amount * (rates_info.get("krw_usd") or (1 / usd_krw))
+            if from_curr == "CAD":
+                return amount * (rates_info.get("cad_usd") or (1 / usd_cad))
+        return amount
 
     accounts: list[AccountBalanceOut] = []
     total_assets = 0.0
     total_liabilities = 0.0
 
     for doc in docs:
-        balance = await compute_account_balance(
+        native_balance = await compute_account_balance(
             db, account_doc=doc, owner_ids=ids
         )
+        acc_curr = doc.get("currency", "CAD")
+        converted_balance = convert_amount(
+            native_balance, acc_curr, target_currency.value
+        )
         is_liability = doc.get("is_liability", False)
-        contribution = -balance if is_liability else balance
+        contribution = (
+            -converted_balance if is_liability else converted_balance
+        )
 
         if is_liability:
-            total_liabilities += balance
+            total_liabilities += converted_balance
         else:
-            total_assets += balance
+            total_assets += converted_balance
 
         accounts.append(
             AccountBalanceOut(
@@ -232,36 +337,22 @@ async def compute_net_worth(
                 currency=Currency(doc["currency"]),
                 account_type=AccountType(doc["account_type"]),
                 is_liability=is_liability,
-                balance=balance,
+                balance=native_balance,
                 net_worth_contribution=contribution,
             )
         )
 
-    # Calculate stock holdings valuation (once per account currency bucket).
-    # When currency is filtered, only include holdings on accounts in that currency
-    # so CAD + KRW dashboard totals do not double-count the same portfolio.
+    # Query stock holdings ONLY for accounts in this country
+    country_account_ids = {str(d["_id"]) for d in docs}
     holdings_query: dict = {
         "owner_id": {"$in": ids},
         "account_type": account_type.value,
+        "account_id": {"$in": list(country_account_ids)},
     }
-    account_ids = {str(d["_id"]) for d in docs}
-    if currency is not None:
-        holdings_query["account_id"] = {"$in": list(account_ids)}
-
     holdings_cursor = db.holdings.find(holdings_query)
     holdings_docs = await holdings_cursor.to_list(length=None)
 
     if holdings_docs:
-        from app.services.exchange import get_cad_krw_rate
-        from app.services.stocks import get_or_update_stock_price
-        
-        rates_info = await get_cad_krw_rate()
-        cad_krw = rates_info["cad_krw"]
-        krw_cad = rates_info["krw_cad"]
-        usd_krw = rates_info["usd_krw"]
-        usd_cad = rates_info["usd_cad"]
-
-        target_currency = currency if currency else Currency.CAD
         stocks_valuation_total = 0.0
 
         price_infos = await asyncio.gather(
@@ -269,34 +360,19 @@ async def compute_net_worth(
         )
 
         for h, price_info in zip(holdings_docs, price_infos):
-            # Prefer holding's stored currency (CAD CDR / KR listing) over Yahoo.
             price = (
-                price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
+                price_info.get("price", h.get("avg_price", 0))
+                if price_info
+                else h.get("avg_price", 0)
             )
             stock_curr = h.get("currency") or (
                 price_info.get("currency") if price_info else "USD"
             )
-            shares = h["shares"]
+            shares = h.get("shares", 0)
             valuation_native = shares * price
-
-            val_converted = valuation_native
-            if stock_curr != target_currency.value:
-                if target_currency == Currency.KRW:
-                    if stock_curr == "CAD":
-                        val_converted = valuation_native * cad_krw
-                    elif stock_curr == "USD":
-                        val_converted = valuation_native * usd_krw
-                elif target_currency == Currency.CAD:
-                    if stock_curr == "KRW":
-                        val_converted = valuation_native * krw_cad
-                    elif stock_curr == "USD":
-                        val_converted = valuation_native * usd_cad
-                elif target_currency == Currency.USD:
-                    if stock_curr == "KRW":
-                        val_converted = valuation_native * (rates_info.get("krw_usd") or (1 / usd_krw))
-                    elif stock_curr == "CAD":
-                        val_converted = valuation_native * (rates_info.get("cad_usd") or (1 / usd_cad))
-
+            val_converted = convert_amount(
+                valuation_native, stock_curr, target_currency.value
+            )
             stocks_valuation_total += val_converted
 
         if stocks_valuation_total > 0:
@@ -317,7 +393,7 @@ async def compute_net_worth(
 
     return NetWorthSummary(
         account_type=account_type,
-        currency=currency,
+        currency=target_currency,
         total_assets=total_assets,
         total_liabilities=total_liabilities,
         net_worth=total_assets - total_liabilities,

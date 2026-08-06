@@ -23,6 +23,8 @@ import {
   ExchangeRate,
   LedgerScope,
   StatsSummary,
+  Transaction,
+  effectiveExpenseAmount,
   fetchStatsSummary,
   fetchUserSettings,
   formatAmount,
@@ -131,46 +133,104 @@ function PieExpenseTooltip({
   payload,
   totalExpense,
   displayCurrency,
-  shareLabel,
-  ofTotalLabel,
+  monthTransactions,
+  tCategories,
 }: {
   active?: boolean;
   payload?: Array<{ payload?: CategorySlice; color?: string }>;
   totalExpense: number;
   displayCurrency: Currency;
-  shareLabel: (percent: string) => string;
-  ofTotalLabel: (amount: string, total: string) => string;
+  monthTransactions?: Transaction[];
+  tCategories?: any;
 }) {
   if (!active || !payload?.length) return null;
   const slice = payload[0]?.payload;
   if (!slice) return null;
 
-  const amountText = formatAmount(slice.amount, displayCurrency);
-  const totalText = formatAmount(totalExpense, displayCurrency);
-  const percentText = slice.percent.toFixed(0);
+  const percentText = slice.percent.toFixed(1);
   const swatch =
     typeof payload[0]?.color === "string" ? payload[0].color : slice.color;
 
+  const topItems = (() => {
+    if (!monthTransactions?.length) return [];
+    const map: Record<string, number> = {};
+    let catSum = 0;
+    monthTransactions.forEach((tx) => {
+      if (tx.type !== "expense") return;
+      const isMatch =
+        tx.category === slice.category ||
+        (tCategories &&
+          translateCategory(tx.category, tCategories) === slice.name);
+      if (isMatch) {
+        const name = tx.merchant?.trim() || tx.sub_category?.trim() || "기타";
+        const amt = effectiveExpenseAmount(tx);
+        map[name] = (map[name] || 0) + amt;
+        catSum += amt;
+      }
+    });
+
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([name, amt]) => ({
+        name,
+        amount: amt,
+        percent: catSum > 0 ? Math.round((amt / catSum) * 100) : 0,
+      }));
+  })();
+
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 shadow-lg min-w-[11rem]">
-      <div className="flex items-center gap-2 min-w-0">
-        <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: swatch }}
-        />
-        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
-          {slice.name}
-        </p>
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700/80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-3.5 shadow-2xl min-w-[13.5rem] transition-all">
+      <div className="flex items-center justify-between gap-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white dark:ring-gray-800"
+            style={{ backgroundColor: swatch }}
+          />
+          <p className="text-sm font-extrabold text-gray-900 dark:text-white truncate">
+            {slice.name}
+          </p>
+        </div>
+        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded-full tabular-nums">
+          {percentText}%
+        </span>
       </div>
-      <p className="mt-1.5 text-sm font-bold tabular-nums text-gray-900 dark:text-white">
-        {amountText}
-      </p>
-      <p className="mt-0.5 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
-        {ofTotalLabel(amountText, totalText)}
-      </p>
-      <p className="mt-0.5 text-[11px] font-medium text-gray-600 dark:text-gray-300">
-        {shareLabel(percentText)}
-      </p>
+
+      <div className="mt-2.5 border-t border-gray-100 dark:border-gray-800/80 pt-2">
+        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+          주요 사용처
+        </p>
+        {topItems.length > 0 ? (
+          <div className="space-y-1">
+            {topItems.map((item) => (
+              <div
+                key={item.name}
+                className="flex items-center justify-between text-xs gap-2"
+              >
+                <span className="truncate font-medium text-gray-700 dark:text-gray-300 max-w-[9rem]">
+                  {item.name}
+                </span>
+                <span className="font-bold tabular-nums text-gray-900 dark:text-white text-[11px]">
+                  {item.percent}%
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs font-semibold tabular-nums text-gray-700 dark:text-gray-200">
+            {formatAmount(slice.amount, displayCurrency)}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-2.5 flex items-center justify-between border-t border-gray-100 dark:border-gray-800/80 pt-1.5 text-[10px]">
+        <span className="font-semibold text-gray-400 dark:text-gray-500 tabular-nums">
+          {formatAmount(slice.amount, displayCurrency)}
+        </span>
+        <span className="text-[9px] font-black tracking-widest text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.5 rounded uppercase">
+          CLICK
+        </span>
+      </div>
     </div>
   );
 }
@@ -184,6 +244,8 @@ interface Props {
   rate: ExchangeRate | null;
   cadStats: StatsSummary | null;
   krwStats: StatsSummary | null;
+  transactions?: Transaction[];
+  onCategoryClick?: (category: string) => void;
 }
 
 function convertAmount(
@@ -331,6 +393,8 @@ export default function DashboardAnalytics({
   rate,
   cadStats,
   krwStats,
+  transactions,
+  onCategoryClick,
 }: Props) {
   const locale = useLocale();
   const t = useTranslations("dashboard");
@@ -447,8 +511,9 @@ export default function DashboardAnalytics({
     setTrendLoading(true);
 
     const months: string[] = [];
-    for (let i = trendRange - 1; i >= 0; i -= 1) {
-      months.push(monthKey(addMonths(month, -i)));
+    const offset = Math.floor(trendRange / 2);
+    for (let i = -offset; i < trendRange - offset; i += 1) {
+      months.push(monthKey(addMonths(month, i)));
     }
 
     async function loadMonth(monthStr: string): Promise<TrendPoint> {
@@ -567,7 +632,16 @@ export default function DashboardAnalytics({
           </p>
         ) : (
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-            <div className="h-56 w-full">
+            <div className="relative h-56 w-full flex items-center justify-center">
+              {/* Centered Total Summary (z-0 so tooltip floats on top) */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
+                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                  총 지출
+                </span>
+                <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums mt-0.5">
+                  {formatAmount(pieTotalExpense, displayCurrency)}
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -576,11 +650,18 @@ export default function DashboardAnalytics({
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    innerRadius={48}
+                    innerRadius={52}
                     outerRadius={78}
-                    paddingAngle={2}
+                    paddingAngle={4}
+                    cornerRadius={4}
                     stroke="none"
                     labelLine={false}
+                    onClick={(entry) => {
+                      if (entry?.category && onCategoryClick) {
+                        onCategoryClick(entry.category);
+                      }
+                    }}
+                    cursor="pointer"
                     label={(props: {
                       cx: number;
                       cy: number;
@@ -612,6 +693,7 @@ export default function DashboardAnalytics({
                     ))}
                   </Pie>
                   <Tooltip
+                    wrapperStyle={{ zIndex: 100, pointerEvents: "none" }}
                     content={({ active, payload }) => (
                       <PieExpenseTooltip
                         active={active}
@@ -623,35 +705,33 @@ export default function DashboardAnalytics({
                         }
                         totalExpense={pieTotalExpense}
                         displayCurrency={displayCurrency}
-                        shareLabel={(percent) =>
-                          t("pieTooltipShare", { percent })
-                        }
-                        ofTotalLabel={(amount, total) =>
-                          t("pieTooltipOfTotal", { amount, total })
-                        }
+                        monthTransactions={transactions}
+                        tCategories={tCategories}
                       />
                     )}
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <ul className="space-y-2.5 max-h-56 overflow-y-auto">
+            <ul className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
               {displaySlices.map((row) => {
                 const Icon = categoryIcon(row.category);
                 return (
                   <li
                     key={row.category}
-                    className="flex items-center justify-between gap-3 min-w-0"
+                    onClick={() => onCategoryClick?.(row.category)}
+                    className="flex items-center justify-between gap-3 min-w-0 p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/80 cursor-pointer transition-colors group"
                   >
                     <div className="flex items-center gap-2 min-w-0 relative">
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setActiveColorPicker(
                             activeColorPicker === row.category ? null : row.category
-                          )
-                        }
-                        className="relative h-5 w-5 shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/20 flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+                          );
+                        }}
+                        className="relative h-5 w-5 shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/20 flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
                         style={{ backgroundColor: row.color }}
                         title={t("pickColor")}
                       >
@@ -667,10 +747,16 @@ export default function DashboardAnalytics({
                           {/* Fullscreen transparent click-outside handler */}
                           <div
                             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm cursor-default"
-                            onClick={() => setActiveColorPicker(null)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveColorPicker(null);
+                            }}
                           />
                           {/* 16-color preset modal popover (fixed and centered to prevent clipping) */}
-                          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                          <div
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <div className="w-56 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-2xl">
                               <div className="flex items-center justify-between mb-3">
                                 <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
@@ -708,15 +794,15 @@ export default function DashboardAnalytics({
                         </>
                       )}
 
-                      <span className="truncate text-sm text-gray-700 dark:text-gray-200">
+                      <span className="truncate text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                         {row.name}
                       </span>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-medium tabular-nums text-gray-900 dark:text-white">
+                      <p className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
                         {formatAmount(row.amount, displayCurrency)}
                       </p>
-                      <p className="text-xs tabular-nums text-gray-400">
+                      <p className="text-xs tabular-nums text-gray-400 dark:text-gray-500 font-medium">
                         {row.percent.toFixed(0)}%
                       </p>
                     </div>

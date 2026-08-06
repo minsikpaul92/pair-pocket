@@ -695,7 +695,13 @@ async function readApiError(res: Response, fallbackCode: string): Promise<never>
   throw new ApiError(fallbackCode);
 }
 
-export type BillingCycle = "monthly" | "yearly" | "installment";
+export type BillingCycle =
+  | "monthly"
+  | "yearly"
+  | "every_x_days"
+  | "weekly"
+  | "biweekly"
+  | "installment";
 export type SubscriptionStatus =
   | "active"
   | "paused"
@@ -721,7 +727,9 @@ export interface Subscription {
   promo_reminder_enabled: boolean;
   end_reminder_enabled: boolean;
   is_fixed_bill?: boolean;
+  interval_days?: number | null;
   account_id: string;
+  counter_account_id?: string | null;
   category: string;
   sub_category: string;
   merchant: string;
@@ -740,6 +748,7 @@ export interface NewSubscription {
   account_type?: AccountType;
   cycle: BillingCycle;
   start_date: string;
+  next_due_date?: string | null;
   end_date?: string | null;
   installment_start_date?: string | null;
   total_installments?: number | null;
@@ -749,7 +758,9 @@ export interface NewSubscription {
   promo_reminder_enabled?: boolean;
   end_reminder_enabled?: boolean;
   is_fixed_bill?: boolean;
+  interval_days?: number | null;
   account_id: string;
+  counter_account_id?: string | null;
   category: string;
   sub_category: string;
   merchant?: string;
@@ -792,6 +803,9 @@ export interface SubscriptionOccurrence {
 export const BILLING_CYCLE_LABEL: Record<BillingCycle, string> = {
   monthly: "매월",
   yearly: "매년",
+  every_x_days: "X일 마다",
+  weekly: "매주",
+  biweekly: "격주",
   installment: "할부",
 };
 
@@ -1103,6 +1117,14 @@ export async function updateAccount(
   });
   if (!res.ok) throw new ApiError("updateAccount");
   return (await res.json()) as FinancialAccount;
+}
+
+export async function deleteAccount(accountId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/accounts/${accountId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) throw new ApiError("deleteAccount");
 }
 
 export function defaultAccountId(

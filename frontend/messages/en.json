@@ -288,6 +288,9 @@
     "editTitle": "Edit account",
     "saveChanges": "Save changes",
     "deactivate": "Deactivate (hide from lists)",
+    "confirmDelete": "Are you sure you want to delete this account/card?",
+    "deleteButton": "Delete account/card",
+    "deleteAccount": "Could not delete account.",
     "namePlaceholderExpense": "e.g. TD Visa, Shinhan Card",
     "namePlaceholderIncome": "e.g. TD Chequing, KB Bank"
   },
@@ -403,6 +406,9 @@
     "cycle": {
       "monthly": "Monthly",
       "yearly": "Yearly",
+      "every_x_days": "Every X days",
+      "weekly": "Weekly",
+      "biweekly": "Bi-weekly",
       "installment": "Installment",
       "fixed": "Fixed bill"
     },
@@ -467,6 +473,7 @@
     "fetchAccounts": "Could not load accounts.",
     "createAccount": "Could not register account.",
     "updateAccount": "Could not update account.",
+    "deleteAccount": "Could not delete account.",
     "fetchInvitationMe": "Could not load invite status.",
     "createInvitation": "Could not send invite.",
     "acceptInvitation": "Could not accept invite.",
