@@ -24,6 +24,8 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 async def parse_receipts_or_statements(
     files: list[UploadFile] = File(...),
     flow_type: str = Query("expense", description="expense | income"),
+    retry_count: int = Query(0, description="Retry count for model escalation"),
+    force_model: str | None = Query(None, description="Force specific Gemini model"),
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
@@ -45,7 +47,12 @@ async def parse_receipts_or_statements(
         prepared.append((content, content_type, file.filename or "file"))
 
     outcomes = await parse_files_in_batches(
-        db, current_user.id, prepared, flow_type=normalized_flow
+        db,
+        current_user.id,
+        prepared,
+        flow_type=normalized_flow,
+        retry_count=retry_count,
+        force_model=force_model,
     )
     results = []
     for item in outcomes:

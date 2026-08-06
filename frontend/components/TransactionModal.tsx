@@ -242,6 +242,9 @@ export default function TransactionModal({
   const [tipAmount, setTipAmount] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanHint, setScanHint] = useState<string | null>(null);
+  const [parsedQueue, setParsedQueue] = useState<ParsedTransaction[]>([]);
+  const [queueIndex, setQueueIndex] = useState(0);
+  const [scanRetryCount, setScanRetryCount] = useState(0);
   const scanInputRef = useRef<HTMLInputElement>(null);
   const [itemsScanning, setItemsScanning] = useState(false);
   const itemsScanInputRef = useRef<HTMLInputElement>(null);
@@ -325,14 +328,24 @@ export default function TransactionModal({
     setError(null);
   }
 
-  async function startBatchModalScan() {
+  async function startBatchModalScan(isRetry = false) {
     if (scanning || scanQueue.length === 0) return;
+    const nextRetry = isRetry ? scanRetryCount + 1 : 0;
+    setScanRetryCount(nextRetry);
+
     setScanning(true);
-    setScanHint(null);
+    setScanHint(
+      nextRetry >= 2
+        ? "⚡ 고성능 AI 모델(gemini-3.6-flash)로 정밀 스캔 중..."
+        : tTx("scanning")
+    );
     setError(null);
     const files = scanQueue.map((q) => q.file);
     try {
-      const results = await parseReceiptsOrStatements(files, { flowType: type });
+      const results = await parseReceiptsOrStatements(files, {
+        flowType: type,
+        retryCount: nextRetry,
+      });
       const flat: ParsedTransaction[] = [];
       for (const r of results as Array<ParsedTransaction & { transactions?: ParsedTransaction[] }>) {
         if (Array.isArray((r as { transactions?: ParsedTransaction[] }).transactions)) {
@@ -343,14 +356,21 @@ export default function TransactionModal({
           flat.push(r);
         }
       }
-      const parsed = flat[0];
-      if (!parsed) {
+      if (flat.length === 0) {
         setError(tTx("scanEmpty"));
         return;
       }
       setScannedFile(files[0] || null);
-      applyParsedTransaction(parsed);
-      setScanHint(tTx("scanFilled"));
+      setParsedQueue(flat);
+      setQueueIndex(0);
+      applyParsedTransaction(flat[0]);
+      setScanHint(
+        flat.length > 1
+          ? `총 ${flat.length}건의 거래를 인식했습니다. 순서대로 검토 후 저장해 주세요.`
+          : nextRetry >= 2
+          ? "고성능 AI 모델로 인식 완료!"
+          : tTx("scanFilled")
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : tTx("scanFailed"));
     } finally {
@@ -830,7 +850,7 @@ export default function TransactionModal({
       if (parsedSub != null && parsedSub > 0) {
         setSubtotal(amountToInput(parsedSub, txCurr));
         setTaxAmount(
-          parsedTax != null && parsedTax > 0
+          parsedTax != null && parsedTax >= 0
             ? amountToInput(parsedTax, txCurr)
             : amountToInput(round2(parsedSub * HST_RATE), txCurr)
         );
@@ -845,24 +865,31 @@ export default function TransactionModal({
             : ""
         );
       } else if (totAmount > 0 && txCurr !== "KRW") {
-        // Auto-calculate Subtotal, Tax (and Tip if tip_percent is provided) from parsed Total Amount
-        const tipPctNum = parsedTipPct || 0;
-        const tipRate = tipPctNum > 0 ? tipPctNum / 100 : 0;
-        const preTip = round2(totAmount / (1 + tipRate));
-        const sub = round2(preTip / 1.13);
-        const tax = round2(preTip - sub);
-        const tip = round2(totAmount - preTip);
+        if (parsedTax === 0) {
+          setTaxAmount(amountToInput(0, txCurr));
+          setSubtotal(amountToInput(totAmount, txCurr));
+          setTipAmount("");
+          setTipPercent("");
+        } else {
+          // Auto-calculate Subtotal, Tax (and Tip if tip_percent is provided) from parsed Total Amount
+          const tipPctNum = parsedTipPct || 0;
+          const tipRate = tipPctNum > 0 ? tipPctNum / 100 : 0;
+          const preTip = round2(totAmount / (1 + tipRate));
+          const sub = round2(preTip / 1.13);
+          const tax = round2(preTip - sub);
+          const tip = round2(totAmount - preTip);
 
-        setSubtotal(amountToInput(sub, txCurr));
-        setTaxAmount(amountToInput(tax, txCurr));
-        setTipAmount(
-          parsedTipAmt != null && parsedTipAmt > 0
-            ? amountToInput(parsedTipAmt, txCurr)
-            : tip > 0
-            ? amountToInput(tip, txCurr)
-            : ""
-        );
-        setTipPercent(tipPctNum > 0 ? String(tipPctNum) : "");
+          setSubtotal(amountToInput(sub, txCurr));
+          setTaxAmount(amountToInput(tax, txCurr));
+          setTipAmount(
+            parsedTipAmt != null && parsedTipAmt > 0
+              ? amountToInput(parsedTipAmt, txCurr)
+              : tip > 0
+              ? amountToInput(tip, txCurr)
+              : ""
+          );
+          setTipPercent(tipPctNum > 0 ? String(tipPctNum) : "");
+        }
       } else {
         setSubtotal("");
         setTaxAmount("");
@@ -871,7 +898,10 @@ export default function TransactionModal({
       }
 
       if (parsed.date) {
-        onDateChange(parseDate(parsed.date));
+        const d = parseDate(parsed.date);
+        if (d && !isNaN(d.getTime())) {
+          onDateChange(d);
+        }
       }
     },
     [transactionCurrency, currency, onDateChange]
@@ -1215,7 +1245,14 @@ export default function TransactionModal({
       ticker: isStock ? finalTicker.toUpperCase() : undefined,
       shares: isStock ? parseFloat(shares) : undefined,
       price: isStock ? parseFloat(price) : undefined,
-      items: items && items.length > 0 ? items : undefined,
+      items: items && items.length > 0
+        ? items.map((it) => ({
+            ...it,
+            quantity: typeof it.quantity === "number" ? it.quantity : parseFloat(String(it.quantity)) || 1,
+            unit_price: typeof it.unit_price === "number" ? it.unit_price : parseFloat(String(it.unit_price)) || 0,
+            total_price: typeof it.total_price === "number" ? it.total_price : parseFloat(String(it.total_price)) || 0,
+          }))
+        : undefined,
       subtotal: showTax && subtotal ? parseAmountInput(subtotal) || null : null,
       tax_amount: showTax && taxAmount ? parseAmountInput(taxAmount) || null : null,
       tip_percent: showTip && tipPercent
@@ -1234,9 +1271,31 @@ export default function TransactionModal({
       } else {
         await createTransaction(payload);
       }
-      clearScanQueue();
-      setScannedFile(null);
-      onSaved();
+
+      const savedDate = parseDate(dateStr);
+      if (
+        savedDate &&
+        (savedDate.getMonth() !== defaultDate.getMonth() ||
+          savedDate.getFullYear() !== defaultDate.getFullYear())
+      ) {
+        const formatted = `${savedDate.getFullYear()}년 ${savedDate.getMonth() + 1}월 ${savedDate.getDate()}일`;
+        alert(`거래가 ${formatted} 날짜로 저장되었습니다. (현재 화면에 선택된 월과 다른 달입니다)`);
+      }
+
+      const remainingQueue = parsedQueue.filter((_, i) => i !== queueIndex);
+      if (remainingQueue.length > 0 && !editingTransaction) {
+        setParsedQueue(remainingQueue);
+        const nextIdx = Math.min(queueIndex, remainingQueue.length - 1);
+        setQueueIndex(nextIdx);
+        applyParsedTransaction(remainingQueue[nextIdx]);
+        onSaved();
+        setScanHint(`저장 완료! (남은 ${remainingQueue.length}건 거래 검토 중)`);
+      } else {
+        clearScanQueue();
+        setScannedFile(null);
+        setParsedQueue([]);
+        onSaved();
+      }
     } catch (err) {
       setError(
         translateError(
@@ -1979,7 +2038,7 @@ export default function TransactionModal({
                 <button
                   type="button"
                   disabled={scanning || scanQueue.length === 0}
-                  onClick={() => void startBatchModalScan()}
+                  onClick={() => void startBatchModalScan(parsedQueue.length > 0 || scannedFile !== null)}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2 transition-colors disabled:opacity-50"
                 >
                   {scanning ? (
@@ -1987,7 +2046,13 @@ export default function TransactionModal({
                   ) : (
                     <Play className="h-3.5 w-3.5" />
                   )}
-                  {scanning ? tTx("scanning") : "분석 시작"}
+                  {scanning
+                    ? scanRetryCount >= 2
+                      ? "정밀 AI 분석 중…"
+                      : tTx("scanning")
+                    : parsedQueue.length > 0 || scannedFile !== null
+                    ? "다시 스캔 (재시도)"
+                    : "분석 시작"}
                 </button>
               </div>
 
@@ -2009,6 +2074,58 @@ export default function TransactionModal({
                   {scanHint}
                 </p>
               )}
+            </div>
+          )}
+
+          {parsedQueue.length > 1 && (
+            <div className="flex items-center justify-between rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 p-3 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-purple-700 dark:text-purple-300">
+                <span>📋</span>
+                <span>총 {parsedQueue.length}건 중 {queueIndex + 1}번째 거래 검토 중</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={queueIndex === 0}
+                  onClick={() => {
+                    const prev = queueIndex - 1;
+                    setQueueIndex(prev);
+                    applyParsedTransaction(parsedQueue[prev]);
+                  }}
+                  className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
+                >
+                  이전
+                </button>
+                <button
+                  type="button"
+                  disabled={queueIndex >= parsedQueue.length - 1}
+                  onClick={() => {
+                    const next = queueIndex + 1;
+                    setQueueIndex(next);
+                    applyParsedTransaction(parsedQueue[next]);
+                  }}
+                  className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
+                >
+                  다음
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const remaining = parsedQueue.filter((_, i) => i !== queueIndex);
+                    setParsedQueue(remaining);
+                    if (remaining.length === 0) {
+                      setScanHint(null);
+                    } else {
+                      const nextIdx = Math.min(queueIndex, remaining.length - 1);
+                      setQueueIndex(nextIdx);
+                      applyParsedTransaction(remaining[nextIdx]);
+                    }
+                  }}
+                  className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-semibold"
+                >
+                  건너뛰기
+                </button>
+              </div>
             </div>
           )}
 
@@ -2326,23 +2443,28 @@ export default function TransactionModal({
                           };
 
                           if (field === "unit_price") {
-                            const unitP = typeof val === "number" ? val : (parseFloat(String(val)) || 0);
-                            updatedItem.unit_price = unitP;
-                            const qty = Number(updatedItem.quantity) > 0 ? Number(updatedItem.quantity) : 1;
+                            const strVal = String(val);
+                            updatedItem.unit_price = strVal as any;
+                            const unitP = parseFloat(strVal) || 0;
+                            const qty = parseFloat(String(updatedItem.quantity)) > 0 ? parseFloat(String(updatedItem.quantity)) : 1;
                             updatedItem.total_price = Number((unitP * qty).toFixed(2));
                           } else if (field === "total_price") {
-                            const totalP = typeof val === "number" ? val : (parseFloat(String(val)) || 0);
-                            updatedItem.total_price = totalP;
-                            const qty = Number(updatedItem.quantity) > 0 ? Number(updatedItem.quantity) : 1;
+                            const strVal = String(val);
+                            updatedItem.total_price = strVal as any;
+                            const totalP = parseFloat(strVal) || 0;
+                            const qty = parseFloat(String(updatedItem.quantity)) > 0 ? parseFloat(String(updatedItem.quantity)) : 1;
                             updatedItem.unit_price = Number((totalP / qty).toFixed(2));
                           } else if (field === "quantity") {
-                            const qty = typeof val === "number" ? val : (parseFloat(String(val)) || 1);
-                            updatedItem.quantity = qty;
+                            const strVal = String(val);
+                            updatedItem.quantity = strVal as any;
+                            const qty = parseFloat(strVal) || 1;
                             const safeQty = qty > 0 ? qty : 1;
-                            if (Number(updatedItem.unit_price) > 0) {
-                              updatedItem.total_price = Number((Number(updatedItem.unit_price) * safeQty).toFixed(2));
-                            } else if (Number(updatedItem.total_price) > 0) {
-                              updatedItem.unit_price = Number((Number(updatedItem.total_price) / safeQty).toFixed(2));
+                            const uP = parseFloat(String(updatedItem.unit_price)) || 0;
+                            const tP = parseFloat(String(updatedItem.total_price)) || 0;
+                            if (uP > 0) {
+                              updatedItem.total_price = Number((uP * safeQty).toFixed(2));
+                            } else if (tP > 0) {
+                              updatedItem.unit_price = Number((tP / safeQty).toFixed(2));
                             }
                           } else {
                             (updatedItem as any)[field] = val;
@@ -2352,7 +2474,7 @@ export default function TransactionModal({
                           setItems(newItems);
 
                           const sumTotal = newItems.reduce(
-                            (acc, it) => acc + (it.total_price || 0),
+                            (acc, it) => acc + (parseFloat(String(it.total_price)) || 0),
                             0
                           );
                           if (sumTotal > 0) {
@@ -2388,12 +2510,9 @@ export default function TransactionModal({
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={item.quantity || ""}
+                              value={item.quantity !== undefined && item.quantity !== null ? String(item.quantity) : ""}
                               onChange={(e) =>
-                                updateItem(
-                                  "quantity",
-                                  parseFloat(e.target.value) || 0
-                                )
+                                updateItem("quantity", e.target.value)
                               }
                               className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
                             />
@@ -2420,24 +2539,18 @@ export default function TransactionModal({
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={item.unit_price || ""}
+                              value={item.unit_price !== undefined && item.unit_price !== null ? String(item.unit_price) : ""}
                               onChange={(e) =>
-                                updateItem(
-                                  "unit_price",
-                                  parseFloat(e.target.value) || 0
-                                )
+                                updateItem("unit_price", e.target.value)
                               }
                               className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
                             />
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={item.total_price || ""}
+                              value={item.total_price !== undefined && item.total_price !== null ? String(item.total_price) : ""}
                               onChange={(e) =>
-                                updateItem(
-                                  "total_price",
-                                  parseFloat(e.target.value) || 0
-                                )
+                                updateItem("total_price", e.target.value)
                               }
                               className={`input-field py-1.5 text-xs text-right font-semibold ${NO_SPIN}`}
                             />
