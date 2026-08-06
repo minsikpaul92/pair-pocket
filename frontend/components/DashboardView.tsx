@@ -970,6 +970,10 @@ export default function DashboardView({
             setEditingAccount(null);
             onChanged?.();
           }}
+          onDeleted={() => {
+            setEditingAccount(null);
+            onChanged?.();
+          }}
         />
       )}
       {creatingKind && (

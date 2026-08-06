@@ -512,7 +512,7 @@ export default function AccountRegisterModal({
                 type="button"
                 onClick={async () => {
                   if (!account?.id) return;
-                  if (!window.confirm("정말 이 계좌/카드를 삭제하시겠습니까?")) return;
+                  if (!window.confirm(t("confirmDelete"))) return;
                   setSubmitting(true);
                   try {
                     await deleteAccount(account.id);
@@ -527,7 +527,7 @@ export default function AccountRegisterModal({
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
-                계좌/카드 삭제
+                {t("deleteButton")}
               </button>
             </div>
           )}

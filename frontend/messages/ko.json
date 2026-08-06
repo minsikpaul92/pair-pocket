@@ -288,6 +288,9 @@
     "editTitle": "카드/은행 수정",
     "saveChanges": "변경 저장",
     "deactivate": "비활성화 (목록에서 숨김)",
+    "confirmDelete": "정말 이 계좌/카드를 삭제하시겠습니까?",
+    "deleteButton": "계좌/카드 삭제",
+    "deleteAccount": "계좌를 삭제하지 못했습니다.",
     "namePlaceholderExpense": "예: TD Visa, 신한카드",
     "namePlaceholderIncome": "예: TD Chequing, 국민은행"
   },
@@ -470,6 +473,7 @@
     "fetchAccounts": "계좌 목록을 불러오지 못했습니다.",
     "createAccount": "계좌를 등록하지 못했습니다.",
     "updateAccount": "계좌를 수정하지 못했습니다.",
+    "deleteAccount": "계좌를 삭제하지 못했습니다.",
     "fetchInvitationMe": "초대 상태를 불러오지 못했습니다.",
     "createInvitation": "초대를 보내지 못했습니다.",
     "acceptInvitation": "초대를 수락하지 못했습니다.",
