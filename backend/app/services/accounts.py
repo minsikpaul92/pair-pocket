@@ -337,7 +337,7 @@ async def compute_net_worth(
                 currency=Currency(doc["currency"]),
                 account_type=AccountType(doc["account_type"]),
                 is_liability=is_liability,
-                balance=converted_balance,
+                balance=native_balance,
                 net_worth_contribution=contribution,
             )
         )
