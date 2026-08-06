@@ -308,24 +308,29 @@ export default function DashboardView({
   // Include USD wallets (Toss US, etc.) — they are absent from CAD/KRW net-worth.
   // Exclude virtual stock lumps — equity is shown in the stock section from holdings.
   const scopedBalances = useMemo(() => {
-    const usdAccounts = usdWorth?.accounts ?? [];
-    const list =
+    const rawList =
       scope === "CAD"
-        ? [...(cadWorth?.accounts ?? []), ...usdAccounts]
+        ? (cadWorth?.accounts ?? [])
         : scope === "KRW"
-          ? [...(krwWorth?.accounts ?? []), ...usdAccounts]
+          ? (krwWorth?.accounts ?? [])
           : [
               ...(cadWorth?.accounts ?? []),
               ...(krwWorth?.accounts ?? []),
-              ...usdAccounts,
             ];
-    return list.filter(
-      (a) =>
-        !a.account_id.startsWith("virtual_stocks") &&
-        accountMatchesScope(a.account_id, a.currency)
-    );
+
+    const seen = new Set<string>();
+    const uniqueList: AccountBalance[] = [];
+    for (const a of rawList) {
+      if (!a.account_id || a.account_id.startsWith("virtual_stocks")) continue;
+      if (!seen.has(a.account_id)) {
+        seen.add(a.account_id);
+        uniqueList.push(a);
+      }
+    }
+
+    return uniqueList.filter((a) => accountMatchesScope(a.account_id, a.currency));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cadWorth, krwWorth, usdWorth, accounts, scope, scopeCountry]);
+  }, [cadWorth, krwWorth, accounts, scope, scopeCountry]);
 
   // Stock account cards + header totals.
   // "all": native buckets by holding/cash currency (hide zero lines).

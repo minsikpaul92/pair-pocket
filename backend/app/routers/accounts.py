@@ -230,3 +230,27 @@ async def update_account(
     )
     updated = await db[COLLECTION].find_one({"_id": ObjectId(account_id)})
     return _serialize_account(updated)
+
+
+@router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    account_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> None:
+    if not ObjectId.is_valid(account_id):
+        raise HTTPException(status_code=404, detail="Account not found.")
+    existing = await db[COLLECTION].find_one({"_id": ObjectId(account_id)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+    require_shared_group_for_write(
+        current_user, AccountType(existing["account_type"])
+    )
+    await assert_can_access_doc(
+        db, current_user, existing, not_found_detail="Account not found."
+    )
+
+    await db[COLLECTION].delete_one({"_id": ObjectId(account_id)})
+    await db.holdings.delete_many({"account_id": account_id})
+

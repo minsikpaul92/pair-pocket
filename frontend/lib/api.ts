@@ -1119,6 +1119,14 @@ export async function updateAccount(
   return (await res.json()) as FinancialAccount;
 }
 
+export async function deleteAccount(accountId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/accounts/${accountId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) throw new ApiError("deleteAccount");
+}
+
 export function defaultAccountId(
   accounts: FinancialAccount[],
   type: TransactionType
