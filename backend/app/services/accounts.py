@@ -191,6 +191,56 @@ async def compute_account_balance(
     return balance
 
 
+def resolve_account_country(doc: dict) -> str:
+    """Determine whether an account belongs to Canada (CA) or Korea (KR)."""
+    country = doc.get("country")
+    if country in ("CA", "KR"):
+        return country
+    name = (doc.get("name") or "").lower()
+    inst = (doc.get("institution") or "").lower()
+    hay = f"{inst} {name}"
+    if any(
+        k in hay
+        for k in [
+            "toss",
+            "토스",
+            "키움",
+            "미래에셋",
+            "삼성증권",
+            "한국투자",
+            "kb증권",
+            "nh투자",
+            "나무",
+            "한투",
+            "신한",
+            "국민",
+            "우리",
+            "하나",
+            "카카오",
+        ]
+    ):
+        return "KR"
+    if any(
+        k in hay
+        for k in [
+            "wealthsimple",
+            "questrade",
+            "td",
+            "rbc",
+            "cibc",
+            "scotiabank",
+            "bmo",
+        ]
+    ):
+        return "CA"
+    curr = doc.get("currency")
+    if curr == "KRW":
+        return "KR"
+    if curr == "CAD":
+        return "CA"
+    return "KR" if ("토스" in hay or "kb" in hay) else "CA"
+
+
 async def compute_net_worth(
     db: AsyncIOMotorDatabase,
     *,
@@ -199,7 +249,7 @@ async def compute_net_worth(
     account_type: AccountType,
     currency: Currency | None = None,
 ) -> NetWorthSummary:
-    """Aggregate per-account balances into net worth, converting all accounts and stock holdings into the requested target currency."""
+    """Aggregate per-account balances into net worth for the requested country tab (KR vs CA)."""
     ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
     if not ids:
         return NetWorthSummary(
@@ -219,7 +269,13 @@ async def compute_net_worth(
         "is_active": True,
     }
 
-    docs = await db[ACCOUNTS_COL].find(query).sort("name", 1).to_list(length=100)
+    all_docs = await db[ACCOUNTS_COL].find(query).sort("name", 1).to_list(length=100)
+
+    target_currency = currency if currency else Currency.CAD
+    target_country = "KR" if target_currency == Currency.KRW else "CA"
+
+    # Filter accounts by target country tab (KR for KRW, CA for CAD)
+    docs = [d for d in all_docs if resolve_account_country(d) == target_country]
 
     from app.services.exchange import get_cad_krw_rate
     from app.services.stocks import get_or_update_stock_price
@@ -229,8 +285,6 @@ async def compute_net_worth(
     krw_cad = rates_info["krw_cad"]
     usd_krw = rates_info["usd_krw"]
     usd_cad = rates_info["usd_cad"]
-
-    target_currency = currency if currency else Currency.CAD
 
     def convert_amount(amount: float, from_curr: str, to_curr: str) -> float:
         if from_curr == to_curr:
@@ -288,9 +342,12 @@ async def compute_net_worth(
             )
         )
 
+    # Query stock holdings ONLY for accounts in this country
+    country_account_ids = {str(d["_id"]) for d in docs}
     holdings_query: dict = {
         "owner_id": {"$in": ids},
         "account_type": account_type.value,
+        "account_id": {"$in": list(country_account_ids)},
     }
     holdings_cursor = db.holdings.find(holdings_query)
     holdings_docs = await holdings_cursor.to_list(length=None)
