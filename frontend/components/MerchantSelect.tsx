@@ -39,14 +39,18 @@ export default function MerchantSelect({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const filteredOptions = value
-    ? options.filter((opt) =>
-        opt.toLowerCase().includes(value.toLowerCase())
-      )
-    : options;
+  const searchLower = value.trim().toLowerCase();
+
+  const matchingOptions = options.filter((opt) =>
+    opt.toLowerCase().includes(searchLower)
+  );
+
+  const otherOptions = options.filter(
+    (opt) => !opt.toLowerCase().includes(searchLower)
+  );
 
   const isExactMatch = options.some(
-    (opt) => opt.toLowerCase() === value.trim().toLowerCase()
+    (opt) => opt.toLowerCase() === searchLower
   );
 
   return (
@@ -70,22 +74,22 @@ export default function MerchantSelect({
           disabled={disabled}
           onClick={() => setOpen((prev) => !prev)}
           className="absolute right-2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          title="자주/최근 사용한 사용처 목록 보기"
+          title="사용처 목록 보기"
         >
           <ChevronDown className="h-4 w-4" />
         </button>
       </div>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">
+        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">
           <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700/60 flex justify-between items-center">
             <span>자주 / 최근 사용한 사용처</span>
-            <span className="text-[9px] font-normal text-indigo-500">추천 목록</span>
+            <span className="text-[9px] font-normal text-indigo-500">목록</span>
           </div>
 
-          {filteredOptions.length > 0 ? (
+          {matchingOptions.length > 0 || otherOptions.length > 0 ? (
             <ul>
-              {filteredOptions.map((opt) => (
+              {matchingOptions.map((opt) => (
                 <li key={opt}>
                   <button
                     type="button"
@@ -105,10 +109,35 @@ export default function MerchantSelect({
                   </button>
                 </li>
               ))}
+
+              {searchLower && otherOptions.length > 0 && (
+                <>
+                  <li className="px-3 py-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900/50 border-t border-b border-gray-100 dark:border-gray-700/60 mt-1">
+                    기타 전체 사용처 ({otherOptions.length})
+                  </li>
+                  {otherOptions.map((opt) => (
+                    <li key={`other-${opt}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onChange(opt);
+                          setOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700/60 text-gray-600 dark:text-gray-400 transition-colors"
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <Store className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                          <span className="truncate">{opt}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </>
+              )}
             </ul>
           ) : (
             <div className="px-3 py-2 text-xs text-gray-400 text-center">
-              추천 목록에 없습니다. 직접 입력된 내용으로 저장됩니다.
+              추천 목록이 없습니다. 직접 입력할 수 있습니다.
             </div>
           )}
 

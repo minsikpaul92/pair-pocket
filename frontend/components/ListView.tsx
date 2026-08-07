@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Plus, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import SwipeableRow from "@/components/SwipeableRow";
 import {
@@ -39,6 +39,8 @@ interface Props {
   onDeleted?: () => void;
   onPendingClick?: (occ: SubscriptionOccurrence) => void;
   initialCategoryFilter?: string;
+  initialSubCategoryFilter?: string;
+  fromExpenseChart?: boolean;
   onBackToDashboard?: () => void;
 }
 
@@ -103,6 +105,8 @@ export default function ListView({
   onDeleted,
   onPendingClick,
   initialCategoryFilter,
+  initialSubCategoryFilter,
+  fromExpenseChart = false,
   onBackToDashboard,
 }: Props) {
   const locale = useLocale();
@@ -118,13 +122,18 @@ export default function ListView({
   const [categoryFilter, setCategoryFilter] = useState<string>(
     initialCategoryFilter || "all"
   );
+  const [subCategoryFilter, setSubCategoryFilter] = useState<string>(
+    initialSubCategoryFilter || "all"
+  );
 
   useEffect(() => {
     if (initialCategoryFilter) {
       setCategoryFilter(initialCategoryFilter);
     }
-  }, [initialCategoryFilter]);
-  const [subCategoryFilter, setSubCategoryFilter] = useState<string>("all");
+    if (initialSubCategoryFilter) {
+      setSubCategoryFilter(initialSubCategoryFilter);
+    }
+  }, [initialCategoryFilter, initialSubCategoryFilter]);
   const [merchantQuery, setMerchantQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -233,6 +242,42 @@ export default function ListView({
     );
   }, [combinedItems, categoryFilter, presets, locale, tSubCategories]);
 
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowSearchDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const searchSuggestions = useMemo(() => {
+    const q = merchantQuery.trim().toLowerCase();
+    if (!q) return [];
+    const set = new Set<string>();
+    for (const item of combinedItems) {
+      if (item.merchant && item.merchant.toLowerCase().includes(q)) {
+        set.add(item.merchant);
+      }
+      if (
+        item.kind === "transaction" &&
+        item.tx.note &&
+        item.tx.note.toLowerCase().includes(q)
+      ) {
+        set.add(item.tx.note.trim());
+      }
+      if (set.size >= 8) break;
+    }
+    return Array.from(set);
+  }, [merchantQuery, combinedItems]);
+
   const filtered = useMemo(() => {
     const q = merchantQuery.trim().toLowerCase();
     return combinedItems.filter((item) => {
@@ -244,7 +289,22 @@ export default function ListView({
         item.sub_category !== subCategoryFilter
       )
         return false;
-      if (q && !item.merchant.toLowerCase().includes(q)) return false;
+      if (q) {
+        const merchantMatch = item.merchant.toLowerCase().includes(q);
+        const noteMatch =
+          item.kind === "transaction" &&
+          Boolean(item.tx.note?.toLowerCase().includes(q));
+        const catMatch = translateCategory(item.category, tCategories)
+          .toLowerCase()
+          .includes(q);
+        const subMatch = translateSubCategory(
+          item.sub_category || "",
+          tSubCategories
+        )
+          .toLowerCase()
+          .includes(q);
+        if (!merchantMatch && !noteMatch && !catMatch && !subMatch) return false;
+      }
       return true;
     });
   }, [
@@ -253,6 +313,8 @@ export default function ListView({
     categoryFilter,
     subCategoryFilter,
     merchantQuery,
+    tCategories,
+    tSubCategories,
   ]);
 
   const sorted = useMemo(() => {
@@ -356,11 +418,19 @@ export default function ListView({
 
   return (
     <div>
-      {onBackToDashboard && (
+      {fromExpenseChart && onBackToDashboard && (
         <div className="mb-3">
           <button
             type="button"
-            onClick={onBackToDashboard}
+            onClick={() => {
+              onBackToDashboard();
+              setTimeout(() => {
+                const el = document.getElementById("expense-ratio-section");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+              }, 100);
+            }}
             className="inline-flex items-center gap-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 px-3.5 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 transition-colors shadow-sm cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -416,14 +486,39 @@ export default function ListView({
           ))}
         </select>
 
-        <div className="relative flex-1 min-w-[10rem]">
+        <div ref={searchContainerRef} className="relative flex-1 min-w-[10rem]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             value={merchantQuery}
-            onChange={(e) => setMerchantQuery(e.target.value)}
-            placeholder={tList("searchMerchant")}
+            onChange={(e) => {
+              setMerchantQuery(e.target.value);
+              setShowSearchDropdown(true);
+            }}
+            onFocus={() => setShowSearchDropdown(true)}
+            placeholder="사용처 / 노트 검색"
             className="input-field pl-9 py-2 text-sm"
           />
+          {showSearchDropdown && searchSuggestions.length > 0 && (
+            <div className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">
+              <ul>
+                {searchSuggestions.map((sug) => (
+                  <li key={sug}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMerchantQuery(sug);
+                        setShowSearchDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-950/40 text-gray-800 dark:text-gray-200 truncate flex items-center justify-between"
+                    >
+                      <span className="truncate">{sug}</span>
+                      <span className="text-[10px] text-blue-500 font-semibold shrink-0 ml-2">자동완성</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {onAddTransaction && (
@@ -438,8 +533,8 @@ export default function ListView({
         )}
       </div>
 
-      <div className="mt-4 card-inset overflow-hidden">
-        <ul className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[28rem] overflow-y-auto">
+      <div className="mt-4 card-inset overflow-hidden flex flex-col max-h-[32rem]">
+        <ul className="divide-y divide-gray-100 dark:divide-gray-700 flex-1 overflow-y-auto min-h-0">
           {sorted.length === 0 ? (
             <li className="px-4 py-12 text-center text-gray-400 text-sm">
               {tList("noTransactions")}
@@ -450,53 +545,23 @@ export default function ListView({
                 const occ = item.occ;
                 const isOverdue = item.isDueOrPast;
                 return (
-                  <li key={item.id}>
+                  <li key={item.id} className="bg-amber-50/50 dark:bg-amber-950/20">
                     <button
                       type="button"
                       onClick={() => onPendingClick?.(occ)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-amber-50/40 dark:hover:bg-amber-500/5 transition-colors cursor-pointer"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-amber-100/50 dark:hover:bg-amber-950/40 transition-colors"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                        <p className="text-sm font-bold truncate text-gray-900 dark:text-white">
                           {showCurrencyCol &&
                             (item.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
-                          <span>
-                            {translateCategory(item.category, tCategories)}
-                          </span>
-                          {item.sub_category && (
-                            <span className="text-gray-400">
-                              ›{" "}
-                              {translateSubCategory(
-                                item.sub_category,
-                                tSubCategories
-                              )}
-                            </span>
-                          )}
-                          <span
-                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                              isOverdue
-                                ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-                                : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                            }`}
-                          >
-                            결제예정
-                          </span>
+                          {item.merchant}
                         </p>
                         <p className="text-[11px] text-gray-400 truncate">
-                          {formatDay(item.date)} · {item.merchant}
-                          {translateSubscriptionSource(
-                            occ.subscription_billing_cycle,
-                            tSub
-                          ) && (
-                            <span className="ml-1 text-gray-400 font-normal">
-                              (
-                              {translateSubscriptionSource(
-                                occ.subscription_billing_cycle,
-                                tSub
-                              )}
-                              )
-                            </span>
-                          )}
+                          {formatDay(item.date)} · {translateCategory(item.category, tCategories)}
+                          {item.sub_category
+                            ? ` › ${translateSubCategory(item.sub_category, tSubCategories)}`
+                            : ""}
                         </p>
                       </div>
                       <p
@@ -530,16 +595,16 @@ export default function ListView({
                       className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">
+                        <p className="text-sm font-bold truncate text-gray-900 dark:text-white">
                           {showCurrencyCol &&
                             (tx.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
-                          {translateCategory(tx.category, tCategories)}
+                          {tx.note?.trim() || tx.merchant || tCommon("unspecified")}
+                        </p>
+                        <p className="text-[11px] text-gray-400 truncate">
+                          {formatDay(tx.date)} · {translateCategory(tx.category, tCategories)}
                           {tx.sub_category
                             ? ` › ${translateSubCategory(tx.sub_category, tSubCategories)}`
                             : ""}
-                        </p>
-                        <p className="text-[11px] text-gray-400 truncate">
-                          {formatDay(tx.date)} · {tx.merchant}
                         </p>
                       </div>
                       <p
@@ -564,6 +629,43 @@ export default function ListView({
             })
           )}
         </ul>
+
+        {/* Pinned Bottom Total Bar (Natural Minimalist Blend) */}
+        <div className="shrink-0 border-t border-gray-100 dark:border-gray-700/60 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-md px-4 py-2.5 flex items-center justify-between gap-3 z-10">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+              합계
+            </span>
+            <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
+              · {sorted.length}건
+            </span>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {activeCurrencies.map((c) => {
+              const tot = totals[c];
+              const displayVal =
+                typeFilter === "income"
+                  ? tot.income
+                  : typeFilter === "expense"
+                    ? tot.expense
+                    : tot.expense > 0
+                      ? tot.expense
+                      : tot.income;
+              return (
+                <div key={c} className="flex items-center gap-1.5">
+                  {activeCurrencies.length > 1 && (
+                    <span className="text-[10px] font-medium text-gray-400">
+                      {c === "CAD" ? "🇨🇦" : c === "KRW" ? "🇰🇷" : "🇺🇸"}
+                    </span>
+                  )}
+                  <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+                    {formatAmount(displayVal, c)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

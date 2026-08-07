@@ -245,6 +245,9 @@ export default function TransactionModal({
   const [parsedQueue, setParsedQueue] = useState<ParsedTransaction[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [scanRetryCount, setScanRetryCount] = useState(0);
+  const [isTaxChecked, setIsTaxChecked] = useState(true);
+  const [modalDragY, setModalDragY] = useState(0);
+  const touchStartY = useRef<number | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
   const [itemsScanning, setItemsScanning] = useState(false);
   const itemsScanInputRef = useRef<HTMLInputElement>(null);
@@ -597,16 +600,21 @@ export default function TransactionModal({
     setAmount(formatted);
     const tot = parseAmountInput(formatted);
     if (tot > 0 && showTax) {
-      const pct = parseFloat(tipPercent) || 0;
-      const tipRate = pct > 0 ? pct / 100 : 0;
-      const preTip = round2(tot / (1 + tipRate));
-      const sub = round2(preTip / 1.13);
-      const tax = round2(preTip - sub);
-      const tip = round2(tot - preTip);
-      setSubtotal(amountToInput(sub, transactionCurrency));
-      setTaxAmount(amountToInput(tax, transactionCurrency));
-      if (pct > 0) {
-        setTipAmount(amountToInput(tip, transactionCurrency));
+      if (!isTaxChecked) {
+        setSubtotal(amountToInput(tot, transactionCurrency));
+        setTaxAmount(amountToInput(0, transactionCurrency));
+      } else {
+        const pct = parseFloat(tipPercent) || 0;
+        const tipRate = pct > 0 ? pct / 100 : 0;
+        const preTip = round2(tot / (1 + tipRate));
+        const sub = round2(preTip / 1.13);
+        const tax = round2(preTip - sub);
+        const tip = round2(tot - preTip);
+        setSubtotal(amountToInput(sub, transactionCurrency));
+        setTaxAmount(amountToInput(tax, transactionCurrency));
+        if (pct > 0) {
+          setTipAmount(amountToInput(tip, transactionCurrency));
+        }
       }
     }
   }
@@ -1072,7 +1080,6 @@ export default function TransactionModal({
     setCategory(next);
     setSubCategory("");
     setSettlesExpenseId("");
-    setMerchant("");
     setMerchantHints([]);
     setInstitution("");
     // Keep saved transfer accounts when editing; only clear on create.
@@ -1083,7 +1090,6 @@ export default function TransactionModal({
   function handleSubCategoryChange(next: string) {
     setSubCategory(next);
     setSettlesExpenseId("");
-    setMerchant("");
     if (category === TRANSFER_CATEGORY && !isEditing) {
       setCounterAccountId(ACCOUNT_NONE);
     }
@@ -1707,17 +1713,80 @@ export default function TransactionModal({
     return merchantField;
   };
 
+  const isDraggingModal = useRef(false);
+  const dragStartY = useRef(0);
+
+  const startDrag = (clientY: number) => {
+    isDraggingModal.current = true;
+    dragStartY.current = clientY;
+  };
+
+  const updateDrag = (clientY: number) => {
+    if (!isDraggingModal.current) return;
+    const deltaY = clientY - dragStartY.current;
+    if (deltaY > 0) {
+      setModalDragY(deltaY);
+    } else {
+      setModalDragY(0);
+    }
+  };
+
+  const finishDrag = () => {
+    if (!isDraggingModal.current) return;
+    isDraggingModal.current = false;
+    setModalDragY((currentDragY) => {
+      if (currentDragY > 60) {
+        onClose();
+      }
+      return 0;
+    });
+  };
+
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (isDraggingModal.current) {
+        updateDrag(e.clientY);
+      }
+    }
+    function onMouseUp() {
+      if (isDraggingModal.current) {
+        finishDrag();
+      }
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
-      onClick={(e) => {
+      onDoubleClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto"
+        className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto select-none"
+        style={{
+          transform: modalDragY > 0 ? `translateY(${modalDragY}px)` : undefined,
+          transition: modalDragY === 0 ? "transform 0.2s ease-out" : "none",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Drag handle pill at top for drag-down-to-close (Mouse & Touch) */}
+        <div
+          onMouseDown={(e) => startDrag(e.clientY)}
+          onTouchStart={(e) => startDrag(e.touches[0].clientY)}
+          onTouchMove={(e) => updateDrag(e.touches[0].clientY)}
+          onTouchEnd={() => finishDrag()}
+          className="w-full py-2 -mt-2 mb-1 flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none group"
+          title="아래로 드래그하여 닫기"
+        >
+          <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full group-hover:bg-gray-400 dark:group-hover:bg-gray-600 transition-colors" />
+        </div>
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -2191,15 +2260,33 @@ export default function TransactionModal({
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {tTx("taxLabel")}
-                </label>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <input
+                    type="checkbox"
+                    checked={isTaxChecked}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsTaxChecked(checked);
+                      if (!checked) {
+                        setTaxAmount(amountToInput(0, transactionCurrency));
+                        if (amount) setSubtotal(amount);
+                      } else {
+                        handleTotalChange(amount);
+                      }
+                    }}
+                    className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                    {tTx("taxLabel")}
+                  </label>
+                </div>
                 <input
                   inputMode="decimal"
                   value={taxAmount}
+                  disabled={!isTaxChecked}
                   onChange={(e) => handleTaxChange(e.target.value)}
                   placeholder="0.00"
-                  className={`input-field ${NO_SPIN}`}
+                  className={`input-field ${NO_SPIN} ${!isTaxChecked ? "opacity-50 bg-gray-50 dark:bg-gray-800" : ""}`}
                 />
               </div>
             </div>
