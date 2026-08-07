@@ -12,6 +12,7 @@ const withPWA = require("@ducanh2912/next-pwa").default({
     process.env.NODE_ENV === "development" || Boolean(process.env.VERCEL),
   workboxOptions: {
     skipWaiting: true,
+    clientsClaim: true,
   },
 });
 
