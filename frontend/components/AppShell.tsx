@@ -252,6 +252,46 @@ export default function AppShell({ user, onLogout }: Props) {
     if (scanMoreInputRef.current) scanMoreInputRef.current.value = "";
   }
 
+  // Auto-check and claim Service Worker PWA updates when returning to app / window focus
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+
+    let refreshing = false;
+
+    const handleControllerChange = () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+
+    const checkUpdate = async () => {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update();
+        }
+      } catch (err) {
+        // Ignore SW update check errors
+      }
+    };
+
+    window.addEventListener("focus", checkUpdate);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkUpdate();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      window.removeEventListener("focus", checkUpdate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
   function clearScanQueue() {
     setScanQueue((prev) => {
       prev.forEach((q) => {
