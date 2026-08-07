@@ -1755,21 +1755,23 @@ export interface ParsedTransaction {
 
 export async function parseReceiptsOrStatements(
   files: File[],
-  options?: { flowType?: "expense" | "income" }
+  options?: { flowType?: "expense" | "income"; retryCount?: number; forceModel?: string }
 ): Promise<ParsedTransaction[]> {
   const formData = new FormData();
   files.forEach((file) => {
     formData.append("files", file);
   });
   const flowType = options?.flowType ?? "expense";
-  const res = await fetch(
-    `${API_BASE_URL}/api/ai/parse?flow_type=${encodeURIComponent(flowType)}`,
-    {
-      method: "POST",
-      headers: { ...authHeaders() },
-      body: formData,
-    }
-  );
+  const retryCount = options?.retryCount ?? 0;
+  let url = `${API_BASE_URL}/api/ai/parse?flow_type=${encodeURIComponent(flowType)}&retry_count=${retryCount}`;
+  if (options?.forceModel) {
+    url += `&force_model=${encodeURIComponent(options.forceModel)}`;
+  }
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: formData,
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || "AI analysis failed");

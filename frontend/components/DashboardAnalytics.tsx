@@ -17,6 +17,8 @@ import {
 } from "recharts";
 
 import { categoryIcon } from "@/components/CategoryIcon";
+import { X } from "lucide-react";
+
 import {
   AccountType,
   Currency,
@@ -30,7 +32,7 @@ import {
   formatAmount,
   setCategoryColor,
 } from "@/lib/api";
-import { translateCategory } from "@/lib/category-i18n";
+import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { addMonths, monthKey } from "@/lib/date";
 
 const WEB_PRESET_COLORS = [
@@ -245,7 +247,11 @@ interface Props {
   cadStats: StatsSummary | null;
   krwStats: StatsSummary | null;
   transactions?: Transaction[];
-  onCategoryClick?: (category: string) => void;
+  onCategoryClick?: (
+    category: string,
+    subCategory?: string,
+    fromExpenseChart?: boolean
+  ) => void;
 }
 
 function convertAmount(
@@ -399,6 +405,7 @@ export default function DashboardAnalytics({
   const locale = useLocale();
   const t = useTranslations("dashboard");
   const tCategories = useTranslations("categories");
+  const tSubCategories = useTranslations("subCategories");
 
   const [expenseRange, setExpenseRange] = useState<PeriodRange>(1);
   const [trendRange, setTrendRange] = useState<PeriodRange>(6);
@@ -410,6 +417,27 @@ export default function DashboardAnalytics({
     {}
   );
   const [activeColorPicker, setActiveColorPicker] = useState<string | null>(null);
+  const [popoverCategory, setPopoverCategory] = useState<string | null>(null);
+
+  const subCategoryGroupMap = useMemo(() => {
+    if (!popoverCategory) return [];
+    const catTxs = (transactions || []).filter(
+      (tx) => tx.category === popoverCategory && tx.type === "expense"
+    );
+    const map = new Map<string, { total: number; txs: Transaction[] }>();
+    for (const tx of catTxs) {
+      const sub = tx.sub_category || "미분류";
+      const existing = map.get(sub) || { total: 0, txs: [] };
+      existing.total += effectiveExpenseAmount(tx);
+      existing.txs.push(tx);
+      map.set(sub, existing);
+    }
+    return Array.from(map.entries()).map(([sub, data]) => ({
+      subCategory: sub,
+      total: data.total,
+      txs: data.txs,
+    }));
+  }, [popoverCategory, transactions]);
 
   const translate = (cat: string) => translateCategory(cat, tCategories);
 
@@ -657,8 +685,8 @@ export default function DashboardAnalytics({
                     stroke="none"
                     labelLine={false}
                     onClick={(entry) => {
-                      if (entry?.category && onCategoryClick) {
-                        onCategoryClick(entry.category);
+                      if (entry?.category) {
+                        setPopoverCategory(entry.category);
                       }
                     }}
                     cursor="pointer"
@@ -719,7 +747,7 @@ export default function DashboardAnalytics({
                 return (
                   <li
                     key={row.category}
-                    onClick={() => onCategoryClick?.(row.category)}
+                    onClick={() => setPopoverCategory(row.category)}
                     className="flex items-center justify-between gap-3 min-w-0 p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/80 cursor-pointer transition-colors group"
                   >
                     <div className="flex items-center gap-2 min-w-0 relative">
@@ -905,6 +933,74 @@ export default function DashboardAnalytics({
           </div>
         )}
       </section>
+
+      {popoverCategory && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setPopoverCategory(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-5 border border-gray-100 dark:border-gray-800 space-y-4 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                  {translateCategory(popoverCategory, tCategories)}
+                </span>
+                <span className="text-xs text-gray-500 font-medium">소비 내역 (중분류)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPopoverCategory(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {subCategoryGroupMap.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">이번 달 지출 내역이 없습니다.</p>
+              ) : (
+                subCategoryGroupMap.map(({ subCategory, total, txs }) => (
+                  <div
+                    key={subCategory}
+                    onClick={() => {
+                      const subVal = subCategory === "미분류" ? undefined : subCategory;
+                      onCategoryClick?.(popoverCategory, subVal, true);
+                      setPopoverCategory(null);
+                    }}
+                    className="p-3 rounded-xl bg-gray-50 hover:bg-indigo-50/60 dark:bg-gray-800/60 dark:hover:bg-gray-800 transition-colors cursor-pointer border border-gray-100 dark:border-gray-700/60 group"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                        {translateSubCategory(subCategory, tSubCategories)} ›
+                      </span>
+                      <span className="text-xs font-bold tabular-nums text-gray-900 dark:text-white">
+                        {formatAmount(total, displayCurrency)}
+                      </span>
+                    </div>
+                    <ul className="space-y-1 pl-1 border-t border-gray-100 dark:border-gray-700/40 pt-1.5 mt-1">
+                      {txs.slice(0, 3).map((tx) => (
+                        <li key={tx.id} className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                          <span className="truncate max-w-[170px]">{tx.note?.trim() || tx.merchant}</span>
+                          <span className="tabular-nums shrink-0 font-medium">{formatAmount(effectiveExpenseAmount(tx), tx.currency)}</span>
+                        </li>
+                      ))}
+                      {txs.length > 3 && (
+                        <li className="text-[10px] text-indigo-500 font-semibold text-right pt-0.5">
+                          외 {txs.length - 3}건 더보기 (클릭)
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -49,7 +49,11 @@ interface Props {
   accountType?: AccountType;
   transactions?: Transaction[];
   onChanged?: () => void;
-  onNavigateToList?: (category?: string) => void;
+  onNavigateToList?: (
+    category?: string,
+    subCategory?: string,
+    fromExpenseChart?: boolean
+  ) => void;
 }
 
 function KindIcon({ kind }: { kind: FinancialAccountKind }) {
@@ -665,18 +669,20 @@ export default function DashboardView({
         </section>
       )}
 
-      <DashboardAnalytics
-        month={month}
-        version={version}
-        scope={scope}
-        accountType={accountType}
-        displayCurrency={heroCurrency}
-        rate={rate}
-        cadStats={cadStats}
-        krwStats={krwStats}
-        transactions={transactions}
-        onCategoryClick={onNavigateToList}
-      />
+      <div id="expense-ratio-section">
+        <DashboardAnalytics
+          month={month}
+          version={version}
+          scope={scope}
+          accountType={accountType}
+          displayCurrency={heroCurrency}
+          rate={rate}
+          cadStats={cadStats}
+          krwStats={krwStats}
+          transactions={transactions}
+          onCategoryClick={onNavigateToList}
+        />
+      </div>
 
       <section className="card-inset p-4">
         <div className="flex items-center justify-between gap-2">

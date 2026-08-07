@@ -180,6 +180,10 @@ export default function AppShell({ user, onLogout }: Props) {
   const [listCategoryFilter, setListCategoryFilter] = useState<string | undefined>(
     undefined
   );
+  const [listSubCategoryFilter, setListSubCategoryFilter] = useState<string | undefined>(
+    undefined
+  );
+  const [fromExpenseChart, setFromExpenseChart] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingOccurrences, setPendingOccurrences] = useState<
     SubscriptionOccurrence[]
@@ -843,7 +847,12 @@ export default function AppShell({ user, onLogout }: Props) {
               onDeleted={bumpVersion}
               onPendingClick={openSubscriptionFromPending}
               initialCategoryFilter={listCategoryFilter}
-              onBackToDashboard={() => setView("dashboard")}
+              initialSubCategoryFilter={listSubCategoryFilter}
+              fromExpenseChart={fromExpenseChart}
+              onBackToDashboard={() => {
+                setView("dashboard");
+                setFromExpenseChart(false);
+              }}
             />
           ) : view === "subscriptions" ? (
             <SubscriptionsView
@@ -891,8 +900,10 @@ export default function AppShell({ user, onLogout }: Props) {
               accountType={accountType}
               transactions={transactions}
               onChanged={bumpVersion}
-              onNavigateToList={(cat) => {
+              onNavigateToList={(cat, subCat, fromChart) => {
                 setListCategoryFilter(cat);
+                setListSubCategoryFilter(subCat || "all");
+                setFromExpenseChart(!!fromChart);
                 setView("list");
               }}
             />

@@ -15,9 +15,9 @@ from app.core.crypto import decrypt_secret, encrypt_secret, is_encrypted
 
 logger = logging.getLogger(__name__)
 
-PRIMARY_MODEL = "gemini-3.6-flash"
+PRIMARY_MODEL = "gemini-3.5-flash-lite"
 FALLBACK_MODELS = (
-    "gemini-3.5-flash-lite",
+    "gemini-3.6-flash",
     "gemini-3.1-flash-lite",
 )
 MODEL_CHAIN = (PRIMARY_MODEL, *FALLBACK_MODELS)
@@ -357,7 +357,8 @@ def _receipt_prompt(flow_type: str = "expense") -> str:
             "Line item parsing rules: each row must align to columns name | standardized_name | quantity | unit | unit_price | total_price. "
             "standardized_name is a normalized product label for cross-store price comparison (same meat cut at different stores).\n"
             "VISIBLE-ONLY FALLBACK RULE: If the receipt or card slip does NOT explicitly list subtotal, tax, or tip line items (e.g. only a single total amount is printed), "
-            "extract ONLY what is visibly printed on the document. Do NOT invent, hallucinate, or force estimated tax/tip amounts if they are not printed."
+            "extract ONLY what is visibly printed on the document. Do NOT invent, hallucinate, or force estimated tax/tip amounts if they are not printed.\n"
+            "ZERO-TAX RULE: If the receipt explicitly shows 0.00 tax, zero HST/GST, or lists zero-rated/tax-exempt grocery items, extract tax_amount as exactly 0.00. Do NOT force a non-zero tax."
         )
 
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -627,16 +628,24 @@ async def _generate_with_single_key(
     payload: dict[str, Any],
     *,
     key_source: str,
+    retry_count: int = 0,
+    force_model: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Try the model chain with one API key. Cooldown state is keyed by key owner."""
     state = await _load_model_state(db, key_owner_id)
     models, skip_info = build_model_chain(state)
 
+    if force_model or retry_count >= 2:
+        target = force_model or "gemini-3.6-flash"
+        models = [target, *[m for m in ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite") if m != target]]
+        skip_info = None
+
     resume_at = _parse_iso(state.get("resume_at"))
     if resume_at and _utc_now() >= resume_at and state.get("cooldown_model"):
         await _save_model_state(db, key_owner_id, None)
         state = {}
-        models, skip_info = build_model_chain(state)
+        if not (force_model or retry_count >= 2):
+            models, skip_info = build_model_chain(state)
 
     if skip_info:
         yield {
@@ -742,6 +751,9 @@ async def generate_content_with_routing(
     owner_id: str,
     api_key: str | None,
     payload: dict[str, Any],
+    *,
+    retry_count: int = 0,
+    force_model: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """
     Quota-aware Gemini router with optional partner-key fallback.
@@ -789,6 +801,8 @@ async def generate_content_with_routing(
             entry["api_key"],
             payload,
             key_source=entry["source"],
+            retry_count=retry_count,
+            force_model=force_model,
         ):
             if event["event"] == "key_exhausted":
                 last_error = event.get("error", last_error)
@@ -811,16 +825,9 @@ async def parse_receipt_or_statement_stream(
     file_name: str,
     *,
     flow_type: str = "expense",
+    retry_count: int = 0,
+    force_model: str | None = None,
 ):
-    """
-    Stream parsing status and results using SSE format.
-    Yields dictionary status updates:
-    - {"event": "trying", "model": str}
-    - {"event": "failed", "model": str, "error": str}
-    - {"event": "quota_fallback", "model": str, "fallback_model": str, "message": str, ...}
-    - {"event": "success", "model": str, "result": dict, "log_id": str}
-    - {"event": "error", "error": str, "log_id": str}
-    """
     chain = await resolve_gemini_api_key_chain(db, owner_id)
     api_key = chain[0]["api_key"] if chain else None
     log_id = ObjectId()
@@ -848,7 +855,9 @@ async def parse_receipt_or_statement_stream(
     payload = _build_single_file_payload(file_bytes, mime_type, flow_type=flow_type)
     last_error: str | None = None
 
-    async for event in generate_content_with_routing(db, owner_id, api_key, payload):
+    async for event in generate_content_with_routing(
+        db, owner_id, api_key, payload, retry_count=retry_count, force_model=force_model
+    ):
         if event["event"] == "success":
             model = event["model"]
             parsed_json = event["result"]
@@ -906,11 +915,20 @@ async def parse_receipt_or_statement(
     file_name: str = "file",
     *,
     flow_type: str = "expense",
+    retry_count: int = 0,
+    force_model: str | None = None,
 ) -> dict:
     """Consume the SSE stream to return the final successful result or raise an error."""
     last_error = "Unknown error"
     async for event in parse_receipt_or_statement_stream(
-        db, owner_id, file_bytes, mime_type, file_name, flow_type=flow_type
+        db,
+        owner_id,
+        file_bytes,
+        mime_type,
+        file_name,
+        flow_type=flow_type,
+        retry_count=retry_count,
+        force_model=force_model,
     ):
         if event["event"] == "success":
             return event["result"]
@@ -929,13 +947,9 @@ async def parse_files_in_batches(
     batch_size: int = IMAGE_BATCH_SIZE,
     delay_seconds: float = BATCH_DELAY_SECONDS,
     flow_type: str = "expense",
+    retry_count: int = 0,
+    force_model: str | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    Parse multiple files in batches of `batch_size` (default 3).
-    Each file is still one Gemini request (current schema is single-doc);
-    batching adds a short delay between groups to reduce RPM bursts.
-    Returns a list of {file_name, result?} / {file_name, error?} dicts.
-    """
     outcomes: list[dict[str, Any]] = []
     batches = list(iter_batches(list(files), batch_size))
     for batch_index, batch in enumerate(batches):
@@ -948,6 +962,8 @@ async def parse_files_in_batches(
                     mime_type,
                     file_name,
                     flow_type=flow_type,
+                    retry_count=retry_count,
+                    force_model=force_model,
                 )
                 outcomes.append({"file_name": file_name, "result": result})
             except Exception as e:
