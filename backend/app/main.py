@@ -60,7 +60,16 @@ app.include_router(stocks.router)
 app.include_router(ai_router.router)
 
 
+from app.database import db
+
+
 @app.get("/", tags=["health"])
 @app.get("/health", tags=["health"])
 async def health_check() -> dict:
-    return {"status": "ok", "service": "PairPocket API"}
+    db_status = "ok"
+    if db.database is not None:
+        try:
+            await db.database.command("ping")
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+    return {"status": "ok", "db": db_status, "service": "PairPocket API"}
