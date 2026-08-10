@@ -460,7 +460,7 @@ export function preferredLocalesList(
 export function shouldShowLocaleToggle(
   settings: Pick<UserSettings, "preferred_locales" | "preferred_locale"> | null | undefined
 ): boolean {
-  return preferredLocalesList(settings).length >= 2;
+  return preferredLocalesList(settings).length >= 1;
 }
 
 export async function fetchUserSettings(): Promise<UserSettings> {
@@ -1864,6 +1864,24 @@ export async function saveOnboardingBasics(payload: {
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || "Failed to save onboarding basics");
+  }
+  return (await res.json()) as UserSettings;
+}
+
+export async function updatePreferredLocales(
+  preferred_locales: string[]
+): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/locales`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      preferred_locales,
+      preferred_locale: preferred_locales[0],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Failed to update language settings");
   }
   return (await res.json()) as UserSettings;
 }

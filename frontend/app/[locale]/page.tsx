@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useLocale } from "next-intl";
+
 import AppShell from "@/components/AppShell";
 import LoginLanding from "@/components/LoginLanding";
 import { useRouter } from "@/i18n/navigation";
@@ -21,6 +23,7 @@ function asAppLocale(value: string | null | undefined): AppLocale {
 
 export default function Home() {
   const router = useRouter();
+  const currentLocale = useLocale() as AppLocale;
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,24 +55,33 @@ export default function Home() {
             if (typeof window !== "undefined") {
               localStorage.setItem("pairpocket_user_locale", prefLocale);
             }
+            if (prefLocale !== currentLocale) {
+              router.replace("/", { locale: prefLocale });
+              return;
+            }
+          } else if (
+            storedLocal &&
+            (locales as readonly string[]).includes(storedLocal) &&
+            storedLocal !== currentLocale
+          ) {
+            router.replace("/", { locale: storedLocal as AppLocale });
+            return;
           }
         } else {
           if (
             storedLocal &&
-            (locales as readonly string[]).includes(storedLocal)
+            (locales as readonly string[]).includes(storedLocal) &&
+            storedLocal !== currentLocale
           ) {
-            const currentPath =
-              typeof window !== "undefined" ? window.location.pathname : "";
-            if (currentPath === "/" || currentPath.startsWith("/en")) {
-              router.replace("/", { locale: storedLocal as AppLocale });
-            }
+            router.replace("/", { locale: storedLocal as AppLocale });
+            return;
           }
         }
       } finally {
         setLoading(false);
       }
     })();
-  }, [router]);
+  }, [router, currentLocale]);
 
   if (loading) {
     return (

@@ -57,6 +57,11 @@ class SetCategoryColorBody(BaseModel):
     color: str = Field(min_length=4, max_length=9)
 
 
+class PreferredLocalesBody(BaseModel):
+    preferred_locales: list[str] = Field(default_factory=list)
+    preferred_locale: str | None = None
+
+
 class OnboardingBasicsBody(BaseModel):
     """Step 0: languages (1-2) + ledger start date (+ optional API key)."""
 

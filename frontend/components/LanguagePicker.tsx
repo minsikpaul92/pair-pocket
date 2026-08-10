@@ -8,6 +8,7 @@ import {
   type AppLocale,
   isBetaLocale,
 } from "@/i18n/locales";
+import { updatePreferredLocales } from "@/lib/api";
 
 const MAX_LOCALES = 2;
 
@@ -46,7 +47,11 @@ export default function LanguagePicker({
     if (typeof window !== "undefined") {
       window.localStorage.setItem("pairpocket_user_locale", next);
     }
-    await onLocaleSelected?.(next);
+    if (onLocaleSelected) {
+      await onLocaleSelected(next);
+    } else {
+      await updatePreferredLocales([next]).catch(() => null);
+    }
     if (next !== locale) {
       router.replace(pathname, { locale: next });
     }
@@ -57,7 +62,11 @@ export default function LanguagePicker({
     if (typeof window !== "undefined") {
       window.localStorage.setItem("pairpocket_user_locale", next);
     }
-    await onLocaleSelected?.(next);
+    if (onLocaleSelected) {
+      await onLocaleSelected(next);
+    } else {
+      await updatePreferredLocales([next]).catch(() => null);
+    }
     router.replace(pathname, { locale: next });
   }
 

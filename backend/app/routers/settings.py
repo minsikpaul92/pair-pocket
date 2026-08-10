@@ -23,6 +23,7 @@ from app.models.user_settings import (
     OnboardingBasicsBody,
     OnboardingCompleteBody,
     OnboardingStepBody,
+    PreferredLocalesBody,
     SetCategoryColorBody,
     ShareGeminiKeyBody,
     UserSettingsOut,
@@ -158,6 +159,46 @@ async def get_settings(
 @router.get("/locales")
 async def list_locales() -> dict:
     return {"locales": LOCALE_OPTIONS}
+
+
+@router.put("/locales", response_model=UserSettingsOut)
+async def update_preferred_locales(
+    payload: PreferredLocalesBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    locales = _normalize_locales(payload.preferred_locales, payload.preferred_locale)
+    if not locales:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Select at least one language",
+        )
+    if len(locales) > 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Select at most two languages",
+        )
+    for locale in locales:
+        if locale not in SUPPORTED_LOCALE_CODES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported locale: {locale}",
+            )
+
+    await _get_or_create(db, current_user.id)
+    await db[COLLECTION].update_one(
+        {"owner_id": current_user.id},
+        {"$set": {"preferred_locale": locales[0], "preferred_locales": locales}},
+    )
+    await write_audit_log(
+        db,
+        owner_id=current_user.id,
+        action="update",
+        entity="preferred_locales",
+        detail={"preferred_locales": locales},
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
 
 
 @router.get("/canada-subscriptions")
