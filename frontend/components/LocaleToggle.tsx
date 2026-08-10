@@ -54,7 +54,7 @@ export default function LocaleToggle({
   if (forceVisible) {
     return <LanguagePicker variant="toggle" className={className} />;
   }
-  if (locales === null || locales.length < 2) {
+  if (locales === null) {
     return null;
   }
   return <LanguagePicker variant="toggle" className={className} />;
