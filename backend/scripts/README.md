@@ -7,7 +7,7 @@ Shared records created before `shared_group_id` was stored on each record are hi
 Before deploying the group-scoping release, inspect each active pair separately from the `backend` directory:
 
 ```bash
-python scripts/migrate_shared_group_scope.py \
+python -m scripts.migrate_shared_group_scope \
   --group-id CURRENT_GROUP_ID \
   --member-id FIRST_USER_OBJECT_ID \
   --member-id SECOND_USER_OBJECT_ID
@@ -16,7 +16,7 @@ python scripts/migrate_shared_group_scope.py \
 The command is a dry run unless `--apply` is provided. Confirm the group and both users in the database, take a database-level backup, then apply:
 
 ```bash
-python scripts/migrate_shared_group_scope.py \
+python -m scripts.migrate_shared_group_scope \
   --group-id CURRENT_GROUP_ID \
   --member-id FIRST_USER_OBJECT_ID \
   --member-id SECOND_USER_OBJECT_ID \
