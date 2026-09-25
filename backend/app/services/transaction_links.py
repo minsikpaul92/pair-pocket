@@ -14,10 +14,9 @@ from app.services.access import assert_can_access_doc
 
 
 def is_shared_funding(doc: dict) -> bool:
-    return (
-        normalize_transfer_category(doc.get("category", "")) == TRANSFER_CATEGORY
-        and is_shared_funding_sub(doc.get("sub_category", ""))
-    )
+    return normalize_transfer_category(
+        doc.get("category", "")
+    ) == TRANSFER_CATEGORY and is_shared_funding_sub(doc.get("sub_category", ""))
 
 
 async def authorized_funding_twin(
@@ -36,7 +35,10 @@ async def authorized_funding_twin(
 
     twin = await db["transactions"].find_one({"_id": ObjectId(linked_id)})
     await assert_can_access_doc(
-        db, user, twin, not_found_detail="Linked transaction not found or not accessible."
+        db,
+        user,
+        twin,
+        not_found_detail="Linked transaction not found or not accessible.",
     )
     roles = {
         (doc.get("account_type"), doc.get("type")),

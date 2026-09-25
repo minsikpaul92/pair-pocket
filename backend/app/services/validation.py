@@ -35,6 +35,7 @@ async def _load_owned_account(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     label: str,
+    shared_group_id: str | None = None,
 ) -> dict:
     if not ObjectId.is_valid(account_id):
         raise HTTPException(
@@ -62,6 +63,12 @@ async def _load_owned_account(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"선택한 {label}을(를) 찾을 수 없습니다.",
         )
+    if account.get("account_type") == AccountType.SHARED and (
+        not shared_group_id or account.get("shared_group_id") != shared_group_id
+    ):
+        raise HTTPException(
+            status_code=422, detail="Account is not in the active shared ledger."
+        )
     return account
 
 
@@ -84,9 +91,7 @@ def _assert_account_matches_payload(
         )
 
 
-def _assert_account_type(
-    account: dict, expected: AccountType, label: str
-) -> None:
+def _assert_account_type(account: dict, expected: AccountType, label: str) -> None:
     if account.get("account_type") != expected.value:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -122,9 +127,7 @@ async def validate_transaction_payload(
 
     # Shared-funding income twin is allowed; other transfer cats are expense-only.
     if is_transfer and payload.type != TransactionType.EXPENSE:
-        if not (
-            is_shared_funding and payload.type == TransactionType.INCOME
-        ):
+        if not (is_shared_funding and payload.type == TransactionType.INCOME):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="[자산 이동/카드]는 지출(type=expense)로만 등록할 수 있습니다.",
@@ -173,6 +176,8 @@ async def validate_transaction_payload(
             payload.settles_expense_id,
             owner_ids=account_owner_ids,
             exclude_settlement_id=exclude_settlement_id,
+            account_type=payload.account_type,
+            shared_group_id=current_user.shared_group_id if current_user else None,
         )
         if remaining is None:
             raise HTTPException(
@@ -205,6 +210,7 @@ async def validate_transaction_payload(
             db,
             account_id=payload.account_id,
             owner_ids=account_owner_ids,
+            shared_group_id=current_user.shared_group_id if current_user else None,
             label="출금 계좌",
         )
         _assert_account_matches_payload(from_account, payload, "출금 계좌")
@@ -231,9 +237,7 @@ async def validate_transaction_payload(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="공용 계좌 입금을 쓰려면 먼저 파트너를 초대해야 합니다.",
             )
-        personal_ids = await resolve_owner_ids(
-            db, current_user, AccountType.PERSONAL
-        )
+        personal_ids = await resolve_owner_ids(db, current_user, AccountType.PERSONAL)
         shared_ids = await resolve_owner_ids(db, current_user, AccountType.SHARED)
         if not shared_ids:
             raise HTTPException(
@@ -247,12 +251,14 @@ async def validate_transaction_payload(
                 db,
                 account_id=payload.account_id,
                 owner_ids=personal_ids,
+                shared_group_id=current_user.shared_group_id if current_user else None,
                 label="출금 계좌",
             )
             to_account = await _load_owned_account(
                 db,
                 account_id=payload.counter_account_id,
                 owner_ids=shared_ids,
+                shared_group_id=current_user.shared_group_id if current_user else None,
                 label="입금 계좌",
             )
             _assert_account_type(from_account, AccountType.PERSONAL, "출금 계좌")
@@ -263,12 +269,14 @@ async def validate_transaction_payload(
                 db,
                 account_id=payload.account_id,
                 owner_ids=shared_ids,
+                shared_group_id=current_user.shared_group_id if current_user else None,
                 label="입금 계좌",
             )
             from_account = await _load_owned_account(
                 db,
                 account_id=payload.counter_account_id,
                 owner_ids=personal_ids,
+                shared_group_id=current_user.shared_group_id if current_user else None,
                 label="출금 계좌",
             )
             _assert_account_type(to_account, AccountType.SHARED, "입금 계좌")
@@ -307,12 +315,14 @@ async def validate_transaction_payload(
             db,
             account_id=payload.account_id,
             owner_ids=account_owner_ids,
+            shared_group_id=current_user.shared_group_id if current_user else None,
             label="출금 계좌",
         )
         to_account = await _load_owned_account(
             db,
             account_id=payload.counter_account_id,
             owner_ids=account_owner_ids,
+            shared_group_id=current_user.shared_group_id if current_user else None,
             label="입금 계좌",
         )
         _assert_account_matches_payload(from_account, payload, "출금 계좌")
@@ -364,6 +374,7 @@ async def validate_transaction_payload(
             db,
             account_id=payload.account_id,
             owner_ids=account_owner_ids,
+            shared_group_id=current_user.shared_group_id if current_user else None,
             label="계좌",
         )
         _assert_account_matches_payload(account, payload, "계좌")

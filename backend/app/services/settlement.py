@@ -7,8 +7,10 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.models.category_preset import (
     INCOME_CATEGORY_SETTLEMENT,
     SUB_CATEGORY_SETTLEMENT,
-    is_settlement_income,
 )
+
+from app.models.transaction import AccountType
+from app.services.access import shared_scope
 
 COLLECTION = "transactions"
 
@@ -18,6 +20,8 @@ async def get_settled_amounts(
     owner_id: str | None = None,
     *,
     owner_ids: list[str] | None = None,
+    account_type: AccountType = AccountType.PERSONAL,
+    shared_group_id: str | None = None,
 ) -> dict[str, float]:
     """Map expense_id → total settlement income already received."""
     ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
@@ -30,6 +34,8 @@ async def get_settled_amounts(
         {
             "$match": {
                 **owner_filter,
+                "account_type": account_type.value,
+                **shared_scope(account_type, shared_group_id),
                 "type": "income",
                 "category": INCOME_CATEGORY_SETTLEMENT,
                 "sub_category": SUB_CATEGORY_SETTLEMENT,
@@ -53,6 +59,8 @@ async def get_remaining_settlement(
     expense_id: str,
     *,
     owner_ids: list[str] | None = None,
+    account_type: AccountType = AccountType.PERSONAL,
+    shared_group_id: str | None = None,
     exclude_settlement_id: str | None = None,
 ) -> float | None:
     """Return how much of an expense can still be settled, or None if not found.
@@ -73,12 +81,23 @@ async def get_remaining_settlement(
     )
 
     expense = await db[COLLECTION].find_one(
-        {"_id": oid, **owner_clause, "type": "expense"}
+        {
+            "_id": oid,
+            **owner_clause,
+            "type": "expense",
+            "account_type": account_type.value,
+            **shared_scope(account_type, shared_group_id),
+        }
     )
     if expense is None:
         return None
 
-    settled_map = await get_settled_amounts(db, owner_ids=ids)
+    settled_map = await get_settled_amounts(
+        db,
+        owner_ids=ids,
+        account_type=account_type,
+        shared_group_id=shared_group_id,
+    )
     already = settled_map.get(expense_id, 0.0)
 
     if exclude_settlement_id and ObjectId.is_valid(exclude_settlement_id):

@@ -1,31 +1,32 @@
 import datetime
 from bson import ObjectId
 import httpx
-from app.models.holding import StockHolding
-from app.models.transaction import AccountType, Currency
+from app.models.transaction import Currency
 
 
-async def sync_holding_from_transactions(db, owner_id: str, account_id: str, ticker: str):
+async def sync_holding_from_transactions(
+    db, owner_id: str, account_id: str, ticker: str
+):
     """
     Recalculates stock holding (shares, avg_price) from transactions for a given account and ticker,
     and upserts/deletes the StockHolding document.
     """
     # 1. Query all transactions for this owner, account, and ticker that are stock trades
-    cursor = db.transactions.find({
-        "owner_id": owner_id,
-        "account_id": account_id,
-        "ticker": ticker,
-        "is_stock_trade": True
-    })
-    transactions = await cursor.to_list(length=None)
-    
-    if not transactions:
-        # If no transactions exist, delete the holding
-        await db.holdings.delete_many({
+    cursor = db.transactions.find(
+        {
             "owner_id": owner_id,
             "account_id": account_id,
-            "ticker": ticker
-        })
+            "ticker": ticker,
+            "is_stock_trade": True,
+        }
+    )
+    transactions = await cursor.to_list(length=None)
+
+    if not transactions:
+        # If no transactions exist, delete the holding
+        await db.holdings.delete_many(
+            {"owner_id": owner_id, "account_id": account_id, "ticker": ticker}
+        )
         return
 
     # Sort by date to process chronologically
@@ -33,14 +34,14 @@ async def sync_holding_from_transactions(db, owner_id: str, account_id: str, tic
 
     total_shares = 0.0
     avg_price = 0.0
-    
+
     # Fetch account detail to know the account_type
     account = await db.accounts.find_one({"_id": ObjectId(account_id)})
     if not account:
         return
-        
+
     account_type = account.get("account_type", "personal")
-    
+
     # Resolve native stock details to fill holding
     price_info = await get_or_update_stock_price(db, ticker)
     stock_name = price_info.get("name", ticker) if price_info else ticker
@@ -48,7 +49,7 @@ async def sync_holding_from_transactions(db, owner_id: str, account_id: str, tic
 
     # Support standard Currency enum validation
     try:
-        validated_currency = Currency(stock_currency)
+        Currency(stock_currency)
     except ValueError:
         # Fallback if currency is USD but not in enum (KRW/CAD).
         # We represent US stocks as USD, but standard Currency in PairPocket is KRW/CAD.
@@ -56,7 +57,7 @@ async def sync_holding_from_transactions(db, owner_id: str, account_id: str, tic
         # Actually, let's allow "USD" in Currency or map it directly.
         # Since we only defined Currency as KRW/CAD in backend, we should map it to "USD" if possible,
         # or we can add USD to Currency enum!
-        validated_currency = Currency.CAD # fallback
+        Currency.CAD  # fallback
 
     for tx in transactions:
         shares = tx.get("shares") or 0.0
@@ -67,38 +68,35 @@ async def sync_holding_from_transactions(db, owner_id: str, account_id: str, tic
         if trade_type == "buy":
             new_shares = total_shares + shares
             if new_shares > 0:
-                avg_price = ((total_shares * avg_price) + (shares * price) + fee) / new_shares
+                avg_price = (
+                    (total_shares * avg_price) + (shares * price) + fee
+                ) / new_shares
             total_shares = new_shares
         elif trade_type == "sell":
             total_shares = max(0.0, total_shares - shares)
             if total_shares == 0:
                 avg_price = 0.0
-    
+
     if total_shares > 0:
         await db.holdings.update_one(
-            {
-                "owner_id": owner_id,
-                "account_id": account_id,
-                "ticker": ticker
-            },
+            {"owner_id": owner_id, "account_id": account_id, "ticker": ticker},
             {
                 "$set": {
                     "account_type": account_type,
+                    "shared_group_id": account.get("shared_group_id"),
                     "name": stock_name,
                     "avg_price": avg_price,
                     "shares": total_shares,
-                    "currency": stock_currency, # Raw string to support USD/KRW/CAD
-                    "updated_at": datetime.datetime.utcnow()
+                    "currency": stock_currency,  # Raw string to support USD/KRW/CAD
+                    "updated_at": datetime.datetime.utcnow(),
                 }
             },
-            upsert=True
+            upsert=True,
         )
     else:
-        await db.holdings.delete_one({
-            "owner_id": owner_id,
-            "account_id": account_id,
-            "ticker": ticker
-        })
+        await db.holdings.delete_one(
+            {"owner_id": owner_id, "account_id": account_id, "ticker": ticker}
+        )
 
 
 # ~2 Yahoo checks per day for a user who opens the app in morning + evening.
@@ -115,8 +113,7 @@ async def _fetch_yahoo_quote(ticker: str) -> dict | None:
     from urllib.parse import quote
 
     url = (
-        "https://query1.finance.yahoo.com/v8/finance/chart/"
-        f"{quote(ticker, safe='')}"
+        "https://query1.finance.yahoo.com/v8/finance/chart/" f"{quote(ticker, safe='')}"
     )
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -148,7 +145,9 @@ async def _fetch_yahoo_quote(ticker: str) -> dict | None:
         return None
 
 
-async def get_or_update_stock_price(db, ticker: str, force_refresh: bool = False) -> dict | None:
+async def get_or_update_stock_price(
+    db, ticker: str, force_refresh: bool = False
+) -> dict | None:
     """Return Mongo-cached price; refresh from Yahoo at most ~2×/day.
 
     Fast path: if ``checked_at`` (or ``updated_at``) is within the session TTL,
@@ -308,7 +307,7 @@ KOREAN_STOCK_MAP = {
 
 def contains_hangul(text: str) -> bool:
     for char in text:
-        if 0xac00 <= ord(char) <= 0xd7a3 or 0x3130 <= ord(char) <= 0x318f:
+        if 0xAC00 <= ord(char) <= 0xD7A3 or 0x3130 <= ord(char) <= 0x318F:
             return True
     return False
 
@@ -320,7 +319,7 @@ async def search_tickers_yfinance(query: str) -> list[dict]:
     """
     if not query or len(query.strip()) < 1:
         return []
-        
+
     q = query.strip()
     if contains_hangul(q):
         for ko, en in KOREAN_STOCK_MAP.items():
@@ -330,15 +329,11 @@ async def search_tickers_yfinance(query: str) -> list[dict]:
             return []
 
     url = "https://query1.finance.yahoo.com/v1/finance/search"
-    params = {
-        "q": q,
-        "quotesCount": 10,
-        "newsCount": 0
-    }
+    params = {"q": q, "quotesCount": 10, "newsCount": 0}
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
-    
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(url, params=params, headers=headers)
@@ -346,23 +341,25 @@ async def search_tickers_yfinance(query: str) -> list[dict]:
                 return []
             data = resp.json()
             quotes = data.get("quotes", [])
-            
+
             results = []
             for q in quotes:
                 quote_type = q.get("quoteType")
                 if quote_type not in ["EQUITY", "ETF"]:
                     continue
-                    
+
                 symbol = q.get("symbol")
                 name = q.get("longname") or q.get("shortname") or symbol
                 exchange = q.get("exchange")
-                
-                results.append({
-                    "ticker": symbol,
-                    "name": name,
-                    "exchange": exchange,
-                    "quote_type": quote_type
-                })
+
+                results.append(
+                    {
+                        "ticker": symbol,
+                        "name": name,
+                        "exchange": exchange,
+                        "quote_type": quote_type,
+                    }
+                )
             return results
     except Exception as e:
         print(f"Error searching tickers: {e}")

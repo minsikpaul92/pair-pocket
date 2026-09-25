@@ -28,7 +28,7 @@ from app.models.user_settings import (
     ShareGeminiKeyBody,
     UserSettingsOut,
 )
-from app.services.access import get_partner_owner_id, resolve_owner_ids
+from app.services.access import get_partner_owner_id, resolve_owner_ids, shared_scope
 from app.services.ai import get_user_gemini_api_key, has_effective_gemini_key
 from app.services.audit import write_audit_log
 
@@ -97,8 +97,8 @@ async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
     preferred_locales = _normalize_locales(
         doc.get("preferred_locales"), doc.get("preferred_locale")
     )
-    preferred_locale = preferred_locales[0] if preferred_locales else doc.get(
-        "preferred_locale"
+    preferred_locale = (
+        preferred_locales[0] if preferred_locales else doc.get("preferred_locale")
     )
     owner_id = doc["owner_id"]
     partner_id = await get_partner_owner_id(db, owner_id)
@@ -532,6 +532,7 @@ async def reset_user_data(
         return {
             "owner_id": {"$in": ids},
             "account_type": AccountType.SHARED.value,
+            **shared_scope(AccountType.SHARED, current_user.shared_group_id),
         }
 
     async def _match_filters() -> list[dict]:
@@ -539,9 +540,7 @@ async def reset_user_data(
             return [await _owner_filter_for(AccountType.PERSONAL)]
         if account_type == "shared":
             return [await _owner_filter_for(AccountType.SHARED)]
-        # all: full wipe of everything I own (personal + shared I created).
-        if scope == "all":
-            return [{"owner_id": owner_id}]
+        # Reset only currently accessible ledgers; archived groups stay intact.
         filters = [await _owner_filter_for(AccountType.PERSONAL)]
         if current_user.shared_group_id:
             filters.append(await _owner_filter_for(AccountType.SHARED))
@@ -574,8 +573,7 @@ async def reset_user_data(
 
     # Full reset + onboarding reopen only when wiping everything for this user.
     if scope == "all" and account_type == "all":
-        accounts = await db.accounts.delete_many({"owner_id": owner_id})
-        deleted["accounts"] = accounts.deleted_count
+        deleted["accounts"] = await _delete_many("accounts")
         await db[COLLECTION].update_one(
             {"owner_id": owner_id},
             {

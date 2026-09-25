@@ -20,6 +20,7 @@ from app.services.ai import (
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
+
 @router.post("/parse")
 async def parse_receipts_or_statements(
     files: list[UploadFile] = File(...),
@@ -41,7 +42,9 @@ async def parse_receipts_or_statements(
     for file in files:
         content_type = file.content_type or "image/jpeg"
         if not (content_type.startswith("image/") or content_type == "application/pdf"):
-            errors.append(f"지원하지 않는 파일 형식입니다 ({file.filename}): {content_type}")
+            errors.append(
+                f"지원하지 않는 파일 형식입니다 ({file.filename}): {content_type}"
+            )
             continue
         content = await file.read()
         prepared.append((content, content_type, file.filename or "file"))
@@ -57,7 +60,9 @@ async def parse_receipts_or_statements(
     results = []
     for item in outcomes:
         if "error" in item:
-            errors.append(f"파일 분석 중 오류 발생 ({item['file_name']}): {item['error']}")
+            errors.append(
+                f"파일 분석 중 오류 발생 ({item['file_name']}): {item['error']}"
+            )
             continue
         parsed = item["result"]
         parsed["file_name"] = item["file_name"]
@@ -65,15 +70,15 @@ async def parse_receipts_or_statements(
 
     if errors and not results:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="; ".join(errors)
+            status_code=status.HTTP_400_BAD_REQUEST, detail="; ".join(errors)
         )
 
     return {
         "status": "success",
         "results": results,
-        "errors": errors if errors else None
+        "errors": errors if errors else None,
     }
+
 
 @router.post("/parse-items")
 async def parse_items_endpoint(
@@ -85,13 +90,14 @@ async def parse_items_endpoint(
     if not (content_type.startswith("image/") or content_type == "application/pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"지원하지 않는 파일 형식입니다: {content_type}"
+            detail=f"지원하지 않는 파일 형식입니다: {content_type}",
         )
     content = await file.read()
     items = await parse_receipt_items(
         db, current_user.id, content, content_type, file.filename or "file"
     )
     return {"status": "success", "items": items}
+
 
 @router.post("/parse-stream")
 async def parse_receipts_or_statements_stream(
@@ -104,7 +110,7 @@ async def parse_receipts_or_statements_stream(
     if not (content_type.startswith("image/") or content_type == "application/pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"지원하지 않는 파일 형식입니다: {content_type}"
+            detail=f"지원하지 않는 파일 형식입니다: {content_type}",
         )
     normalized_flow = flow_type.strip().lower()
     if normalized_flow not in ("expense", "income"):
@@ -113,7 +119,7 @@ async def parse_receipts_or_statements_stream(
             detail="flow_type must be expense or income",
         )
     content = await file.read()
-    
+
     async def sse_generator():
         try:
             async for update in parse_receipt_or_statement_stream(
@@ -166,9 +172,7 @@ async def parse_onboarding_step_screenshots(
         prepared.append((content, content_type, file.filename or "image.jpg"))
 
     try:
-        result = await parse_onboarding_screenshots(
-            db, current_user.id, step, prepared
-        )
+        result = await parse_onboarding_screenshots(db, current_user.id, step, prepared)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -239,24 +243,24 @@ def _serialize_log(doc: dict) -> dict:
         "feedback": doc.get("feedback"),
         "status": doc.get("status"),
         "error_message": doc.get("error_message"),
-        "owner_id": doc["owner_id"]
+        "owner_id": doc["owner_id"],
     }
+
 
 @router.get("/logs", response_model=list[OCRLogOut])
 async def list_ocr_logs(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    from app.services.access import resolve_owner_ids
-    from app.models.transaction import AccountType
-    
-    owner_ids = await resolve_owner_ids(db, current_user, AccountType.SHARED)
-    if not owner_ids:
-        owner_ids = [current_user.id]
-        
-    cursor = db["ocr_logs"].find({"owner_id": {"$in": owner_ids}}).sort("timestamp", -1).limit(50)
+    cursor = (
+        db["ocr_logs"]
+        .find({"owner_id": current_user.id})
+        .sort("timestamp", -1)
+        .limit(50)
+    )
     logs = await cursor.to_list(length=50)
-    return [_serialize_log(l) for l in logs]
+    return [_serialize_log(log) for log in logs]
+
 
 @router.patch("/logs/{log_id}/feedback")
 async def update_ocr_log_feedback(
@@ -269,29 +273,31 @@ async def update_ocr_log_feedback(
     if body.feedback not in [None, "thumbs_up", "thumbs_down"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Feedback must be 'thumbs_up', 'thumbs_down', or null"
+            detail="Feedback must be 'thumbs_up', 'thumbs_down', or null",
         )
-    
+
     try:
         oid = ObjectId(log_id)
     except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid log ID")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid log ID"
+        )
 
     log_doc = await db["ocr_logs"].find_one({"_id": oid})
     if not log_doc:
-        raise HTTPException(status_code=status.HTTP_444_NOT_FOUND if hasattr(status, "HTTP_444_NOT_FOUND") else 404, detail="Log not found")
-        
-    from app.services.access import resolve_owner_ids
-    from app.models.transaction import AccountType
-    owner_ids = await resolve_owner_ids(db, current_user, AccountType.SHARED)
-    if not owner_ids:
-        owner_ids = [current_user.id]
-        
-    if log_doc["owner_id"] not in owner_ids:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=(
+                status.HTTP_444_NOT_FOUND
+                if hasattr(status, "HTTP_444_NOT_FOUND")
+                else 404
+            ),
+            detail="Log not found",
+        )
 
-    await db["ocr_logs"].update_one(
-        {"_id": oid},
-        {"$set": {"feedback": body.feedback}}
-    )
+    if log_doc["owner_id"] != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
+    await db["ocr_logs"].update_one({"_id": oid}, {"$set": {"feedback": body.feedback}})
     return {"status": "success"}

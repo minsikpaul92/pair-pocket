@@ -39,7 +39,7 @@ Today the product is tuned for **KRW / CAD** (Korea–Canada). The same pattern 
 
 ### Personal ↔ Shared ledger toggle
 
-Switch between personal and shared ledgers. Solo use stays on the personal ledger. Strengthening privacy boundaries and preserving historical partnership scopes are priorities in the roadmap below.
+Switch between personal and shared ledgers. Solo use stays on the personal ledger. Shared records are bound to the partnership that created them, so unlinking and linking a new partner does not expose an earlier shared history.
 
 ![Personal and Shared toggle](docs/demo/01-personal-shared-toggle.gif)
 
@@ -85,10 +85,12 @@ This is the planned work, ordered by priority. Unchecked items are not completed
 
 ### Phase 1 — Privacy, data integrity, and reliability
 
-- [ ] **Protect linked transactions.** Make transaction relationships server-managed. Verify ownership, ledger access, and the reciprocal relationship before updating or deleting a linked entry. Add regression tests proving that one user cannot mutate another user's unrelated transactions.
-- [ ] **Keep personal history out of shared suggestions.** Apply the ledger scope to merchant, institution, and category lookups as well as transaction lists. Verify that shared autocomplete never includes a partner's personal history.
-- [ ] **Preserve historical partnership boundaries.** Store a stable shared-ledger/group ID on shared records and authorize access against that group. Define access after unlinking, and migrate existing records with a dry run and backup. Do not assign ambiguous historical records to a new partnership automatically. Test unlinking and linking to a different partner.
-- [ ] **Make invitations and paired writes atomic.** Use conditional updates and database transactions where supported to prevent concurrent invitation acceptance and partial writes. Creating, editing, or deleting shared funding must leave both sides consistent, including converting an ordinary transaction into shared funding. Verify failure and retry behavior.
+- [x] **Protect linked transactions.** Transaction relationships are server-managed. Updates and deletes verify ownership, ledger access, and the reciprocal relationship, with regression coverage preventing one user from mutating another user's unrelated transactions.
+- [x] **Keep personal history out of shared suggestions.** Merchant and institution lookups follow the selected ledger scope, so shared autocomplete does not include a partner's personal history.
+- [x] **Preserve historical partnership boundaries.** Shared transactions, accounts, subscriptions, occurrences, and holdings carry the stable group ID that created them. Unlinking archives that group, and a new partnership cannot read its records. Legacy active-pair records were migrated with a verified dry run and pre-change JSON backup; ambiguous records fail closed.
+- [x] **Make partnership changes atomic.** Invitation acceptance and unlinking use conditional updates inside MongoDB transactions. Concurrent or repeated acceptance cannot leave only one partner linked, and the partnership group lifecycle is recorded explicitly.
+- [ ] **Make account and card defaults reliable.** Replace the current mix of account flags, unused settings fields, and browser-only stock defaults with one server-backed source of truth. Add a Settings section for personal/shared and currency-specific default spending accounts, income accounts, payment cards, subscription payment methods, and brokerage accounts. Show default badges and quick actions on dashboard account cards, and expose independent applicable choices in account editing instead of one context-dependent checkbox. Make switching atomic, validate account type/currency/group access, define fallback behavior when a default is deleted or deactivated, remove stock `localStorage` defaults, and migrate existing flags without changing account balances or history. Ensure transaction, subscription, transfer, and stock forms all resolve defaults through the same rules and retain actionable errors when no valid account exists.
+- [ ] **Make paired shared-funding writes atomic.** Creating, editing, or deleting shared funding must leave both sides consistent, including converting an ordinary transaction into shared funding. Use database transactions or an equivalent recoverable operation and verify failure and retry behavior.
 - [ ] **Validate settlements consistently.** Require matching currency, ledger scope, and access to the original expense. Prevent over-settlement under concurrent requests and reject edits that invalidate existing settlements. Test remaining amounts and account balances after each operation.
 - [ ] **Keep sessions signed in reliably.** Investigate token expiry, browser storage, and authentication error handling; the current access token lifetime is seven days. Implement renewable sessions with rotating, revocable refresh credentials and protected cookie handling suitable for the deployed frontend/API domains. Retry authentication once after refresh, keep network failures separate from expired sessions, and preserve drafts if sign-in is required.
 - [ ] **Preserve input and explain failures.** Close or clear a form only after confirmed save success. Retain drafts after failed saves, prevent duplicate submissions, and show actionable English/Korean messages for missing fields, invalid account/currency combinations, expired sessions, and server failures. Isolate any persisted drafts by user and clear sensitive drafts on logout. Distinguish failed loading from an empty ledger and provide retry controls.
@@ -129,24 +131,25 @@ For each completed item:
 
 Use `main` as the release branch and short-lived `docs/`, `fix/`, and `feat/` branches for focused changes. The branch names below are proposed work units, not claims that implementation already exists.
 
-| Order | Branch | Scope |
-| --- | --- | --- |
-| 0 | `docs/roadmap` | Live URL and this English implementation roadmap |
-| 1 | `fix/ledger-access` | Linked-entry authorization and private lookup isolation |
-| 2 | `fix/partnership-scope` | Historical group scoping, migration, and invitation consistency |
-| 3 | `fix/ledger-integrity` | Atomic paired writes and settlement validation |
-| 4 | `fix/session-persistence` | Session diagnosis, renewal, and expiry recovery |
-| 5 | `fix/save-recovery` | Draft preservation, readable errors, and safe retries |
-| 6 | `feat/receipt-batches` | Multiple-receipt review and partial-failure recovery |
-| 7 | `feat/statement-import` | PDF transaction import and duplicate review |
-| 8 | `feat/unified-layout` | Shared layout and Settings-only language preference |
-| 9 | `feat/release-notes` | Versioned release history in Settings |
-| 10 | `feat/public-introduction` | Product explanation before sign-in |
-| 11 | `feat/weekly-spending` | Weekly dashboard analysis |
-| 12 | `feat/item-classification` | Item groups and custom-category AI context |
-| 13 | `feat/monthly-budgets` | Budgets, pacing, and grounded AI explanations |
-| 14 | `feat/peer-comparisons` | Optional profile and sourced benchmarks |
-| 15 | `feat/unit-price-insights` | Receipt-based unit prices and shopping advice |
+| Order | Branch | Status | Scope |
+| --- | --- | --- | --- |
+| 0 | `docs/roadmap` | Complete ([#48](https://github.com/minsikpaul92/pair-pocket/pull/48)) | Live URL and this English implementation roadmap |
+| 1 | `fix/ledger-access` | Complete ([#49](https://github.com/minsikpaul92/pair-pocket/pull/49)) | Linked-entry authorization and private lookup isolation |
+| 2 | `fix/partnership-scope` | Complete ([#50](https://github.com/minsikpaul92/pair-pocket/pull/50)) | Historical group scoping, migration, and atomic invitation lifecycle |
+| 3 | `fix/account-defaults` | Planned | Server-backed account/card defaults and Settings management |
+| 4 | `fix/ledger-integrity` | Planned | Atomic paired writes and settlement validation |
+| 5 | `fix/session-persistence` | Planned | Session diagnosis, renewal, and expiry recovery |
+| 6 | `fix/save-recovery` | Planned | Draft preservation, readable errors, and safe retries |
+| 7 | `feat/receipt-batches` | Planned | Multiple-receipt review and partial-failure recovery |
+| 8 | `feat/statement-import` | Planned | PDF transaction import and duplicate review |
+| 9 | `feat/unified-layout` | Planned | Shared layout and Settings-only language preference |
+| 10 | `feat/release-notes` | Planned | Versioned release history in Settings |
+| 11 | `feat/public-introduction` | Planned | Product explanation before sign-in |
+| 12 | `feat/weekly-spending` | Planned | Weekly dashboard analysis |
+| 13 | `feat/item-classification` | Planned | Item groups and custom-category AI context |
+| 14 | `feat/monthly-budgets` | Planned | Budgets, pacing, and grounded AI explanations |
+| 15 | `feat/peer-comparisons` | Planned | Optional profile and sourced benchmarks |
+| 16 | `feat/unit-price-insights` | Planned | Receipt-based unit prices and shopping advice |
 
 Start each independent change from the latest `main`. Merge prerequisite data/model changes before starting dependent work, or explicitly use a dependent PR while its prerequisite is under review. Avoid putting the whole roadmap into one branch. Each PR should explain the problem, resulting behavior, verification, and any migration requirements. Push the branch to `origin`, open a PR into `main`, and merge after review and required checks. Enable appropriate branch protection in GitHub if it is not already configured.
 

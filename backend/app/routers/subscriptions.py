@@ -26,6 +26,7 @@ from app.services.access import (
     owner_match,
     require_shared_group_for_write,
     resolve_owner_ids,
+    shared_scope,
 )
 from app.services.subscriptions import (
     amount_for_due_date,
@@ -36,7 +37,6 @@ from app.services.subscriptions import (
     materialize_due_occurrences,
     monthly_subscription_summary,
     purge_subscription_on_reschedule,
-    run_all_reminder_jobs,
     schedule_subscription_cancel,
     send_end_reminders,
     send_promo_reminders,
@@ -93,6 +93,7 @@ async def _validate_account(
     owner_ids: list[str],
     currency: str,
     account_type: str,
+    shared_group_id: str | None = None,
 ) -> None:
     if not ObjectId.is_valid(account_id):
         raise HTTPException(
@@ -103,6 +104,8 @@ async def _validate_account(
         {
             "_id": ObjectId(account_id),
             **owner_match(owner_ids),
+            "account_type": account_type,
+            **shared_scope(account_type, shared_group_id),
             "is_active": True,
         }
     )
@@ -135,15 +138,11 @@ async def list_subscriptions(
     query: dict = {
         **owner_match(owner_ids),
         "account_type": account_type.value,
+        **shared_scope(account_type.value, current_user.shared_group_id),
     }
     if currency is not None:
         query["currency"] = currency.value
-    docs = (
-        await db[COLLECTION]
-        .find(query)
-        .sort("name", 1)
-        .to_list(length=100)
-    )
+    docs = await db[COLLECTION].find(query).sort("name", 1).to_list(length=100)
     today = datetime.utcnow()
     filtered: list[dict] = []
     for doc in docs:
@@ -166,6 +165,7 @@ async def subscription_monthly_summary(
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     return await monthly_subscription_summary(
         db,
+        shared_group_id=current_user.shared_group_id,
         owner_ids=owner_ids,
         account_type=account_type.value,
         month=month,
@@ -185,6 +185,7 @@ async def pending_occurrences(
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     docs = await list_pending_occurrences(
         db,
+        shared_group_id=current_user.shared_group_id,
         owner_ids=owner_ids,
         account_type=account_type.value,
         month=month,
@@ -220,7 +221,9 @@ async def pending_occurrences(
     return out
 
 
-@router.post("/occurrences/{occurrence_id}/skip", response_model=SubscriptionOccurrenceOut)
+@router.post(
+    "/occurrences/{occurrence_id}/skip", response_model=SubscriptionOccurrenceOut
+)
 async def skip_pending_occurrence(
     occurrence_id: str,
     current_user: UserOut = Depends(get_current_user),
@@ -231,6 +234,7 @@ async def skip_pending_occurrence(
     all_ids = list({*personal_ids, *shared_ids})
     skipped = await skip_occurrence(
         db,
+        current_user=current_user,
         occurrence_id=occurrence_id,
         owner_ids=all_ids,
     )
@@ -256,9 +260,7 @@ async def skip_pending_occurrence(
         "status": OccurrenceStatus.SKIPPED,
         "transaction_id": skipped.get("transaction_id"),
         "subscription_name": sub["name"] if sub else None,
-        "subscription_billing_cycle": (
-            BillingCycle(sub["cycle"]) if sub else None
-        ),
+        "subscription_billing_cycle": (BillingCycle(sub["cycle"]) if sub else None),
     }
 
 
@@ -272,12 +274,14 @@ async def sync_due_subscriptions(
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     count = await materialize_due_occurrences(
         db,
+        shared_group_id=current_user.shared_group_id,
         owner_ids=owner_ids,
         account_type=account_type.value,
         as_of=as_of,
     )
     reminders = await send_promo_reminders(
         db,
+        shared_group_id=current_user.shared_group_id,
         owner_id=current_user.id,
         account_type=account_type.value,
         user_email=current_user.email,
@@ -285,6 +289,7 @@ async def sync_due_subscriptions(
     )
     end_reminders = await send_end_reminders(
         db,
+        shared_group_id=current_user.shared_group_id,
         owner_id=current_user.id,
         account_type=account_type.value,
         user_email=current_user.email,
@@ -308,6 +313,7 @@ async def subscription_history(
     all_ids = list({*personal_ids, *shared_ids})
     result = await get_subscription_history(
         db,
+        current_user=current_user,
         subscription_id=subscription_id,
         owner_ids=all_ids,
     )
@@ -322,10 +328,7 @@ async def create_subscription(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    if (
-        payload.cycle == BillingCycle.INSTALLMENT
-        and not payload.total_installments
-    ):
+    if payload.cycle == BillingCycle.INSTALLMENT and not payload.total_installments:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="할부는 총 회차(total_installments)가 필요합니다.",
@@ -343,6 +346,7 @@ async def create_subscription(
     owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
     await _validate_account(
         db,
+        shared_group_id=current_user.shared_group_id,
         account_id=payload.account_id,
         owner_ids=owner_ids,
         currency=payload.currency.value,
@@ -353,6 +357,11 @@ async def create_subscription(
     doc = payload.model_dump(exclude={"completed_installments"})
     doc["currency"] = payload.currency.value
     doc["account_type"] = payload.account_type.value
+    doc["shared_group_id"] = (
+        current_user.shared_group_id
+        if payload.account_type == AccountType.SHARED
+        else None
+    )
     doc["cycle"] = payload.cycle.value
     doc["owner_id"] = current_user.id
     doc["status"] = SubscriptionStatus.ACTIVE.value
@@ -387,7 +396,10 @@ async def create_subscription(
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
     await generate_occurrences(db, subscription=created)
     await materialize_due_occurrences(
-        db, owner_ids=owner_ids, account_type=payload.account_type.value
+        db,
+        shared_group_id=current_user.shared_group_id,
+        owner_ids=owner_ids,
+        account_type=payload.account_type.value,
     )
     return _serialize_sub(created)
 
@@ -405,6 +417,10 @@ async def update_subscription(
     existing = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
     await assert_can_access_doc(
         db, current_user, existing, not_found_detail="Subscription not found."
+    )
+
+    owner_ids = await resolve_owner_ids(
+        db, current_user, AccountType(existing["account_type"])
     )
 
     old_next_due = existing.get("next_due_date") or existing["start_date"]
@@ -436,15 +452,14 @@ async def update_subscription(
         "installment_start_date", existing.get("installment_start_date")
     )
     if cycle == BillingCycle.INSTALLMENT.value and total and inst_start:
-        updates["end_date"] = installment_end_date(
-            inst_start, total_installments=total
-        )
+        updates["end_date"] = installment_end_date(inst_start, total_installments=total)
     if "account_id" in updates and updates["account_id"]:
         owner_ids = await resolve_owner_ids(
             db, current_user, AccountType(existing["account_type"])
         )
         await _validate_account(
             db,
+            shared_group_id=current_user.shared_group_id,
             account_id=updates["account_id"],
             owner_ids=owner_ids,
             currency=existing["currency"],
@@ -479,9 +494,7 @@ async def update_subscription(
                     }
                 },
             )
-            updated = await db[COLLECTION].find_one(
-                {"_id": ObjectId(subscription_id)}
-            )
+            updated = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
 
     if updated and updated.get("status") in (
         SubscriptionStatus.ACTIVE.value,
@@ -495,12 +508,16 @@ async def update_subscription(
         )
         await generate_occurrences(db, subscription=updated)
         # Refresh pending amounts for promo pricing.
-        pending = await db[OCC_COL].find(
-            {
-                "subscription_id": subscription_id,
-                "status": OccurrenceStatus.PENDING.value,
-            }
-        ).to_list(length=100)
+        pending = (
+            await db[OCC_COL]
+            .find(
+                {
+                    "subscription_id": subscription_id,
+                    "status": OccurrenceStatus.PENDING.value,
+                }
+            )
+            .to_list(length=100)
+        )
         for occ in pending:
             due = occ.get("due_date")
             if isinstance(due, datetime):
@@ -534,16 +551,19 @@ async def update_subscription(
         # Keep already-materialized transactions in sync when price/promo changes
         # (e.g. Figma promo $0 should update calendar/list amounts).
         amount_fields_changed = any(
-            k in updates
-            for k in ("amount", "promo_amount", "promo_end_date")
+            k in updates for k in ("amount", "promo_amount", "promo_end_date")
         )
         if amount_fields_changed:
-            completed = await db[OCC_COL].find(
-                {
-                    "subscription_id": subscription_id,
-                    "status": OccurrenceStatus.COMPLETED.value,
-                }
-            ).to_list(length=500)
+            completed = (
+                await db[OCC_COL]
+                .find(
+                    {
+                        "subscription_id": subscription_id,
+                        "status": OccurrenceStatus.COMPLETED.value,
+                    }
+                )
+                .to_list(length=500)
+            )
             for occ in completed:
                 due = occ.get("due_date")
                 if not isinstance(due, datetime):
@@ -567,7 +587,10 @@ async def update_subscription(
                         {"$set": {"amount": new_amt}},
                     )
     await materialize_due_occurrences(
-        db, owner_ids=owner_ids, account_type=updated["account_type"]
+        db,
+        shared_group_id=current_user.shared_group_id,
+        owner_ids=owner_ids,
+        account_type=updated["account_type"],
     )
     return _serialize_sub(updated)
 
