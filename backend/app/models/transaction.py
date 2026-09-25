@@ -104,7 +104,8 @@ class TransactionBase(BaseModel):
 
 
 class TransactionCreate(TransactionBase):
-    pass
+    # Only the server may create relationships between ledger entries.
+    linked_transaction_id: None = Field(default=None, exclude=True)
 
 
 class TransactionOut(TransactionBase):

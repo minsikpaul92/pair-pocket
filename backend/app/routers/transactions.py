@@ -23,6 +23,7 @@ from app.services.access import (
     resolve_owner_ids,
 )
 from app.services.settlement import get_settled_amounts
+from app.services.transaction_links import authorized_funding_twin, is_shared_funding
 from app.services.validation import validate_transaction_payload
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -156,6 +157,7 @@ async def merchant_suggestions(
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     match: dict = {
         **owner_match(owner_ids),
+        "account_type": account_type.value,
         "category": category,
         "merchant": {"$nin": [None, "", "미지정"]},
     }
@@ -188,7 +190,13 @@ async def all_merchants(
     """Return all unique merchant names ever used by the user, most recent first."""
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     pipeline = [
-        {"$match": {**owner_match(owner_ids), "merchant": {"$nin": [None, "", "미지정"]}}},
+        {
+            "$match": {
+                **owner_match(owner_ids),
+                "account_type": account_type.value,
+                "merchant": {"$nin": [None, "", "미지정"]},
+            }
+        },
         {
             "$group": {
                 "_id": "$merchant",
@@ -218,6 +226,7 @@ async def lookup_merchant(
     doc = await db[COLLECTION].find_one(
         {
             **owner_match(owner_ids),
+            "account_type": account_type.value,
             "merchant": {"$regex": f"^{escaped_name}$", "$options": "i"},
         },
         sort=[("date", -1)],
@@ -248,8 +257,9 @@ async def institution_suggestions(
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     match: dict = {
         **owner_match(owner_ids),
+        "account_type": account_type.value,
         "category": "투자/저축",
-        "institution": {"$exists": True, "$ne": None, "$ne": ""},
+        "institution": {"$exists": True, "$nin": [None, ""]},
     }
     if sub_category is not None:
         match["sub_category"] = sub_category
@@ -298,6 +308,7 @@ async def list_settleable_expenses(
             {
                 "_id": ObjectId(exclude_settlement_id),
                 **owner_match(owner_ids),
+                "account_type": account_type.value,
             }
         )
         if existing and existing.get("settles_expense_id"):
@@ -357,7 +368,9 @@ def _document_from_payload(
     )
     from app.models.category_preset import is_transfer_expense
 
-    document = payload.model_dump(exclude={"effective_amount", "settled_amount"})
+    document = payload.model_dump(
+        exclude={"effective_amount", "settled_amount", "linked_transaction_id"}
+    )
     document["category"] = normalize_transfer_category(payload.category)
     document["sub_category"] = normalize_transfer_sub_category(payload.sub_category)
     document["currency"] = payload.currency.value
@@ -461,8 +474,6 @@ async def create_transaction(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    from app.models.ledger import is_shared_funding_sub
-
     require_shared_group_for_write(current_user, payload.account_type)
     owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
     await validate_transaction_payload(
@@ -475,7 +486,7 @@ async def create_transaction(
     document = _document_from_payload(payload, owner_id=current_user.id)
 
     if (
-        is_shared_funding_sub(document["sub_category"])
+        is_shared_funding(document)
         and document["type"] == TransactionType.EXPENSE.value
     ):
         require_shared_group_for_write(current_user, AccountType.SHARED)
@@ -503,8 +514,6 @@ async def update_transaction(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    from app.models.ledger import is_shared_funding_sub
-
     if not ObjectId.is_valid(transaction_id):
         raise HTTPException(status_code=404, detail="Transaction not found.")
 
@@ -512,6 +521,14 @@ async def update_transaction(
     await assert_can_access_doc(
         db, current_user, existing, not_found_detail="Transaction not found."
     )
+    twin = await authorized_funding_twin(db, current_user, existing)
+    if (
+        existing["owner_id"] != current_user.id
+        and payload.account_type.value != existing["account_type"]
+    ):
+        raise HTTPException(
+            status_code=403, detail="Only the owner can change the ledger scope."
+        )
     require_shared_group_for_write(current_user, payload.account_type)
     owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
 
@@ -526,12 +543,17 @@ async def update_transaction(
     # Keep original owner so partner edits don't reassign ownership.
     document = _document_from_payload(payload, owner_id=existing["owner_id"])
     # Preserve link unless this is no longer shared funding.
-    if is_shared_funding_sub(document["sub_category"]) and existing.get(
-        "linked_transaction_id"
+    document["linked_transaction_id"] = (
+        str(twin["_id"]) if twin and is_shared_funding(document) else None
+    )
+    if twin and is_shared_funding(document) and (
+        document["account_type"] != existing["account_type"]
+        or document["type"] != existing["type"]
     ):
-        document["linked_transaction_id"] = existing["linked_transaction_id"]
-    elif not is_shared_funding_sub(document["sub_category"]):
-        document["linked_transaction_id"] = None
+        raise HTTPException(
+            status_code=422,
+            detail="Linked funding entries cannot change ledger or direction.",
+        )
 
     await db[COLLECTION].update_one(
         {"_id": ObjectId(transaction_id)}, {"$set": document}
@@ -539,40 +561,30 @@ async def update_transaction(
     updated = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
 
     # Sync linked twin for 공용 계좌 입금.
-    linked_id = existing.get("linked_transaction_id") or (
-        updated.get("linked_transaction_id") if updated else None
-    )
-    if (
-        linked_id
-        and ObjectId.is_valid(linked_id)
-        and is_shared_funding_sub(document["sub_category"])
-    ):
-        twin = await db[COLLECTION].find_one({"_id": ObjectId(linked_id)})
-        if twin:
-            if updated.get("type") == TransactionType.EXPENSE.value:
-                twin_patch = _shared_funding_income_doc(
-                    updated, linked_expense_id=transaction_id
-                )
-                # Don't overwrite twin owner_id / linked id incorrectly
-                twin_patch["linked_transaction_id"] = transaction_id
-                twin_patch["owner_id"] = twin.get("owner_id", updated["owner_id"])
-                await db[COLLECTION].update_one(
-                    {"_id": ObjectId(linked_id)}, {"$set": twin_patch}
-                )
-            elif updated.get("type") == TransactionType.INCOME.value:
-                expense_patch = _shared_funding_expense_fields_from_income(updated)
-                expense_patch["category"] = updated["category"]
-                expense_patch["sub_category"] = updated["sub_category"]
-                expense_patch["kind"] = updated["kind"]
-                expense_patch["type"] = TransactionType.EXPENSE.value
-                expense_patch["account_type"] = AccountType.PERSONAL.value
-                expense_patch["linked_transaction_id"] = transaction_id
-                await db[COLLECTION].update_one(
-                    {"_id": ObjectId(linked_id)}, {"$set": expense_patch}
-                )
-    elif linked_id and ObjectId.is_valid(linked_id) and not is_shared_funding_sub(
-        document["sub_category"]
-    ):
+    linked_id = str(twin["_id"]) if twin else None
+    if twin and is_shared_funding(document):
+        if updated.get("type") == TransactionType.EXPENSE.value:
+            twin_patch = _shared_funding_income_doc(
+                updated, linked_expense_id=transaction_id
+            )
+            # Don't overwrite twin owner_id / linked id incorrectly
+            twin_patch["linked_transaction_id"] = transaction_id
+            twin_patch["owner_id"] = twin.get("owner_id", updated["owner_id"])
+            await db[COLLECTION].update_one(
+                {"_id": ObjectId(linked_id)}, {"$set": twin_patch}
+            )
+        elif updated.get("type") == TransactionType.INCOME.value:
+            expense_patch = _shared_funding_expense_fields_from_income(updated)
+            expense_patch["category"] = updated["category"]
+            expense_patch["sub_category"] = updated["sub_category"]
+            expense_patch["kind"] = updated["kind"]
+            expense_patch["type"] = TransactionType.EXPENSE.value
+            expense_patch["account_type"] = AccountType.PERSONAL.value
+            expense_patch["linked_transaction_id"] = transaction_id
+            await db[COLLECTION].update_one(
+                {"_id": ObjectId(linked_id)}, {"$set": expense_patch}
+            )
+    elif twin and not is_shared_funding(document):
         # Category changed away from shared funding — drop the orphan twin.
         await db[COLLECTION].delete_one({"_id": ObjectId(linked_id)})
 
@@ -594,6 +606,7 @@ async def delete_transaction(
     await assert_can_access_doc(
         db, current_user, existing, not_found_detail="Transaction not found."
     )
+    twin = await authorized_funding_twin(db, current_user, existing)
 
     # Block deleting an expense that still has linked N빵 settlements.
     if existing.get("type") == TransactionType.EXPENSE.value:
@@ -613,9 +626,8 @@ async def delete_transaction(
             )
 
     # Cascade-delete 공용 계좌 입금 twin.
-    twin_id = existing.get("linked_transaction_id")
-    if twin_id and ObjectId.is_valid(twin_id):
-        await db[COLLECTION].delete_one({"_id": ObjectId(twin_id)})
+    if twin:
+        await db[COLLECTION].delete_one({"_id": twin["_id"]})
 
     result = await db[COLLECTION].delete_one({"_id": ObjectId(transaction_id)})
     if result.deleted_count == 0:
