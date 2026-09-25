@@ -165,6 +165,7 @@ venv/
 env/
 pip-log.txt
 .pytest_cache/
+migration-backups/
 
 # IDE and Editor settings
 .vscode/

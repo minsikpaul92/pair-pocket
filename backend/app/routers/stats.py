@@ -78,6 +78,7 @@ async def stats_summary(
         db,
         owner_ids=owner_ids,
         account_type=account_type,
+        shared_group_id=current_user.shared_group_id,
         currency=currency,
         month=month,
         category=category,

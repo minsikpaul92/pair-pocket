@@ -14,6 +14,7 @@ from app.models.category_preset import (
 )
 from app.models.ledger import TransactionKind
 from app.models.transaction import AccountType, Currency, TransactionType
+from app.services.access import shared_scope
 from app.services.settlement import get_settled_amounts
 
 COLLECTION = "transactions"
@@ -31,6 +32,7 @@ def build_transaction_filter(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     account_type: AccountType,
+    shared_group_id: str | None = None,
     currency: Currency | None = None,
     month: str | None = None,
     tx_type: TransactionType | None = None,
@@ -50,6 +52,7 @@ def build_transaction_filter(
     query: dict = {
         **owner_clause,
         "account_type": account_type.value,
+        **shared_scope(account_type, shared_group_id),
     }
     if currency is not None:
         query["currency"] = currency.value
@@ -75,6 +78,7 @@ async def compute_stats(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     account_type: AccountType,
+    shared_group_id: str | None = None,
     currency: Currency | None = None,
     month: str | None = None,
     category: str | None = None,
@@ -91,6 +95,7 @@ async def compute_stats(
     base_filter = build_transaction_filter(
         owner_ids=ids,
         account_type=account_type,
+        shared_group_id=shared_group_id,
         currency=currency,
         month=month,
         category=category,
@@ -161,14 +166,23 @@ async def compute_stats(
     pure_consumption = max(total_expense - investment_savings_total, 0)
 
     # Per-expense effective spending after linked N빵 settlements
-    settled_map = await get_settled_amounts(db, owner_ids=ids)
-    expense_docs = await db[COLLECTION].find(
-        {
-            **base_filter,
-            "type": TransactionType.EXPENSE.value,
-            "kind": {"$ne": TransactionKind.TRANSFER.value},
-        }
-    ).to_list(length=1000)
+    settled_map = await get_settled_amounts(
+        db,
+        owner_ids=ids,
+        account_type=account_type,
+        shared_group_id=shared_group_id,
+    )
+    expense_docs = (
+        await db[COLLECTION]
+        .find(
+            {
+                **base_filter,
+                "type": TransactionType.EXPENSE.value,
+                "kind": {"$ne": TransactionKind.TRANSFER.value},
+            }
+        )
+        .to_list(length=1000)
+    )
 
     effective_by_category: dict[str, float] = {}
     effective_by_merchant: dict[str, float] = {}

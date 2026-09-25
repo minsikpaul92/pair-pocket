@@ -13,6 +13,8 @@ from app.models.subscription import (
     SubscriptionStatus,
 )
 from app.models.transaction import TransactionType
+from app.models.user import UserOut
+from app.services.access import assert_can_access_doc, shared_scope
 
 SUBS_COL = "subscriptions"
 OCC_COL = "subscription_occurrences"
@@ -142,9 +144,7 @@ def _months_between(start: datetime, end: datetime) -> int:
     return max(0, (end.year - start.year) * 12 + (end.month - start.month))
 
 
-def installment_end_date(
-    start: datetime, *, total_installments: int
-) -> datetime:
+def installment_end_date(start: datetime, *, total_installments: int) -> datetime:
     return _add_months(start, max(total_installments - 1, 0))
 
 
@@ -239,12 +239,14 @@ async def finalize_expired_cancellations(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     account_type: str,
+    shared_group_id: str | None = None,
 ) -> int:
     today = _calendar_day(datetime.utcnow())
     result = await db[SUBS_COL].update_many(
         {
             **_owner_clause(owner_id, owner_ids),
             "account_type": account_type,
+            **shared_scope(account_type, shared_group_id),
             "status": SubscriptionStatus.CANCEL_SCHEDULED.value,
             "cancel_effective_date": {"$lte": today},
         },
@@ -303,8 +305,8 @@ async def purge_subscription_on_reschedule(
     """Remove pending rows and auto-materialized rows at the old next-due anchor."""
     old_day = _calendar_day(old_next_due)
     removed = 0
-    occs = await db[OCC_COL].find({"subscription_id": subscription_id}).to_list(
-        length=200
+    occs = (
+        await db[OCC_COL].find({"subscription_id": subscription_id}).to_list(length=200)
     )
     for occ in occs:
         due = occ.get("due_date")
@@ -312,9 +314,7 @@ async def purge_subscription_on_reschedule(
             continue
         due_day = _calendar_day(due)
         status = occ.get("status")
-        should_remove = (
-            status == OccurrenceStatus.PENDING.value or due_day == old_day
-        )
+        should_remove = status == OccurrenceStatus.PENDING.value or due_day == old_day
         if not should_remove:
             continue
         occ_id = str(occ["_id"])
@@ -335,9 +335,7 @@ def _reminder_email_body(
 ) -> str:
     sub_id = str(sub["_id"])
     view_url = f"{settings.frontend_url}/?view=subscriptions&subscription={sub_id}"
-    cancel_url = (
-        f"{settings.frontend_url}/?view=subscriptions&subscription={sub_id}&action=cancel"
-    )
+    cancel_url = f"{settings.frontend_url}/?view=subscriptions&subscription={sub_id}&action=cancel"
     details = "\n".join(detail_lines)
     return (
         f"안녕하세요,\n\n"
@@ -354,6 +352,7 @@ async def send_promo_reminders(
     *,
     owner_id: str,
     account_type: str,
+    shared_group_id: str | None = None,
     user_email: str,
     as_of: str | None = None,
 ) -> int:
@@ -364,16 +363,21 @@ async def send_promo_reminders(
     today = _parse_as_of(as_of)
     week_ahead = today + timedelta(days=7)
     sent_count = 0
-    subs = await db[SUBS_COL].find(
-        {
-            "owner_id": owner_id,
-            "account_type": account_type,
-            "promo_reminder_enabled": True,
-            "promo_amount": {"$ne": None},
-            "promo_end_date": {"$gte": today, "$lte": week_ahead},
-            "promo_reminder_sent_at": None,
-        }
-    ).to_list(length=50)
+    subs = (
+        await db[SUBS_COL]
+        .find(
+            {
+                "owner_id": owner_id,
+                "account_type": account_type,
+                **shared_scope(account_type, shared_group_id),
+                "promo_reminder_enabled": True,
+                "promo_amount": {"$ne": None},
+                "promo_end_date": {"$gte": today, "$lte": week_ahead},
+                "promo_reminder_sent_at": None,
+            }
+        )
+        .to_list(length=50)
+    )
 
     for sub in subs:
         promo_end = sub.get("promo_end_date")
@@ -407,6 +411,7 @@ async def send_end_reminders(
     *,
     owner_id: str,
     account_type: str,
+    shared_group_id: str | None = None,
     user_email: str,
     as_of: str | None = None,
 ) -> int:
@@ -417,15 +422,20 @@ async def send_end_reminders(
     today = _parse_as_of(as_of)
     week_ahead = today + timedelta(days=7)
     sent_count = 0
-    subs = await db[SUBS_COL].find(
-        {
-            "owner_id": owner_id,
-            "account_type": account_type,
-            "end_reminder_enabled": True,
-            "end_date": {"$gte": today, "$lte": week_ahead},
-            "end_reminder_sent_at": None,
-        }
-    ).to_list(length=50)
+    subs = (
+        await db[SUBS_COL]
+        .find(
+            {
+                "owner_id": owner_id,
+                "account_type": account_type,
+                **shared_scope(account_type, shared_group_id),
+                "end_reminder_enabled": True,
+                "end_date": {"$gte": today, "$lte": week_ahead},
+                "end_reminder_sent_at": None,
+            }
+        )
+        .to_list(length=50)
+    )
 
     for sub in subs:
         end = sub.get("end_date")
@@ -455,6 +465,7 @@ async def get_subscription_history(
     db: AsyncIOMotorDatabase,
     *,
     subscription_id: str,
+    current_user: UserOut,
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
 ) -> dict | None:
@@ -468,19 +479,26 @@ async def get_subscription_history(
     )
     if not sub:
         return None
+    await assert_can_access_doc(db, current_user, sub)
 
-    occs = await db[OCC_COL].find(
-        {
-            "subscription_id": subscription_id,
-            "status": OccurrenceStatus.COMPLETED.value,
-        }
-    ).to_list(length=500)
+    occs = (
+        await db[OCC_COL]
+        .find(
+            {
+                "subscription_id": subscription_id,
+                "status": OccurrenceStatus.COMPLETED.value,
+            }
+        )
+        .to_list(length=500)
+    )
     occ_ids = [str(o["_id"]) for o in occs]
     txs: list[dict] = []
     if occ_ids:
-        txs = await db[TX_COL].find(
-            {"subscription_occurrence_id": {"$in": occ_ids}}
-        ).to_list(length=500)
+        txs = (
+            await db[TX_COL]
+            .find({"subscription_occurrence_id": {"$in": occ_ids}})
+            .to_list(length=500)
+        )
 
     regular_price = float(sub["amount"])
     promo_end = sub.get("promo_end_date")
@@ -504,16 +522,18 @@ async def get_subscription_history(
 
     total_saved = max(regular_total - total_paid, 0.0)
     start = sub.get("installment_start_date") or sub["start_date"]
-    end = (
-        sub.get("cancel_effective_date")
-        or sub.get("end_date")
-        or datetime.utcnow()
-    )
+    end = sub.get("cancel_effective_date") or sub.get("end_date") or datetime.utcnow()
     months_active = max(_months_between(start, end), 1)
     if txs:
         months_active = max(
             months_active,
-            len({(tx["date"].year, tx["date"].month) for tx in txs if isinstance(tx.get("date"), datetime)}),
+            len(
+                {
+                    (tx["date"].year, tx["date"].month)
+                    for tx in txs
+                    if isinstance(tx.get("date"), datetime)
+                }
+            ),
         )
 
     avg_saved = total_saved / promo_payments if promo_payments else 0.0
@@ -538,6 +558,7 @@ async def monthly_subscription_summary(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     account_type: str,
+    shared_group_id: str | None = None,
     month: str,
     currency: str | None = None,
 ) -> dict:
@@ -548,6 +569,7 @@ async def monthly_subscription_summary(
     pending_query: dict = {
         **_owner_clause(owner_id, owner_ids),
         "account_type": account_type,
+        **shared_scope(account_type, shared_group_id),
         "status": OccurrenceStatus.PENDING.value,
         "due_date": {"$gte": start, "$lt": end},
     }
@@ -564,6 +586,7 @@ async def monthly_subscription_summary(
     tx_query: dict = {
         **_owner_clause(owner_id, owner_ids),
         "account_type": account_type,
+        **shared_scope(account_type, shared_group_id),
         "subscription_occurrence_id": {"$exists": True, "$ne": None},
         "date": {"$gte": start, "$lt": end},
     }
@@ -590,11 +613,20 @@ async def prune_all_invalid_pending(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     account_type: str,
+    shared_group_id: str | None = None,
 ) -> int:
     removed = 0
-    subs = await db[SUBS_COL].find(
-        {**_owner_clause(owner_id, owner_ids), "account_type": account_type}
-    ).to_list(length=200)
+    subs = (
+        await db[SUBS_COL]
+        .find(
+            {
+                **_owner_clause(owner_id, owner_ids),
+                "account_type": account_type,
+                **shared_scope(account_type, shared_group_id),
+            }
+        )
+        .to_list(length=200)
+    )
     for sub in subs:
         removed += await prune_occurrences_before_start(db, subscription=sub)
     return removed
@@ -639,9 +671,7 @@ async def generate_occurrences(
 
     while due <= horizon_end:
         if _calendar_day(due) < schedule_start:
-            due = _next_due(
-                due, cycle, interval_days=subscription.get("interval_days")
-            )
+            due = _next_due(due, cycle, interval_days=subscription.get("interval_days"))
             continue
         if end and due > end:
             break
@@ -671,6 +701,7 @@ async def generate_occurrences(
                         "subscription_id": sub_id,
                         "owner_id": subscription["owner_id"],
                         "account_type": subscription["account_type"],
+                        "shared_group_id": subscription.get("shared_group_id"),
                         "due_date": due,
                         "amount": amount_for_due_date(subscription, due),
                         "currency": subscription["currency"],
@@ -681,9 +712,7 @@ async def generate_occurrences(
                 )
                 created += 1
 
-        due = _next_due(
-            due, cycle, interval_days=subscription.get("interval_days")
-        )
+        due = _next_due(due, cycle, interval_days=subscription.get("interval_days"))
 
     return created
 
@@ -727,6 +756,7 @@ async def materialize_due_occurrences(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     account_type: str,
+    shared_group_id: str | None = None,
     as_of: str | None = None,
 ) -> int:
     """Lazy sync: turn due PENDING occurrences into Transactions.
@@ -739,20 +769,24 @@ async def materialize_due_occurrences(
         return 0
 
     await prune_all_invalid_pending(
-        db, owner_ids=ids, account_type=account_type
+        db, owner_ids=ids, account_type=account_type, shared_group_id=shared_group_id
     )
-    await dedupe_subscription_transactions(db)
     await finalize_expired_cancellations(
-        db, owner_ids=ids, account_type=account_type
+        db, owner_ids=ids, account_type=account_type, shared_group_id=shared_group_id
     )
 
-    pending = await db[OCC_COL].find(
-        {
-            **_owner_clause(owner_ids=ids),
-            "account_type": account_type,
-            "status": OccurrenceStatus.PENDING.value,
-        }
-    ).to_list(length=500)
+    pending = (
+        await db[OCC_COL]
+        .find(
+            {
+                **_owner_clause(owner_ids=ids),
+                "account_type": account_type,
+                **shared_scope(account_type, shared_group_id),
+                "status": OccurrenceStatus.PENDING.value,
+            }
+        )
+        .to_list(length=500)
+    )
 
     materialized = 0
     for occ in pending:
@@ -760,6 +794,22 @@ async def materialize_due_occurrences(
         if not isinstance(due, datetime):
             continue
         if _calendar_day(due) > today:
+            continue
+
+        sub_oid = _as_object_id(occ.get("subscription_id"))
+        sub = (
+            await db[SUBS_COL].find_one(
+                {
+                    "_id": sub_oid,
+                    "account_type": account_type,
+                    **_owner_clause(owner_ids=ids),
+                    **shared_scope(account_type, shared_group_id),
+                }
+            )
+            if sub_oid
+            else None
+        )
+        if not sub:
             continue
 
         claimed = await db[OCC_COL].find_one_and_update(
@@ -807,6 +857,7 @@ async def materialize_due_occurrences(
             "currency": claimed["currency"],
             "type": TransactionType.EXPENSE.value,
             "account_type": sub["account_type"],
+            "shared_group_id": sub.get("shared_group_id"),
             "category": sub["category"],
             "sub_category": sub["sub_category"],
             "merchant": sub.get("merchant") or sub["name"],
@@ -814,7 +865,11 @@ async def materialize_due_occurrences(
             "settles_expense_id": None,
             "account_id": sub["account_id"],
             "counter_account_id": counter_acc,
-            "kind": TransactionKind.TRANSFER.value if is_transfer_kind else TransactionKind.NORMAL.value,
+            "kind": (
+                TransactionKind.TRANSFER.value
+                if is_transfer_kind
+                else TransactionKind.NORMAL.value
+            ),
             "owner_id": tx_owner,
             "subscription_occurrence_id": str(claimed["_id"]),
             "subscription_id": str(sub["_id"]),
@@ -865,6 +920,7 @@ async def list_pending_occurrences(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     account_type: str,
+    shared_group_id: str | None = None,
     month: str | None = None,
     currency: str | None = None,
     as_of: str | None = None,
@@ -875,6 +931,7 @@ async def list_pending_occurrences(
     query: dict = {
         **_owner_clause(owner_id, owner_ids),
         "account_type": account_type,
+        **shared_scope(account_type, shared_group_id),
         "status": OccurrenceStatus.PENDING.value,
     }
     if currency:
@@ -896,6 +953,7 @@ async def skip_occurrence(
     db: AsyncIOMotorDatabase,
     *,
     occurrence_id: str,
+    current_user: UserOut,
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
 ) -> dict | None:
@@ -903,6 +961,11 @@ async def skip_occurrence(
     if not ObjectId.is_valid(occurrence_id):
         return None
 
+    existing = await db[OCC_COL].find_one({"_id": ObjectId(occurrence_id)})
+    await assert_can_access_doc(db, current_user, existing)
+    sub_oid = _as_object_id(existing.get("subscription_id"))
+    parent = await db[SUBS_COL].find_one({"_id": sub_oid}) if sub_oid else None
+    await assert_can_access_doc(db, current_user, parent)
     claimed = await db[OCC_COL].find_one_and_update(
         {
             "_id": ObjectId(occurrence_id),
@@ -930,9 +993,7 @@ async def skip_occurrence(
         return claimed
 
     cycle = BillingCycle(sub["cycle"])
-    next_due = _next_due(
-        due, cycle, interval_days=sub.get("interval_days")
-    )
+    next_due = _next_due(due, cycle, interval_days=sub.get("interval_days"))
     await db[SUBS_COL].update_one(
         {"_id": sub_oid},
         {
@@ -973,6 +1034,7 @@ async def run_all_reminder_jobs(
                 owner_id=owner_id,
                 account_type=account_type,
                 user_email=email,
+                shared_group_id=user.get("shared_group_id"),
                 as_of=as_of,
             )
             end_total += await send_end_reminders(
@@ -980,6 +1042,7 @@ async def run_all_reminder_jobs(
                 owner_id=owner_id,
                 account_type=account_type,
                 user_email=email,
+                shared_group_id=user.get("shared_group_id"),
                 as_of=as_of,
             )
     return {

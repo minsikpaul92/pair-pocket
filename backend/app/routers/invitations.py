@@ -20,6 +20,7 @@ from app.models.invitation import (
 )
 from app.models.user import UserOut
 from app.services.email import email_configured, send_email
+from app.services.partnerships import accept_partner_invitation, archive_partnership
 
 router = APIRouter(prefix="/api/invitations", tags=["invitations"])
 
@@ -56,9 +57,7 @@ def _invite_email_body(
     accept_url: str,
     shared_start: str | None = None,
 ) -> str:
-    start_line = (
-        f"공유 가계부 시작일: {shared_start}\n\n" if shared_start else ""
-    )
+    start_line = f"공유 가계부 시작일: {shared_start}\n\n" if shared_start else ""
     return (
         f"{inviter_name}님이 PairPocket 공유 가계부에 초대했습니다.\n\n"
         f"{start_line}"
@@ -101,9 +100,7 @@ async def invitation_status(
     settings = get_settings()
     pending_out = None
     if pending:
-        pending_url = (
-            f"{settings.frontend_url.rstrip('/')}/invite/{pending['token']}"
-        )
+        pending_url = f"{settings.frontend_url.rstrip('/')}/invite/{pending['token']}"
         pending_out = _serialize_invite(pending, accept_url=pending_url)
 
     return {
@@ -210,99 +207,7 @@ async def accept_invitation(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    if current_user.shared_group_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이미 파트너와 연결되어 있습니다.",
-        )
-
-    invite = await db[COLLECTION].find_one({"token": payload.token})
-    if not invite or invite.get("status") != InvitationStatus.PENDING.value:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="유효하지 않거나 이미 처리된 초대입니다.",
-        )
-
-    if invite["expires_at"] < datetime.utcnow():
-        await db[COLLECTION].update_one(
-            {"_id": invite["_id"]},
-            {"$set": {"status": InvitationStatus.EXPIRED.value}},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="초대 링크가 만료되었습니다.",
-        )
-
-    if invite["invitee_email"].lower() != current_user.email.lower():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="이 초대는 다른 이메일 주소로 발송되었습니다. 초대받은 Google 계정으로 로그인해 주세요.",
-        )
-
-    if invite["inviter_id"] == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="자기 자신의 초대는 수락할 수 없습니다.",
-        )
-
-    inviter = await db[USERS_COL].find_one({"_id": ObjectId(invite["inviter_id"])})
-    if not inviter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="초대한 사용자를 찾을 수 없습니다.",
-        )
-    if inviter.get("shared_group_id"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="초대한 사용자가 이미 다른 파트너와 연결되어 있습니다.",
-        )
-
-    group_id = secrets.token_urlsafe(16)
-    await db[USERS_COL].update_one(
-        {"_id": ObjectId(invite["inviter_id"])},
-        {"$set": {"shared_group_id": group_id}},
-    )
-    await db[USERS_COL].update_one(
-        {"_id": ObjectId(current_user.id)},
-        {"$set": {"shared_group_id": group_id}},
-    )
-    # Apply shared ledger start date from the invite to both partners.
-    shared_start = invite.get("shared_ledger_start_date")
-    if isinstance(shared_start, str) and _valid_start(shared_start):
-        for oid in (invite["inviter_id"], current_user.id):
-            await db["user_settings"].update_one(
-                {"owner_id": oid},
-                {
-                    "$set": {"shared_ledger_start_date": shared_start},
-                    "$setOnInsert": {
-                        "merchants": [],
-                        "institutions": [],
-                        "custom_categories": {"expense": {}, "income": {}},
-                        "category_colors": {},
-                        "onboarding_personal_completed": False,
-                        "onboarding_personal_step": 0,
-                    },
-                },
-                upsert=True,
-            )
-    await db[COLLECTION].update_one(
-        {"_id": invite["_id"]},
-        {
-            "$set": {
-                "status": InvitationStatus.ACCEPTED.value,
-                "accepted_at": datetime.utcnow(),
-                "accepted_by": current_user.id,
-            }
-        },
-    )
-    # Revoke other pending invites from either party.
-    await db[COLLECTION].update_many(
-        {
-            "status": InvitationStatus.PENDING.value,
-            "inviter_id": {"$in": [invite["inviter_id"], current_user.id]},
-        },
-        {"$set": {"status": InvitationStatus.REVOKED.value}},
-    )
+    group_id, inviter = await accept_partner_invitation(db, current_user, payload.token)
 
     partner = {
         "id": str(inviter["_id"]),
@@ -341,18 +246,8 @@ async def unlink_partnership(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    """Clear shared_group_id for both partners. Shared ledger data is kept but becomes inaccessible until re-linked to the same group (new invites create a new group)."""
-    if not current_user.shared_group_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="연결된 파트너가 없습니다.",
-        )
-
-    group_id = current_user.shared_group_id
-    await db[USERS_COL].update_many(
-        {"shared_group_id": group_id},
-        {"$set": {"shared_group_id": None}},
-    )
+    """Archive the old group; a subsequent invitation always creates a new group."""
+    await archive_partnership(db, current_user)
     return {
         "shared_group_id": None,
         "partner": None,

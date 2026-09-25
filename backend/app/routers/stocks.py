@@ -12,13 +12,12 @@ from app.models.holding import (
 )
 from app.models.transaction import AccountType, Currency
 from app.models.user import UserOut
-from app.services.access import resolve_owner_ids, assert_can_access_doc
+from app.services.access import resolve_owner_ids, assert_can_access_doc, shared_scope
 from app.services.accounts import compute_account_balance
 from app.services.stocks import (
     get_or_update_stock_price,
     resolve_stock_price,
     search_tickers_yfinance,
-    sync_holding_from_transactions,
 )
 from app.services.exchange import get_cad_krw_rate
 
@@ -42,16 +41,21 @@ async def get_holdings(
 ) -> list[dict]:
     """Get all stock holdings with current valuation and yield."""
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
-    
-    cursor = db.holdings.find({
-        "owner_id": {"$in": owner_ids},
-        "account_type": account_type
-    })
+
+    cursor = db.holdings.find(
+        {
+            "owner_id": {"$in": owner_ids},
+            "account_type": account_type,
+            **shared_scope(account_type, current_user.shared_group_id),
+        }
+    )
     holdings_docs = await cursor.to_list(length=None)
 
     # Batch-load accounts once (avoid N+1).
     account_ids = {
-        h["account_id"] for h in holdings_docs if ObjectId.is_valid(h.get("account_id", ""))
+        h["account_id"]
+        for h in holdings_docs
+        if ObjectId.is_valid(h.get("account_id", ""))
     }
     accounts_by_id: dict[str, dict] = {}
     if account_ids:
@@ -81,9 +85,7 @@ async def get_holdings(
         holding_currency = h.get("currency") or "USD"
 
         # Persist resolved Yahoo symbol when bare US ticker was wrong for CAD/KRW.
-        resolved_ticker = (
-            price_info.get("ticker") if price_info else None
-        ) or ticker
+        resolved_ticker = (price_info.get("ticker") if price_info else None) or ticker
         if (
             price_info
             and resolved_ticker != ticker
@@ -95,54 +97,62 @@ async def get_holdings(
                 {"$set": {"ticker": resolved_ticker}},
             )
             ticker = resolved_ticker
-        
-        price = price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
+
+        price = (
+            price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
+        )
         prev_close = price_info.get("prev_close", price) if price_info else price
         # Keep holding currency as source of truth for CAD CDRs (don't overwrite with USD).
         currency = holding_currency
-        if price_info and str(price_info.get("currency", "")).upper() == str(
-            holding_currency
-        ).upper():
+        if (
+            price_info
+            and str(price_info.get("currency", "")).upper()
+            == str(holding_currency).upper()
+        ):
             currency = price_info["currency"]
-        
+
         shares = h["shares"]
         avg_price = h["avg_price"]
-        
+
         invested = shares * avg_price
         valuation = shares * price
         profit = valuation - invested
         yield_percent = (profit / invested * 100) if invested > 0 else 0.0
-        
+
         daily_change = price - prev_close
-        daily_change_percent = (daily_change / prev_close * 100) if prev_close > 0 else 0.0
-        
+        daily_change_percent = (
+            (daily_change / prev_close * 100) if prev_close > 0 else 0.0
+        )
+
         account = accounts_by_id.get(h["account_id"])
         institution = account.get("institution") if account else "기타"
         account_name = account.get("name") if account else "기타 계좌"
         account_country = account.get("country") if account else None
 
-        holdings.append({
-            "id": str(h["_id"]),
-            "account_id": h["account_id"],
-            "account_name": account_name,
-            "institution": institution,
-            "account_country": account_country,
-            "ticker": ticker,
-            "name": h["name"],
-            "shares": shares,
-            "avg_price": avg_price,
-            "price": price,
-            "prev_close": prev_close,
-            "currency": currency,
-            "invested": invested,
-            "valuation": valuation,
-            "profit": profit,
-            "yield": yield_percent,
-            "daily_change": daily_change,
-            "daily_change_percent": daily_change_percent,
-            "updated_at": h.get("updated_at", datetime.utcnow())
-        })
-        
+        holdings.append(
+            {
+                "id": str(h["_id"]),
+                "account_id": h["account_id"],
+                "account_name": account_name,
+                "institution": institution,
+                "account_country": account_country,
+                "ticker": ticker,
+                "name": h["name"],
+                "shares": shares,
+                "avg_price": avg_price,
+                "price": price,
+                "prev_close": prev_close,
+                "currency": currency,
+                "invested": invested,
+                "valuation": valuation,
+                "profit": profit,
+                "yield": yield_percent,
+                "daily_change": daily_change,
+                "daily_change_percent": daily_change_percent,
+                "updated_at": h.get("updated_at", datetime.utcnow()),
+            }
+        )
+
     return holdings
 
 
@@ -158,18 +168,22 @@ async def create_holding(
     if not account:
         raise HTTPException(status_code=404, detail="Brokerage account not found")
     if account.get("kind") != "investment":
-        raise HTTPException(status_code=400, detail="Account is not an investment account")
-        
+        raise HTTPException(
+            status_code=400, detail="Account is not an investment account"
+        )
+
     # Check authorization
     await assert_can_access_doc(db, current_user, account)
-    
+
     # Resolve Yahoo symbol with holding currency (CAD CDRs must not map to US).
     price_info = await resolve_stock_price(
         db,
         payload.ticker,
-        preferred_currency=payload.currency.value
-        if hasattr(payload.currency, "value")
-        else str(payload.currency),
+        preferred_currency=(
+            payload.currency.value
+            if hasattr(payload.currency, "value")
+            else str(payload.currency)
+        ),
         hint_price=payload.avg_price,
     )
     name = price_info.get("name", payload.name) if price_info else payload.name
@@ -182,45 +196,50 @@ async def create_holding(
         if hasattr(payload.currency, "value")
         else str(payload.currency)
     )
-    if (
-        price_info
-        and str(price_info.get("currency", "")).upper() == currency.upper()
-    ):
+    if price_info and str(price_info.get("currency", "")).upper() == currency.upper():
         currency = price_info["currency"]
 
     holding_doc = {
         "owner_id": current_user.id,
         "account_id": payload.account_id,
         "account_type": account["account_type"],
+        "shared_group_id": account.get("shared_group_id"),
         "ticker": resolved_ticker,
         "name": name,
         "avg_price": payload.avg_price,
         "shares": payload.shares,
         "currency": currency,
-        "updated_at": datetime.utcnow()
+        "updated_at": datetime.utcnow(),
     }
-    
+
     # Check if holding already exists for this account & ticker
-    existing = await db.holdings.find_one({
-        "owner_id": current_user.id,
-        "account_id": payload.account_id,
-        "ticker": payload.ticker.upper()
-    })
-    
+    existing = await db.holdings.find_one(
+        {
+            "owner_id": current_user.id,
+            "account_id": payload.account_id,
+            "ticker": payload.ticker.upper(),
+        }
+    )
+
     if existing:
         # Merge holdings
         new_shares = existing["shares"] + payload.shares
-        new_avg_price = ((existing["shares"] * existing["avg_price"]) + (payload.shares * payload.avg_price)) / new_shares
+        new_avg_price = (
+            (existing["shares"] * existing["avg_price"])
+            + (payload.shares * payload.avg_price)
+        ) / new_shares
         await db.holdings.update_one(
             {"_id": existing["_id"]},
-            {"$set": {
-                "shares": new_shares,
-                "avg_price": new_avg_price,
-                "updated_at": datetime.utcnow()
-            }}
+            {
+                "$set": {
+                    "shares": new_shares,
+                    "avg_price": new_avg_price,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
         )
         return {"status": "merged", "id": str(existing["_id"])}
-        
+
     res = await db.holdings.insert_one(holding_doc)
     return {"status": "created", "id": str(res.inserted_id)}
 
@@ -236,33 +255,25 @@ async def update_holding(
     holding = await db.holdings.find_one({"_id": ObjectId(holding_id)})
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
-        
-    # Verify ownership
-    if holding["owner_id"] != current_user.id:
-        # Check shared access
-        owner_ids = await resolve_owner_ids(db, current_user, holding["account_type"])
-        if holding["owner_id"] not in owner_ids:
-            raise HTTPException(status_code=403, detail="Forbidden")
+
+    await assert_can_access_doc(db, current_user, holding)
 
     update_fields = {}
     if payload.avg_price is not None:
         update_fields["avg_price"] = payload.avg_price
     if payload.shares is not None:
         update_fields["shares"] = payload.shares
-        
+
     if not update_fields:
         return {"status": "noop"}
-        
+
     update_fields["updated_at"] = datetime.utcnow()
-    
+
     if payload.shares == 0:
         await db.holdings.delete_one({"_id": ObjectId(holding_id)})
         return {"status": "deleted"}
 
-    await db.holdings.update_one(
-        {"_id": ObjectId(holding_id)},
-        {"$set": update_fields}
-    )
+    await db.holdings.update_one({"_id": ObjectId(holding_id)}, {"$set": update_fields})
     return {"status": "updated"}
 
 
@@ -276,12 +287,8 @@ async def delete_holding(
     holding = await db.holdings.find_one({"_id": ObjectId(holding_id)})
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")
-        
-    # Verify ownership
-    if holding["owner_id"] != current_user.id:
-        owner_ids = await resolve_owner_ids(db, current_user, holding["account_type"])
-        if holding["owner_id"] not in owner_ids:
-            raise HTTPException(status_code=403, detail="Forbidden")
+
+    await assert_can_access_doc(db, current_user, holding)
 
     await db.holdings.delete_one({"_id": ObjectId(holding_id)})
     return {"status": "deleted"}
@@ -297,18 +304,19 @@ async def get_portfolio_summary(
 ) -> dict:
     """Get portfolio aggregates and investment account cash balances."""
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
-    
+
     # 1. Calculate stock totals
     query = {
         "owner_id": {"$in": owner_ids},
-        "account_type": account_type
+        "account_type": account_type,
+        **shared_scope(account_type, current_user.shared_group_id),
     }
     if account_id:
         query["account_id"] = account_id
 
     cursor = db.holdings.find(query)
     holdings_docs = await cursor.to_list(length=None)
-    
+
     rates_info = await get_cad_krw_rate()
     cad_krw = rates_info["cad_krw"]
     krw_cad = rates_info["krw_cad"]
@@ -341,15 +349,19 @@ async def get_portfolio_summary(
     )
 
     for h, price_info in zip(holdings_docs, price_infos):
-        price = price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
-        currency = price_info.get("currency", h["currency"]) if price_info else h["currency"]
-        
+        price = (
+            price_info.get("price", h["avg_price"]) if price_info else h["avg_price"]
+        )
+        currency = (
+            price_info.get("currency", h["currency"]) if price_info else h["currency"]
+        )
+
         shares = h["shares"]
         avg_price = h["avg_price"]
-        
+
         invested_native = shares * avg_price
         valuation_native = shares * price
-        
+
         total_invested += convert_to_display(invested_native, currency)
         total_valuation += convert_to_display(valuation_native, currency)
 
@@ -357,14 +369,17 @@ async def get_portfolio_summary(
     total_yield = (total_profit / total_invested * 100) if total_invested > 0 else 0.0
 
     # 2. Get Investment Cash Balances
-    accounts_cursor = db.accounts.find({
-        "owner_id": {"$in": owner_ids},
-        "account_type": account_type,
-        "kind": "investment",
-        "is_active": True
-    })
+    accounts_cursor = db.accounts.find(
+        {
+            "owner_id": {"$in": owner_ids},
+            "account_type": account_type,
+            **shared_scope(account_type, current_user.shared_group_id),
+            "kind": "investment",
+            "is_active": True,
+        }
+    )
     investment_accounts = await accounts_cursor.to_list(length=None)
-    
+
     cash_balances = []
     balances = await asyncio.gather(
         *[
@@ -373,13 +388,15 @@ async def get_portfolio_summary(
         ]
     )
     for acc, bal in zip(investment_accounts, balances):
-        cash_balances.append({
-            "account_id": str(acc["_id"]),
-            "name": acc["name"],
-            "institution": acc.get("institution") or "기타",
-            "balance": bal,
-            "currency": acc["currency"]
-        })
+        cash_balances.append(
+            {
+                "account_id": str(acc["_id"]),
+                "name": acc["name"],
+                "institution": acc.get("institution") or "기타",
+                "balance": bal,
+                "currency": acc["currency"],
+            }
+        )
 
     return {
         "display_currency": display_currency,
@@ -387,7 +404,7 @@ async def get_portfolio_summary(
         "total_valuation": total_valuation,
         "total_profit": total_profit,
         "total_yield": total_yield,
-        "cash_balances": cash_balances
+        "cash_balances": cash_balances,
     }
 
 
@@ -433,7 +450,7 @@ async def market_indices(
 @router.post("/update-prices")
 async def trigger_price_update(
     db: AsyncIOMotorDatabase = Depends(get_database),
-    _: UserOut = Depends(get_current_user), # Wait, should we secure this?
+    _: UserOut = Depends(get_current_user),  # Wait, should we secure this?
 ) -> dict:
     """Scheduler endpoint to trigger updates on all active tickers in DB."""
     # Find all unique tickers in holdings
@@ -443,5 +460,5 @@ async def trigger_price_update(
         price = await get_or_update_stock_price(db, ticker, force_refresh=True)
         if price:
             updated.append(ticker)
-            
+
     return {"status": "success", "count": len(updated), "updated": updated}

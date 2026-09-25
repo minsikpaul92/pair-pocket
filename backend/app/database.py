@@ -30,12 +30,8 @@ async def _ensure_indexes() -> None:
     await db.database["users"].create_index("shared_group_id", sparse=True)
     await db.database["user_settings"].create_index("owner_id", unique=True)
     await db.database["invitations"].create_index("token", unique=True)
-    await db.database["invitations"].create_index(
-        [("inviter_id", 1), ("status", 1)]
-    )
-    await db.database["transactions"].create_index(
-        [("owner_id", 1), ("date", -1)]
-    )
+    await db.database["invitations"].create_index([("inviter_id", 1), ("status", 1)])
+    await db.database["transactions"].create_index([("owner_id", 1), ("date", -1)])
     await db.database["transactions"].create_index(
         [("owner_id", 1), ("category", 1), ("sub_category", 1)]
     )
@@ -47,6 +43,18 @@ async def _ensure_indexes() -> None:
         [("owner_id", 1), ("settles_expense_id", 1)],
         sparse=True,
     )
+
+    group_scoped = (
+        "transactions",
+        "accounts",
+        "subscriptions",
+        "subscription_occurrences",
+        "holdings",
+    )
+    for collection in group_scoped:
+        await db.database[collection].create_index(
+            [("shared_group_id", 1), ("owner_id", 1), ("account_type", 1)]
+        )
 
     # Clean up legacy duplicate auto-generated expenses before unique index.
     await dedupe_subscription_transactions(db.database)

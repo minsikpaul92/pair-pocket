@@ -10,6 +10,13 @@ from app.models.user import UserOut
 USERS_COL = "users"
 
 
+def shared_scope(account_type: str | AccountType, shared_group_id: str | None) -> dict:
+    """Fail closed for shared records without a verified historical group."""
+    if account_type == AccountType.SHARED:
+        return {"shared_group_id": shared_group_id or {"$in": []}}
+    return {}
+
+
 async def resolve_owner_ids(
     db: AsyncIOMotorDatabase,
     user: UserOut,
@@ -116,7 +123,16 @@ async def assert_can_access_doc(
 ) -> dict:
     """Raise 404 if missing or not accessible; return the document otherwise."""
     if not doc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail
+        )
+
+    if doc.get("account_type") == AccountType.SHARED and (
+        not user.shared_group_id or doc.get("shared_group_id") != user.shared_group_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail
+        )
 
     ok = await user_can_access_owner(
         db,
@@ -125,5 +141,7 @@ async def assert_can_access_doc(
         account_type=doc.get("account_type", AccountType.PERSONAL.value),
     )
     if not ok:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail
+        )
     return doc

@@ -9,6 +9,7 @@ from app.models.account import AccountBalanceOut, FinancialAccountKind, NetWorth
 from app.models.category_preset import is_card_repayment, is_non_cashflow_transfer
 from app.models.ledger import TransactionKind
 from app.models.transaction import AccountType, Currency, TransactionType
+from app.services.access import shared_scope
 
 ACCOUNTS_COL = "accounts"
 TX_COL = "transactions"
@@ -126,6 +127,7 @@ async def compute_account_balance(
 
     query: dict = {
         **owner_clause,
+        **shared_scope(account_doc["account_type"], account_doc.get("shared_group_id")),
     }
     account_filter = [
         {"account_id": account_id},
@@ -247,6 +249,7 @@ async def compute_net_worth(
     owner_id: str | None = None,
     owner_ids: list[str] | None = None,
     account_type: AccountType,
+    shared_group_id: str | None = None,
     currency: Currency | None = None,
 ) -> NetWorthSummary:
     """Aggregate per-account balances into net worth for the requested country tab (KR vs CA)."""
@@ -266,6 +269,7 @@ async def compute_net_worth(
     query: dict = {
         **owner_clause,
         "account_type": account_type.value,
+        **shared_scope(account_type, shared_group_id),
         "is_active": True,
     }
 
@@ -319,9 +323,7 @@ async def compute_net_worth(
             native_balance, acc_curr, target_currency.value
         )
         is_liability = doc.get("is_liability", False)
-        contribution = (
-            -converted_balance if is_liability else converted_balance
-        )
+        contribution = -converted_balance if is_liability else converted_balance
 
         if is_liability:
             total_liabilities += converted_balance
@@ -347,6 +349,7 @@ async def compute_net_worth(
     holdings_query: dict = {
         "owner_id": {"$in": ids},
         "account_type": account_type.value,
+        **shared_scope(account_type, shared_group_id),
         "account_id": {"$in": list(country_account_ids)},
     }
     holdings_cursor = db.holdings.find(holdings_query)

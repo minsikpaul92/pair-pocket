@@ -20,6 +20,7 @@ from app.models.user import UserOut
 from app.services.access import (
     assert_can_access_doc,
     owner_match,
+    shared_scope,
     require_shared_group_for_write,
     resolve_owner_ids,
 )
@@ -47,6 +48,7 @@ async def list_accounts(
     query: dict = {
         **owner_match(owner_ids),
         "account_type": account_type.value,
+        **shared_scope(account_type.value, current_user.shared_group_id),
     }
     if currency:
         query["currency"] = currency
@@ -74,6 +76,9 @@ async def create_account(
             {
                 **owner_match(owner_ids),
                 "account_type": payload.account_type.value,
+                **shared_scope(
+                    payload.account_type.value, current_user.shared_group_id
+                ),
                 "currency": payload.currency.value,
                 "kind": {"$ne": FinancialAccountKind.CREDIT_CARD.value},
             },
@@ -84,6 +89,9 @@ async def create_account(
             {
                 **owner_match(owner_ids),
                 "account_type": payload.account_type.value,
+                **shared_scope(
+                    payload.account_type.value, current_user.shared_group_id
+                ),
                 "currency": payload.currency.value,
                 "kind": FinancialAccountKind.CREDIT_CARD.value,
             },
@@ -93,6 +101,7 @@ async def create_account(
         inv_filter: dict = {
             **owner_match(owner_ids),
             "account_type": payload.account_type.value,
+            **shared_scope(payload.account_type.value, current_user.shared_group_id),
             "kind": FinancialAccountKind.INVESTMENT.value,
         }
         if payload.country is not None:
@@ -108,6 +117,9 @@ async def create_account(
             {
                 **owner_match(owner_ids),
                 "account_type": payload.account_type.value,
+                **shared_scope(
+                    payload.account_type.value, current_user.shared_group_id
+                ),
                 "currency": payload.currency.value,
             },
             {"$set": {"is_default_income": False}},
@@ -117,6 +129,11 @@ async def create_account(
     doc["kind"] = payload.kind.value
     doc["currency"] = payload.currency.value
     doc["account_type"] = payload.account_type.value
+    doc["shared_group_id"] = (
+        current_user.shared_group_id
+        if payload.account_type == AccountType.SHARED
+        else None
+    )
     if payload.country is not None:
         doc["country"] = payload.country.value
     # Investment never acts as expense/credit wallet; use is_default_investment.
@@ -151,6 +168,7 @@ async def net_worth(
         db,
         owner_ids=owner_ids,
         account_type=account_type,
+        shared_group_id=current_user.shared_group_id,
         currency=cur,
     )
 
@@ -182,6 +200,7 @@ async def update_account(
             {
                 **owner_match(owner_ids),
                 "account_type": existing["account_type"],
+                **shared_scope(existing["account_type"], current_user.shared_group_id),
                 "currency": existing["currency"],
                 "kind": {"$ne": FinancialAccountKind.CREDIT_CARD.value},
             },
@@ -192,6 +211,7 @@ async def update_account(
             {
                 **owner_match(owner_ids),
                 "account_type": existing["account_type"],
+                **shared_scope(existing["account_type"], current_user.shared_group_id),
                 "currency": existing["currency"],
                 "kind": FinancialAccountKind.CREDIT_CARD.value,
             },
@@ -201,6 +221,7 @@ async def update_account(
         inv_filter: dict = {
             **owner_match(owner_ids),
             "account_type": existing["account_type"],
+            **shared_scope(existing["account_type"], current_user.shared_group_id),
             "kind": FinancialAccountKind.INVESTMENT.value,
         }
         country = updates.get("country") or existing.get("country")
@@ -219,15 +240,14 @@ async def update_account(
             {
                 **owner_match(owner_ids),
                 "account_type": existing["account_type"],
+                **shared_scope(existing["account_type"], current_user.shared_group_id),
                 "currency": existing["currency"],
             },
             {"$set": {"is_default_income": False}},
         )
 
     updates["updated_at"] = datetime.utcnow()
-    await db[COLLECTION].update_one(
-        {"_id": ObjectId(account_id)}, {"$set": updates}
-    )
+    await db[COLLECTION].update_one({"_id": ObjectId(account_id)}, {"$set": updates})
     updated = await db[COLLECTION].find_one({"_id": ObjectId(account_id)})
     return _serialize_account(updated)
 
@@ -244,13 +264,10 @@ async def delete_account(
     if not existing:
         raise HTTPException(status_code=404, detail="Account not found.")
 
-    require_shared_group_for_write(
-        current_user, AccountType(existing["account_type"])
-    )
+    require_shared_group_for_write(current_user, AccountType(existing["account_type"]))
     await assert_can_access_doc(
         db, current_user, existing, not_found_detail="Account not found."
     )
 
     await db[COLLECTION].delete_one({"_id": ObjectId(account_id)})
     await db.holdings.delete_many({"account_id": account_id})
-
