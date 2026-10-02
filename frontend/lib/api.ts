@@ -148,10 +148,8 @@ export interface FinancialAccount {
   country: AccountCountry | null;
   opening_balance: number;
   is_liability: boolean;
-  is_default_expense: boolean;
-  is_default_income: boolean;
-  is_default_credit: boolean;
-  is_default_investment: boolean;
+  /** Default slots this account holds (server-managed). */
+  default_roles: DefaultRole[];
   is_active: boolean;
   institution: string | null;
   last_four: string | null;
@@ -168,10 +166,8 @@ export interface NewFinancialAccount {
   account_type?: AccountType;
   country?: AccountCountry | null;
   opening_balance?: number;
-  is_default_expense?: boolean;
-  is_default_income?: boolean;
-  is_default_credit?: boolean;
-  is_default_investment?: boolean;
+  /** Slots to claim; omit to let the server fill only empty slots. */
+  default_roles?: DefaultRole[];
   institution?: string | null;
   last_four?: string | null;
   account_number?: string | null;
@@ -1142,10 +1138,7 @@ export async function updateAccount(
       | "name"
       | "nickname"
       | "opening_balance"
-      | "is_default_expense"
-      | "is_default_income"
-      | "is_default_credit"
-      | "is_default_investment"
+      | "default_roles"
       | "is_active"
       | "institution"
       | "last_four"
@@ -1170,46 +1163,106 @@ export async function deleteAccount(accountId: string): Promise<void> {
   if (!res.ok) throw new ApiError("deleteAccount");
 }
 
-export function defaultAccountId(
-  accounts: FinancialAccount[],
-  type: TransactionType
-): string {
-  // Prefer non-investment wallets. Expense/income defaults are independent.
-  const usable = accounts.filter((a) => a.kind !== "investment");
-  if (type === "expense") {
-    return (
-      usable.find((a) => a.is_default_expense)?.id ||
-      usable.find((a) => a.is_default_credit)?.id ||
-      ""
-    );
-  }
-  return usable.find((a) => a.is_default_income)?.id ?? "";
+export type DefaultRole = "bank" | "card" | "income" | "subscription" | "brokerage";
+export const DEFAULT_ROLES: DefaultRole[] = [
+  "card",
+  "bank",
+  "income",
+  "subscription",
+  "brokerage",
+];
+/** What a form is choosing an account for; the server maps it to slot order. */
+export type DefaultPurpose = "expense" | "transfer" | "income" | "subscription" | "stock";
+
+export interface DefaultSlot {
+  currency: "CAD" | "KRW";
+  role: DefaultRole;
+  account_id: string | null;
+  status: "set" | "missing" | "invalid";
+  eligible_account_ids: string[];
 }
 
-/** Prefer default brokerage account for stock flows. */
-export function defaultInvestmentAccountId(
-  accounts: FinancialAccount[]
-): string {
-  const brokers = accounts.filter((a) => a.kind === "investment" && a.is_active);
-  return (
-    brokers.find((a) => a.is_default_investment)?.id ||
-    brokers[0]?.id ||
-    ""
-  );
+export interface ResolvedDefault {
+  account_id: string | null;
+  source: DefaultRole | "only_option" | null;
+  reason: "not_set" | "no_account" | null;
 }
 
-/** Prefer default credit card when present, else default expense account. */
-export function defaultPaymentAccountId(
+export interface AccountDefaults {
+  account_type: AccountType;
+  slots: DefaultSlot[];
+  resolved: Partial<Record<"CAD" | "KRW", Record<DefaultPurpose, ResolvedDefault>>>;
+}
+
+export async function fetchAccountDefaults(
+  accountType: AccountType
+): Promise<AccountDefaults> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/account-defaults?account_type=${accountType}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new ApiError("fetchAccountDefaults");
+  return (await res.json()) as AccountDefaults;
+}
+
+export async function setAccountDefault(
+  accountType: AccountType,
+  currency: "CAD" | "KRW",
+  role: DefaultRole,
+  accountId: string | null
+): Promise<AccountDefaults> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/account-defaults/${accountType}/${currency}/${role}`,
+    accountId
+      ? {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ account_id: accountId }),
+        }
+      : { method: "DELETE", headers: authHeaders() }
+  );
+  if (!res.ok) throw new ApiError("setAccountDefault");
+  return (await res.json()) as AccountDefaults;
+}
+
+/**
+ * Account a form should pre-select, or "" when none applies. Only returns ids
+ * present in `accounts` so a stale default never selects a hidden account.
+ */
+export function resolveDefaultAccountId(
+  defaults: AccountDefaults | null,
+  currency: Currency,
+  purpose: DefaultPurpose,
   accounts: FinancialAccount[]
 ): string {
-  const usable = accounts.filter((a) => a.kind !== "investment");
-  return (
-    usable.find((a) => a.is_default_credit)?.id ||
-    usable.find((a) => a.is_default_expense)?.id ||
-    usable.find((a) => a.kind === "credit_card")?.id ||
-    usable[0]?.id ||
-    ""
-  );
+  if (currency !== "CAD" && currency !== "KRW") return "";
+  const id = defaults?.resolved[currency]?.[purpose]?.account_id;
+  return id && accounts.some((a) => a.id === id) ? id : "";
+}
+
+/** Why no default applies, for an actionable hint ("not_set" | "no_account"). */
+export function defaultMissingReason(
+  defaults: AccountDefaults | null,
+  currency: Currency,
+  purpose: DefaultPurpose
+): ResolvedDefault["reason"] {
+  if (currency !== "CAD" && currency !== "KRW") return null;
+  return defaults?.resolved[currency]?.[purpose]?.reason ?? null;
+}
+
+/**
+ * Slot roles an account could hold, mirroring the server rules. Brokerages
+ * follow the country tab; other kinds need a CAD or KRW account.
+ */
+export function applicableDefaultRoles(account: {
+  kind: FinancialAccountKind;
+  currency: Currency;
+}): DefaultRole[] {
+  if (account.kind === "investment") return ["brokerage"];
+  if (account.currency !== "CAD" && account.currency !== "KRW") return [];
+  return account.kind === "credit_card"
+    ? ["card", "subscription"]
+    : ["bank", "income", "subscription"];
 }
 
 export function accountLabel(account: FinancialAccount): string {

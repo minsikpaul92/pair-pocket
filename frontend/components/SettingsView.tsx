@@ -18,6 +18,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import LocaleToggle from "@/components/LocaleToggle";
 import ThemeToggle from "@/components/ThemeToggle";
+import AccountDefaultsSettings from "@/components/AccountDefaultsSettings";
 import DayPicker from "@/components/DayPicker";
 import ExpenseRatioHiddenSettings from "@/components/ExpenseRatioHiddenSettings";
 import {
@@ -509,6 +510,8 @@ export default function SettingsView({
           </div>
         )}
       </section>
+
+      <AccountDefaultsSettings hasPartner={hasPartner} />
 
       <section className="card-inset p-5 space-y-3">
         <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
