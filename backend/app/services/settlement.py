@@ -2,6 +2,7 @@
 
 from bson import ObjectId
 from bson.errors import InvalidId
+from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.category_preset import (
@@ -22,6 +23,7 @@ async def get_settled_amounts(
     owner_ids: list[str] | None = None,
     account_type: AccountType = AccountType.PERSONAL,
     shared_group_id: str | None = None,
+    session=None,
 ) -> dict[str, float]:
     """Map expense_id → total settlement income already received."""
     ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
@@ -49,7 +51,9 @@ async def get_settled_amounts(
             }
         },
     ]
-    docs = await db[COLLECTION].aggregate(pipeline).to_list(length=500)
+    docs = await db[COLLECTION].aggregate(pipeline, session=session).to_list(
+        length=500
+    )
     return {d["_id"]: d["total"] for d in docs if d["_id"]}
 
 
@@ -112,3 +116,90 @@ async def get_remaining_settlement(
             already = max(already - float(existing["amount"]), 0.0)
 
     return max(expense["amount"] - already, 0.0)
+
+
+SETTLEMENT_EPSILON = 0.001
+
+
+async def settled_total(
+    db: AsyncIOMotorDatabase,
+    expense_id: str,
+    *,
+    exclude_settlement_id: str | None = None,
+    session=None,
+) -> float:
+    """Sum of settlement income linked to one expense."""
+    query: dict = {
+        "type": "income",
+        "category": INCOME_CATEGORY_SETTLEMENT,
+        "sub_category": SUB_CATEGORY_SETTLEMENT,
+        "settles_expense_id": expense_id,
+    }
+    if exclude_settlement_id and ObjectId.is_valid(exclude_settlement_id):
+        query["_id"] = {"$ne": ObjectId(exclude_settlement_id)}
+    total = 0.0
+    async for doc in db[COLLECTION].find(query, {"amount": 1}, session=session):
+        total += float(doc["amount"])
+    return total
+
+
+async def check_settlement(
+    db: AsyncIOMotorDatabase,
+    *,
+    expense_id: str,
+    amount: float,
+    currency: str,
+    owner_ids: list[str],
+    account_type: AccountType,
+    shared_group_id: str | None,
+    exclude_settlement_id: str | None = None,
+    lock: bool = False,
+    session=None,
+) -> float:
+    """Validate a settlement against its expense; return the remaining amount.
+
+    The expense must be accessible, in the same ledger, and in the same
+    currency. With `lock` (inside a transaction) the expense document is
+    written first, so concurrent settlements of the same expense conflict
+    and are retried against the updated total instead of over-settling.
+    """
+    try:
+        oid = ObjectId(expense_id)
+    except (InvalidId, TypeError):
+        oid = None
+    expense = None
+    if oid and owner_ids:
+        expense = await db[COLLECTION].find_one(
+            {
+                "_id": oid,
+                "owner_id": {"$in": owner_ids},
+                "type": "expense",
+                "account_type": account_type.value,
+                **shared_scope(account_type, shared_group_id),
+            },
+            session=session,
+        )
+    if expense is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="정산 대상 지출을 찾을 수 없습니다.",
+        )
+    if expense.get("currency") != currency:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="정산 통화가 원래 지출의 통화와 일치하지 않습니다.",
+        )
+    if lock:
+        await db[COLLECTION].update_one(
+            {"_id": oid}, {"$inc": {"settlement_lock_rev": 1}}, session=session
+        )
+    already = await settled_total(
+        db, expense_id, exclude_settlement_id=exclude_settlement_id, session=session
+    )
+    remaining = max(float(expense["amount"]) - already, 0.0)
+    if amount > remaining + SETTLEMENT_EPSILON:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"정산 금액이 남은 지출({remaining:.2f})을 초과합니다.",
+        )
+    return remaining

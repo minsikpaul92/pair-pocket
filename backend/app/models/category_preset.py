@@ -20,6 +20,7 @@ from app.models.ledger import (
     TRANSFER_SUB_ETRANSFER,
     TRANSFER_SUB_INVESTMENT_FUNDING,
     TRANSFER_SUB_SHARED_FUNDING,
+    TRANSFER_SUB_SHARED_WITHDRAWAL,
     is_cashflow_transfer_sub,
     is_internal_transfer_sub,
     is_shared_funding_sub,
@@ -54,6 +55,7 @@ EXPENSE_PRESETS: dict[str, list[str]] = {
         TRANSFER_SUB_ACCOUNT_TRANSFER,
         TRANSFER_SUB_INVESTMENT_FUNDING,
         TRANSFER_SUB_SHARED_FUNDING,
+        TRANSFER_SUB_SHARED_WITHDRAWAL,
         TRANSFER_SUB_ETRANSFER,
     ],
 }
@@ -68,8 +70,8 @@ INCOME_PRESETS: dict[str, list[str]] = {
         "은행 이자",
         "정부 환급금(HST/Tax Refund)",
     ],
-    # Mirror of personal→shared funding (server-created income twin).
-    TRANSFER_CATEGORY: [TRANSFER_SUB_SHARED_FUNDING],
+    # Receiving side of personal↔shared transfers (linked to an expense twin).
+    TRANSFER_CATEGORY: [TRANSFER_SUB_SHARED_FUNDING, TRANSFER_SUB_SHARED_WITHDRAWAL],
 }
 
 PRESETS_BY_TYPE: dict[TransactionType, dict[str, list[str]]] = {

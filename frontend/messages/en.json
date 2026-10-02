@@ -247,7 +247,12 @@
     "selectInstitution": "Select institution / account",
     "setDefaultStockAccountCA": "Set as default Canadian brokerage",
     "setDefaultStockAccountKR": "Set as default Korean brokerage",
-    "defaultSaveFailed": "Couldn't save the default account. Please try again."
+    "defaultSaveFailed": "Couldn't save the default account. Please try again.",
+    "transferFromPersonal": "From personal account",
+    "transferFromShared": "From shared account",
+    "transferToPersonal": "To personal account",
+    "transferToShared": "To shared account",
+    "transferNoteSharedWithdrawal": "Moves money from a shared account to a personal account. Recorded as an expense on the shared ledger and as income personally."
   },
   "settlement": {
     "noExpenses": "No expenses available for settlement.",
@@ -394,7 +399,8 @@
     "stockSale": "Stock sale proceeds",
     "dividends": "Investment dividends",
     "bankInterest": "Bank interest",
-    "taxRefund": "Government refund (HST/Tax)"
+    "taxRefund": "Government refund (HST/Tax)",
+    "sharedWithdrawal": "Shared to personal transfer"
   },
   "subscriptions": {
     "title": "Fixed expenses",

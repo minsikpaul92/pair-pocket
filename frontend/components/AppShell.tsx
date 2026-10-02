@@ -1189,6 +1189,7 @@ export default function AppShell({ user, onLogout }: Props) {
           currency={modalCurrency}
           ledgerScope={scope}
           accountType={accountType}
+          hasPartner={Boolean(partner)}
           parsedTransaction={parsedData}
           allowCurrencyPick={scope === "ALL" && !editingTransaction}
           onCurrencyChange={setModalCurrency}
