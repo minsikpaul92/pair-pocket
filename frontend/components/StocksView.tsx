@@ -20,6 +20,7 @@ import {
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import FloatingActionStack from "@/components/FloatingActionStack";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
+import { useAccountDefaults } from "@/lib/useAccountDefaults";
 
 import {
   AccountType,
@@ -37,7 +38,7 @@ import {
   createStockHolding,
   updateStockHolding,
   deleteStockHolding,
-  defaultInvestmentAccountId,
+  resolveDefaultAccountId,
   fetchStockSummary,
   fetchAccounts,
   fetchExchangeRate,
@@ -60,6 +61,7 @@ type SortOption = "yield" | "valuation" | "shares";
 type ViewMode = "price" | "valuation";
 
 export default function StocksView({ accountType, ledgerScope, version, onChanged }: Props) {
+  const { defaults: accountDefaults } = useAccountDefaults(accountType, version);
   const t = useTranslations("stocks");
 
   // State controls
@@ -237,12 +239,21 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     return map;
   }, [summary]);
 
+  const preferredBrokerageId = useMemo(() => {
+    const tabs: ("CAD" | "KRW")[] =
+      ledgerScope === "KRW" ? ["KRW"] : ledgerScope === "CAD" ? ["CAD"] : ["CAD", "KRW"];
+    for (const tab of tabs) {
+      const id = resolveDefaultAccountId(accountDefaults, tab, "stock", visibleAccounts);
+      if (id) return id;
+    }
+    return visibleAccounts[0]?.id ?? "";
+  }, [accountDefaults, ledgerScope, visibleAccounts]);
+
   useEffect(() => {
     if (!showAddModal) return;
     if (targetAccountId) return;
-    const preferred = defaultInvestmentAccountId(visibleAccounts);
-    if (preferred) setTargetAccountId(preferred);
-  }, [showAddModal, targetAccountId, visibleAccounts]);
+    if (preferredBrokerageId) setTargetAccountId(preferredBrokerageId);
+  }, [showAddModal, targetAccountId, preferredBrokerageId]);
 
   const visibleAccountIds = useMemo(
     () => new Set(visibleAccounts.map((a) => a.id)),
@@ -625,8 +636,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     setScanning(true);
     setFormError(null);
     try {
-      const preferred = defaultInvestmentAccountId(visibleAccounts);
-      if (preferred) setTargetAccountId(preferred);
+      if (preferredBrokerageId) setTargetAccountId(preferredBrokerageId);
       setShowAddModal(true);
       const result = await parseOnboardingScreenshots(
         "brokerage",

@@ -11,6 +11,7 @@ import CategorySelect from "@/components/CategorySelect";
 import DayPicker from "@/components/DayPicker";
 import InstitutionSelect from "@/components/InstitutionSelect";
 import MerchantSelect from "@/components/MerchantSelect";
+import { useAccountDefaults } from "@/lib/useAccountDefaults";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import SwipeableRow from "@/components/SwipeableRow";
@@ -39,13 +40,14 @@ import {
   accountLabel,
   categoriesForType,
   createTransaction,
-  defaultAccountId,
   deleteTransaction,
   fetchAccounts,
   fetchInstitutionSuggestions,
   fetchMerchantSuggestions,
   fetchSettleableExpenses,
   effectiveExpenseAmount,
+  resolveDefaultAccountId,
+  setAccountDefault,
   formatAmount,
   formatAmountInput,
   amountToInput,
@@ -199,7 +201,8 @@ export default function TransactionModal({
   const [txCurrency, setTxCurrency] = useState<Currency>(currency);
   const [transactionCurrency, setTransactionCurrency] = useState<Currency>(currency);
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null);
-  const [dummyTrigger, setDummyTrigger] = useState(0);
+  const { defaults: accountDefaults, setDefaults: setAccountDefaults } =
+    useAccountDefaults(accountType);
   const [merchantHints, setMerchantHints] = useState<string[]>([]);
   const [institutionOptions, setInstitutionOptions] = useState<string[]>([]);
   const [settleableExpenses, setSettleableExpenses] = useState<SettleableExpense[]>(
@@ -955,30 +958,51 @@ export default function TransactionModal({
     }
   }
 
+  // Defaults load asynchronously; never override an account the user chose
+  // (or just created) for the current type / currency.
+  const accountContextKey = `${type}|${currency}|${isStock}|${isTransfer}`;
+  const manualAccountPickRef = useRef<string | null>(null);
+  const pickAccount = useCallback(
+    (id: string) => {
+      manualAccountPickRef.current = accountContextKey;
+      setAccountId(id);
+    },
+    [accountContextKey]
+  );
+
   useEffect(() => {
     if (isEditing || isTransfer) return;
+    if (manualAccountPickRef.current === accountContextKey) return;
     if (isStock) {
-      const key = currency === "CAD" ? "default_stock_cad_account_id" : "default_stock_krw_account_id";
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        setAccountId(saved);
-        const selected = accounts.find((a) => a.id === saved);
-        if (selected) {
-          setInstitution(selected.institution || selected.name);
-        }
-      } else {
-        const firstInv = accounts.find((a) => a.kind === "investment" && a.currency === currency);
-        if (firstInv) {
-          setAccountId(firstInv.id);
-          setInstitution(firstInv.institution || firstInv.name);
-        } else {
-          setAccountId(ACCOUNT_NONE);
-        }
-      }
+      const preferred = resolveDefaultAccountId(
+        accountDefaults,
+        currency,
+        "stock",
+        accounts
+      );
+      const selected = accounts.find((a) => a.id === preferred);
+      setAccountId(preferred || ACCOUNT_NONE);
+      if (selected) setInstitution(selected.institution || selected.name);
     } else {
-      setAccountId(defaultAccountId(accounts, type));
+      setAccountId(
+        resolveDefaultAccountId(
+          accountDefaults,
+          currency,
+          type === "income" ? "income" : "expense",
+          accounts
+        )
+      );
     }
-  }, [type, accounts, isTransfer, isEditing, isStock, currency]);
+  }, [
+    type,
+    accounts,
+    accountDefaults,
+    isTransfer,
+    isEditing,
+    isStock,
+    currency,
+    accountContextKey,
+  ]);
 
   useEffect(() => {
     // Never wipe transfer accounts while editing — keep the saved from/to cards.
@@ -993,13 +1017,15 @@ export default function TransactionModal({
         (a) => a.id === prev && !a.is_liability
       );
       if (stillValid) return prev;
-      const preferred = defaultAccountId(accounts, "expense");
-      const preferredOk = accounts.some(
-        (a) => a.id === preferred && !a.is_liability
+      const preferred = resolveDefaultAccountId(
+        accountDefaults,
+        currency,
+        "transfer",
+        accounts
       );
-      return preferredOk ? preferred : ACCOUNT_NONE;
+      return preferred || ACCOUNT_NONE;
     });
-  }, [isTransfer, accounts, isEditing]);
+  }, [isTransfer, accounts, accountDefaults, currency, isEditing]);
 
   useEffect(() => {
     if (!isTransfer || isEditing) return;
@@ -1416,7 +1442,7 @@ export default function TransactionModal({
         <AccountSelect
           accounts={transferFromAccounts}
           value={accountId}
-          onChange={setAccountId}
+          onChange={pickAccount}
           onRegister={() => {
             setAccountRegisterTarget("primary");
             setShowAccountRegister(true);
@@ -1493,7 +1519,7 @@ export default function TransactionModal({
           accounts={accounts}
           value={accountId}
           onChange={(val) => {
-            setAccountId(val);
+            pickAccount(val);
             const selected = accounts.find((a) => a.id === val);
             if (selected) {
               setInstitution(selected.institution || selected.name);
@@ -1514,22 +1540,35 @@ export default function TransactionModal({
             <input
               type="checkbox"
               checked={
-                currency === "CAD"
-                  ? accountId === localStorage.getItem("default_stock_cad_account_id")
-                  : accountId === localStorage.getItem("default_stock_krw_account_id")
+                accountDefaults?.slots.some(
+                  (s) =>
+                    s.currency === currency &&
+                    s.role === "brokerage" &&
+                    s.status === "set" &&
+                    s.account_id === accountId
+                ) ?? false
               }
-              onChange={(e) => {
-                const key = currency === "CAD" ? "default_stock_cad_account_id" : "default_stock_krw_account_id";
-                if (e.target.checked) {
-                  localStorage.setItem(key, accountId);
-                } else {
-                  localStorage.removeItem(key);
+              disabled={currency !== "CAD" && currency !== "KRW"}
+              onChange={async (e) => {
+                if (currency !== "CAD" && currency !== "KRW") return;
+                try {
+                  setAccountDefaults(
+                    await setAccountDefault(
+                      accountType,
+                      currency,
+                      "brokerage",
+                      e.target.checked ? accountId : null
+                    )
+                  );
+                } catch {
+                  setError(tTx("defaultSaveFailed"));
                 }
-                setDummyTrigger((p) => p + 1);
               }}
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            {currency === "CAD" ? "기본 캐나다 주식 계좌로 설정" : "기본 한국 주식 계좌로 설정"}
+            {currency === "KRW"
+              ? tTx("setDefaultStockAccountKR")
+              : tTx("setDefaultStockAccountCA")}
           </label>
         )}
       </div>
@@ -1834,7 +1873,7 @@ export default function TransactionModal({
                   <AccountSelect
                     accounts={accounts}
                     value={accountId}
-                    onChange={setAccountId}
+                    onChange={pickAccount}
                     onRegister={() => {
                       setAccountRegisterTarget("primary");
                       setShowAccountRegister(true);
@@ -2718,18 +2757,7 @@ export default function TransactionModal({
           preferredType={type}
           onClose={() => setShowAccountRegister(false)}
           onCreated={(created) => {
-            const bump = (prev: FinancialAccount[]) => {
-              const cleared = prev.map((a) => ({
-                ...a,
-                is_default_expense: created.is_default_expense
-                  ? false
-                  : a.is_default_expense,
-                is_default_income: created.is_default_income
-                  ? false
-                  : a.is_default_income,
-              }));
-              return [...cleared, created];
-            };
+            const bump = (prev: FinancialAccount[]) => [...prev, created];
             setAccounts(bump);
             if (created.account_type === "shared") {
               setSharedAccounts(bump);
@@ -2739,7 +2767,7 @@ export default function TransactionModal({
             if (accountRegisterTarget === "counter") {
               setCounterAccountId(created.id);
             } else {
-              setAccountId(created.id);
+              pickAccount(created.id);
             }
             setShowAccountRegister(false);
           }}

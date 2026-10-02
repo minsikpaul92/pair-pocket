@@ -9,9 +9,10 @@ import {
   Wallet,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
+import { DefaultRoleBadges, DefaultRoleMenu } from "@/components/DefaultRoleControls";
 import DashboardAnalytics from "@/components/DashboardAnalytics";
 import {
   ACCOUNT_KIND_KEYS,
@@ -510,6 +511,22 @@ export default function DashboardView({
     brokerOrder
   );
   const hasCashAccount = assetAccounts.some((a) => a.kind === "cash");
+
+  const accountsById = new Map(accounts.map((a) => [a.id, a]));
+  const renderDefaults = (accountId: string) => {
+    const account = accountsById.get(accountId);
+    if (!account) return null;
+    return {
+      badges: <DefaultRoleBadges roles={account.default_roles} />,
+      menu: (
+        <DefaultRoleMenu
+          account={account}
+          accountType={accountType}
+          onChanged={() => onChanged?.()}
+        />
+      ),
+    };
+  };
   const createCountry: BankCountry | null = scopeCountry;
   const createCurrency: Currency =
     scope === "KRW" ? "KRW" : scope === "CAD" ? "CAD" : display;
@@ -726,7 +743,7 @@ export default function DashboardView({
                     e.preventDefault();
                     handleCardDrop(acc.account_id);
                   }}
-                  className={isDragging ? "opacity-50" : undefined}
+                  className={`relative ${isDragging ? "opacity-50" : ""}`}
                 >
                   <button
                     type="button"
@@ -742,7 +759,7 @@ export default function DashboardView({
                     <div className="flex items-center gap-2 min-w-0">
                       <GripVertical className="h-3.5 w-3.5 text-gray-300 shrink-0 cursor-grab" />
                       <KindIcon kind={acc.kind} />
-                      <p className="text-sm font-medium truncate flex-1">
+                      <p className="text-sm font-medium truncate flex-1 pr-7">
                         {scope === "ALL" &&
                           (acc.currency === "CAD"
                             ? "🇨🇦 "
@@ -759,7 +776,11 @@ export default function DashboardView({
                     >
                       {overpaid ? `+${displayAmt}` : displayAmt}
                     </p>
+                    {renderDefaults(acc.account_id)?.badges}
                   </button>
+                  <div className="absolute right-1.5 top-1.5">
+                    {renderDefaults(acc.account_id)?.menu}
+                  </div>
                 </li>
               );
             })
@@ -921,6 +942,7 @@ export default function DashboardView({
         scope={scope}
         kindLabel={(kind) => tAccountKinds(ACCOUNT_KIND_KEYS[kind])}
         onEdit={openAccountEdit}
+        renderDefaults={renderDefaults}
         onAdd={() => setCreatingKind("checking")}
         showCashPlaceholder={!hasCashAccount}
         cashPlaceholderLabel={tDashboard("cashZero")}
@@ -957,11 +979,10 @@ export default function DashboardView({
           currency={editingAccount.currency}
           accountType={accountType}
           preferredType={
-            editingAccount.kind === "investment"
+            editingAccount.kind === "investment" ||
+            editingAccount.default_roles.includes("income")
               ? "income"
-              : editingAccount.is_default_income
-                ? "income"
-                : "expense"
+              : "expense"
           }
           account={editingAccount}
           country={
@@ -1012,6 +1033,7 @@ function AccountGroup({
   scope,
   kindLabel,
   onEdit,
+  renderDefaults,
   onAdd,
   showCashPlaceholder,
   cashPlaceholderLabel,
@@ -1023,6 +1045,11 @@ function AccountGroup({
   scope: LedgerScope;
   kindLabel: (kind: FinancialAccountKind) => string;
   onEdit: (accountId: string) => void;
+  /** Default badges / quick menu for one account row. */
+  renderDefaults?: (accountId: string) => {
+    badges: ReactNode;
+    menu: ReactNode;
+  } | null;
   onAdd?: () => void;
   showCashPlaceholder?: boolean;
   cashPlaceholderLabel?: string;
@@ -1072,12 +1099,13 @@ function AccountGroup({
         {accounts.map((acc) => {
           const label = acc.nickname?.trim() || acc.name;
           const showFlag = scope === "ALL";
+          const defaults = renderDefaults?.(acc.account_id);
           return (
-            <li key={acc.account_id}>
+            <li key={acc.account_id} className="flex items-center pr-2">
               <button
                 type="button"
                 onClick={() => onEdit(acc.account_id)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
               >
                 <KindIcon kind={acc.kind} />
                 <div className="min-w-0 flex-1">
@@ -1093,11 +1121,13 @@ function AccountGroup({
                   <p className="text-[11px] text-gray-400 truncate">
                     {kindLabel(acc.kind)}
                   </p>
+                  {defaults?.badges}
                 </div>
                 <p className="text-sm font-semibold tabular-nums whitespace-nowrap text-gray-900 dark:text-white">
                   {formatAmount(acc.balance, acc.currency)}
                 </p>
               </button>
+              {defaults?.menu}
             </li>
           );
         })}

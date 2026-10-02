@@ -29,6 +29,16 @@ class AccountCountry(str, Enum):
     KR = "KR"
 
 
+class DefaultRole(str, Enum):
+    """Default-account slot. Stored in `account_defaults`, not on the account."""
+
+    BANK = "bank"  # spending fallback and transfers
+    CARD = "card"
+    INCOME = "income"
+    SUBSCRIPTION = "subscription"  # optional override; falls back to card → bank
+    BROKERAGE = "brokerage"
+
+
 class AccountBase(BaseModel):
     """A trackable wallet: bank account, credit card, brokerage, etc."""
 
@@ -47,12 +57,6 @@ class AccountBase(BaseModel):
     # True for credit cards — balance contributes negatively to net worth.
     is_liability: bool = False
 
-    is_default_expense: bool = False
-    is_default_income: bool = False
-    # Default credit card for card payments (independent of bank expense default).
-    is_default_credit: bool = False
-    # Default brokerage for stock buys / holdings (independent of expense wallets).
-    is_default_investment: bool = False
     is_active: bool = True
 
     # Optional display metadata (issuer icon, last four digits, etc.)
@@ -78,18 +82,26 @@ class AccountBase(BaseModel):
         return v
 
 
-class AccountCreate(AccountBase):
-    pass
+class LegacyDefaultFlags(BaseModel):
+    """Deprecated per-account flags, accepted from clients built before slots."""
 
-
-class AccountUpdate(BaseModel):
-    name: str | None = None
-    nickname: str | None = None
-    opening_balance: float | None = None
     is_default_expense: bool | None = None
     is_default_income: bool | None = None
     is_default_credit: bool | None = None
     is_default_investment: bool | None = None
+
+
+class AccountCreate(AccountBase, LegacyDefaultFlags):
+    # Slots this account should hold, e.g. ["bank", "income"].
+    default_roles: list[DefaultRole] | None = None
+
+
+class AccountUpdate(LegacyDefaultFlags):
+    name: str | None = None
+    nickname: str | None = None
+    opening_balance: float | None = None
+    # Full set of slots this account should hold; omit to leave defaults alone.
+    default_roles: list[DefaultRole] | None = None
     is_active: bool | None = None
     institution: str | None = None
     last_four: str | None = None
@@ -100,6 +112,12 @@ class AccountUpdate(BaseModel):
 class AccountOut(AccountBase):
     id: str
     owner_id: str
+    default_roles: list[DefaultRole] = Field(default_factory=list)
+    # Deprecated mirrors of default_roles for older clients.
+    is_default_expense: bool = False
+    is_default_income: bool = False
+    is_default_credit: bool = False
+    is_default_investment: bool = False
     created_at: datetime
     updated_at: datetime
 

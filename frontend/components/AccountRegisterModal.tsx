@@ -8,6 +8,7 @@ import BankPicker from "@/components/BankPicker";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import {
   ACCOUNT_KIND_KEYS,
+  DefaultRole,
   AccountType,
   Currency,
   FinancialAccount,
@@ -16,6 +17,7 @@ import {
   OnboardingParseResult,
   TransactionType,
   addInstitution,
+  applicableDefaultRoles,
   createAccount,
   deleteAccount,
   fetchUserSettings,
@@ -91,14 +93,11 @@ export default function AccountRegisterModal({
     account?.institution ?? ""
   );
   const [customInstitutions, setCustomInstitutions] = useState<string[]>([]);
-  const [isDefault, setIsDefault] = useState(() => {
-    if (!account) return true;
-    if (account.kind === "investment") return Boolean(account.is_default_investment);
-    if (account.kind === "credit_card") return Boolean(account.is_default_credit);
-    return preferredType === "expense"
-      ? Boolean(account.is_default_expense)
-      : Boolean(account.is_default_income);
-  });
+  // New accounts claim empty default slots on the server automatically;
+  // checked roles also take over slots another account holds.
+  const [defaultRoles, setDefaultRoles] = useState<Set<DefaultRole>>(
+    () => new Set(account?.default_roles ?? [])
+  );
   const [isActive, setIsActive] = useState(account?.is_active ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +109,17 @@ export default function AccountRegisterModal({
   const isInvestment = kind === "investment";
   const displayCurrency = account?.currency ?? selectedCurrency;
   const scanStep = isInvestment || initialKind === "investment" ? "brokerage" : "assets";
+  const roleOptions = applicableDefaultRoles({ kind, currency: displayCurrency });
+  const selectedRoles = roleOptions.filter((role) => defaultRoles.has(role));
+
+  function toggleRole(role: DefaultRole, on: boolean) {
+    setDefaultRoles((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(role);
+      else next.delete(role);
+      return next;
+    });
+  }
 
   useEffect(() => {
     fetchUserSettings()
@@ -194,31 +204,6 @@ export default function AccountRegisterModal({
     const cardLastFour = isCreditCard ? normalizeLastFour(lastFour) : null;
     setSubmitting(true);
     try {
-      const defaultFlags = {
-        is_default_expense:
-          !isInvestment && !isCreditCard && preferredType === "expense"
-            ? isDefault
-            : isEdit && account
-              ? account.is_default_expense
-              : false,
-        is_default_income:
-          !isInvestment && !isCreditCard && preferredType === "income"
-            ? isDefault
-            : isEdit && account
-              ? account.is_default_income
-              : false,
-        is_default_credit: isCreditCard
-          ? isDefault
-          : isEdit && account
-            ? account.is_default_credit
-            : false,
-        is_default_investment: isInvestment
-          ? isDefault
-          : isEdit && account
-            ? account.is_default_investment
-            : false,
-      };
-
       if (isEdit && account) {
         const updated = await updateAccount(account.id, {
           name: trimmed,
@@ -227,7 +212,7 @@ export default function AccountRegisterModal({
           institution: isCash ? null : institution || null,
           last_four: cardLastFour,
           account_number: maskedAccount,
-          ...defaultFlags,
+          default_roles: selectedRoles,
           is_active: isActive,
         });
         onUpdated?.(updated);
@@ -246,7 +231,7 @@ export default function AccountRegisterModal({
         institution: isCash ? null : institution || null,
         last_four: cardLastFour,
         account_number: maskedAccount,
-        ...defaultFlags,
+        default_roles: selectedRoles.length ? selectedRoles : undefined,
       };
 
       const created = await createAccount(payload);
@@ -470,23 +455,30 @@ export default function AccountRegisterModal({
             </div>
           )}
 
-          <label className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 px-4 py-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isDefault}
-              onChange={(e) => setIsDefault(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
-            />
-            <span className="text-sm">
-              {isInvestment
-                ? t("defaultBrokerAccount")
-                : isCreditCard
-                  ? t("defaultCreditAccount")
-                  : preferredType === "expense"
-                    ? t("defaultExpenseAccount")
-                    : t("defaultIncomeAccount")}
-            </span>
-          </label>
+          {roleOptions.length > 0 && (
+            <fieldset className="rounded-xl bg-gray-50 dark:bg-gray-800/60 px-4 py-3 space-y-2">
+              <legend className="sr-only">{t("defaultRolesTitle")}</legend>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t("defaultRolesTitle")}
+              </p>
+              {roleOptions.map((role) => (
+                <label key={role} className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={defaultRoles.has(role)}
+                    onChange={(e) => toggleRole(role, e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                  />
+                  <span className="text-sm">{t(`defaultRole.${role}`)}</span>
+                </label>
+              ))}
+              {!isEdit && (
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed">
+                  {t("defaultRolesAutoHint")}
+                </p>
+              )}
+            </fieldset>
+          )}
 
           {isEdit && (
             <label className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 px-4 py-3 cursor-pointer">

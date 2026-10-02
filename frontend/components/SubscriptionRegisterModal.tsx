@@ -2,7 +2,7 @@
 
 import { Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
@@ -28,7 +28,7 @@ import {
   addMonthsToDateKey,
   categoriesForType,
   createSubscription,
-  defaultPaymentAccountId,
+  resolveDefaultAccountId,
   deleteSubscription,
   fetchAccounts,
   fetchSubscriptionHistory,
@@ -42,6 +42,7 @@ import {
   updateSubscription,
 } from "@/lib/api";
 import { dayKey, parseDate } from "@/lib/date";
+import { useAccountDefaults } from "@/lib/useAccountDefaults";
 import { translateError } from "@/lib/errors";
 import {
   formatSubscriptionDate,
@@ -254,16 +255,32 @@ export default function SubscriptionRegisterModal({
       .catch(() => setHistory(null));
   }, [editing]);
 
+  const { defaults: accountDefaults } = useAccountDefaults(accountType);
+  // Defaults load asynchronously; keep an account the user already chose.
+  const accountContextKey = `${currency}|${accountType}`;
+  const manualAccountPickRef = useRef<string | null>(null);
+  const pickAccount = useCallback(
+    (id: string) => {
+      manualAccountPickRef.current = accountContextKey;
+      setAccountId(id);
+    },
+    [accountContextKey]
+  );
+
   useEffect(() => {
     fetchAccounts({ currency, accountType })
-      .then((list) => {
-        setAccounts(list);
-        if (!editing) {
-          setAccountId(defaultPaymentAccountId(list) || ACCOUNT_NONE);
-        }
-      })
+      .then(setAccounts)
       .catch(() => setAccounts([]));
-  }, [currency, accountType, editing]);
+  }, [currency, accountType]);
+
+  // Subscriptions: subscription slot → default card → default bank account.
+  useEffect(() => {
+    if (editing || manualAccountPickRef.current === accountContextKey) return;
+    setAccountId(
+      resolveDefaultAccountId(accountDefaults, currency, "subscription", accounts) ||
+        ACCOUNT_NONE
+    );
+  }, [accountDefaults, accounts, currency, editing, accountContextKey]);
 
   useEffect(() => {
     if (editing) return;
@@ -866,7 +883,7 @@ export default function SubscriptionRegisterModal({
                 <AccountSelect
                   accounts={transferFromAccounts}
                   value={accountId}
-                  onChange={setAccountId}
+                  onChange={pickAccount}
                   onRegister={() => setShowAccountRegister(true)}
                   allowNone={false}
                   placeholder={tTx("selectFromAccount") || "출금 계좌 선택"}
@@ -896,7 +913,7 @@ export default function SubscriptionRegisterModal({
               <AccountSelect
                 accounts={accounts}
                 value={accountId}
-                onChange={setAccountId}
+                onChange={pickAccount}
                 onRegister={() => setShowAccountRegister(true)}
                 allowNone={false}
                 placeholder={t("selectPaymentAccount")}
@@ -1171,7 +1188,7 @@ export default function SubscriptionRegisterModal({
           onClose={() => setShowAccountRegister(false)}
           onCreated={(created) => {
             setAccounts((prev) => [...prev, created]);
-            setAccountId(created.id);
+            pickAccount(created.id);
             setShowAccountRegister(false);
           }}
         />
