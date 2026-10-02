@@ -17,7 +17,7 @@ import {
 } from "recharts";
 
 import { categoryIcon } from "@/components/CategoryIcon";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 import {
   AccountType,
@@ -27,13 +27,15 @@ import {
   StatsSummary,
   Transaction,
   effectiveExpenseAmount,
+  hiddenSubKey,
   fetchStatsSummary,
+  fetchTransactions,
   fetchUserSettings,
   formatAmount,
   setCategoryColor,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
-import { addMonths, monthKey } from "@/lib/date";
+import { addDays, addMonths, dayKey, monthKey, weekStart } from "@/lib/date";
 
 const WEB_PRESET_COLORS = [
   "#000000", // Black
@@ -71,6 +73,7 @@ const CATEGORY_DEFAULT_COLORS: Record<string, string> = {
 const PIE_ICON_MIN_PERCENT = 12;
 
 type PeriodRange = 1 | 3 | 6 | 12;
+type ExpenseRange = "week" | PeriodRange;
 
 interface TrendPoint {
   month: string;
@@ -310,14 +313,31 @@ function statsToExpenseMap(
   stats: StatsSummary | null,
   currency: Currency,
   display: Currency,
-  rate: ExchangeRate | null
+  rate: ExchangeRate | null,
+  hidden: ReadonlySet<string>
 ): Map<string, number> {
   const map = new Map<string, number>();
   if (!stats) return map;
+  const add = (category: string, amount: number) => {
+    if (amount <= 0) return;
+    const converted = convertAmount(amount, currency, display, rate);
+    map.set(category, (map.get(category) ?? 0) + converted);
+  };
+  const subRows = stats.expense_breakdown_by_sub_category;
+  if (subRows) {
+    for (const row of subRows) {
+      if (
+        hidden.has(row.category) ||
+        hidden.has(hiddenSubKey(row.category, row.sub_category))
+      ) {
+        continue;
+      }
+      add(row.category, row.amount);
+    }
+    return map;
+  }
   for (const row of stats.expense_breakdown_by_category ?? []) {
-    if (row.amount <= 0) continue;
-    const converted = convertAmount(row.amount, currency, display, rate);
-    map.set(row.category, (map.get(row.category) ?? 0) + converted);
+    if (!hidden.has(row.category)) add(row.category, row.amount);
   }
   return map;
 }
@@ -346,7 +366,10 @@ function shortMonthLabel(monthStr: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { month: "short" }).format(d);
 }
 
-function periodLabelKey(range: PeriodRange): "periodMonth" | "periodQuarter" | "periodHalf" | "periodYear" {
+function periodLabelKey(
+  range: ExpenseRange
+): "periodWeek" | "periodMonth" | "periodQuarter" | "periodHalf" | "periodYear" {
+  if (range === "week") return "periodWeek";
   if (range === 1) return "periodMonth";
   if (range === 3) return "periodQuarter";
   if (range === 6) return "periodHalf";
@@ -407,7 +430,11 @@ export default function DashboardAnalytics({
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
 
-  const [expenseRange, setExpenseRange] = useState<PeriodRange>(1);
+  const [expenseRange, setExpenseRange] = useState<ExpenseRange>(1);
+  const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() =>
+    weekStart(new Date())
+  );
+  const [weekTransactions, setWeekTransactions] = useState<Transaction[]>([]);
   const [trendRange, setTrendRange] = useState<PeriodRange>(6);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [trendLoading, setTrendLoading] = useState(true);
@@ -416,12 +443,30 @@ export default function DashboardAnalytics({
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
     {}
   );
+  const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(
+    () => new Set()
+  );
   const [activeColorPicker, setActiveColorPicker] = useState<string | null>(null);
   const [popoverCategory, setPopoverCategory] = useState<string | null>(null);
 
+  const isWeek = expenseRange === "week";
+  const weekStartKey = dayKey(selectedWeekStart);
+  const weekEndKey = dayKey(addDays(selectedWeekStart, 6));
+  const isCurrentWeek = weekStartKey === dayKey(weekStart(new Date()));
+  // Tooltip / sub-category popover read the shown period, minus hidden entries.
+  const periodTransactions = useMemo(
+    () =>
+      (isWeek ? weekTransactions : transactions ?? []).filter(
+        (tx) =>
+          !hiddenCategories.has(tx.category) &&
+          !hiddenCategories.has(hiddenSubKey(tx.category, tx.sub_category))
+      ),
+    [isWeek, weekTransactions, transactions, hiddenCategories]
+  );
+
   const subCategoryGroupMap = useMemo(() => {
     if (!popoverCategory) return [];
-    const catTxs = (transactions || []).filter(
+    const catTxs = (periodTransactions || []).filter(
       (tx) => tx.category === popoverCategory && tx.type === "expense"
     );
     const map = new Map<string, { total: number; txs: Transaction[] }>();
@@ -437,7 +482,7 @@ export default function DashboardAnalytics({
       total: data.total,
       txs: data.txs,
     }));
-  }, [popoverCategory, transactions]);
+  }, [popoverCategory, periodTransactions]);
 
   const translate = (cat: string) => translateCategory(cat, tCategories);
 
@@ -445,14 +490,27 @@ export default function DashboardAnalytics({
   const monthSlices = useMemo(() => {
     const maps: Map<string, number>[] = [];
     if (scope === "CAD" || scope === "ALL") {
-      maps.push(statsToExpenseMap(cadStats, "CAD", displayCurrency, rate));
+      maps.push(
+        statsToExpenseMap(cadStats, "CAD", displayCurrency, rate, hiddenCategories)
+      );
     }
     if (scope === "KRW" || scope === "ALL") {
-      maps.push(statsToExpenseMap(krwStats, "KRW", displayCurrency, rate));
+      maps.push(
+        statsToExpenseMap(krwStats, "KRW", displayCurrency, rate, hiddenCategories)
+      );
     }
     return toSlices(mergeExpenseMaps(maps), translate, categoryColors);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cadStats, krwStats, scope, displayCurrency, rate, categoryColors, tCategories]);
+  }, [
+    cadStats,
+    krwStats,
+    scope,
+    displayCurrency,
+    rate,
+    categoryColors,
+    hiddenCategories,
+    tCategories,
+  ]);
 
   const displaySlices = expenseRange === 1 ? monthSlices : expenseSlices;
   const pieData = useMemo(() => displaySlices.slice(0, 8), [displaySlices]);
@@ -463,11 +521,17 @@ export default function DashboardAnalytics({
 
   useEffect(() => {
     fetchUserSettings()
-      .then((s) => setCategoryColors(s.category_colors ?? {}))
-      .catch(() => setCategoryColors({}));
+      .then((s) => {
+        setCategoryColors(s.category_colors ?? {});
+        setHiddenCategories(new Set(s.expense_ratio_hidden_categories ?? []));
+      })
+      .catch(() => {
+        setCategoryColors({});
+        setHiddenCategories(new Set());
+      });
   }, [version]);
 
-  // Multi-month expense breakdown for quarter / half / year.
+  // Week (Sun–Sat, independent of month) or multi-month breakdown.
   useEffect(() => {
     if (expenseRange === 1) {
       setExpenseSlices([]);
@@ -478,33 +542,54 @@ export default function DashboardAnalytics({
     let active = true;
     setExpenseLoading(true);
 
-    const months: string[] = [];
-    for (let i = expenseRange - 1; i >= 0; i -= 1) {
-      months.push(monthKey(addMonths(month, -i)));
+    type Period = { month?: string; start?: string; end?: string };
+    const periods: Period[] = [];
+    if (expenseRange === "week") {
+      periods.push({ start: weekStartKey, end: weekEndKey });
+      fetchTransactions({
+        accountType,
+        start: weekStartKey,
+        end: weekEndKey,
+        currency: scope === "ALL" ? undefined : scope,
+      })
+        .then((rows) => {
+          if (active) setWeekTransactions(rows);
+        })
+        .catch(() => {
+          if (active) setWeekTransactions([]);
+        });
+    } else {
+      for (let i = expenseRange - 1; i >= 0; i -= 1) {
+        periods.push({ month: monthKey(addMonths(month, -i)) });
+      }
     }
 
-    async function loadMonthMaps(monthStr: string): Promise<Map<string, number>[]> {
+    async function loadPeriodMaps(period: Period): Promise<Map<string, number>[]> {
       const maps: Map<string, number>[] = [];
       if (scope === "CAD" || scope === "ALL") {
         const cad = await fetchStatsSummary({
+          ...period,
           currency: "CAD",
-          month: monthStr,
           accountType,
         }).catch(() => null);
-        maps.push(statsToExpenseMap(cad, "CAD", displayCurrency, rate));
+        maps.push(
+          statsToExpenseMap(cad, "CAD", displayCurrency, rate, hiddenCategories)
+        );
       }
       if (scope === "KRW" || scope === "ALL") {
         const krw = await fetchStatsSummary({
+          ...period,
           currency: "KRW",
-          month: monthStr,
           accountType,
         }).catch(() => null);
-        maps.push(statsToExpenseMap(krw, "KRW", displayCurrency, rate));
+        maps.push(
+          statsToExpenseMap(krw, "KRW", displayCurrency, rate, hiddenCategories)
+        );
       }
       return maps;
     }
 
-    Promise.all(months.map(loadMonthMaps))
+    Promise.all(periods.map(loadPeriodMaps))
       .then((nested) => {
         if (!active) return;
         const flat = nested.flat();
@@ -525,6 +610,8 @@ export default function DashboardAnalytics({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     expenseRange,
+    weekStartKey,
+    weekEndKey,
     month,
     version,
     scope,
@@ -532,6 +619,7 @@ export default function DashboardAnalytics({
     displayCurrency,
     rate,
     categoryColors,
+    hiddenCategories,
   ]);
 
   useEffect(() => {
@@ -624,7 +712,14 @@ export default function DashboardAnalytics({
     }
   }
 
-  const expensePeriods: PeriodRange[] = [1, 3, 6, 12];
+  const expensePeriods: ExpenseRange[] = ["week", 1, 3, 6, 12];
+  const weekDayFormat = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+  });
+  const weekRangeLabel = `${weekDayFormat.format(
+    selectedWeekStart
+  )} – ${weekDayFormat.format(addDays(selectedWeekStart, 6))}`;
   const trendPeriods: PeriodRange[] = [3, 6, 12];
 
   return (
@@ -651,6 +746,38 @@ export default function DashboardAnalytics({
             ))}
           </div>
         </div>
+
+        {isWeek && (
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedWeekStart((d) => addDays(d, -7))}
+              className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+              aria-label={t("previousWeek")}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="min-w-[9rem] text-center text-xs font-semibold tabular-nums text-gray-700 dark:text-gray-200 whitespace-nowrap">
+              {weekRangeLabel}
+              {isCurrentWeek ? ` · ${t("thisWeek")}` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedWeekStart((d) => addDays(d, 7))}
+              disabled={isCurrentWeek}
+              className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:hover:bg-transparent"
+              aria-label={t("nextWeek")}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {hiddenCategories.size > 0 && (
+          <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+            {t("hiddenCategoriesNote", { count: hiddenCategories.size })}
+          </p>
+        )}
 
         {expenseLoading ? (
           <div className="mt-4 h-48 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
@@ -733,7 +860,7 @@ export default function DashboardAnalytics({
                         }
                         totalExpense={pieTotalExpense}
                         displayCurrency={displayCurrency}
-                        monthTransactions={transactions}
+                        monthTransactions={periodTransactions}
                         tCategories={tCategories}
                       />
                     )}

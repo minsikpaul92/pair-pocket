@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
@@ -7,13 +9,19 @@ from app.database import get_database
 from app.models.transaction import AccountType, Currency
 from app.models.user import UserOut
 from app.services.access import resolve_owner_ids
-from app.services.stats import compute_stats
+from app.services.stats import compute_stats, resolve_date_range
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
 class CategoryBreakdown(BaseModel):
     category: str
+    amount: float
+
+
+class ExpenseSubCategoryBreakdown(BaseModel):
+    category: str
+    sub_category: str
     amount: float
 
 
@@ -25,6 +33,8 @@ class SubCategoryBreakdown(BaseModel):
 class FiltersApplied(BaseModel):
     currency: str | None = None
     month: str | None = None
+    start: str | None = None
+    end: str | None = None
     category: str | None = None
     sub_category: str | None = None
     merchant: str | None = None
@@ -54,7 +64,14 @@ class StatsSummary(BaseModel):
     breakdown_by_category: list[CategoryBreakdown]
     expense_breakdown_by_category: list[CategoryBreakdown] = Field(
         default_factory=list,
-        description="Expense categories only (excludes 투자/저축) for pie charts.",
+        description=(
+            "Consumption categories for pie charts "
+            "(excludes 투자/저축 and 자산 이동/카드)."
+        ),
+    )
+    expense_breakdown_by_sub_category: list[ExpenseSubCategoryBreakdown] = Field(
+        default_factory=list,
+        description="Same scope as expense_breakdown_by_category, per sub-category.",
     )
     breakdown_by_sub_category: list[SubCategoryBreakdown]
     filters_applied: FiltersApplied
@@ -65,6 +82,8 @@ async def stats_summary(
     account_type: AccountType = AccountType.PERSONAL,
     currency: Currency | None = None,
     month: str | None = Query(default=None, description="Filter by 'YYYY-MM'."),
+    start: date | None = Query(default=None, description="Inclusive 'YYYY-MM-DD'."),
+    end: date | None = Query(default=None, description="Inclusive 'YYYY-MM-DD'."),
     category: str | None = None,
     sub_category: str | None = None,
     merchant: str | None = None,
@@ -73,6 +92,7 @@ async def stats_summary(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     """Dashboard stats with investment exclusion and N빵 settlement netting."""
+    date_range = resolve_date_range(start, end, month=month)
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     return await compute_stats(
         db,
@@ -81,6 +101,7 @@ async def stats_summary(
         shared_group_id=current_user.shared_group_id,
         currency=currency,
         month=month,
+        date_range=date_range,
         category=category,
         sub_category=sub_category,
         merchant=merchant,

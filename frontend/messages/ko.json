@@ -162,7 +162,12 @@
     "noExpenseData": "선택한 기간의 지출 데이터가 없습니다.",
     "noTrendData": "선택한 기간의 데이터가 없습니다.",
     "pieTooltipShare": "전체 지출의 {percent}%",
-    "pieTooltipOfTotal": "{amount} / {total}"
+    "pieTooltipOfTotal": "{amount} / {total}",
+    "periodWeek": "주간",
+    "thisWeek": "이번 주",
+    "previousWeek": "이전 주",
+    "nextWeek": "다음 주",
+    "hiddenCategoriesNote": "설정에서 숨긴 카테고리 {count}개는 제외됩니다."
   },
   "list": {
     "allCategories": "전체 대분류",
@@ -750,7 +755,12 @@
     "accountSection": "계정",
     "supportTitle": "후원",
     "supportDescription": "PairPocket이 도움이 됐다면 커피 한 잔으로 응원할 수 있어요. 광고는 없습니다.",
-    "supportCta": "Buy me a coffee"
+    "supportCta": "Buy me a coffee",
+    "expenseRatioHiddenTitle": "지출 비율에서 숨길 카테고리",
+    "expenseRatioHiddenHelp": "선택한 카테고리나 중분류는 대시보드 지출 비율 차트에서 빠집니다. 월세처럼 큰 고정비를 빼면 나머지 소비 흐름이 잘 보입니다. 지출 합계와 내역에는 그대로 남습니다.",
+    "expenseRatioHiddenError": "저장하지 못했습니다. 다시 시도해 주세요.",
+    "expenseRatioHiddenSubToggle": "중분류",
+    "expenseRatioHiddenSubCount": "중분류 {count}개 숨김"
   },
   "onboarding": {
     "title": "시작하기",

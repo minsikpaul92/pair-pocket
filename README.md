@@ -106,7 +106,7 @@ This is the planned work, ordered by priority. Unchecked items are not completed
 
 ### Phase 3 — Spending detail and budgets
 
-- [ ] **Add weekly spending analysis.** Provide weekly totals, a weekly trend, and previous-week comparisons in the dashboard. Define one week-boundary and user-timezone policy, label partial weeks, and handle weeks crossing month/year boundaries consistently. Reuse existing settlement and transfer rules so weekly and monthly totals reconcile.
+- [ ] **Add weekly spending analysis.** *(Started in `feat/expense-ratio`: the expense mix has a Sunday–Saturday week view with previous/next navigation across month boundaries; weekly trend and previous-week comparison remain.)* Provide weekly totals, a weekly trend, and previous-week comparisons in the dashboard. Define one week-boundary and user-timezone policy, label partial weeks, and handle weeks crossing month/year boundaries consistently. Reuse existing settlement and transfer rules so weekly and monthly totals reconcile.
 - [ ] **Browse item-level subcategories.** Introduce a clear hierarchy of category, subcategory, and item group; keep merchant as a separate dimension. Preserve raw receipt descriptions and add normalized item names, quantities, units, and group IDs. Let Gemini suggest reusable groups and let users correct assignments. Support filtering and totals at all three levels without double-counting receipt items and their parent transaction; account for taxes, tips, and discounts explicitly.
 - [ ] **Recognize custom categories in Gemini imports.** Include the user's current allowed categories, subcategories, descriptions, and relevant corrections in each classification request. Validate returned category IDs on the server and flag uncertain assignments for review. Offer explicit reclassification of historical items. Adding a category updates the supplied context; it does not automatically train Gemini.
 - [ ] **Set monthly budgets and explain spending.** Support personal/shared budgets with a defined currency, a monthly total, and category allocations. Calculate actual spending, remaining budget, pacing, and projected month-end spending in application code. Explain overspending and practical savings opportunities with Gemini using those verified totals. Separate recurring commitments and transfers appropriately, and make exchange-rate assumptions visible for combined-currency views.
@@ -136,20 +136,21 @@ Use `main` as the release branch and short-lived `docs/`, `fix/`, and `feat/` br
 | 0 | `docs/roadmap` | Complete ([#48](https://github.com/minsikpaul92/pair-pocket/pull/48)) | Live URL and this English implementation roadmap |
 | 1 | `fix/ledger-access` | Complete ([#49](https://github.com/minsikpaul92/pair-pocket/pull/49)) | Linked-entry authorization and private lookup isolation |
 | 2 | `fix/partnership-scope` | Complete ([#50](https://github.com/minsikpaul92/pair-pocket/pull/50)) | Historical group scoping, migration, and atomic invitation lifecycle |
-| 3 | `fix/account-defaults` | Planned | Server-backed account/card defaults and Settings management |
-| 4 | `fix/ledger-integrity` | Planned | Atomic paired writes and settlement validation |
-| 5 | `fix/session-persistence` | Planned | Session diagnosis, renewal, and expiry recovery |
-| 6 | `fix/save-recovery` | Planned | Draft preservation, readable errors, and safe retries |
-| 7 | `feat/receipt-batches` | Planned | Multiple-receipt review and partial-failure recovery |
-| 8 | `feat/statement-import` | Planned | PDF transaction import and duplicate review |
-| 9 | `feat/unified-layout` | Planned | Shared layout and Settings-only language preference |
-| 10 | `feat/release-notes` | Planned | Versioned release history in Settings |
-| 11 | `feat/public-introduction` | Planned | Product explanation before sign-in |
-| 12 | `feat/weekly-spending` | Planned | Weekly dashboard analysis |
-| 13 | `feat/item-classification` | Planned | Item groups and custom-category AI context |
-| 14 | `feat/monthly-budgets` | Planned | Budgets, pacing, and grounded AI explanations |
-| 15 | `feat/peer-comparisons` | Planned | Optional profile and sourced benchmarks |
-| 16 | `feat/unit-price-insights` | Planned | Receipt-based unit prices and shopping advice |
+| 3 | `feat/expense-ratio` | In review | Weekly (Sun–Sat) expense mix, transfer exclusion, hideable categories |
+| 4 | `fix/account-defaults` | Planned | Server-backed account/card defaults and Settings management |
+| 5 | `fix/ledger-integrity` | Planned | Atomic paired writes, settlement validation, and shared↔personal transfers entered from either side |
+| 6 | `fix/session-persistence` | Planned | Session diagnosis, renewal, and expiry recovery |
+| 7 | `fix/save-recovery` | Planned | Draft preservation, readable errors, and safe retries |
+| 8 | `feat/receipt-batches` | Planned | Multiple-receipt review and partial-failure recovery |
+| 9 | `feat/statement-import` | Planned | PDF transaction import and duplicate review |
+| 10 | `feat/unified-layout` | Planned | Shared layout and Settings-only language preference |
+| 11 | `feat/release-notes` | Planned | Versioned release history in Settings |
+| 12 | `feat/public-introduction` | Planned | Product explanation before sign-in |
+| 13 | `feat/weekly-spending` | Planned | Weekly dashboard analysis |
+| 14 | `feat/item-classification` | Planned | Item groups and custom-category AI context |
+| 15 | `feat/monthly-budgets` | Planned | Budgets, pacing, and grounded AI explanations |
+| 16 | `feat/peer-comparisons` | Planned | Optional profile and sourced benchmarks |
+| 17 | `feat/unit-price-insights` | Planned | Receipt-based unit prices and shopping advice |
 
 Start each independent change from the latest `main`. Merge prerequisite data/model changes before starting dependent work, or explicitly use a dependent PR while its prerequisite is under review. Avoid putting the whole roadmap into one branch. Each PR should explain the problem, resulting behavior, verification, and any migration requirements. Push the branch to `origin`, open a PR into `main`, and merge after review and required checks. Enable appropriate branch protection in GitHub if it is not already configured.
 

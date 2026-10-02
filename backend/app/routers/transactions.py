@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -24,6 +24,7 @@ from app.services.access import (
     resolve_owner_ids,
 )
 from app.services.settlement import get_settled_amounts
+from app.services.stats import resolve_date_range
 from app.services.transaction_links import authorized_funding_twin, is_shared_funding
 from app.services.validation import validate_transaction_payload
 
@@ -100,6 +101,8 @@ async def list_transactions(
     account_type: AccountType = AccountType.PERSONAL,
     currency: Currency | None = None,
     month: str | None = Query(default=None, description="Filter by 'YYYY-MM'."),
+    start: date | None = Query(default=None, description="Inclusive 'YYYY-MM-DD'."),
+    end: date | None = Query(default=None, description="Inclusive 'YYYY-MM-DD'."),
     type: TransactionType | None = None,
     category: str | None = None,
     sub_category: str | None = None,
@@ -109,6 +112,7 @@ async def list_transactions(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[dict]:
     """Return transactions with multi-level category filtering."""
+    date_range = resolve_date_range(start, end, month=month)
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
     query: dict = {
         **owner_match(owner_ids),
@@ -118,8 +122,10 @@ async def list_transactions(
     if currency is not None:
         query["currency"] = currency.value
     if month is not None:
-        start, end = _month_range(month)
-        query["date"] = {"$gte": start, "$lt": end}
+        month_start, month_end = _month_range(month)
+        query["date"] = {"$gte": month_start, "$lt": month_end}
+    elif date_range is not None:
+        query["date"] = {"$gte": date_range[0], "$lt": date_range[1]}
     if type is not None:
         query["type"] = type.value
     if category is not None:
