@@ -80,7 +80,9 @@
     "processing": "Signing in...",
     "failed": "Sign-in failed. Please try again.",
     "oauthNotConfigured": "Google sign-in is not configured yet. Ask an admin, or use local preview login.",
-    "invalidAccess": "Invalid access."
+    "invalidAccess": "Invalid access.",
+    "loadFailed": "Couldn't reach PairPocket. Your sign-in is kept; check your connection and try again.",
+    "retry": "Try again"
   },
   "invite": {
     "title": "Invite partner",
@@ -491,6 +493,8 @@
   },
   "errors": {
     "generic": "Something went wrong.",
+    "network": "Couldn't reach the server. Check your connection and try again.",
+    "serverUnavailable": "The server is unavailable right now. Please try again shortly.",
     "fetchTransactions": "Could not load transactions.",
     "fetchCategories": "Could not load categories.",
     "addCategory": "Could not add category.",

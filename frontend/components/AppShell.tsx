@@ -48,7 +48,6 @@ import {
   PartnerSummary,
   SubscriptionOccurrence,
   Transaction,
-  clearToken,
   fetchAllPendingOccurrences,
   fetchAllTransactions,
   fetchCategoryPresets,
@@ -58,6 +57,7 @@ import {
   fetchTransactions,
   fetchUserSettings,
   preferredLocalesList,
+  signOut,
   skipSubscriptionOccurrence,
   syncSubscriptions,
   parseReceiptsOrStatements,
@@ -485,8 +485,7 @@ export default function AppShell({ user, onLogout }: Props) {
   }
 
   function handleLogout() {
-    clearToken();
-    onLogout();
+    void signOut().finally(onLogout);
   }
 
   function handleInvite() {

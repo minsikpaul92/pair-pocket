@@ -64,6 +64,16 @@ async def _ensure_indexes() -> None:
             [("shared_group_id", 1), ("owner_id", 1), ("account_type", 1)]
         )
 
+    # Sign-in sessions: lookups by credential hash; Mongo drops expired rows.
+    for collection, key in (
+        ("auth_sessions", "token_hash"),
+        ("auth_login_codes", "code_hash"),
+        ("auth_legacy_upgrades", "token_hash"),
+    ):
+        await db.database[collection].create_index(key, unique=True)
+        await db.database[collection].create_index("expires_at", expireAfterSeconds=0)
+    await db.database["auth_sessions"].create_index("family_id")
+
     # Clean up legacy duplicate auto-generated expenses before unique index.
     await dedupe_subscription_transactions(db.database)
     try:
