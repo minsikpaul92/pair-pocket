@@ -239,7 +239,10 @@
     "addCategory": "Add category",
     "addSubCategory": "Add sub-category",
     "addInstitution": "Add institution",
-    "selectInstitution": "Select institution / account"
+    "selectInstitution": "Select institution / account",
+    "setDefaultStockAccountCA": "Set as default Canadian brokerage",
+    "setDefaultStockAccountKR": "Set as default Korean brokerage",
+    "defaultSaveFailed": "Couldn't save the default account. Please try again."
   },
   "settlement": {
     "noExpenses": "No expenses available for settlement.",
@@ -292,7 +295,25 @@
     "deleteButton": "Delete account/card",
     "deleteAccount": "Could not delete account.",
     "namePlaceholderExpense": "e.g. TD Visa, Shinhan Card",
-    "namePlaceholderIncome": "e.g. TD Chequing, KB Bank"
+    "namePlaceholderIncome": "e.g. TD Chequing, KB Bank",
+    "defaultRolesTitle": "Use as default",
+    "defaultRolesAutoHint": "Even if nothing is checked, this account fills any default that is still empty.",
+    "defaultRole": {
+      "card": "Default payment card",
+      "bank": "Default bank account",
+      "income": "Default income account",
+      "subscription": "Subscription payment",
+      "brokerage": "Default brokerage"
+    },
+    "defaultBadge": {
+      "card": "Default card",
+      "bank": "Default account",
+      "income": "Income",
+      "subscription": "Subscriptions",
+      "brokerage": "Default brokerage"
+    },
+    "defaultMenuLabel": "Set as default",
+    "defaultSaveFailed": "Couldn't save the default. Please try again."
   },
   "accountKinds": {
     "checking": "Checking",
@@ -750,7 +771,24 @@
     "accountSection": "Account",
     "supportTitle": "Support",
     "supportDescription": "If PairPocket helps you, you can buy me a coffee. No ads in the app.",
-    "supportCta": "Buy me a coffee"
+    "supportCta": "Buy me a coffee",
+    "accountDefaultsTitle": "Default accounts",
+    "accountDefaultsHelp": "Accounts pre-selected when you add transactions, subscriptions, and stock trades. Spending and subscriptions use the default card first, then the default bank account. Transfers use the bank account first.",
+    "accountDefaultsPersonal": "Personal",
+    "accountDefaultsShared": "Shared",
+    "accountDefaultsSharedHint": "Shared defaults are common to you and your partner. A change by either of you applies to both.",
+    "accountDefaultsNone": "Not set",
+    "accountDefaultsFollowCard": "Default card → bank account",
+    "accountDefaultsNoAccount": "No matching account",
+    "accountDefaultsInvalid": "The selected account can no longer be used. Choose another.",
+    "accountDefaultsLoadError": "Couldn't load default accounts.",
+    "accountDefaultsRoleHelp": {
+      "card": "Used first for spending and subscriptions",
+      "bank": "Spending without a card, and transfers",
+      "income": "Where income is deposited",
+      "subscription": "When empty: default card, then bank account",
+      "brokerage": "Used for stock buys and sells"
+    }
   },
   "onboarding": {
     "title": "Get started",

@@ -239,7 +239,10 @@
     "addCategory": "새 대분류 추가",
     "addSubCategory": "새 중분류 추가",
     "addInstitution": "새 금융기관 추가",
-    "selectInstitution": "금융기관 / 계좌명 선택"
+    "selectInstitution": "금융기관 / 계좌명 선택",
+    "setDefaultStockAccountCA": "기본 캐나다 주식 계좌로 설정",
+    "setDefaultStockAccountKR": "기본 한국 주식 계좌로 설정",
+    "defaultSaveFailed": "기본 계좌를 저장하지 못했습니다. 다시 시도해 주세요."
   },
   "settlement": {
     "noExpenses": "정산 가능한 지출이 없습니다.",
@@ -292,7 +295,25 @@
     "deleteButton": "계좌/카드 삭제",
     "deleteAccount": "계좌를 삭제하지 못했습니다.",
     "namePlaceholderExpense": "예: TD Visa, 신한카드",
-    "namePlaceholderIncome": "예: TD Chequing, 국민은행"
+    "namePlaceholderIncome": "예: TD Chequing, 국민은행",
+    "defaultRolesTitle": "기본 계좌로 사용",
+    "defaultRolesAutoHint": "아무것도 선택하지 않아도, 아직 기본값이 없는 항목은 이 계좌가 자동으로 맡습니다.",
+    "defaultRole": {
+      "card": "기본 결제 카드",
+      "bank": "기본 은행 계좌",
+      "income": "기본 수입 계좌",
+      "subscription": "구독 결제 수단",
+      "brokerage": "기본 증권 계좌"
+    },
+    "defaultBadge": {
+      "card": "기본 카드",
+      "bank": "기본 계좌",
+      "income": "수입",
+      "subscription": "구독",
+      "brokerage": "기본 증권"
+    },
+    "defaultMenuLabel": "기본값 지정",
+    "defaultSaveFailed": "기본값을 저장하지 못했습니다. 다시 시도해 주세요."
   },
   "accountKinds": {
     "checking": "입출금",
@@ -750,7 +771,24 @@
     "accountSection": "계정",
     "supportTitle": "후원",
     "supportDescription": "PairPocket이 도움이 됐다면 커피 한 잔으로 응원할 수 있어요. 광고는 없습니다.",
-    "supportCta": "Buy me a coffee"
+    "supportCta": "Buy me a coffee",
+    "accountDefaultsTitle": "기본 계좌",
+    "accountDefaultsHelp": "거래·구독·주식을 입력할 때 미리 선택될 계좌입니다. 지출과 구독은 기본 카드를 먼저 쓰고, 카드가 없으면 기본 은행 계좌를 씁니다. 계좌이체는 은행 계좌를 먼저 씁니다.",
+    "accountDefaultsPersonal": "개인",
+    "accountDefaultsShared": "공유",
+    "accountDefaultsSharedHint": "공유 기본값은 파트너와 함께 씁니다. 한 사람이 바꾸면 둘 다에게 적용됩니다.",
+    "accountDefaultsNone": "지정 안 함",
+    "accountDefaultsFollowCard": "기본 카드 → 은행 계좌",
+    "accountDefaultsNoAccount": "해당 계좌 없음",
+    "accountDefaultsInvalid": "지정된 계좌를 더 이상 쓸 수 없습니다. 다른 계좌를 선택하세요.",
+    "accountDefaultsLoadError": "기본 계좌를 불러오지 못했습니다.",
+    "accountDefaultsRoleHelp": {
+      "card": "지출과 구독에 먼저 사용",
+      "bank": "카드가 없을 때 지출, 계좌이체에 사용",
+      "income": "수입이 들어오는 계좌",
+      "subscription": "비워 두면 기본 카드 → 은행 계좌 순서",
+      "brokerage": "주식 매수·매도에 사용"
+    }
   },
   "onboarding": {
     "title": "시작하기",

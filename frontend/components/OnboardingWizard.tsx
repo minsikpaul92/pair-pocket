@@ -53,7 +53,7 @@ import {
   createStockHolding,
   createSubscription,
   completeOnboarding,
-  defaultInvestmentAccountId,
+  DefaultRole,
   fetchAccounts,
   fetchCanadaSubscriptions,
   fetchCategoryPresets,
@@ -105,7 +105,32 @@ type DraftAccount = {
   is_default_expense: boolean;
   is_default_credit: boolean;
   is_default_investment: boolean;
+  /** Server default roles this wizard does not manage (e.g. income). */
+  other_roles?: DefaultRole[];
 };
+
+/** The one default role the wizard's checkbox controls for a draft account. */
+function managedRole(a: Pick<DraftAccount, "kind">): DefaultRole {
+  if (a.kind === "investment") return "brokerage";
+  if (a.kind === "credit_card") return "card";
+  return "bank";
+}
+
+function draftDefaultRoles(a: DraftAccount): DefaultRole[] {
+  const role = managedRole(a);
+  const on =
+    role === "brokerage"
+      ? a.is_default_investment
+      : role === "card"
+        ? a.is_default_credit
+        : a.is_default_expense;
+  return [...(a.other_roles ?? []).filter((r) => r !== role), ...(on ? [role] : [])];
+}
+
+function defaultBrokerId(list: FinancialAccount[]): string {
+  const brokers = list.filter((a) => a.kind === "investment" && a.is_active);
+  return brokers.find((a) => a.default_roles.includes("brokerage"))?.id || brokers[0]?.id || "";
+}
 
 type DraftSub = {
   key: string;
@@ -194,8 +219,8 @@ function preferredPaymentAccountId(
     : list;
   const pool = scoped.length ? scoped : list;
   return (
-    pool.find((a) => a.is_default_credit)?.id ||
-    pool.find((a) => a.is_default_expense)?.id ||
+    pool.find((a) => a.default_roles.includes("card"))?.id ||
+    pool.find((a) => a.default_roles.includes("bank"))?.id ||
     pool.find((a) => a.kind === "credit_card")?.id ||
     pool.find((a) => a.kind !== "investment")?.id ||
     pool[0]?.id ||
@@ -407,9 +432,10 @@ function accountToDraft(acc: FinancialAccount): DraftAccount {
     institution: acc.institution || "",
     last_four: acc.last_four || "",
     account_number: acc.account_number || "",
-    is_default_expense: Boolean(acc.is_default_expense),
-    is_default_credit: Boolean(acc.is_default_credit),
-    is_default_investment: Boolean(acc.is_default_investment),
+    is_default_expense: acc.default_roles.includes("bank"),
+    is_default_credit: acc.default_roles.includes("card"),
+    is_default_investment: acc.default_roles.includes("brokerage"),
+    other_roles: acc.default_roles.filter((r) => r !== managedRole(acc)),
   };
 }
 
@@ -911,18 +937,10 @@ export default function OnboardingWizard() {
               institution,
               last_four: lastFour,
               account_number: accountNumber,
-              is_default_expense:
-                !isInvestment && !isCard
-                  ? Boolean(a.is_default_expense)
-                  : false,
-              is_default_credit: isCard
-                ? Boolean(a.is_default_credit)
-                : false,
-              is_default_investment: isInvestment
-                ? Boolean(a.is_default_investment)
-                : false,
+              default_roles: draftDefaultRoles(a),
             });
           } else {
+            const roles = draftDefaultRoles(a);
             await createAccount({
               name: a.name.trim() || a.institution || t("unnamedAccount"),
               kind: a.kind,
@@ -933,17 +951,8 @@ export default function OnboardingWizard() {
               institution,
               last_four: lastFour,
               account_number: accountNumber,
-              is_default_expense:
-                !isInvestment && !isCard
-                  ? Boolean(a.is_default_expense)
-                  : false,
-              is_default_credit: isCard
-                ? Boolean(a.is_default_credit)
-                : false,
-              is_default_investment: isInvestment
-                ? Boolean(a.is_default_investment)
-                : false,
-              is_default_income: false,
+              // Unchecked: the server still fills any empty default slot.
+              default_roles: roles.length ? roles : undefined,
             });
           }
         }
@@ -986,7 +995,7 @@ export default function OnboardingWizard() {
             currency: subs[0]?.currency || "CAD",
             account_type: "personal",
             opening_balance: 0,
-            is_default_expense: true,
+            default_roles: ["bank"],
           });
           fallbackId = cash.id;
         }
@@ -1364,8 +1373,7 @@ export default function OnboardingWizard() {
       matchesBrokerCountry(a, brokerCountry)
     );
     const pool = scopedBrokers.length ? scopedBrokers : investmentAccounts;
-    const defaultAccountId =
-      defaultInvestmentAccountId(pool) || pool[0]?.id || "";
+    const defaultAccountId = defaultBrokerId(pool) || pool[0]?.id || "";
     let matchedId = defaultAccountId;
     if (brokerage.name && pool.length) {
       const needle = brokerage.name.toLowerCase();
@@ -1416,7 +1424,7 @@ export default function OnboardingWizard() {
     return matchesBrokerCountry(acc, brokerCountry);
   });
   const defaultVisibleBrokerId =
-    defaultInvestmentAccountId(visibleInvestmentAccounts) ||
+    defaultBrokerId(visibleInvestmentAccounts) ||
     visibleInvestmentAccounts[0]?.id ||
     "";
   const defaultVisibleBrokerCurrency = (

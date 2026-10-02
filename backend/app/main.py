@@ -7,6 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import get_settings
 from app.database import close_mongo_connection, connect_to_mongo
 from app.routers import (
+    account_defaults,
     accounts,
     auth,
     categories,
@@ -46,6 +47,7 @@ app.add_middleware(
 )
 
 app.include_router(accounts.router)
+app.include_router(account_defaults.router)
 app.include_router(subscriptions.router)
 app.include_router(invitations.router)
 app.include_router(internal.router)

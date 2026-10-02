@@ -13,8 +13,6 @@ class UserSettingsBase(BaseModel):
     institutions: list[str] = Field(default_factory=list)
     custom_categories: CustomCategoryMap = Field(default_factory=CustomCategoryMap)
     category_colors: dict[str, str] = Field(default_factory=dict)
-    default_expense_account_id: str | None = None
-    default_income_account_id: str | None = None
     gemini_api_key: str | None = None
     share_gemini_api_key: bool = False
     preferred_locale: str | None = None
