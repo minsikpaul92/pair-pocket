@@ -245,8 +245,13 @@ The login flow is backend-driven (Authorization Code Flow via Authlib).
 ### Auth endpoints
 
 - `GET /api/auth/login` — start Google OAuth
-- `GET /api/auth/callback` — OAuth redirect (issues JWT)
+- `GET /api/auth/callback` — OAuth redirect; sends the frontend a one-time sign-in code
+- `POST /api/auth/session` — redeem that code: sets the `pp_refresh` cookie, returns a 30-minute access token
+- `POST /api/auth/refresh` — rotate the refresh cookie, return a new access token
+- `POST /api/auth/logout` — revoke the session and clear the cookie
 - `GET /api/auth/me` — current user (`Authorization: Bearer <token>`)
+
+The refresh cookie is HttpOnly, scoped to `/api/auth`, and valid for 30 days from the last renewal. The frontend reaches the session routes through its own origin (a rewrite in `frontend/next.config.js`), so the cookie stays first-party even though the API is on another domain. Reusing a rotated refresh credential revokes that session.
 
 ## Support
 
