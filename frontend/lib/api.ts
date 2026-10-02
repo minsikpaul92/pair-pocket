@@ -119,19 +119,149 @@ export interface CurrentUser {
   shared_group_id: string | null;
 }
 
-export async function fetchCurrentUser(): Promise<CurrentUser | null> {
-  const token = getToken();
-  if (!token) return null;
+/**
+ * Session routes go through this app's own origin (rewritten to the API in
+ * next.config.js) so the HttpOnly refresh cookie is first-party.
+ */
+const SESSION_BASE = "/api/auth";
 
-  const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+/** Fired when the session can no longer be renewed and sign-in is required. */
+export const SESSION_EXPIRED_EVENT = "pairpocket:session-expired";
 
-  if (!res.ok) {
-    clearToken();
-    return null;
+/** Store a new access token. Returns false when the server reports no session. */
+async function requestSession(path: string, init: RequestInit = {}): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await fetch(`${SESSION_BASE}${path}`, {
+      method: "POST",
+      credentials: "same-origin",
+      ...init,
+    });
+  } catch {
+    throw new ApiError("network");
   }
-  return (await res.json()) as CurrentUser;
+  if (res.ok) {
+    setToken(((await res.json()) as { access_token: string }).access_token);
+    return true;
+  }
+  if ([401, 403, 404, 409].includes(res.status)) return false;
+  throw new ApiError("serverUnavailable");
+}
+
+let refreshInFlight: Promise<boolean> | null = null;
+
+/**
+ * Renew the access token with the refresh cookie. Concurrent callers share one
+ * request, and tabs take turns so they do not rotate the same cookie at once.
+ */
+export function refreshSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  const staleToken = getToken();
+  const renew = async (): Promise<boolean> => {
+    const current = getToken();
+    if (current && current !== staleToken) return true; // another tab renewed
+    return requestSession("/refresh");
+  };
+  const locked: Promise<boolean> =
+    typeof navigator !== "undefined" && navigator.locks
+      ? // request() resolves with the callback's awaited result.
+        (navigator.locks.request(
+          "pairpocket-session-refresh",
+          renew
+        ) as unknown as Promise<boolean>)
+      : renew();
+  const inFlight = locked.finally(() => {
+    refreshInFlight = null;
+  });
+  refreshInFlight = inFlight;
+  return inFlight;
+}
+
+function expireSession(): void {
+  clearToken();
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
+async function sendWithToken(url: string, init: RequestInit): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  try {
+    return await fetch(url, { ...init, headers });
+  } catch {
+    throw new ApiError("network");
+  }
+}
+
+/**
+ * fetch() with the access token. On 401 it renews the session once and
+ * retries; if renewal fails the session is over. Network and server failures
+ * throw ApiError("network" | "serverUnavailable") and keep the session.
+ */
+async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  let res: Response | null = null;
+  if (getToken()) {
+    res = await sendWithToken(url, init);
+    if (res.status !== 401) return res;
+  }
+  if (await refreshSession()) {
+    res = await sendWithToken(url, init);
+    if (res.status !== 401) return res;
+  }
+  expireSession();
+  return res ?? new Response(null, { status: 401 });
+}
+
+/** Exchange the OAuth callback's one-time code for a session. */
+export function completeSignIn(code: string): Promise<boolean> {
+  return requestSession("/session", {
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+}
+
+/** Tokens issued before renewable sessions carry no session id (`sid`). */
+function isLegacyToken(token: string): boolean {
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return !("sid" in JSON.parse(atob(payload)));
+  } catch {
+    return false;
+  }
+}
+
+/** Move a pre-session 7-day sign-in onto a renewable session, best effort. */
+async function upgradeLegacySession(): Promise<void> {
+  const token = getToken();
+  if (!token || !isLegacyToken(token)) return;
+  await requestSession("/session/upgrade", {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => false);
+}
+
+export async function signOut(): Promise<void> {
+  try {
+    await fetch(`${SESSION_BASE}/logout`, {
+      method: "POST",
+      credentials: "same-origin",
+    });
+  } catch {
+    // Signing out locally still ends this browser's use of the token.
+  }
+  clearToken();
+}
+
+/**
+ * The signed-in user, or null when there is no session. Network and server
+ * failures throw so callers can offer a retry instead of the sign-in screen.
+ */
+export async function fetchCurrentUser(): Promise<CurrentUser | null> {
+  const res = await apiFetch(`${API_BASE_URL}/api/auth/me`);
+  if (res.status === 401) return null;
+  if (!res.ok) throw new ApiError("serverUnavailable");
+  const user = (await res.json()) as CurrentUser;
+  await upgradeLegacySession();
+  return user;
 }
 
 export const loginUrl = `${API_BASE_URL}/api/auth/login`;
@@ -347,7 +477,7 @@ export async function fetchTransactions(
   if (filters.merchant) params.set("merchant", filters.merchant);
   if (filters.institution) params.set("institution", filters.institution);
 
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/transactions?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -383,7 +513,7 @@ export function hasSettlement(tx: Transaction): boolean {
 }
 
 export async function fetchCategoryPresets(): Promise<CategoryPresets> {
-  const res = await fetch(`${API_BASE_URL}/api/categories`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/categories`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new ApiError("fetchCategories");
@@ -394,7 +524,7 @@ export async function addCustomCategory(
   type: TransactionType,
   category: string
 ): Promise<CategoryPresets> {
-  const res = await fetch(`${API_BASE_URL}/api/categories/category`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/categories/category`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ type, category }),
@@ -408,7 +538,7 @@ export async function addCustomSubCategory(
   category: string,
   sub_category: string
 ): Promise<CategoryPresets> {
-  const res = await fetch(`${API_BASE_URL}/api/categories/sub-category`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/categories/sub-category`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ type, category, sub_category }),
@@ -418,7 +548,7 @@ export async function addCustomSubCategory(
 }
 
 export async function addInstitution(name: string): Promise<string[]> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/institutions`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/institutions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ name }),
@@ -429,7 +559,7 @@ export async function addInstitution(name: string): Promise<string[]> {
 }
 
 export async function removeInstitution(name: string): Promise<string[]> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/settings/institutions?name=${encodeURIComponent(name)}`,
     {
       method: "DELETE",
@@ -485,7 +615,7 @@ export function shouldShowLocaleToggle(
 }
 
 export async function fetchUserSettings(): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new ApiError("fetchUserSettings");
@@ -501,7 +631,7 @@ export async function setCategoryColor(
   category: string,
   color: string
 ): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/category-colors`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/category-colors`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ category, color }),
@@ -527,7 +657,7 @@ export function hiddenSubKey(category: string, subCategory: string): string {
 export async function setExpenseRatioHiddenCategories(
   categories: string[]
 ): Promise<UserSettings> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/settings/expense-ratio-hidden-categories`,
     {
       method: "PUT",
@@ -549,7 +679,7 @@ export async function fetchSubCategories(
   category: string
 ): Promise<string[]> {
   const params = new URLSearchParams({ type, category });
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/categories/sub-categories?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -569,7 +699,7 @@ export async function fetchMerchantSuggestions(
     account_type: accountType,
   });
   if (subCategory) params.set("sub_category", subCategory);
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/transactions/merchants?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -581,7 +711,7 @@ export async function fetchAllMerchants(
   accountType: AccountType = "personal"
 ): Promise<string[]> {
   const params = new URLSearchParams({ account_type: accountType });
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/transactions/merchants/all?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -595,7 +725,7 @@ export async function lookupMerchant(
 ): Promise<{ found: boolean; category?: string; sub_category?: string }> {
   if (!name.trim()) return { found: false };
   const params = new URLSearchParams({ name: name.trim(), account_type: accountType });
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/transactions/merchants/lookup?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -609,7 +739,7 @@ export async function fetchInstitutionSuggestions(
 ): Promise<string[]> {
   const params = new URLSearchParams({ currency });
   if (subCategory) params.set("sub_category", subCategory);
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/transactions/institutions?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -640,7 +770,7 @@ export async function fetchSettleableExpenses(
   if (excludeSettlementId) {
     params.set("exclude_settlement_id", excludeSettlementId);
   }
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/transactions/settleable?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -675,7 +805,7 @@ export async function fetchStatsSummary(
   if (filters.merchant) params.set("merchant", filters.merchant);
   if (filters.institution) params.set("institution", filters.institution);
 
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/stats/summary?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -696,7 +826,7 @@ export interface ExchangeRate {
 }
 
 export async function fetchExchangeRate(): Promise<ExchangeRate> {
-  const res = await fetch(`${API_BASE_URL}/api/exchange-rate`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/exchange-rate`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new ApiError("fetchExchangeRate");
@@ -732,7 +862,7 @@ export async function fetchNetWorth(filters: {
   params.set("account_type", filters.accountType ?? "personal");
   if (filters.currency) params.set("currency", filters.currency);
 
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/accounts/net-worth?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -879,7 +1009,7 @@ export async function fetchSubscriptions(filters: {
   params.set("account_type", filters.accountType ?? "personal");
   if (filters.currency) params.set("currency", filters.currency);
   if (filters.month) params.set("month", filters.month);
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/subscriptions?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -896,7 +1026,7 @@ export async function fetchSubscriptionMonthlySummary(filters: {
   params.set("account_type", filters.accountType ?? "personal");
   params.set("month", filters.month);
   if (filters.currency) params.set("currency", filters.currency);
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/subscriptions/summary?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -928,7 +1058,7 @@ export async function fetchAllSubscriptionMonthlySummary(
 export async function fetchSubscriptionHistory(
   id: string
 ): Promise<SubscriptionHistory | null> {
-  const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}/history`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/subscriptions/${id}/history`, {
     headers: authHeaders(),
   });
   if (!res.ok) return null;
@@ -938,7 +1068,7 @@ export async function fetchSubscriptionHistory(
 export async function createSubscription(
   payload: NewSubscription
 ): Promise<Subscription> {
-  const res = await fetch(`${API_BASE_URL}/api/subscriptions`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/subscriptions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -970,7 +1100,7 @@ export async function updateSubscription(
     is_fixed_bill?: boolean;
   }>
 ): Promise<Subscription> {
-  const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -982,7 +1112,7 @@ export async function updateSubscription(
 export async function scheduleSubscriptionCancel(
   id: string
 ): Promise<Subscription> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/subscriptions/${id}/schedule-cancel`,
     { method: "POST", headers: authHeaders() }
   );
@@ -991,7 +1121,7 @@ export async function scheduleSubscriptionCancel(
 }
 
 export async function deleteSubscription(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -1004,7 +1134,7 @@ export async function fetchPendingOccurrences(filters: {
   accountType?: AccountType;
 } = {}): Promise<SubscriptionOccurrence[]> {
   const params = pendingQueryParams(filters);
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/subscriptions/pending?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -1015,7 +1145,7 @@ export async function fetchPendingOccurrences(filters: {
 export async function skipSubscriptionOccurrence(
   occurrenceId: string
 ): Promise<SubscriptionOccurrence> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/subscriptions/occurrences/${occurrenceId}/skip`,
     { method: "POST", headers: authHeaders() }
   );
@@ -1030,7 +1160,7 @@ export async function syncSubscriptions(
     account_type: accountType,
     as_of: dayKey(new Date()),
   });
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/subscriptions/sync?${params.toString()}`,
     { method: "POST", headers: authHeaders() }
   );
@@ -1068,7 +1198,7 @@ export async function fetchAllPendingOccurrences(filters: {
 export async function createTransaction(
   tx: NewTransaction
 ): Promise<Transaction> {
-  const res = await fetch(`${API_BASE_URL}/api/transactions`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/transactions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(tx),
@@ -1083,7 +1213,7 @@ export async function updateTransaction(
   id: string,
   tx: NewTransaction
 ): Promise<Transaction> {
-  const res = await fetch(`${API_BASE_URL}/api/transactions/${id}`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/transactions/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(tx),
@@ -1095,7 +1225,7 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/transactions/${id}`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/transactions/${id}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -1114,7 +1244,7 @@ export async function fetchAccounts(filters: {
   if (filters.currency) params.set("currency", filters.currency);
   if (filters.activeOnly === false) params.set("active_only", "false");
 
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/accounts?${params.toString()}`,
     { headers: authHeaders() }
   );
@@ -1125,7 +1255,7 @@ export async function fetchAccounts(filters: {
 export async function createAccount(
   payload: NewFinancialAccount
 ): Promise<FinancialAccount> {
-  const res = await fetch(`${API_BASE_URL}/api/accounts`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/accounts`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
@@ -1160,7 +1290,7 @@ export async function updateAccount(
     >
   >
 ): Promise<FinancialAccount> {
-  const res = await fetch(`${API_BASE_URL}/api/accounts/${accountId}`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/accounts/${accountId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -1170,7 +1300,7 @@ export async function updateAccount(
 }
 
 export async function deleteAccount(accountId: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/accounts/${accountId}`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/accounts/${accountId}`, {
     method: "DELETE",
     headers: { ...authHeaders() },
   });
@@ -1211,7 +1341,7 @@ export interface AccountDefaults {
 export async function fetchAccountDefaults(
   accountType: AccountType
 ): Promise<AccountDefaults> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/account-defaults?account_type=${accountType}`,
     { headers: authHeaders() }
   );
@@ -1225,7 +1355,7 @@ export async function setAccountDefault(
   role: DefaultRole,
   accountId: string | null
 ): Promise<AccountDefaults> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/account-defaults/${accountType}/${currency}/${role}`,
     accountId
       ? {
@@ -1629,7 +1759,7 @@ export interface InvitationMe {
 }
 
 export async function fetchInvitationMe(): Promise<InvitationMe> {
-  const res = await fetch(`${API_BASE_URL}/api/invitations/me`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/invitations/me`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new ApiError("fetchInvitationMe");
@@ -1640,7 +1770,7 @@ export async function createInvitation(
   inviteeEmail: string,
   sharedLedgerStartDate: string
 ): Promise<InvitationOut> {
-  const res = await fetch(`${API_BASE_URL}/api/invitations`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/invitations`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
@@ -1659,7 +1789,7 @@ export async function createInvitation(
 }
 
 export async function acceptInvitation(token: string): Promise<InvitationMe> {
-  const res = await fetch(`${API_BASE_URL}/api/invitations/accept`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/invitations/accept`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ token }),
@@ -1675,7 +1805,7 @@ export async function acceptInvitation(token: string): Promise<InvitationMe> {
 }
 
 export async function revokePendingInvitation(): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/invitations/pending`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/invitations/pending`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -1689,7 +1819,7 @@ export async function revokePendingInvitation(): Promise<void> {
 }
 
 export async function unlinkPartnership(): Promise<InvitationMe> {
-  const res = await fetch(`${API_BASE_URL}/api/invitations/partnership`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/invitations/partnership`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -1773,7 +1903,7 @@ export interface MarketIndexQuote {
 }
 
 export async function fetchMarketIndices(): Promise<MarketIndexQuote[]> {
-  const res = await fetch(`${API_BASE_URL}/api/stocks/market-indices`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/stocks/market-indices`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new ApiError("fetchMarketIndices");
@@ -1782,7 +1912,7 @@ export async function fetchMarketIndices(): Promise<MarketIndexQuote[]> {
 }
 
 export async function searchStocks(query: string): Promise<StockSearchResult[]> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/stocks/search?q=${encodeURIComponent(query)}`,
     { headers: authHeaders() }
   );
@@ -1793,7 +1923,7 @@ export async function searchStocks(query: string): Promise<StockSearchResult[]> 
 export async function fetchStockHoldings(
   accountType: AccountType = "personal"
 ): Promise<StockHolding[]> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/stocks/holdings?account_type=${accountType}`,
     { headers: authHeaders() }
   );
@@ -1804,7 +1934,7 @@ export async function fetchStockHoldings(
 export async function createStockHolding(
   payload: StockHoldingCreate
 ): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/stocks/holdings`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/stocks/holdings`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -1817,7 +1947,7 @@ export async function updateStockHolding(
   id: string,
   payload: StockHoldingUpdate
 ): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/stocks/holdings/${id}`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/stocks/holdings/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -1827,7 +1957,7 @@ export async function updateStockHolding(
 }
 
 export async function deleteStockHolding(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/stocks/holdings/${id}`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/stocks/holdings/${id}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -1843,7 +1973,7 @@ export async function fetchStockSummary(
   if (accountId) {
     url += `&account_id=${accountId}`;
   }
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await apiFetch(url, { headers: authHeaders() });
   if (!res.ok) throw new ApiError("fetchStockSummary");
   return (await res.json()) as StockSummary;
 }
@@ -1877,7 +2007,7 @@ export async function parseReceiptsOrStatements(
   if (options?.forceModel) {
     url += `&force_model=${encodeURIComponent(options.forceModel)}`;
   }
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: "POST",
     headers: { ...authHeaders() },
     body: formData,
@@ -1895,7 +2025,7 @@ export async function parseReceiptItems(
 ): Promise<TransactionItem[]> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${API_BASE_URL}/api/ai/parse-items`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/ai/parse-items`, {
     method: "POST",
     headers: { ...authHeaders() },
     body: formData,
@@ -1909,7 +2039,7 @@ export async function parseReceiptItems(
 }
 
 export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/ai`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/ai`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ api_key: apiKey }),
@@ -1924,7 +2054,7 @@ export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {
 export async function setShareGeminiApiKey(
   share: boolean
 ): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/ai/share`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/ai/share`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ share }),
@@ -1940,7 +2070,7 @@ export async function updateLedgerStartDate(
   ledgerStartDate: string,
   kind: "personal" | "shared" = "personal"
 ): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/ledger-start-date`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/ledger-start-date`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
@@ -1961,7 +2091,7 @@ export async function saveOnboardingBasics(payload: {
   api_key?: string | null;
   preferred_locale?: string;
 }): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/basics`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/onboarding/basics`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
@@ -1981,7 +2111,7 @@ export async function saveOnboardingBasics(payload: {
 export async function updatePreferredLocales(
   preferred_locales: string[]
 ): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/locales`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/locales`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
@@ -1997,7 +2127,7 @@ export async function updatePreferredLocales(
 }
 
 export async function saveOnboardingStep(step: number): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/step`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/onboarding/step`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ step }),
@@ -2009,7 +2139,7 @@ export async function saveOnboardingStep(step: number): Promise<UserSettings> {
 export async function completeOnboarding(
   completed = true
 ): Promise<UserSettings> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/onboarding/complete`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/onboarding/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ completed }),
@@ -2095,7 +2225,7 @@ export async function parseOnboardingScreenshots(
   for (const file of files) {
     formData.append("files", file);
   }
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/ai/onboarding-parse-stream?step=${encodeURIComponent(step)}`,
     {
       method: "POST",
@@ -2184,7 +2314,7 @@ export async function fetchCanadaSubscriptions(): Promise<{
   top7: CanadaSubscriptionChip[];
   more: CanadaSubscriptionChip[];
 }> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/canada-subscriptions`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/canada-subscriptions`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new ApiError("fetchCanadaSubscriptions");
@@ -2198,7 +2328,7 @@ export async function fetchKoreaSubscriptions(): Promise<{
   top7: CanadaSubscriptionChip[];
   more: CanadaSubscriptionChip[];
 }> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/korea-subscriptions`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/korea-subscriptions`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new ApiError("fetchKoreaSubscriptions");
@@ -2219,7 +2349,7 @@ export async function resetUserData(
     scope,
     account_type: accountType,
   });
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE_URL}/api/settings/reset?${params.toString()}`,
     {
       method: "POST",
@@ -2250,7 +2380,7 @@ export interface OCRLog {
 }
 
 export async function fetchOCRLogs(): Promise<OCRLog[]> {
-  const res = await fetch(`${API_BASE_URL}/api/ai/logs`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/ai/logs`, {
     method: "GET",
     headers: authHeaders(),
   });
@@ -2262,7 +2392,7 @@ export async function fetchOCRLogs(): Promise<OCRLog[]> {
 }
 
 export async function updateOCRLogFeedback(logId: string, feedback: "thumbs_up" | "thumbs_down" | null): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/ai/logs/${logId}/feedback`, {
+  const res = await apiFetch(`${API_BASE_URL}/api/ai/logs/${logId}/feedback`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ feedback }),

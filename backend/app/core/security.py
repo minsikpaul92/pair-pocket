@@ -12,20 +12,23 @@ from app.models.user import UserOut
 bearer_scheme = HTTPBearer(auto_error=True)
 
 
-def create_access_token(subject: str) -> str:
-    """Issue an app JWT whose `sub` is the user's Mongo id (as a string)."""
+def create_access_token(subject: str, session_id: str) -> str:
+    """Issue an app JWT whose `sub` is the user's Mongo id (as a string).
+
+    `sid` names the sign-in session family that issued it.
+    """
     settings = get_settings()
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    payload = {"sub": subject, "exp": expire}
+    payload = {"sub": subject, "sid": session_id, "exp": expire}
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 
-def _decode_token(token: str) -> str:
+def decode_access_token(token: str) -> dict:
     settings = get_settings()
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token, settings.secret_key, algorithms=[settings.jwt_algorithm]
         )
     except jwt.PyJWTError:
@@ -33,6 +36,10 @@ def _decode_token(token: str) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token.",
         )
+
+
+def _decode_token(token: str) -> str:
+    payload = decode_access_token(token)
     subject = payload.get("sub")
     if not subject:
         raise HTTPException(

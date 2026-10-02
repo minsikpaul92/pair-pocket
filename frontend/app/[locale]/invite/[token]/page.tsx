@@ -8,7 +8,6 @@ import { useRouter } from "@/i18n/navigation";
 import {
   acceptInvitation,
   fetchCurrentUser,
-  getToken,
   loginUrl,
 } from "@/lib/api";
 import { translateError } from "@/lib/errors";
@@ -35,14 +34,16 @@ export default function InviteAcceptPage() {
     let cancelled = false;
 
     async function run() {
-      const authToken = getToken();
-      if (!authToken) {
-        sessionStorage.setItem(PENDING_INVITE_KEY, token);
-        window.location.href = loginUrl;
+      let user;
+      try {
+        user = await fetchCurrentUser();
+      } catch (err) {
+        if (!cancelled) {
+          setError(translateError(err, tErrors, "acceptInvitation"));
+          setMessage("");
+        }
         return;
       }
-
-      const user = await fetchCurrentUser();
       if (!user) {
         sessionStorage.setItem(PENDING_INVITE_KEY, token);
         window.location.href = loginUrl;

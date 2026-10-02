@@ -5,7 +5,19 @@ import { useTranslations } from "next-intl";
 import { Suspense, useEffect, useState } from "react";
 
 import { useRouter } from "@/i18n/navigation";
-import { setToken } from "@/lib/api";
+import { completeSignIn, setToken } from "@/lib/api";
+
+// The code is single-use; re-running the effect (Strict Mode) must not spend it twice.
+const redemptions = new Map<string, Promise<boolean>>();
+
+function redeemOnce(code: string): Promise<boolean> {
+  let redemption = redemptions.get(code);
+  if (!redemption) {
+    redemption = completeSignIn(code).catch(() => false);
+    redemptions.set(code, redemption);
+  }
+  return redemption;
+}
 
 function CallbackHandler() {
   const router = useRouter();
@@ -14,8 +26,18 @@ function CallbackHandler() {
   const [message, setMessage] = useState(t("processing"));
 
   useEffect(() => {
+    const code = searchParams.get("code");
+    // Legacy: an API deployed before renewable sessions sends the token itself.
     const token = searchParams.get("token");
     const error = searchParams.get("error");
+
+    function continueIntoApp() {
+      const pendingInvite =
+        typeof window !== "undefined"
+          ? window.sessionStorage.getItem("pairpocket_pending_invite")
+          : null;
+      router.replace(pendingInvite ? `/invite/${pendingInvite}` : "/");
+    }
 
     if (error) {
       setMessage(
@@ -25,17 +47,27 @@ function CallbackHandler() {
       return () => clearTimeout(timer);
     }
 
+    if (code) {
+      let cancelled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      redeemOnce(code).then((ok) => {
+        if (cancelled) return;
+        if (ok) {
+          continueIntoApp();
+          return;
+        }
+        setMessage(t("failed"));
+        timer = setTimeout(() => router.replace("/"), 2500);
+      });
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }
+
     if (token) {
       setToken(token);
-      const pendingInvite =
-        typeof window !== "undefined"
-          ? window.sessionStorage.getItem("pairpocket_pending_invite")
-          : null;
-      if (pendingInvite) {
-        router.replace(`/invite/${pendingInvite}`);
-        return;
-      }
-      router.replace("/");
+      continueIntoApp();
       return;
     }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import AppShell from "@/components/AppShell";
 import LoginLanding from "@/components/LoginLanding";
@@ -10,6 +10,7 @@ import { useRouter } from "@/i18n/navigation";
 import { locales, type AppLocale } from "@/i18n/locales";
 import {
   CurrentUser,
+  SESSION_EXPIRED_EVENT,
   fetchCurrentUser,
   fetchUserSettings,
 } from "@/lib/api";
@@ -24,12 +25,23 @@ function asAppLocale(value: string | null | undefined): AppLocale {
 export default function Home() {
   const router = useRouter();
   const currentLocale = useLocale() as AppLocale;
+  const t = useTranslations("auth");
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
+  // Server unreachable: offer a retry rather than the sign-in screen.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    const onExpired = () => setUser(null);
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
 
   useEffect(() => {
     (async () => {
       try {
+        setLoadFailed(false);
         const u = await fetchCurrentUser();
         setUser(u);
         const storedLocal =
@@ -77,16 +89,38 @@ export default function Home() {
             return;
           }
         }
+      } catch {
+        setLoadFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [router, currentLocale]);
+  }, [router, currentLocale, attempt]);
 
   if (loading) {
     return (
       <main className="min-h-dvh flex items-center justify-center bg-gray-50 dark:bg-black">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+      </main>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <main className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-gray-50 px-6 text-center dark:bg-black">
+        <p className="max-w-sm text-base text-gray-700 dark:text-gray-300">
+          {t("loadFailed")}
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            setAttempt((n) => n + 1);
+          }}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          {t("retry")}
+        </button>
       </main>
     );
   }
