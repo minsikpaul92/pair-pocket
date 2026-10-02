@@ -162,7 +162,12 @@
     "noExpenseData": "No expense data for the selected period.",
     "noTrendData": "No data for the selected period.",
     "pieTooltipShare": "{percent}% of expenses",
-    "pieTooltipOfTotal": "{amount} of {total}"
+    "pieTooltipOfTotal": "{amount} of {total}",
+    "periodWeek": "Week",
+    "thisWeek": "This week",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "hiddenCategoriesNote": "{count, plural, one {# category} other {# categories}} hidden in Settings."
   },
   "list": {
     "allCategories": "All categories",
@@ -772,6 +777,11 @@
     "supportTitle": "Support",
     "supportDescription": "If PairPocket helps you, you can buy me a coffee. No ads in the app.",
     "supportCta": "Buy me a coffee",
+    "expenseRatioHiddenTitle": "Hide categories from expense mix",
+    "expenseRatioHiddenHelp": "Selected categories or sub-categories are left out of the dashboard expense mix chart. Removing a large fixed cost such as rent makes the rest of your spending easier to read. Totals and the transaction list still include them.",
+    "expenseRatioHiddenError": "Couldn't save. Please try again.",
+    "expenseRatioHiddenSubToggle": "Sub-categories",
+    "expenseRatioHiddenSubCount": "{count} hidden",
     "accountDefaultsTitle": "Default accounts",
     "accountDefaultsHelp": "Accounts pre-selected when you add transactions, subscriptions, and stock trades. Spending and subscriptions use the default card first, then the default bank account. Transfers use the bank account first.",
     "accountDefaultsPersonal": "Personal",

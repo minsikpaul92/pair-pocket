@@ -283,6 +283,11 @@ export interface StatsSummary {
   net_cashflow: number;
   breakdown_by_category: { category: string; amount: number }[];
   expense_breakdown_by_category?: { category: string; amount: number }[];
+  expense_breakdown_by_sub_category?: {
+    category: string;
+    sub_category: string;
+    amount: number;
+  }[];
   breakdown_by_sub_category: { label: string; amount: number }[];
   breakdown_by_merchant_effective?: { merchant: string; amount: number }[];
   settlement_details?: {
@@ -302,6 +307,9 @@ function authHeaders(): HeadersInit {
 export interface TransactionFilters {
   currency?: Currency;
   month?: string;
+  /** Inclusive YYYY-MM-DD range; use instead of month. */
+  start?: string;
+  end?: string;
   accountType?: AccountType;
   type?: TransactionType;
   category?: string;
@@ -317,6 +325,8 @@ export async function fetchTransactions(
   params.set("account_type", filters.accountType ?? "personal");
   if (filters.currency) params.set("currency", filters.currency);
   if (filters.month) params.set("month", filters.month);
+  if (filters.start) params.set("start", filters.start);
+  if (filters.end) params.set("end", filters.end);
   if (filters.type) params.set("type", filters.type);
   if (filters.category) params.set("category", filters.category);
   if (filters.sub_category) params.set("sub_category", filters.sub_category);
@@ -425,6 +435,7 @@ export interface UserSettings {
     income: Record<string, string[]>;
   };
   category_colors: Record<string, string>;
+  expense_ratio_hidden_categories: string[];
   has_gemini_key?: boolean;
   has_effective_gemini_key?: boolean;
   partner_has_gemini_key?: boolean;
@@ -468,6 +479,7 @@ export async function fetchUserSettings(): Promise<UserSettings> {
   return {
     ...data,
     category_colors: data.category_colors ?? {},
+    expense_ratio_hidden_categories: data.expense_ratio_hidden_categories ?? [],
   };
 }
 
@@ -489,6 +501,32 @@ export async function setCategoryColor(
   return {
     ...data,
     category_colors: data.category_colors ?? {},
+    expense_ratio_hidden_categories: data.expense_ratio_hidden_categories ?? [],
+  };
+}
+
+/** Hidden expense-ratio entry for one sub-category (matches the backend format). */
+export function hiddenSubKey(category: string, subCategory: string): string {
+  return `${category} › ${subCategory}`;
+}
+
+export async function setExpenseRatioHiddenCategories(
+  categories: string[]
+): Promise<UserSettings> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/settings/expense-ratio-hidden-categories`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ categories }),
+    }
+  );
+  if (!res.ok) throw new ApiError("setExpenseRatioHiddenCategories");
+  const data = (await res.json()) as UserSettings;
+  return {
+    ...data,
+    category_colors: data.category_colors ?? {},
+    expense_ratio_hidden_categories: data.expense_ratio_hidden_categories ?? [],
   };
 }
 
@@ -599,6 +637,9 @@ export async function fetchSettleableExpenses(
 export interface StatsFilters {
   currency?: Currency;
   month?: string;
+  /** Inclusive YYYY-MM-DD range; use instead of month. */
+  start?: string;
+  end?: string;
   accountType?: AccountType;
   category?: string;
   sub_category?: string;
@@ -613,6 +654,8 @@ export async function fetchStatsSummary(
   params.set("account_type", filters.accountType ?? "personal");
   if (filters.currency) params.set("currency", filters.currency);
   if (filters.month) params.set("month", filters.month);
+  if (filters.start) params.set("start", filters.start);
+  if (filters.end) params.set("end", filters.end);
   if (filters.category) params.set("category", filters.category);
   if (filters.sub_category) params.set("sub_category", filters.sub_category);
   if (filters.merchant) params.set("merchant", filters.merchant);

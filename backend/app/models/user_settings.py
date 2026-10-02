@@ -13,6 +13,8 @@ class UserSettingsBase(BaseModel):
     institutions: list[str] = Field(default_factory=list)
     custom_categories: CustomCategoryMap = Field(default_factory=CustomCategoryMap)
     category_colors: dict[str, str] = Field(default_factory=dict)
+    # Hidden from the dashboard expense-ratio chart: "category" or "category › sub".
+    expense_ratio_hidden_categories: list[str] = Field(default_factory=list)
     gemini_api_key: str | None = None
     share_gemini_api_key: bool = False
     preferred_locale: str | None = None
@@ -44,6 +46,10 @@ class ShareGeminiKeyBody(BaseModel):
 class LedgerStartDateBody(BaseModel):
     ledger_start_date: str = Field(min_length=10, max_length=10)
     kind: str = Field(default="personal", pattern="^(personal|shared)$")
+
+
+class ExpenseRatioHiddenCategoriesBody(BaseModel):
+    categories: list[str] = Field(default_factory=list, max_length=100)
 
 
 class AddInstitutionBody(BaseModel):
