@@ -28,7 +28,6 @@ import {
   TRANSFER_SUB_CARD_REPAYMENT,
   TRANSFER_SUB_ETRANSFER,
   TRANSFER_SUB_INVESTMENT_FUNDING,
-  TRANSFER_SUB_SHARED_FUNDING,
   SettleableExpense,
   NewTransaction,
   SubscriptionOccurrence,
@@ -55,7 +54,7 @@ import {
   hasSettlement,
   isEtransferSub,
   isNonCashflowTransaction,
-  isSharedFundingSub,
+  pairedTransferLedgers,
   normalizeTransferCategory,
   normalizeTransferSubCategory,
   subCategoriesFor,
@@ -88,6 +87,8 @@ interface Props {
   currency: Currency;
   ledgerScope?: LedgerScope;
   accountType?: AccountType;
+  /** Personal ↔ shared transfers need a linked partner. */
+  hasPartner?: boolean;
   parsedTransaction?: ParsedTransaction | null;
   allowCurrencyPick?: boolean;
   onCurrencyChange?: (currency: Currency) => void;
@@ -136,6 +137,7 @@ export default function TransactionModal({
   currency,
   ledgerScope = "ALL",
   accountType = "personal",
+  hasPartner = false,
   parsedTransaction = null,
   allowCurrencyPick = false,
   onCurrencyChange,
@@ -425,34 +427,47 @@ export default function TransactionModal({
 
   const dateStr = dayKey(defaultDate);
 
+  const editingLedgerTransfer = Boolean(
+    isEditing &&
+      editingTransaction &&
+      normalizeTransferCategory(editingTransaction.category) === TRANSFER_CATEGORY &&
+      pairedTransferLedgers(editingTransaction.sub_category || "")
+  );
+  const ledgerTransfersAvailable = hasPartner || editingLedgerTransfer;
+
+  /**
+   * Personal ↔ shared transfers are entered as an expense in the sending
+   * ledger or as income in the receiving ledger; other transfer subs are
+   * expense-only.
+   */
+  const transferSubAllowed = useCallback(
+    (sub: string) => {
+      const pair = pairedTransferLedgers(sub);
+      if (!pair) return type === "expense";
+      if (!ledgerTransfersAvailable) return false;
+      const [outflow, inflow] = pair;
+      return type === "expense" ? accountType === outflow : accountType === inflow;
+    },
+    [type, accountType, ledgerTransfersAvailable]
+  );
+
   const categoryOptions = useMemo(() => {
     const raw = categoriesForType(presets, type);
     if (type === "income") {
-      const editingSharedFunding =
-        isEditing &&
-        editingTransaction &&
-        normalizeTransferCategory(editingTransaction.category) ===
-          TRANSFER_CATEGORY &&
-        isSharedFundingSub(editingTransaction.sub_category || "");
-      if (!editingSharedFunding) {
-        return raw.filter((c) => c !== TRANSFER_CATEGORY);
-      }
+      const hasReceivable = subCategoriesFor(presets, type, TRANSFER_CATEGORY).some(
+        transferSubAllowed
+      );
+      if (!hasReceivable) return raw.filter((c) => c !== TRANSFER_CATEGORY);
     }
     return raw;
-  }, [presets, type, isEditing, editingTransaction]);
+  }, [presets, type, transferSubAllowed]);
 
   const subCategoryOptions = useMemo(() => {
     if (!category) return [];
     const raw = subCategoriesFor(presets, type, category);
-    if (
-      category === TRANSFER_CATEGORY &&
-      type === "expense" &&
-      accountType !== "personal"
-    ) {
-      return raw.filter((s) => !isSharedFundingSub(s));
-    }
+    if (category === TRANSFER_CATEGORY) return raw.filter(transferSubAllowed);
     return raw;
-  }, [presets, type, category, accountType]);
+  }, [presets, type, category, transferSubAllowed]);
 
   const isInvestment =
     type === "expense" && category === EXPENSE_CATEGORY_INVESTMENT;
@@ -463,8 +478,11 @@ export default function TransactionModal({
     subCategory === SUB_CATEGORY_SETTLEMENT;
 
   const normalizedSub = normalizeTransferSubCategory(subCategory);
-  const isSharedFunding =
-    category === TRANSFER_CATEGORY && isSharedFundingSub(normalizedSub);
+  // (sending ledger, receiving ledger) for personal ↔ shared transfers.
+  const ledgerPair =
+    category === TRANSFER_CATEGORY ? pairedTransferLedgers(normalizedSub) : null;
+  const isLedgerTransfer = ledgerPair !== null;
+  const otherLedger: AccountType = accountType === "personal" ? "shared" : "personal";
   const isEtransfer =
     type === "expense" &&
     category === TRANSFER_CATEGORY &&
@@ -477,12 +495,15 @@ export default function TransactionModal({
     type === "expense" &&
     category === TRANSFER_CATEGORY &&
     subCategory === TRANSFER_SUB_INVESTMENT_FUNDING;
-  // From/to account UI for internal moves + shared funding (not e-Transfer).
+  // From/to account UI for internal moves + ledger transfers (not e-Transfer).
   const isTransfer =
     (type === "expense" && category === TRANSFER_CATEGORY && !isEtransfer) ||
-    (type === "income" && isSharedFunding);
+    (type === "income" && isLedgerTransfer);
   const isTransferCategory =
-    category === TRANSFER_CATEGORY && (type === "expense" || isSharedFunding);
+    category === TRANSFER_CATEGORY && (type === "expense" || isLedgerTransfer);
+  // account_id is always in this ledger; on the receiving side it is the
+  // "to" account and counter_account_id is the "from" account.
+  const fromIsPrimary = !isLedgerTransfer || type === "expense";
 
   const isStockBuy = type === "expense" && category === "투자/저축" && subCategory === "주식 매수";
   const isStockSell = type === "income" && category === "금융/기타" && subCategory === "주식 판매수익";
@@ -503,6 +524,7 @@ export default function TransactionModal({
         "계좌 이체",
         "투자 계좌 이체",
         "공용 계좌 입금",
+        "개인 계좌로 인출",
         "e-Transfer",
       ]),
     []
@@ -678,18 +700,12 @@ export default function TransactionModal({
     if (isInvestmentFunding) return acc.kind === "investment";
     return !acc.is_liability;
   };
-  const transferToAccounts = isSharedFunding
-    ? type === "income"
-      ? personalAccounts
-      : sharedAccounts
-    : accounts;
-  const transferFromAccounts = isSharedFunding
-    ? type === "income"
-      ? sharedAccounts
-      : accountType === "personal"
-        ? accounts
-        : personalAccounts
-    : accounts;
+  const ledgerAccounts: Record<AccountType, FinancialAccount[]> = {
+    personal: personalAccounts,
+    shared: sharedAccounts,
+  };
+  const transferFromAccounts = ledgerPair ? ledgerAccounts[ledgerPair[0]] : accounts;
+  const transferToAccounts = ledgerPair ? ledgerAccounts[ledgerPair[1]] : accounts;
 
   useEffect(() => {
     fetchExchangeRate()
@@ -732,7 +748,7 @@ export default function TransactionModal({
   }, [ledgerScope, accountType]);
 
   useEffect(() => {
-    if (!isSharedFunding) {
+    if (!isLedgerTransfer) {
       setSharedAccounts([]);
       setPersonalAccounts([]);
       return;
@@ -757,7 +773,7 @@ export default function TransactionModal({
     return () => {
       active = false;
     };
-  }, [isSharedFunding, ledgerScope]);
+  }, [isLedgerTransfer, ledgerScope]);
 
   // Hydrate form when opening an existing transaction for edit.
   // Reset to blank create form when editingTransaction is cleared.
@@ -1271,7 +1287,7 @@ export default function TransactionModal({
       account_id: accountId || null,
       counter_account_id:
         isTransfer && !isEtransfer ? counterAccountId || null : null,
-      kind: isTransfer && !isSharedFunding && !isEtransfer ? "transfer" : "normal",
+      kind: isTransfer && !isLedgerTransfer && !isEtransfer ? "transfer" : "normal",
       is_stock_trade: isStock,
       trade_type: isStock ? (isStockBuy ? "buy" : "sell") : undefined,
       ticker: isStock ? finalTicker.toUpperCase() : undefined,
@@ -1437,14 +1453,16 @@ export default function TransactionModal({
     <div className="space-y-3">
       <div>
         <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-          {tTx("fromAccount")}
+          {ledgerPair
+            ? tTx(ledgerPair[0] === "personal" ? "transferFromPersonal" : "transferFromShared")
+            : tTx("fromAccount")}
         </label>
         <AccountSelect
           accounts={transferFromAccounts}
-          value={accountId}
-          onChange={pickAccount}
+          value={fromIsPrimary ? accountId : counterAccountId}
+          onChange={fromIsPrimary ? pickAccount : setCounterAccountId}
           onRegister={() => {
-            setAccountRegisterTarget("primary");
+            setAccountRegisterTarget(fromIsPrimary ? "primary" : "counter");
             setShowAccountRegister(true);
           }}
           disabled={accountsLoading || !subCategory}
@@ -1459,16 +1477,16 @@ export default function TransactionModal({
           <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {isCardRepayment
               ? tTx("repayCard")
-              : isSharedFunding
-                ? tTx("sharedToAccount")
+              : ledgerPair
+                ? tTx(ledgerPair[1] === "personal" ? "transferToPersonal" : "transferToShared")
                 : tTx("toAccount")}
           </label>
           <AccountSelect
             accounts={transferToAccounts}
-            value={counterAccountId}
-            onChange={setCounterAccountId}
+            value={fromIsPrimary ? counterAccountId : accountId}
+            onChange={fromIsPrimary ? setCounterAccountId : pickAccount}
             onRegister={() => {
-              setAccountRegisterTarget("counter");
+              setAccountRegisterTarget(fromIsPrimary ? "counter" : "primary");
               setShowAccountRegister(true);
             }}
             disabled={accountsLoading || !subCategory}
@@ -1476,9 +1494,7 @@ export default function TransactionModal({
             placeholder={
               isCardRepayment
                 ? tTx("selectCard")
-                : isSharedFunding
-                  ? tTx("selectSharedToAccount")
-                  : tTx("selectToAccount")
+                : tTx("selectToAccount")
             }
             variant="field"
             filterAccounts={toAccountFilter}
@@ -1502,8 +1518,12 @@ export default function TransactionModal({
       <p className="text-xs text-gray-400">
         {isEtransfer
           ? tTx("transferNoteEtransfer")
-          : isSharedFunding
-            ? tTx("transferNoteSharedFunding")
+          : ledgerPair
+            ? tTx(
+                ledgerPair[0] === "personal"
+                  ? "transferNoteSharedFunding"
+                  : "transferNoteSharedWithdrawal"
+              )
             : tTx("transferNote")}
       </p>
     </div>
@@ -2744,14 +2764,8 @@ export default function TransactionModal({
         <AccountRegisterModal
           currency={currency}
           accountType={
-            isSharedFunding
-              ? accountRegisterTarget === "counter"
-                ? type === "income"
-                  ? "personal"
-                  : "shared"
-                : type === "income"
-                  ? "shared"
-                  : "personal"
+            isLedgerTransfer && accountRegisterTarget === "counter"
+              ? otherLedger
               : accountType
           }
           preferredType={type}

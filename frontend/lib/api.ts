@@ -14,14 +14,28 @@ export const TRANSFER_SUB_ACCOUNT_TRANSFER = "내 계좌 이동";
 export const TRANSFER_SUB_ACCOUNT_TRANSFER_LEGACY = "계좌 이체";
 export const TRANSFER_SUB_INVESTMENT_FUNDING = "투자 계좌 입금";
 export const TRANSFER_SUB_SHARED_FUNDING = "공용 계좌 입금";
+export const TRANSFER_SUB_SHARED_WITHDRAWAL = "개인 계좌로 인출";
 export const TRANSFER_SUB_ETRANSFER = "e-Transfer/계좌이체";
 export const INCOME_CATEGORY_SETTLEMENT = "정산";
 export const SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급";
 
 const CASHFLOW_TRANSFER_SUBS = new Set([
   TRANSFER_SUB_SHARED_FUNDING,
+  TRANSFER_SUB_SHARED_WITHDRAWAL,
   TRANSFER_SUB_ETRANSFER,
 ]);
+
+/** (sending ledger, receiving ledger) of personal ↔ shared transfers. */
+const PAIRED_TRANSFER_LEDGERS: Record<string, ["personal" | "shared", "personal" | "shared"]> = {
+  [TRANSFER_SUB_SHARED_FUNDING]: ["personal", "shared"],
+  [TRANSFER_SUB_SHARED_WITHDRAWAL]: ["shared", "personal"],
+};
+
+export function pairedTransferLedgers(
+  subCategory: string
+): ["personal" | "shared", "personal" | "shared"] | null {
+  return PAIRED_TRANSFER_LEDGERS[normalizeTransferSubCategory(subCategory)] ?? null;
+}
 
 export function normalizeTransferCategory(category: string): string {
   return category === TRANSFER_CATEGORY_LEGACY ? TRANSFER_CATEGORY : category;

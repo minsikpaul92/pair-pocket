@@ -23,9 +23,19 @@ from app.services.access import (
     require_shared_group_for_write,
     resolve_owner_ids,
 )
-from app.services.settlement import get_settled_amounts
+from app.services import db_transactions
+from app.services.settlement import (
+    SETTLEMENT_EPSILON,
+    check_settlement,
+    get_settled_amounts,
+    settled_total,
+)
 from app.services.stats import resolve_date_range
-from app.services.transaction_links import authorized_funding_twin, is_shared_funding
+from app.services.transaction_links import (
+    authorized_funding_twin,
+    is_paired_transfer,
+    twin_document,
+)
 from app.services.validation import validate_transaction_payload
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -383,9 +393,9 @@ def _document_from_payload(
     from app.models.ledger import (
         TransactionKind,
         is_cashflow_transfer_sub,
-        is_shared_funding_sub,
         normalize_transfer_category,
         normalize_transfer_sub_category,
+        paired_transfer_ledgers,
     )
     from app.models.category_preset import is_transfer_expense
 
@@ -407,76 +417,13 @@ def _document_from_payload(
         document["kind"] = TransactionKind.TRANSFER.value
     else:
         document["kind"] = TransactionKind.NORMAL.value
-        if not is_shared_funding_sub(sub):
+        if not (is_transfer_expense(cat) and paired_transfer_ledgers(sub)):
             document["counter_account_id"] = None
 
     document["owner_id"] = owner_id
     if not document.get("merchant"):
         document["merchant"] = "미지정"
     return document
-
-
-def _shared_funding_income_doc(
-    expense_doc: dict, *, linked_expense_id: str, shared_group_id: str
-) -> dict:
-    """Build the shared-ledger income twin for 공용 계좌 입금."""
-    from app.models.ledger import TransactionKind
-
-    return {
-        "date": expense_doc["date"],
-        "amount": expense_doc["amount"],
-        "currency": expense_doc["currency"],
-        "type": TransactionType.INCOME.value,
-        "account_type": AccountType.SHARED.value,
-        "shared_group_id": shared_group_id,
-        "category": expense_doc["category"],
-        "sub_category": expense_doc["sub_category"],
-        "merchant": expense_doc.get("merchant") or "미지정",
-        "institution": None,
-        "settles_expense_id": None,
-        "account_id": expense_doc.get("counter_account_id"),
-        "counter_account_id": expense_doc.get("account_id"),
-        "linked_transaction_id": linked_expense_id,
-        "kind": TransactionKind.NORMAL.value,
-        "owner_id": expense_doc["owner_id"],
-        "subscription_billing_cycle": None,
-        "subscription_id": None,
-        "is_stock_trade": False,
-        "trade_type": None,
-        "ticker": None,
-        "shares": None,
-        "price": None,
-        "fee": None,
-        "items": None,
-    }
-
-
-def _shared_funding_expense_fields_from_income(
-    income_doc: dict,
-) -> dict:
-    """Map shared income edit back onto the personal expense twin."""
-    return {
-        "date": income_doc["date"],
-        "amount": income_doc["amount"],
-        "currency": income_doc["currency"],
-        "merchant": income_doc.get("merchant") or "미지정",
-        # income.account_id = shared; income.counter = personal
-        "account_id": income_doc.get("counter_account_id"),
-        "counter_account_id": income_doc.get("account_id"),
-    }
-
-
-async def _link_pair(
-    db: AsyncIOMotorDatabase, expense_id: ObjectId, income_id: ObjectId
-) -> None:
-    await db[COLLECTION].update_one(
-        {"_id": expense_id},
-        {"$set": {"linked_transaction_id": str(income_id)}},
-    )
-    await db[COLLECTION].update_one(
-        {"_id": income_id},
-        {"$set": {"linked_transaction_id": str(expense_id)}},
-    )
 
 
 async def _sync_stock_holding(db: AsyncIOMotorDatabase, doc: dict | None) -> None:
@@ -490,6 +437,54 @@ async def _sync_stock_holding(db: AsyncIOMotorDatabase, doc: dict | None) -> Non
             owner_id=doc["owner_id"],
             account_id=doc["account_id"],
             ticker=doc["ticker"],
+        )
+
+
+def _is_settlement(doc: dict) -> bool:
+    return bool(doc.get("settles_expense_id")) and doc.get("type") == (
+        TransactionType.INCOME.value
+    )
+
+
+async def _lock_settlement(
+    db, session, user: UserOut, doc: dict, *, exclude_settlement_id=None
+) -> None:
+    """Re-check the remaining amount inside the transaction, locking the expense."""
+    account_type = AccountType(doc["account_type"])
+    await check_settlement(
+        db,
+        expense_id=doc["settles_expense_id"],
+        amount=float(doc["amount"]),
+        currency=doc["currency"],
+        owner_ids=await resolve_owner_ids(db, user, account_type),
+        account_type=account_type,
+        shared_group_id=user.shared_group_id,
+        exclude_settlement_id=exclude_settlement_id,
+        lock=True,
+        session=session,
+    )
+
+
+async def _guard_settled_expense(db, session, existing: dict, document: dict) -> None:
+    """An expense with settlements keeps its ledger, currency, and covers them."""
+    if existing.get("type") != TransactionType.EXPENSE.value:
+        return
+    settled = await settled_total(db, str(existing["_id"]), session=session)
+    if settled <= 0:
+        return
+    if (
+        document["type"] != TransactionType.EXPENSE.value
+        or document["account_type"] != existing.get("account_type")
+        or document["currency"] != existing.get("currency")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="N빵 정산이 연결된 지출은 장부, 통화, 지출/수입 구분을 바꿀 수 없습니다.",
+        )
+    if float(document["amount"]) + SETTLEMENT_EPSILON < settled:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"이미 정산된 금액({settled:.2f})보다 작게 바꿀 수 없습니다.",
         )
 
 
@@ -512,22 +507,28 @@ async def create_transaction(
         payload, owner_id=current_user.id, shared_group_id=current_user.shared_group_id
     )
 
-    if (
-        is_shared_funding(document)
-        and document["type"] == TransactionType.EXPENSE.value
-    ):
-        require_shared_group_for_write(current_user, AccountType.SHARED)
-        result = await db[COLLECTION].insert_one(document)
-        expense_id = result.inserted_id
-        income_doc = _shared_funding_income_doc(
-            {**document, "_id": expense_id},
-            linked_expense_id=str(expense_id),
-            shared_group_id=current_user.shared_group_id,
-        )
-        income_result = await db[COLLECTION].insert_one(income_doc)
-        await _link_pair(db, expense_id, income_result.inserted_id)
-        created = await db[COLLECTION].find_one({"_id": expense_id})
-        return _serialize(created)
+    if is_paired_transfer(document) or _is_settlement(document):
+
+        async def write(session):
+            if _is_settlement(document):
+                await _lock_settlement(db, session, current_user, document)
+            result = await db[COLLECTION].insert_one(dict(document), session=session)
+            if is_paired_transfer(document):
+                twin = twin_document(
+                    {**document, "_id": result.inserted_id},
+                    shared_group_id=current_user.shared_group_id,
+                )
+                twin["linked_transaction_id"] = str(result.inserted_id)
+                twin_result = await db[COLLECTION].insert_one(twin, session=session)
+                await db[COLLECTION].update_one(
+                    {"_id": result.inserted_id},
+                    {"$set": {"linked_transaction_id": str(twin_result.inserted_id)}},
+                    session=session,
+                )
+            return result.inserted_id
+
+        inserted_id = await db_transactions.run_in_transaction(db, write)
+        return _serialize(await db[COLLECTION].find_one({"_id": inserted_id}))
 
     result = await db[COLLECTION].insert_one(document)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
@@ -574,13 +575,10 @@ async def update_transaction(
         owner_id=existing["owner_id"],
         shared_group_id=current_user.shared_group_id,
     )
-    # Preserve link unless this is no longer shared funding.
-    document["linked_transaction_id"] = (
-        str(twin["_id"]) if twin and is_shared_funding(document) else None
-    )
+    paired = is_paired_transfer(document)
     if (
         twin
-        and is_shared_funding(document)
+        and paired
         and (
             document["account_type"] != existing["account_type"]
             or document["type"] != existing["type"]
@@ -590,43 +588,59 @@ async def update_transaction(
             status_code=422,
             detail="Linked funding entries cannot change ledger or direction.",
         )
+    if paired and not twin and existing["owner_id"] != current_user.id:
+        # The other side would land in the owner's books; only they may do that.
+        raise HTTPException(status_code=403, detail="Only the owner can link this entry.")
+    document["linked_transaction_id"] = str(twin["_id"]) if twin and paired else None
 
-    await db[COLLECTION].update_one(
-        {"_id": ObjectId(transaction_id)}, {"$set": document}
+    oid = ObjectId(transaction_id)
+
+    async def write(session):
+        await _guard_settled_expense(db, session, existing, document)
+        if _is_settlement(document):
+            await _lock_settlement(
+                db,
+                session,
+                current_user,
+                document,
+                exclude_settlement_id=transaction_id,
+            )
+        await db[COLLECTION].update_one({"_id": oid}, {"$set": document}, session=session)
+        if twin and paired:
+            patch = twin_document(
+                {**document, "_id": oid}, shared_group_id=twin.get("shared_group_id")
+            )
+            patch["owner_id"] = twin["owner_id"]
+            patch["linked_transaction_id"] = transaction_id
+            await db[COLLECTION].update_one(
+                {"_id": twin["_id"]}, {"$set": patch}, session=session
+            )
+        elif twin:
+            # No longer a ledger transfer — remove the other side.
+            await db[COLLECTION].delete_one({"_id": twin["_id"]}, session=session)
+        elif paired:
+            # Converting an ordinary entry into a ledger transfer.
+            new_twin = twin_document(
+                {**document, "_id": oid}, shared_group_id=current_user.shared_group_id
+            )
+            new_twin["linked_transaction_id"] = transaction_id
+            created = await db[COLLECTION].insert_one(new_twin, session=session)
+            await db[COLLECTION].update_one(
+                {"_id": oid},
+                {"$set": {"linked_transaction_id": str(created.inserted_id)}},
+                session=session,
+            )
+
+    has_settlements = (
+        existing.get("type") == TransactionType.EXPENSE.value
+        and await settled_total(db, transaction_id) > 0
     )
-    updated = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
+    if twin is not None or paired or _is_settlement(document) or has_settlements:
+        await db_transactions.run_in_transaction(db, write)
+    else:
+        await write(None)
 
-    # Sync linked twin for 공용 계좌 입금.
-    linked_id = str(twin["_id"]) if twin else None
-    if twin and is_shared_funding(document):
-        if updated.get("type") == TransactionType.EXPENSE.value:
-            twin_patch = _shared_funding_income_doc(
-                updated,
-                linked_expense_id=transaction_id,
-                shared_group_id=twin["shared_group_id"],
-            )
-            # Don't overwrite twin owner_id / linked id incorrectly
-            twin_patch["linked_transaction_id"] = transaction_id
-            twin_patch["owner_id"] = twin.get("owner_id", updated["owner_id"])
-            await db[COLLECTION].update_one(
-                {"_id": ObjectId(linked_id)}, {"$set": twin_patch}
-            )
-        elif updated.get("type") == TransactionType.INCOME.value:
-            expense_patch = _shared_funding_expense_fields_from_income(updated)
-            expense_patch["category"] = updated["category"]
-            expense_patch["sub_category"] = updated["sub_category"]
-            expense_patch["kind"] = updated["kind"]
-            expense_patch["type"] = TransactionType.EXPENSE.value
-            expense_patch["account_type"] = AccountType.PERSONAL.value
-            expense_patch["shared_group_id"] = None
-            expense_patch["linked_transaction_id"] = transaction_id
-            await db[COLLECTION].update_one(
-                {"_id": ObjectId(linked_id)}, {"$set": expense_patch}
-            )
-    elif twin and not is_shared_funding(document):
-        # Category changed away from shared funding — drop the orphan twin.
-        await db[COLLECTION].delete_one({"_id": ObjectId(linked_id)})
-
+    updated = await db[COLLECTION].find_one({"_id": oid})
     await _sync_stock_holding(db, existing)
     await _sync_stock_holding(db, updated)
     return _serialize(updated)
@@ -646,30 +660,28 @@ async def delete_transaction(
         db, current_user, existing, not_found_detail="Transaction not found."
     )
     twin = await authorized_funding_twin(db, current_user, existing)
+    oid = ObjectId(transaction_id)
 
-    # Block deleting an expense that still has linked N빵 settlements.
-    if existing.get("type") == TransactionType.EXPENSE.value:
-        owner_ids = await resolve_owner_ids(
-            db, current_user, AccountType(existing["account_type"])
-        )
-        linked = await db[COLLECTION].count_documents(
-            {
-                **owner_match(owner_ids),
-                "settles_expense_id": transaction_id,
-            }
-        )
-        if linked > 0:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="이 지출에 연결된 N빵 정산이 있어 삭제할 수 없습니다. 정산을 먼저 삭제해 주세요.",
-            )
+    async def write(session):
+        # Block deleting an expense that still has linked N빵 settlements.
+        if existing.get("type") == TransactionType.EXPENSE.value:
+            if await settled_total(db, transaction_id, session=session) > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "이 지출에 연결된 N빵 정산이 있어 삭제할 수 없습니다. "
+                        "정산을 먼저 삭제해 주세요."
+                    ),
+                )
+        if twin:
+            await db[COLLECTION].delete_one({"_id": twin["_id"]}, session=session)
+        result = await db[COLLECTION].delete_one({"_id": oid}, session=session)
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Transaction not found.")
 
-    # Cascade-delete 공용 계좌 입금 twin.
     if twin:
-        await db[COLLECTION].delete_one({"_id": twin["_id"]})
-
-    result = await db[COLLECTION].delete_one({"_id": ObjectId(transaction_id)})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Transaction not found.")
+        await db_transactions.run_in_transaction(db, write)
+    else:
+        await write(None)
 
     await _sync_stock_holding(db, existing)

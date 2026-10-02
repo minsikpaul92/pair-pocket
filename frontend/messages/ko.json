@@ -247,7 +247,12 @@
     "selectInstitution": "금융기관 / 계좌명 선택",
     "setDefaultStockAccountCA": "기본 캐나다 주식 계좌로 설정",
     "setDefaultStockAccountKR": "기본 한국 주식 계좌로 설정",
-    "defaultSaveFailed": "기본 계좌를 저장하지 못했습니다. 다시 시도해 주세요."
+    "defaultSaveFailed": "기본 계좌를 저장하지 못했습니다. 다시 시도해 주세요.",
+    "transferFromPersonal": "보내는 개인 계좌",
+    "transferFromShared": "보내는 공용 계좌",
+    "transferToPersonal": "받는 개인 계좌",
+    "transferToShared": "받는 공용 계좌",
+    "transferNoteSharedWithdrawal": "공용 통장에서 개인 통장으로 옮깁니다. 공용은 지출, 개인은 수입으로 기록됩니다."
   },
   "settlement": {
     "noExpenses": "정산 가능한 지출이 없습니다.",
@@ -394,7 +399,8 @@
     "stockSale": "주식 판매수익",
     "dividends": "투자 배당금",
     "bankInterest": "은행 이자",
-    "taxRefund": "정부 환급금(HST/Tax Refund)"
+    "taxRefund": "정부 환급금(HST/Tax Refund)",
+    "sharedWithdrawal": "개인 계좌로 인출"
   },
   "subscriptions": {
     "title": "고정지출",

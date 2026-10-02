@@ -1,4 +1,9 @@
-"""Validate server-managed personal expense / shared income relationships."""
+"""Server-managed personal ↔ shared transfer pairs.
+
+A transfer between ledgers is stored as two linked entries: an expense in the
+outflow ledger and an income in the inflow ledger. Either side can be entered;
+the server creates, updates, and deletes the other side with it.
+"""
 
 from bson import ObjectId
 from fastapi import HTTPException
@@ -6,17 +11,75 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.ledger import (
     TRANSFER_CATEGORY,
-    is_shared_funding_sub,
+    TransactionKind,
     normalize_transfer_category,
+    paired_transfer_ledgers,
 )
+from app.models.transaction import AccountType, TransactionType
 from app.models.user import UserOut
 from app.services.access import assert_can_access_doc
 
 
-def is_shared_funding(doc: dict) -> bool:
-    return normalize_transfer_category(
-        doc.get("category", "")
-    ) == TRANSFER_CATEGORY and is_shared_funding_sub(doc.get("sub_category", ""))
+def pair_ledgers(doc: dict) -> tuple[str, str] | None:
+    """(outflow, inflow) ledgers when the doc is a personal↔shared transfer."""
+    if normalize_transfer_category(doc.get("category", "")) != TRANSFER_CATEGORY:
+        return None
+    return paired_transfer_ledgers(doc.get("sub_category", ""))
+
+
+def is_paired_transfer(doc: dict) -> bool:
+    return pair_ledgers(doc) is not None
+
+
+def expected_roles(doc: dict) -> set[tuple[str, str]]:
+    outflow, inflow = pair_ledgers(doc)  # type: ignore[misc]
+    return {
+        (outflow, TransactionType.EXPENSE.value),
+        (inflow, TransactionType.INCOME.value),
+    }
+
+
+def has_valid_role(doc: dict) -> bool:
+    """Entry sits on one side of its pair (outflow expense or inflow income)."""
+    return (doc.get("account_type"), doc.get("type")) in expected_roles(doc)
+
+
+def twin_document(doc: dict, *, shared_group_id: str | None) -> dict:
+    """The other side of a pair: swapped ledger, direction, and accounts."""
+    outflow, inflow = pair_ledgers(doc)  # type: ignore[misc]
+    is_outflow = doc["type"] == TransactionType.EXPENSE.value
+    ledger = inflow if is_outflow else outflow
+    return {
+        "date": doc["date"],
+        "amount": doc["amount"],
+        "currency": doc["currency"],
+        "type": (
+            TransactionType.INCOME.value if is_outflow else TransactionType.EXPENSE.value
+        ),
+        "account_type": ledger,
+        "shared_group_id": (
+            shared_group_id if ledger == AccountType.SHARED.value else None
+        ),
+        "category": doc["category"],
+        "sub_category": doc["sub_category"],
+        "merchant": doc.get("merchant") or "미지정",
+        "note": doc.get("note"),
+        "institution": None,
+        "settles_expense_id": None,
+        "account_id": doc.get("counter_account_id"),
+        "counter_account_id": doc.get("account_id"),
+        "kind": TransactionKind.NORMAL.value,
+        "owner_id": doc["owner_id"],
+        "subscription_billing_cycle": None,
+        "subscription_id": None,
+        "is_stock_trade": False,
+        "trade_type": None,
+        "ticker": None,
+        "shares": None,
+        "price": None,
+        "fee": None,
+        "items": None,
+    }
 
 
 async def authorized_funding_twin(
@@ -24,7 +87,7 @@ async def authorized_funding_twin(
 ) -> dict | None:
     """Authorize both entries before any mutation, including category changes.
 
-    A shared ledger grants no write access to a partner's personal expense.
+    A shared ledger grants no write access to a partner's personal entry.
     Invalid legacy links fail closed instead of deleting unrelated records.
     """
     linked_id = doc.get("linked_transaction_id")
@@ -40,17 +103,17 @@ async def authorized_funding_twin(
         twin,
         not_found_detail="Linked transaction not found or not accessible.",
     )
-    roles = {
-        (doc.get("account_type"), doc.get("type")),
-        (twin.get("account_type"), twin.get("type")),
-    }
     if (
         str(doc["_id"]) == linked_id
         or twin.get("linked_transaction_id") != str(doc["_id"])
         or twin.get("owner_id") != doc.get("owner_id")
-        or roles != {("personal", "expense"), ("shared", "income")}
-        or not is_shared_funding(doc)
-        or not is_shared_funding(twin)
+        or not is_paired_transfer(doc)
+        or pair_ledgers(twin) != pair_ledgers(doc)
+        or {
+            (doc.get("account_type"), doc.get("type")),
+            (twin.get("account_type"), twin.get("type")),
+        }
+        != expected_roles(doc)
         or not doc.get("account_id")
         or not doc.get("counter_account_id")
         or doc["account_id"] == doc["counter_account_id"]
