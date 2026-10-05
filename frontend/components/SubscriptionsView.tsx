@@ -44,6 +44,7 @@ import { translateError } from "@/lib/errors";
 interface Props {
   scope: LedgerScope;
   accountType?: AccountType;
+  hasPartner?: boolean;
   month: Date;
   version: number;
   presets: CategoryPresets | null;
@@ -221,6 +222,7 @@ const EMPTY_SUMMARY: MonthlySubscriptionSummary = {
 export default function SubscriptionsView({
   scope,
   accountType = "personal",
+  hasPartner = false,
   month,
   version,
   presets,
@@ -628,6 +630,7 @@ export default function SubscriptionsView({
         <SubscriptionRegisterModal
           currency={registerCurrency}
           accountType={accountType}
+          hasPartner={hasPartner}
           presets={presets}
           editing={editing}
           initialParse={initialParse}

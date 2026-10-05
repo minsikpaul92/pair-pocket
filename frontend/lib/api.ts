@@ -1084,7 +1084,9 @@ export async function updateSubscription(
     amount: number;
     status: SubscriptionStatus;
     end_date: string | null;
+    account_type: AccountType;
     account_id: string;
+    counter_account_id: string | null;
     category: string;
     sub_category: string;
     merchant?: string;
