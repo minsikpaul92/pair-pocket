@@ -52,6 +52,7 @@ import {
 interface Props {
   currency: Currency;
   accountType?: AccountType;
+  hasPartner?: boolean;
   presets: CategoryPresets;
   editing?: Subscription | null;
   initialParse?: OnboardingParseResult | null;
@@ -70,7 +71,8 @@ function dateInputFromIso(iso: string | null | undefined): string {
 
 export default function SubscriptionRegisterModal({
   currency,
-  accountType = "personal",
+  accountType: initialAccountType = "personal",
+  hasPartner = false,
   presets,
   editing = null,
   initialParse = null,
@@ -83,9 +85,15 @@ export default function SubscriptionRegisterModal({
   const tCommon = useTranslations("common");
   const tTx = useTranslations("transaction");
   const tErrors = useTranslations("errors");
+  const tAccountType = useTranslations("accountType");
   const locale = useLocale();
 
   const isEditing = Boolean(editing);
+  // Editing may move the item between the personal and shared ledgers.
+  const [accountType, setAccountType] = useState<AccountType>(
+    editing?.account_type ?? initialAccountType
+  );
+  const scopeChanged = isEditing && accountType !== editing?.account_type;
 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -267,6 +275,16 @@ export default function SubscriptionRegisterModal({
     [accountContextKey]
   );
 
+  function switchScope(next: AccountType) {
+    if (next === accountType) return;
+    setAccountType(next);
+    // Payment accounts belong to one ledger, so the old pick no longer applies.
+    manualAccountPickRef.current = null;
+    setAccountId(ACCOUNT_NONE);
+    setCounterAccountId(ACCOUNT_NONE);
+    setAccounts([]);
+  }
+
   useEffect(() => {
     fetchAccounts({ currency, accountType })
       .then(setAccounts)
@@ -275,12 +293,12 @@ export default function SubscriptionRegisterModal({
 
   // Subscriptions: subscription slot → default card → default bank account.
   useEffect(() => {
-    if (editing || manualAccountPickRef.current === accountContextKey) return;
+    if ((editing && !scopeChanged) || manualAccountPickRef.current === accountContextKey) return;
     setAccountId(
       resolveDefaultAccountId(accountDefaults, currency, "subscription", accounts) ||
         ACCOUNT_NONE
     );
-  }, [accountDefaults, accounts, currency, editing, accountContextKey]);
+  }, [accountDefaults, accounts, currency, editing, scopeChanged, accountContextKey]);
 
   useEffect(() => {
     if (editing) return;
@@ -873,6 +891,39 @@ export default function SubscriptionRegisterModal({
               className="input-field"
             />
           </div>
+
+          {isEditing && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t("ledgerScope")}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["personal", "shared"] as const).map((value) => {
+                  const disabled = value === "shared" && !hasPartner && accountType !== "shared";
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => switchScope(value)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-40 ${
+                        accountType === value
+                          ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                          : "border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {tAccountType(value)}
+                    </button>
+                  );
+                })}
+              </div>
+              {scopeChanged && (
+                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  {t(accountType === "shared" ? "scopeToSharedHint" : "scopeToPersonalHint")}
+                </p>
+              )}
+            </div>
+          )}
 
           {isTransfer ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

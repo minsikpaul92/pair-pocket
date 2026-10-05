@@ -81,6 +81,8 @@ class SubscriptionUpdate(BaseModel):
     amount: float | None = Field(default=None, ge=0)
     status: SubscriptionStatus | None = None
     end_date: datetime | None = None
+    # Moving between personal and shared requires a new payment account in the target ledger.
+    account_type: AccountType | None = None
     account_id: str | None = None
     counter_account_id: str | None = None
     category: str | None = None

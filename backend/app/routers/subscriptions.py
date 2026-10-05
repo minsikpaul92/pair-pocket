@@ -422,6 +422,11 @@ async def update_subscription(
     owner_ids = await resolve_owner_ids(
         db, current_user, AccountType(existing["account_type"])
     )
+    scope_changed = (
+        payload.account_type is not None
+        and payload.account_type.value != existing["account_type"]
+    )
+    target_type = payload.account_type if scope_changed else AccountType(existing["account_type"])
 
     old_next_due = existing.get("next_due_date") or existing["start_date"]
     start_rescheduled = False
@@ -453,17 +458,45 @@ async def update_subscription(
     )
     if cycle == BillingCycle.INSTALLMENT.value and total and inst_start:
         updates["end_date"] = installment_end_date(inst_start, total_installments=total)
-    if "account_id" in updates and updates["account_id"]:
-        owner_ids = await resolve_owner_ids(
-            db, current_user, AccountType(existing["account_type"])
+    updates.pop("account_type", None)
+    if scope_changed:
+        # Past (completed) transactions stay in the ledger they were charged to;
+        # only the subscription and its upcoming occurrences move.
+        if not updates.get("account_id"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="공유/개인을 바꾸려면 새 결제 계좌를 선택해야 합니다.",
+            )
+        require_shared_group_for_write(current_user, target_type)
+        owner_ids = await resolve_owner_ids(db, current_user, target_type)
+        updates["account_type"] = target_type.value
+        updates["shared_group_id"] = (
+            current_user.shared_group_id if target_type == AccountType.SHARED else None
         )
+        updates["owner_id"] = current_user.id
+        if "counter_account_id" not in updates:
+            updates["counter_account_id"] = None
+    if "account_id" in updates and updates["account_id"]:
+        if not scope_changed:
+            owner_ids = await resolve_owner_ids(
+                db, current_user, AccountType(existing["account_type"])
+            )
         await _validate_account(
             db,
             shared_group_id=current_user.shared_group_id,
             account_id=updates["account_id"],
             owner_ids=owner_ids,
             currency=existing["currency"],
-            account_type=existing["account_type"],
+            account_type=target_type.value,
+        )
+    if scope_changed and updates.get("counter_account_id"):
+        await _validate_account(
+            db,
+            shared_group_id=current_user.shared_group_id,
+            account_id=updates["counter_account_id"],
+            owner_ids=owner_ids,
+            currency=existing["currency"],
+            account_type=target_type.value,
         )
     if updates:
         updates["updated_at"] = datetime.utcnow()
@@ -472,6 +505,20 @@ async def update_subscription(
         )
 
     updated = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
+    if scope_changed:
+        await db[OCC_COL].update_many(
+            {
+                "subscription_id": subscription_id,
+                "status": OccurrenceStatus.PENDING.value,
+            },
+            {
+                "$set": {
+                    "account_type": updated["account_type"],
+                    "shared_group_id": updated.get("shared_group_id"),
+                    "owner_id": updated["owner_id"],
+                }
+            },
+        )
     if start_rescheduled:
         await purge_subscription_on_reschedule(
             db,

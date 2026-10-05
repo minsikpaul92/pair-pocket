@@ -897,6 +897,7 @@ export default function AppShell({ user, onLogout }: Props) {
             <SubscriptionsView
               scope={scope}
               accountType={accountType}
+              hasPartner={Boolean(currentUser.shared_group_id)}
               month={month}
               version={version}
               presets={presets}
