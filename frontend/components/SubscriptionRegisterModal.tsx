@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, X } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -248,7 +248,7 @@ export default function SubscriptionRegisterModal({
     setEndReminderEnabled(editing.end_reminder_enabled);
     setCategory(editing.category);
     setSubCategory(editing.sub_category);
-    setMerchant(editing.merchant || editing.name);
+    setMerchant(editing.merchant && editing.merchant !== "미지정" ? editing.merchant : editing.name);
     setAccountId(editing.account_id);
     setCounterAccountId(editing.counter_account_id || ACCOUNT_NONE);
   }, [editing]);
@@ -505,6 +505,58 @@ export default function SubscriptionRegisterModal({
     }
   }
 
+  const accountFields = (
+    <>
+    {isTransfer ? (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            {tTx("fromAccount")}
+          </label>
+          <AccountSelect
+            accounts={transferFromAccounts}
+            value={accountId}
+            onChange={pickAccount}
+            onRegister={() => setShowAccountRegister(true)}
+            allowNone={false}
+            placeholder={tTx("selectFromAccount")}
+            variant="field"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            {tTx("toAccount")}
+          </label>
+          <AccountSelect
+            accounts={transferToAccounts}
+            value={counterAccountId}
+            onChange={setCounterAccountId}
+            onRegister={() => setShowAccountRegister(true)}
+            allowNone={false}
+            placeholder={tTx("selectToAccount")}
+            variant="field"
+          />
+        </div>
+      </div>
+    ) : (
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+          {t("paymentAccount")}
+        </label>
+        <AccountSelect
+          accounts={accounts}
+          value={accountId}
+          onChange={pickAccount}
+          onRegister={() => setShowAccountRegister(true)}
+          allowNone={false}
+          placeholder={t("selectPaymentAccount")}
+          variant="field"
+        />
+      </div>
+    )}
+    </>
+  );
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
@@ -534,6 +586,41 @@ export default function SubscriptionRegisterModal({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {isEditing && editing && (hasPartner || editing.account_type === "shared") && (
+          <div className="mt-4 space-y-3">
+            {scopeChanged ? (
+              <>
+                <div className="flex items-center justify-between rounded-xl bg-emerald-50 dark:bg-emerald-950/30 px-3.5 py-2.5">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                    {tAccountType(editing.account_type)}
+                    <ArrowRight className="h-4 w-4" />
+                    {tAccountType(accountType)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => switchScope(editing.account_type)}
+                    className="text-xs text-gray-500 hover:underline"
+                  >
+                    {t("undoMove")}
+                  </button>
+                </div>
+                {accountFields}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  switchScope(editing.account_type === "personal" ? "shared" : "personal")
+                }
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 dark:border-emerald-800 py-2.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+                {t(editing.account_type === "personal" ? "moveToShared" : "moveToPersonal")}
+              </button>
+            )}
+          </div>
+        )}
 
         {isEditing && history && (
           <div className="mt-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-4 space-y-2 text-sm">
@@ -609,13 +696,13 @@ export default function SubscriptionRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              구독/지출 유형
+              {t("typeLabel")}
             </label>
             <div className="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
               {[
-                { key: "subscription", label: "구독" },
-                { key: "installment", label: "할부" },
-                { key: "fixed", label: "고정지출" },
+                { key: "subscription", label: t("typeSubscription") },
+                { key: "installment", label: t("typeInstallment") },
+                { key: "fixed", label: t("typeFixed") },
               ].map((item) => {
                 const selected = subType === item.key;
                 return (
@@ -665,13 +752,13 @@ export default function SubscriptionRegisterModal({
           {subType !== "installment" && (
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                결제 주기 규칙
+                {t("cycleRule")}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { rule: "monthly", label: "매월" },
-                  { rule: "yearly", label: "매년" },
-                  { rule: "every_x_days", label: "N일 마다" },
+                  { rule: "monthly", label: t("ruleMonthly") },
+                  { rule: "yearly", label: t("ruleYearly") },
+                  { rule: "every_x_days", label: t("ruleEveryXDays") },
                 ].map((r) => {
                   const active = recurrenceRule === r.rule;
                   return (
@@ -772,11 +859,11 @@ export default function SubscriptionRegisterModal({
               {recurrenceRule === "monthly" && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                    매월 정기 결제일
+                    {t("monthlyDayLabel")}
                   </label>
                   <div className="flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/80 p-2.5 px-3 border border-gray-200 dark:border-gray-700">
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      매월
+                      {t("monthlyDayPrefix")}
                     </span>
                     <input
                       type="number"
@@ -794,11 +881,11 @@ export default function SubscriptionRegisterModal({
                       className="input-field w-20 text-center font-bold text-blue-600 dark:text-blue-400 text-base py-1"
                     />
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      일 결제 {dayOfMonth === 31 && "(말일)"}
+                      {t("monthlyDaySuffix")} {dayOfMonth === 31 && t("lastDayNote")}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-gray-400">
-                    1~31일 중 지정할 수 있으며, 31일은 해당 월의 말일로 자동 처리됩니다.
+                    {t("monthlyDayHint")}
                   </p>
                 </div>
               )}
@@ -806,7 +893,7 @@ export default function SubscriptionRegisterModal({
               {recurrenceRule === "every_x_days" && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                    결제/이체 주기 간격 (며칠 마다)
+                    {t("intervalLabel")}
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -818,17 +905,17 @@ export default function SubscriptionRegisterModal({
                       className="input-field max-w-[120px]"
                     />
                     <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                      일 마다 자동 반복
+                      {t("intervalSuffix")}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-gray-400">
-                    설정한 일수마다 자동으로 결제 및 계좌 이체가 반복됩니다 (예: 7일 = 매주, 14일 = 격주)
+                    {t("intervalHint")}
                   </p>
                   <div className="flex gap-1.5 mt-2">
                     {[
-                      { days: "7", label: "매주 (7일)" },
-                      { days: "14", label: "격주 (14일)" },
-                      { days: "30", label: "30일 마다" },
+                      { days: "7", label: t("presetWeekly") },
+                      { days: "14", label: t("presetBiweekly") },
+                      { days: "30", label: t("presetEvery30") },
                     ].map((preset) => (
                       <button
                         key={preset.days}
@@ -892,91 +979,12 @@ export default function SubscriptionRegisterModal({
             />
           </div>
 
-          {isEditing && (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {t("ledgerScope")}
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["personal", "shared"] as const).map((value) => {
-                  const disabled = value === "shared" && !hasPartner && accountType !== "shared";
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => switchScope(value)}
-                      className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-40 ${
-                        accountType === value
-                          ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
-                          : "border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      {tAccountType(value)}
-                    </button>
-                  );
-                })}
-              </div>
-              {scopeChanged && (
-                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
-                  {t(accountType === "shared" ? "scopeToSharedHint" : "scopeToPersonalHint")}
-                </p>
-              )}
-            </div>
-          )}
-
-          {isTransfer ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {tTx("fromAccount") || "보내는 계좌 (출금)"}
-                </label>
-                <AccountSelect
-                  accounts={transferFromAccounts}
-                  value={accountId}
-                  onChange={pickAccount}
-                  onRegister={() => setShowAccountRegister(true)}
-                  allowNone={false}
-                  placeholder={tTx("selectFromAccount") || "출금 계좌 선택"}
-                  variant="field"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {tTx("toAccount") || "받는 계좌 (입금)"}
-                </label>
-                <AccountSelect
-                  accounts={transferToAccounts}
-                  value={counterAccountId}
-                  onChange={setCounterAccountId}
-                  onRegister={() => setShowAccountRegister(true)}
-                  allowNone={false}
-                  placeholder={tTx("selectToAccount") || "입금 계좌 선택"}
-                  variant="field"
-                />
-              </div>
-            </div>
-          ) : (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {t("paymentAccount")}
-              </label>
-              <AccountSelect
-                accounts={accounts}
-                value={accountId}
-                onChange={pickAccount}
-                onRegister={() => setShowAccountRegister(true)}
-                allowNone={false}
-                placeholder={t("selectPaymentAccount")}
-                variant="field"
-              />
-            </div>
-          )}
+          {!scopeChanged && accountFields}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                구독/이체 시작일 (기준일)
+                {t("startDateLabel")}
               </label>
               <DayPicker
                 value={parseDate(startDate)}
@@ -1002,7 +1010,7 @@ export default function SubscriptionRegisterModal({
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-1">
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {t("nextPaymentDate") || "다음 정기 결제일"}
+                  {t("nextPaymentDate")}
                 </label>
                 {subType !== "installment" && (
                   <button
@@ -1018,7 +1026,7 @@ export default function SubscriptionRegisterModal({
                     }}
                     className="text-[11px] font-medium text-blue-500 hover:underline"
                   >
-                    {showEndDate ? "종료일 취소" : "+ 종료일 지정"}
+                    {showEndDate ? t("endDateRemove") : t("endDateAdd")}
                   </button>
                 )}
               </div>
@@ -1037,7 +1045,7 @@ export default function SubscriptionRegisterModal({
           {nextDueDate && (
             <div className="rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 p-2.5 px-3.5 text-xs flex items-center justify-between">
               <span className="font-medium text-blue-800 dark:text-blue-200">
-                ✨ 다음 결제 예정일
+                {t("nextDueBanner")}
               </span>
               <span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">
                 {formatSubscriptionDate(`${nextDueDate}T00:00:00`, locale)}
