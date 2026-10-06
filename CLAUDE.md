@@ -8,6 +8,11 @@ Guidance for Claude Code when working in this repository.
 - Write every pull request title and description, and every GitHub comment or review reply, in English.
 - Do not use em dashes in documents, pull requests, or comments.
 
+## Branches
+
+- `main` is the live service and deploys automatically. Never commit or push to `main` directly.
+- Branch from `develop` and open pull requests into `develop`. Only release pull requests from `develop` (and `hotfix/*` branches) merge into `main`. See `docs/BRANCHING.md`.
+
 ## Korean and English parity
 
 - Korean is the source of truth. Every user-visible feature must behave identically in ko and en; only the language changes.

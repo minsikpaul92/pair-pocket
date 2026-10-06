@@ -1,0 +1,24 @@
+name: Branch policy
+
+# main is production: only release PRs from develop and hotfix branches merge into it.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  release-source:
+    name: Release source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Allow develop and hotfix/* only
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            develop|hotfix/*) echo "OK: $HEAD_REF may merge into main." ;;
+            *)
+              echo "Pull requests into main must come from develop or a hotfix/* branch (got: $HEAD_REF)."
+              echo "Retarget this pull request to develop. See docs/BRANCHING.md."
+              exit 1
+              ;;
+          esac
