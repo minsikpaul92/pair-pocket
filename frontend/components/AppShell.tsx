@@ -756,7 +756,7 @@ export default function AppShell({ user, onLogout }: Props) {
             </div>
 
             <div className="hidden md:flex items-center gap-2 shrink-0">
-              <LocaleToggle />
+              {partner && <LocaleToggle />}
               <ThemeToggle />
             </div>
           </div>

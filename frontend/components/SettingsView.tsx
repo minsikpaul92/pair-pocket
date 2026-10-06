@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
-import LocaleToggle from "@/components/LocaleToggle";
+import LanguagePicker from "@/components/LanguagePicker";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountDefaultsSettings from "@/components/AccountDefaultsSettings";
 import DayPicker from "@/components/DayPicker";
@@ -31,7 +31,6 @@ import {
   ResetAccountType,
   UserSettings,
   PartnerSummary,
-  shouldShowLocaleToggle,
 } from "@/lib/api";
 import { dayKey } from "@/lib/date";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
@@ -319,6 +318,15 @@ export default function SettingsView({
       )}
 
       {/* Mobile-only: controls removed from the compact top bar */}
+      <section className="card-inset p-5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t("languageLabel")}
+          </span>
+          <LanguagePicker variant="select" className="min-w-0 w-48 max-w-full" />
+        </div>
+      </section>
+
       <section className="card-inset p-5 space-y-1 md:hidden">
         <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3 mb-1">
           <Settings className="h-5 w-5 text-blue-500" />
@@ -327,21 +335,7 @@ export default function SettingsView({
           </h2>
         </div>
 
-        {shouldShowLocaleToggle(settings) && (
-          <div className="flex items-center justify-between gap-3 py-3">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-              {t("languageLabel")}
-            </span>
-            <LocaleToggle />
-          </div>
-        )}
-        <div
-          className={`flex items-center justify-between gap-3 py-3 ${
-            shouldShowLocaleToggle(settings)
-              ? "border-t border-gray-100 dark:border-gray-800"
-              : ""
-          }`}
-        >
+        <div className="flex items-center justify-between gap-3 py-3">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
             {t("themeLabel")}
           </span>

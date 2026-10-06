@@ -607,13 +607,6 @@ export function preferredLocalesList(
   return [];
 }
 
-/** KO/EN chrome toggle only when the user opted into 2 languages at onboarding. */
-export function shouldShowLocaleToggle(
-  settings: Pick<UserSettings, "preferred_locales" | "preferred_locale"> | null | undefined
-): boolean {
-  return preferredLocalesList(settings).length >= 1;
-}
-
 export async function fetchUserSettings(): Promise<UserSettings> {
   const res = await apiFetch(`${API_BASE_URL}/api/settings`, {
     headers: authHeaders(),
