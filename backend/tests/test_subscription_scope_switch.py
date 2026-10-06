@@ -210,3 +210,29 @@ def test_installment_can_switch_scope(env):
     )
     assert res.status_code == 200, res.text
     assert res.json()["account_type"] == "shared"
+
+
+def test_past_charges_stay_in_original_ledger_after_switch(env):
+    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%dT00:00:00")
+    sub_id = create(env, env.accounts.personal, "personal", start_date=yesterday)
+    charged = run(env.db.transactions.find({"subscription_id": sub_id}).to_list(None))
+    assert len(charged) == 1 and charged[0]["account_type"] == "personal"
+
+    res = env.client.patch(
+        f"/api/subscriptions/{sub_id}",
+        json={"account_type": "shared", "account_id": str(env.accounts.shared["_id"])},
+    )
+    assert res.status_code == 200, res.text
+
+    txs = run(env.db.transactions.find({"subscription_id": sub_id}).to_list(None))
+    personal = [t for t in txs if t["account_type"] == "personal"]
+    assert [t["_id"] for t in personal] == [charged[0]["_id"]]
+    assert personal[0]["account_id"] == str(env.accounts.personal["_id"])
+    # Nothing new is charged to the shared ledger until the next due date.
+    assert all(t["account_type"] == "personal" for t in txs)
+    upcoming = run(
+        env.db.subscription_occurrences.find(
+            {"subscription_id": sub_id, "status": "pending"}
+        ).to_list(None)
+    )
+    assert upcoming and all(o["account_type"] == "shared" for o in upcoming)
