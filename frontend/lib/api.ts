@@ -315,9 +315,18 @@ export async function signInTestAccount(
   return ((await res.json()) as { code: string }).code;
 }
 
-/** Delete every test account and its data. */
-export async function resetTestAccounts(password: string): Promise<void> {
-  await postTestLogin("/reset", { password });
+/** How test accounts start after a reset. */
+export type TestResetPreset = "empty" | "couples";
+
+/**
+ * Delete every test account and its data. "couples" then recreates Tester 1+2
+ * and 3+4 as linked couples with default accounts, onboarding done.
+ */
+export async function resetTestAccounts(
+  password: string,
+  preset: TestResetPreset
+): Promise<void> {
+  await postTestLogin("/reset", { password, preset });
 }
 
 export type Currency = "KRW" | "CAD" | "USD";

@@ -10,11 +10,15 @@ touched: test users are found by their fixed `google_id` values.
 from __future__ import annotations
 
 import hmac
+import secrets
+from datetime import date, datetime
 
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import Settings
+from app.models.account import FinancialAccountKind
+from app.models.transaction import AccountType, Currency
 from app.models.user import UserOut
 from app.services.partnerships import archive_partnership
 from app.services.sessions import create_login_code
@@ -70,6 +74,11 @@ def is_test_account(account_id: str) -> bool:
 
 async def sign_in(db: AsyncIOMotorDatabase, account_id: str) -> str:
     """Create the test user on first use and return a one-time login code."""
+    return await create_login_code(db, await _ensure_user(db, account_id))
+
+
+async def _ensure_user(db: AsyncIOMotorDatabase, account_id: str) -> str:
+    """Upsert the test user and its settings; return the user id."""
     account = _ACCOUNTS_BY_ID[account_id]
     google_id = _google_id(account_id)
     await db["users"].update_one(
@@ -104,7 +113,74 @@ async def sign_in(db: AsyncIOMotorDatabase, account_id: str) -> str:
         },
         upsert=True,
     )
-    return await create_login_code(db, user_id)
+    return user_id
+
+
+# Starting accounts for the "couples" preset: (name, kind), all in CAD.
+PRESET_PERSONAL_ACCOUNTS = (
+    ("Test Checking", FinancialAccountKind.CHECKING),
+    ("Test Credit Card", FinancialAccountKind.CREDIT_CARD),
+)
+PRESET_SHARED_ACCOUNTS = (("Test Shared Checking", FinancialAccountKind.CHECKING),)
+
+
+async def seed_couples(db: AsyncIOMotorDatabase) -> None:
+    """Tester 1+2 and 3+4 as linked couples, set up, with default CAD accounts.
+
+    Each tester gets a personal checking account and credit card, and each
+    couple a shared checking account. They become the default accounts, the
+    same way the first account a real user adds does.
+    """
+    from app.models.account import AccountCreate
+    from app.routers.accounts import create_account
+
+    start = date.today().replace(day=1).isoformat()
+    user_ids = {a["id"]: await _ensure_user(db, a["id"]) for a in TEST_ACCOUNTS}
+    for ids in (("tester1", "tester2"), ("tester3", "tester4")):
+        members = [user_ids[i] for i in ids]
+        group_id = secrets.token_urlsafe(16)
+        await db["shared_groups"].insert_one(
+            {
+                "_id": group_id,
+                "members": members,
+                "status": "active",
+                "created_at": datetime.utcnow(),
+                "shared_ledger_start_date": start,
+            }
+        )
+        for member in members:
+            await db["users"].update_one(
+                {"_id": ObjectId(member)}, {"$set": {"shared_group_id": group_id}}
+            )
+            await db["user_settings"].update_one(
+                {"owner_id": member},
+                {
+                    "$set": {
+                        "onboarding_personal_completed": True,
+                        "ledger_start_date": start,
+                        "shared_ledger_start_date": start,
+                    }
+                },
+            )
+        users = [
+            _user_out(await db["users"].find_one({"_id": ObjectId(m)})) for m in members
+        ]
+        for user in users:
+            for name, kind in PRESET_PERSONAL_ACCOUNTS:
+                await create_account(
+                    AccountCreate(name=name, kind=kind, currency=Currency.CAD), user, db
+                )
+        for name, kind in PRESET_SHARED_ACCOUNTS:
+            await create_account(
+                AccountCreate(
+                    name=name,
+                    kind=kind,
+                    currency=Currency.CAD,
+                    account_type=AccountType.SHARED,
+                ),
+                users[0],
+                db,
+            )
 
 
 async def reset(db: AsyncIOMotorDatabase) -> dict[str, int]:

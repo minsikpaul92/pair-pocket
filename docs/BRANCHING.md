@@ -78,7 +78,14 @@ Staging has four built-in test accounts so testers do not need Google accounts: 
 - Turn them on with the `TEST_LOGIN_PASSWORD` config var on the staging API. The sign-in page then shows a "Test sign-in" box: pick an account, enter that password.
 - The API only honors it when `MONGODB_DB_NAME` ends in `_staging`, `_test` or `_dev`, so the production app (database `pairpocket`) ignores the variable even if it is set by mistake. Use a long random password anyway: the staging URL is public.
 - Each account starts like a brand-new user in its language (onboarding included). Test emails go to `tester<N>@example.com`, which never receives mail; invite a tester by that address and use the invite link the app shows when the email cannot be sent.
-- "Reset all test accounts" (same password) deletes the four users and everything they own: ledger data, settings, sessions, invitations and their shared groups. A real user linked with a tester is unlinked and keeps their own data.
+- Two reset buttons (same password) first delete the four users and everything they own: ledger data, settings, sessions, invitations and their shared groups. A real user linked with a tester is unlinked and keeps their own data. Then:
+
+  | Button | Result | Use it to test |
+  | --- | --- | --- |
+  | **Reset to linked couples with accounts** (recommended) | Tester 1+2 (Korean) and Tester 3+4 (English) are linked couples, onboarding is done, ledger start dates are the first of this month. Each tester has `Test Checking` and `Test Credit Card` (CAD, personal); each couple has `Test Shared Checking` (CAD, shared). They are the default accounts. | Everyday use: transactions, transfers, settlements, subscriptions, dashboard, both languages |
+  | **Reset to empty accounts** | No users; each tester starts as a brand-new user on next sign-in. | Onboarding, partner invitation and acceptance |
+
+  Gemini keys are not part of either preset; add one in Settings to test AI scans.
 - Locally, set `MONGODB_DB_NAME=pairpocket_dev` and `TEST_LOGIN_PASSWORD` in `backend/.env` to get the same box.
 
 ## Commit and PR conventions

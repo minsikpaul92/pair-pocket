@@ -6,6 +6,7 @@ POST /api/auth/session like a Google sign-in.
 """
 
 import asyncio
+from typing import Literal
 
 from fastapi import APIRouter, Depends, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -31,6 +32,9 @@ class StagingLoginIn(BaseModel):
 
 class StagingResetIn(BaseModel):
     password: str
+    # "empty": brand-new users. "couples": Tester 1+2 and 3+4 linked, set up,
+    # with default accounts (staging_login.seed_couples).
+    preset: Literal["empty", "couples"] = "empty"
 
 
 def _require_enabled() -> None:
@@ -67,4 +71,7 @@ async def reset_test_accounts(
 ) -> dict:
     _require_enabled()
     await _require_password(body.password)
-    return {"deleted": await staging_login.reset(db)}
+    deleted = await staging_login.reset(db)
+    if body.preset == "couples":
+        await staging_login.seed_couples(db)
+    return {"deleted": deleted, "preset": body.preset}

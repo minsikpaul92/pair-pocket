@@ -10,6 +10,7 @@ import {
   resetTestAccounts,
   signInTestAccount,
   type TestAccount,
+  type TestResetPreset,
 } from "@/lib/api";
 import { translateError } from "@/lib/errors";
 
@@ -58,13 +59,16 @@ export default function TestLoginPanel() {
     }
   }
 
-  async function reset() {
+  async function reset(preset: TestResetPreset) {
     if (!window.confirm(t("resetConfirm"))) return;
     setBusy(true);
     setNotice(null);
     try {
-      await resetTestAccounts(password);
-      setNotice({ kind: "info", text: t("resetDone") });
+      await resetTestAccounts(password, preset);
+      setNotice({
+        kind: "info",
+        text: t(preset === "couples" ? "resetCouplesDone" : "resetDone"),
+      });
     } catch (err) {
       setNotice({ kind: "error", text: translateError(err, tErrors) });
     } finally {
@@ -74,6 +78,8 @@ export default function TestLoginPanel() {
 
   const field =
     "mt-1 w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100";
+  const resetButton =
+    "flex-1 rounded-xl border border-amber-500 px-4 py-2.5 text-sm font-medium text-amber-800 dark:text-amber-300 transition-colors hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50";
 
   return (
     <form
@@ -139,11 +145,22 @@ export default function TestLoginPanel() {
         >
           {t("signIn")}
         </button>
+      </div>
+
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
-          onClick={reset}
+          onClick={() => reset("couples")}
           disabled={busy || !password}
-          className="rounded-xl border border-amber-500 px-4 py-2.5 text-sm font-medium text-amber-800 dark:text-amber-300 transition-colors hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50"
+          className={resetButton}
+        >
+          {t("resetCouples")}
+        </button>
+        <button
+          type="button"
+          onClick={() => reset("empty")}
+          disabled={busy || !password}
+          className={resetButton}
         >
           {t("reset")}
         </button>

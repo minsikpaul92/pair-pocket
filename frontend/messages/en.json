@@ -92,7 +92,9 @@
       "accountOption": "{name} · {language}",
       "password": "Password",
       "signIn": "Sign in with test account",
-      "reset": "Reset all test accounts",
+      "reset": "Reset to empty accounts",
+      "resetCouples": "Reset to linked couples with accounts",
+      "resetCouplesDone": "Reset done. Tester 1 and 2, and Tester 3 and 4, are linked couples. Each has a checking account and a credit card, and each couple a shared checking account, all set as defaults.",
       "resetConfirm": "This deletes all data (transactions, accounts, subscriptions, partner links) of the 4 test accounts. Continue?",
       "resetDone": "Test accounts were reset. The next sign-in starts like a brand-new user."
     }

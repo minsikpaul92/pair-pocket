@@ -169,3 +169,46 @@ def test_reset_deletes_only_test_accounts(env):
     assert run(env.db.auth_sessions.count_documents({})) == 0
     groups = run(env.db.shared_groups.find({}).to_list(None))
     assert [(g["_id"], g["status"]) for g in groups] == [("mixed", "archived")]
+
+
+def test_couples_preset_links_testers_with_default_accounts(env):
+    sign_in(env, "tester1")  # existing data is replaced, not merged
+    res = env.client.post(
+        "/api/auth/test-login/reset", json={"password": PASSWORD, "preset": "couples"}
+    )
+    assert res.status_code == 200
+
+    users = {
+        u["google_id"].split(":")[1]: u for u in run(env.db.users.find({}).to_list(None))
+    }
+    assert sorted(users) == ["tester1", "tester2", "tester3", "tester4"]
+    assert users["tester1"]["shared_group_id"] == users["tester2"]["shared_group_id"]
+    assert users["tester3"]["shared_group_id"] == users["tester4"]["shared_group_id"]
+    assert users["tester1"]["shared_group_id"] != users["tester3"]["shared_group_id"]
+    assert run(env.db.shared_groups.count_documents({"status": "active"})) == 2
+
+    for user in users.values():
+        uid = str(user["_id"])
+        settings = run(env.db.user_settings.find_one({"owner_id": uid}))
+        assert settings["onboarding_personal_completed"] is True
+        assert settings["ledger_start_date"]
+        personal = run(
+            env.db.accounts.count_documents({"owner_id": uid, "account_type": "personal"})
+        )
+        assert personal == 2
+        defaults = run(
+            env.db.account_defaults.count_documents({"scope_key": f"personal:{uid}"})
+        )
+        assert defaults >= 1
+    shared = run(env.db.accounts.find({"account_type": "shared"}).to_list(None))
+    assert len(shared) == 2
+    assert {a["shared_group_id"] for a in shared} == {
+        users["tester1"]["shared_group_id"],
+        users["tester3"]["shared_group_id"],
+    }
+
+    # Signing in keeps the prepared state; an empty reset clears it again.
+    assert sign_in(env, "tester1") == str(users["tester1"]["_id"])
+    env.client.post("/api/auth/test-login/reset", json={"password": PASSWORD})
+    assert run(env.db.users.count_documents({})) == 0
+    assert run(env.db.accounts.count_documents({})) == 0
