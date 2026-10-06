@@ -304,7 +304,7 @@ def test_settlement_currency_must_match_expense(env):
     exp = expense(env, 100)
     res = settle(env, exp["id"], 10, currency="KRW")
     assert res.status_code == 422
-    assert "통화" in res.json()["detail"]
+    assert res.json()["detail"] == "settlementCurrencyMismatch"
 
 
 def test_settlement_must_be_in_the_same_ledger(env):

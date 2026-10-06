@@ -3,9 +3,10 @@
 from datetime import datetime
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.errors import AppError
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.subscription import (
@@ -95,11 +96,9 @@ async def _validate_account(
     account_type: str,
     shared_group_id: str | None = None,
 ) -> None:
+    invalid = status.HTTP_422_UNPROCESSABLE_ENTITY
     if not ObjectId.is_valid(account_id):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="유효하지 않은 결제 계좌입니다.",
-        )
+        raise AppError(invalid, "invalidAccountId", field="paymentAccount")
     account = await db[ACCOUNTS_COL].find_one(
         {
             "_id": ObjectId(account_id),
@@ -110,20 +109,11 @@ async def _validate_account(
         }
     )
     if not account:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="선택한 결제 계좌를 찾을 수 없습니다.",
-        )
+        raise AppError(invalid, "selectedAccountNotFound", field="paymentAccount")
     if account.get("currency") != currency:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="계좌 통화와 구독 통화가 일치하지 않습니다.",
-        )
+        raise AppError(invalid, "subscriptionCurrencyMismatch")
     if account.get("account_type") != account_type:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="계좌의 공용/개인 구분이 구독과 일치하지 않습니다.",
-        )
+        raise AppError(invalid, "subscriptionLedgerMismatch")
 
 
 @router.get("", response_model=list[SubscriptionOut])
@@ -239,10 +229,7 @@ async def skip_pending_occurrence(
         owner_ids=all_ids,
     )
     if not skipped:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="예정 결제를 찾을 수 없거나 이미 처리되었습니다.",
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, "occurrenceNotFound")
 
     sub_oid = skipped.get("subscription_id")
     sub = None
@@ -318,7 +305,7 @@ async def subscription_history(
         owner_ids=all_ids,
     )
     if not result:
-        raise HTTPException(status_code=404, detail="Subscription not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "subscriptionNotFound")
     return result
 
 
@@ -329,17 +316,15 @@ async def create_subscription(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     if payload.cycle == BillingCycle.INSTALLMENT and not payload.total_installments:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="할부는 총 회차(total_installments)가 필요합니다.",
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "totalInstallmentsRequired"
         )
     if (
         payload.cycle != BillingCycle.INSTALLMENT
         and payload.total_installments is not None
     ):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="total_installments는 할부(cycle=installment)에서만 사용할 수 있습니다.",
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "totalInstallmentsNotAllowed"
         )
 
     require_shared_group_for_write(current_user, payload.account_type)
@@ -412,11 +397,11 @@ async def update_subscription(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     if not ObjectId.is_valid(subscription_id):
-        raise HTTPException(status_code=404, detail="Subscription not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "subscriptionNotFound")
 
     existing = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
     await assert_can_access_doc(
-        db, current_user, existing, not_found_detail="Subscription not found."
+        db, current_user, existing, not_found_code="subscriptionNotFound"
     )
 
     owner_ids = await resolve_owner_ids(
@@ -463,9 +448,8 @@ async def update_subscription(
         # Past (completed) transactions stay in the ledger they were charged to;
         # only the subscription and its upcoming occurrences move.
         if not updates.get("account_id"):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="공유/개인을 바꾸려면 새 결제 계좌를 선택해야 합니다.",
+            raise AppError(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "scopeSwitchNeedsAccount"
             )
         require_shared_group_for_write(current_user, target_type)
         owner_ids = await resolve_owner_ids(db, current_user, target_type)
@@ -649,11 +633,11 @@ async def schedule_cancel_subscription(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     if not ObjectId.is_valid(subscription_id):
-        raise HTTPException(status_code=404, detail="Subscription not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "subscriptionNotFound")
 
     existing = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
     await assert_can_access_doc(
-        db, current_user, existing, not_found_detail="Subscription not found."
+        db, current_user, existing, not_found_code="subscriptionNotFound"
     )
 
     if existing.get("status") == SubscriptionStatus.CANCEL_SCHEDULED.value:
@@ -689,11 +673,11 @@ async def delete_subscription(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> None:
     if not ObjectId.is_valid(subscription_id):
-        raise HTTPException(status_code=404, detail="Subscription not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "subscriptionNotFound")
 
     existing = await db[COLLECTION].find_one({"_id": ObjectId(subscription_id)})
     await assert_can_access_doc(
-        db, current_user, existing, not_found_detail="Subscription not found."
+        db, current_user, existing, not_found_code="subscriptionNotFound"
     )
 
     await db[OCC_COL].delete_many(

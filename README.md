@@ -129,7 +129,7 @@ For each completed item:
 
 ### Branch and pull request plan
 
-Use `main` as the release branch and short-lived `docs/`, `fix/`, and `feat/` branches for focused changes. The branch names below are proposed work units, not claims that implementation already exists.
+`main` is the live release branch and deploys automatically; `develop` is the integration branch. Focused `docs/`, `fix/`, and `feat/` branches start from `develop` and merge back into it, and `develop` is released to `main` once it has been verified on staging (see [`docs/BRANCHING.md`](./docs/BRANCHING.md)). The branch names below are proposed work units, not claims that implementation already exists.
 
 | Order | Branch | Status | Scope |
 | --- | --- | --- | --- |
@@ -152,7 +152,7 @@ Use `main` as the release branch and short-lived `docs/`, `fix/`, and `feat/` br
 | 16 | `feat/peer-comparisons` | Planned | Optional profile and sourced benchmarks |
 | 17 | `feat/unit-price-insights` | Planned | Receipt-based unit prices and shopping advice |
 
-Start each independent change from the latest `main`. Merge prerequisite data/model changes before starting dependent work, or explicitly use a dependent PR while its prerequisite is under review. Avoid putting the whole roadmap into one branch. Each PR should explain the problem, resulting behavior, verification, and any migration requirements. Push the branch to `origin`, open a PR into `main`, and merge after review and required checks. Enable appropriate branch protection in GitHub if it is not already configured.
+Start each independent change from the latest `develop`. Merge prerequisite data/model changes before starting dependent work, or explicitly use a dependent PR while its prerequisite is under review. Avoid putting the whole roadmap into one branch. Each PR should explain the problem, resulting behavior, verification, and any migration requirements. Push the branch to `origin`, open a PR into `develop`, and merge after review and required checks. Release `develop` to `main` with a release PR; only `develop` and `hotfix/*` branches may target `main`.
 
 ---
 

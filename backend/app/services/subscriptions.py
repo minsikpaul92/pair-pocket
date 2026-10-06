@@ -6,6 +6,7 @@ from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import ReturnDocument
 
+from app.core.i18n import translate
 from app.models.ledger import TransactionKind
 from app.models.subscription import (
     BillingCycle,
@@ -328,22 +329,25 @@ async def purge_subscription_on_reschedule(
 
 def _reminder_email_body(
     *,
-    settings,
+    locale: str,
     sub: dict,
     title: str,
     detail_lines: list[str],
 ) -> str:
-    sub_id = str(sub["_id"])
-    view_url = f"{settings.frontend_url}/?view=subscriptions&subscription={sub_id}"
-    cancel_url = f"{settings.frontend_url}/?view=subscriptions&subscription={sub_id}&action=cancel"
+    from app.services.email import frontend_link
+
+    view_url = frontend_link(
+        locale, f"?view=subscriptions&subscription={sub['_id']}"
+    )
+    cancel_url = f"{view_url}&action=cancel"
     details = "\n".join(detail_lines)
     return (
-        f"안녕하세요,\n\n"
+        f"{translate(locale, 'email.reminder.greeting')}\n\n"
         f"{title}\n"
         f"{details}\n\n"
-        f"구독 확인: {view_url}\n"
-        f"해지하기: {cancel_url}\n\n"
-        f"PairPocket"
+        f"{translate(locale, 'email.reminder.view', url=view_url)}\n"
+        f"{translate(locale, 'email.reminder.cancel', url=cancel_url)}\n\n"
+        f"{translate(locale, 'email.signature')}"
     )
 
 
@@ -356,10 +360,8 @@ async def send_promo_reminders(
     user_email: str,
     as_of: str | None = None,
 ) -> int:
-    from app.config import get_settings
-    from app.services.email import send_email
+    from app.services.email import recipient_locale, send_email
 
-    settings = get_settings()
     today = _parse_as_of(as_of)
     week_ahead = today + timedelta(days=7)
     sent_count = 0
@@ -379,23 +381,41 @@ async def send_promo_reminders(
         .to_list(length=50)
     )
 
+    if not subs:
+        return 0
+    locale = await recipient_locale(db, owner_id)
     for sub in subs:
         promo_end = sub.get("promo_end_date")
         if not promo_end:
             continue
-        end_label = promo_end.strftime("%Y-%m-%d")
+        name, currency = sub["name"], sub["currency"]
         body = _reminder_email_body(
-            settings=settings,
+            locale=locale,
             sub=sub,
-            title=f"'{sub['name']}' 구독 프로모션이 {end_label}에 종료됩니다.",
+            title=translate(
+                locale,
+                "email.reminder.promoTitle",
+                name=name,
+                date=promo_end.strftime("%Y-%m-%d"),
+            ),
             detail_lines=[
-                f"프로모션 금액: {sub.get('promo_amount')} {sub['currency']}",
-                f"이후 정상 금액: {sub['amount']} {sub['currency']}",
+                translate(
+                    locale,
+                    "email.reminder.promoAmount",
+                    amount=sub.get("promo_amount"),
+                    currency=currency,
+                ),
+                translate(
+                    locale,
+                    "email.reminder.regularAfterPromo",
+                    amount=sub["amount"],
+                    currency=currency,
+                ),
             ],
         )
         if send_email(
             to=user_email,
-            subject=f"[PairPocket] {sub['name']} 프로모션 종료 1주일 전 알림",
+            subject=translate(locale, "email.reminder.promoSubject", name=name),
             body=body,
         ):
             await db[SUBS_COL].update_one(
@@ -415,10 +435,8 @@ async def send_end_reminders(
     user_email: str,
     as_of: str | None = None,
 ) -> int:
-    from app.config import get_settings
-    from app.services.email import send_email
+    from app.services.email import recipient_locale, send_email
 
-    settings = get_settings()
     today = _parse_as_of(as_of)
     week_ahead = today + timedelta(days=7)
     sent_count = 0
@@ -437,20 +455,35 @@ async def send_end_reminders(
         .to_list(length=50)
     )
 
+    if not subs:
+        return 0
+    locale = await recipient_locale(db, owner_id)
     for sub in subs:
         end = sub.get("end_date")
         if not end:
             continue
-        end_label = end.strftime("%Y-%m-%d")
+        name = sub["name"]
         body = _reminder_email_body(
-            settings=settings,
+            locale=locale,
             sub=sub,
-            title=f"'{sub['name']}' 구독이 {end_label}에 종료됩니다.",
-            detail_lines=[f"정상 금액: {sub['amount']} {sub['currency']}"],
+            title=translate(
+                locale,
+                "email.reminder.endTitle",
+                name=name,
+                date=end.strftime("%Y-%m-%d"),
+            ),
+            detail_lines=[
+                translate(
+                    locale,
+                    "email.reminder.regularAmount",
+                    amount=sub["amount"],
+                    currency=sub["currency"],
+                )
+            ],
         )
         if send_email(
             to=user_email,
-            subject=f"[PairPocket] {sub['name']} 구독 종료 1주일 전 알림",
+            subject=translate(locale, "email.reminder.endSubject", name=name),
             body=body,
         ):
             await db[SUBS_COL].update_one(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { 
   Briefcase, 
   Camera,
@@ -21,6 +21,9 @@ import AccountRegisterModal from "@/components/AccountRegisterModal";
 import FloatingActionStack from "@/components/FloatingActionStack";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
+import { errorMessage } from "@/lib/errors";
+import { useInstitutionLabel } from "@/lib/useInstitutionLabel";
+import { intlLocale } from "@/i18n/locales";
 
 import {
   AccountType,
@@ -63,6 +66,9 @@ type ViewMode = "price" | "valuation";
 export default function StocksView({ accountType, ledgerScope, version, onChanged }: Props) {
   const { defaults: accountDefaults } = useAccountDefaults(accountType, version);
   const t = useTranslations("stocks");
+  const tErrors = useTranslations("errors");
+  const institutionName = useInstitutionLabel();
+  const numberLocale = intlLocale(useLocale());
 
   // State controls
   const [displayCurrency, setDisplayCurrency] = useState<Currency>("CAD");
@@ -77,7 +83,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const [scanning, setScanning] = useState(false);
   const stockCameraRef = useRef<HTMLInputElement>(null);
 
-  /** ALL / Korea always roll up; Canada rolls up only when CAD or USD is selected (not 전체). */
+  /** ALL / Korea always roll up; Canada rolls up only when CAD or USD is selected (not "all"). */
   const useFxRollup =
     ledgerScope === "ALL" ||
     ledgerScope === "KRW" ||
@@ -299,7 +305,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       items.push({
         key: id,
         label: t(id as "nasdaq" | "sp500" | "dow" | "kospi" | "tsx"),
-        value: quote.price.toLocaleString(undefined, {
+        value: quote.price.toLocaleString(numberLocale, {
           maximumFractionDigits: quote.price >= 1000 ? 2 : 2,
         }),
         change: `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
@@ -313,7 +319,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         items.push({
           key: "fx-usd-krw",
           label: t("fxUsdKrw"),
-          value: usdKrw.toLocaleString(undefined, {
+          value: usdKrw.toLocaleString(numberLocale, {
             maximumFractionDigits: 2,
           }),
         });
@@ -325,14 +331,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         items.push({
           key: "fx-usd-cad",
           label: t("fxUsdCad"),
-          value: usdCad.toLocaleString(undefined, {
+          value: usdCad.toLocaleString(numberLocale, {
             maximumFractionDigits: 4,
           }),
         });
       }
     }
     return items;
-  }, [marketIndices, rates, ledgerScope, t]);
+  }, [marketIndices, rates, ledgerScope, t, numberLocale]);
 
   useEffect(() => {
     setTickerIndex(0);
@@ -510,7 +516,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       loadData();
       if (onChanged) onChanged();
     } catch (err: any) {
-      setFormError(err.message || t("addFailed"));
+      setFormError(errorMessage(err, tErrors, t("addFailed")));
     } finally {
       setSubmitting(false);
     }
@@ -531,7 +537,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       loadData();
       if (onChanged) onChanged();
     } catch (err: any) {
-      alert(err.message || t("editFailed"));
+      alert(errorMessage(err, tErrors, t("editFailed")));
     } finally {
       setSubmitting(false);
     }
@@ -546,7 +552,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       loadData();
       if (onChanged) onChanged();
     } catch (err: any) {
-      alert(err.message || t("deleteFailed"));
+      alert(errorMessage(err, tErrors, t("deleteFailed")));
     }
   };
 
@@ -644,7 +650,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
       );
       await applyAiParse(result);
     } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : t("addFailed"));
+      setFormError(errorMessage(err, tErrors, t("addFailed")));
     } finally {
       setScanning(false);
       e.target.value = "";
@@ -869,7 +875,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         />
       </div>
 
-      {/* 2. 내 투자 계좌 (My Investment Accounts) */}
+      {/* 2. My investment accounts */}
       <div className="card-inset p-4 sm:p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -895,7 +901,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         </div>
 
         <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory">
-          {/* 1. 전체 계좌 통합 카드 */}
+          {/* 1. All accounts combined card */}
           <button
             onClick={() => setSelectedAccountIdFilter("ALL")}
             className={`text-left p-3.5 rounded-2xl transition-all border shrink-0 w-[148px] sm:w-[160px] snap-start ${
@@ -949,7 +955,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             )}
           </button>
 
-          {/* 2. 개별 계좌 카드 목록 */}
+          {/* 2. Per-account cards */}
           {orderedVisibleAccounts.map((acc) => {
             const isSelected = selectedAccountIdFilter === acc.id;
             const stats = accountStatsMap[acc.id] || {
@@ -1004,8 +1010,8 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 >
                   <div className="flex items-center justify-between gap-1 min-w-0">
                     <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-grab" />
-                    <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap flex-1" title={`${acc.institution ? `[${acc.institution}] ` : ""}${acc.nickname || acc.name}`}>
-                      {acc.institution ? `[${acc.institution}] ` : ""}{acc.nickname || acc.name}
+                    <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap flex-1" title={`${acc.institution ? `[${institutionName(acc.institution)}] ` : ""}${acc.nickname || acc.name}`}>
+                      {acc.institution ? `[${institutionName(acc.institution)}] ` : ""}{acc.nickname || acc.name}
                     </span>
                     <button
                       type="button"
@@ -1179,7 +1185,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   {(() => {
                     const matchedAcc = investmentAccounts.find((a) => a.id === selectedAccountIdFilter);
                     return matchedAcc
-                      ? `${matchedAcc.institution ? `[${matchedAcc.institution}] ` : ""}${matchedAcc.name}`
+                      ? `${matchedAcc.institution ? `[${institutionName(matchedAcc.institution)}] ` : ""}${matchedAcc.name}`
                       : t("filteredAccount");
                   })()}
                 </span>
@@ -1462,7 +1468,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   <option value="">{t("selectBrokerage")}</option>
                   {visibleAccounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.institution ? `[${acc.institution}] ` : ""}
+                      {acc.institution ? `[${institutionName(acc.institution)}] ` : ""}
                       {acc.name} ({acc.currency})
                     </option>
                   ))}
@@ -1569,7 +1575,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                     value={sharesInput}
                     onChange={(e) => setSharesInput(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 dark:border-gray-850 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
-                    placeholder="예: 10"
+                    placeholder={t("sharesPlaceholder")}
                     required
                   />
                 </div>
@@ -1652,13 +1658,16 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   >
                     {selectedHoldingGroup.holdings.map((h: any) => (
                       <option key={h.id} value={h.id}>
-                        {h.account_name || h.institution} ({h.shares}주)
+                        {h.account_name || institutionName(h.institution)} ({t("sharesCount", { shares: h.shares })})
                       </option>
                     ))}
                   </select>
                 ) : (
                   <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 px-3.5 py-2 rounded-xl">
-                    {selectedHolding.account_name || selectedHolding.institution || t("defaultAccount")}
+                    {selectedHolding.account_name ||
+                      (selectedHolding.institution
+                        ? institutionName(selectedHolding.institution)
+                        : t("defaultAccount"))}
                   </div>
                 )}
               </div>

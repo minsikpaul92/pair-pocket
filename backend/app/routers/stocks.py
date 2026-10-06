@@ -1,9 +1,10 @@
 from datetime import datetime
 from bson import ObjectId
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.errors import AppError
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.holding import (
@@ -166,11 +167,9 @@ async def create_holding(
     # Verify account exists and is investment kind
     account = await db.accounts.find_one({"_id": ObjectId(payload.account_id)})
     if not account:
-        raise HTTPException(status_code=404, detail="Brokerage account not found")
+        raise AppError(status.HTTP_404_NOT_FOUND, "accountNotFound")
     if account.get("kind") != "investment":
-        raise HTTPException(
-            status_code=400, detail="Account is not an investment account"
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "notInvestmentAccount")
 
     # Check authorization
     await assert_can_access_doc(db, current_user, account)
@@ -254,7 +253,7 @@ async def update_holding(
     """Manually update average price and/or shares of a holding."""
     holding = await db.holdings.find_one({"_id": ObjectId(holding_id)})
     if not holding:
-        raise HTTPException(status_code=404, detail="Holding not found")
+        raise AppError(status.HTTP_404_NOT_FOUND, "holdingNotFound")
 
     await assert_can_access_doc(db, current_user, holding)
 
@@ -286,7 +285,7 @@ async def delete_holding(
     """Manually delete a holding."""
     holding = await db.holdings.find_one({"_id": ObjectId(holding_id)})
     if not holding:
-        raise HTTPException(status_code=404, detail="Holding not found")
+        raise AppError(status.HTTP_404_NOT_FOUND, "holdingNotFound")
 
     await assert_can_access_doc(db, current_user, holding)
 

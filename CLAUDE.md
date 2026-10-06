@@ -8,9 +8,16 @@ Guidance for Claude Code when working in this repository.
 - Write every pull request title and description, and every GitHub comment or review reply, in English.
 - Do not use em dashes in documents, pull requests, or comments.
 
-## Korean and English parity
+## Branches
 
-- Korean is the source of truth. Every user-visible feature must behave identically in ko and en; only the language changes.
+- `main` is the live service and deploys automatically. Never commit or push to `main` directly.
+- Branch from `develop` and open pull requests into `develop`. Only release pull requests from `develop` (and `hotfix/*` branches) merge into `main`. See `docs/BRANCHING.md`.
+
+## Language packs
+
+See `docs/I18N.md` for the full workflow.
+
+- Korean is the source of truth. Every user-visible feature must behave identically in every language; only the text changes.
 - Never hardcode Korean (or English) text in components. Add the string to both `frontend/messages/ko.json` and `frontend/messages/en.json` with the same key and the same `{placeholders}`.
-- Run `npm run check:i18n` in `frontend` before pushing. It fails on key or placeholder mismatches and on new hardcoded Hangul. When you remove hardcoded strings, run `node scripts/check-i18n.mjs --update-baseline` so the debt only goes down.
-- Backend `detail` messages are Korean and are not shown to users as-is: `translateError` in `frontend/lib/errors.ts` only translates codes from `messages/*.json` `errors.*` and otherwise shows the generic fallback. Do not rely on a backend message reaching the user.
+- Run `npm run check:i18n` in `frontend` before pushing. It fails on key or placeholder mismatches, broken ICU syntax, registry drift and any hardcoded Hangul outside the data modules.
+- The API never sends display text. Raise `AppError(status, "camelCaseCode", **params)` (`backend/app/core/errors.py`), never `HTTPException`, and add `errors.server.<code>` to `ko.json` and `en.json`. Email text lives in `backend/app/locales/<code>.json`. `backend/tests/test_i18n_packs.py` enforces both.

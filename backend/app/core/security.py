@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import get_settings
+from app.core.errors import AppError
 from app.database import get_database
 from app.models.user import UserOut
 
@@ -32,19 +33,14 @@ def decode_access_token(token: str) -> dict:
             token, settings.secret_key, algorithms=[settings.jwt_algorithm]
         )
     except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token.",
-        )
+        raise AppError(status.HTTP_401_UNAUTHORIZED, "sessionExpired")
 
 
 def _decode_token(token: str) -> str:
     payload = decode_access_token(token)
     subject = payload.get("sub")
     if not subject:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload."
-        )
+        raise AppError(status.HTTP_401_UNAUTHORIZED, "sessionExpired")
     return subject
 
 
@@ -59,15 +55,11 @@ async def get_current_user(
     try:
         object_id = ObjectId(user_id)
     except InvalidId:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject."
-        )
+        raise AppError(status.HTTP_401_UNAUTHORIZED, "sessionExpired")
 
     document = await db["users"].find_one({"_id": object_id})
     if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found."
-        )
+        raise AppError(status.HTTP_401_UNAUTHORIZED, "sessionExpired")
 
     return UserOut(
         id=str(document["_id"]),

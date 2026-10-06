@@ -34,7 +34,12 @@ import {
   formatAmount,
   setCategoryColor,
 } from "@/lib/api";
-import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import {
+  merchantLabel,
+  translateCategory,
+  translateSubCategory,
+} from "@/lib/category-i18n";
+import { CATEGORY, MERCHANT_PLACEHOLDER } from "@/lib/category-values";
 import { addDays, addMonths, dayKey, monthKey, weekStart } from "@/lib/date";
 
 const WEB_PRESET_COLORS = [
@@ -57,17 +62,20 @@ const WEB_PRESET_COLORS = [
 ];
 
 const CATEGORY_DEFAULT_COLORS: Record<string, string> = {
-  "식비": "#0000FF",       // Blue
-  "주거/통신": "#808000",  // Olive
-  "교통/차량": "#008080",  // Teal
-  "생활/쇼핑": "#00FFFF",  // Aqua / Cyan
-  "건강/의료": "#FF0000",  // Red
-  "문화/취미": "#800080",  // Purple
-  "경조사/선물": "#800000", // Maroon
-  "투자/저축": "#008000",  // Green
-  "세금": "#808080",       // Gray
-  "이체": "#C0C0C0",       // Silver
+  [CATEGORY.food]: "#0000FF", // Blue
+  [CATEGORY.housing]: "#808000", // Olive
+  [CATEGORY.transport]: "#008080", // Teal
+  [CATEGORY.living]: "#00FFFF", // Aqua / Cyan
+  [CATEGORY.health]: "#FF0000", // Red
+  [CATEGORY.culture]: "#800080", // Purple
+  [CATEGORY.gifts]: "#800000", // Maroon
+  [CATEGORY.investmentSavings]: "#008000", // Green
+  [CATEGORY.tax]: "#808080", // Gray
+  [CATEGORY.transfer]: "#C0C0C0", // Silver
 };
+
+/** Grouping key for expenses without a sub-category. */
+const UNCATEGORIZED_SUB = "__uncategorized__";
 
 /** Show icon inside pie slice only when the slice is large enough. */
 const PIE_ICON_MIN_PERCENT = 12;
@@ -148,6 +156,7 @@ function PieExpenseTooltip({
   monthTransactions?: Transaction[];
   tCategories?: any;
 }) {
+  const t = useTranslations("dashboard");
   if (!active || !payload?.length) return null;
   const slice = payload[0]?.payload;
   if (!slice) return null;
@@ -167,7 +176,11 @@ function PieExpenseTooltip({
         (tCategories &&
           translateCategory(tx.category, tCategories) === slice.name);
       if (isMatch) {
-        const name = tx.merchant?.trim() || tx.sub_category?.trim() || "기타";
+        const merchant = tx.merchant?.trim();
+        const name =
+          (merchant && merchant !== MERCHANT_PLACEHOLDER ? merchant : "") ||
+          tx.sub_category?.trim() ||
+          t("otherMerchant");
         const amt = effectiveExpenseAmount(tx);
         map[name] = (map[name] || 0) + amt;
         catSum += amt;
@@ -203,7 +216,7 @@ function PieExpenseTooltip({
 
       <div className="mt-2.5 border-t border-gray-100 dark:border-gray-800/80 pt-2">
         <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-          주요 사용처
+          {t("topMerchants")}
         </p>
         {topItems.length > 0 ? (
           <div className="space-y-1">
@@ -429,6 +442,7 @@ export default function DashboardAnalytics({
   const t = useTranslations("dashboard");
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
+  const tCommon = useTranslations("common");
 
   const [expenseRange, setExpenseRange] = useState<ExpenseRange>(1);
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() =>
@@ -471,7 +485,7 @@ export default function DashboardAnalytics({
     );
     const map = new Map<string, { total: number; txs: Transaction[] }>();
     for (const tx of catTxs) {
-      const sub = tx.sub_category || "미분류";
+      const sub = tx.sub_category || UNCATEGORIZED_SUB;
       const existing = map.get(sub) || { total: 0, txs: [] };
       existing.total += effectiveExpenseAmount(tx);
       existing.txs.push(tx);
@@ -486,7 +500,7 @@ export default function DashboardAnalytics({
 
   const translate = (cat: string) => translateCategory(cat, tCategories);
 
-  // Current-month slices from props (fast path for "이번 달").
+  // Current-month slices from props (fast path for "this month").
   const monthSlices = useMemo(() => {
     const maps: Map<string, number>[] = [];
     if (scope === "CAD" || scope === "ALL") {
@@ -791,7 +805,7 @@ export default function DashboardAnalytics({
               {/* Centered Total Summary (z-0 so tooltip floats on top) */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                  총 지출
+                  {t("totalExpense")}
                 </span>
                 <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums mt-0.5">
                   {formatAmount(pieTotalExpense, displayCurrency)}
@@ -1075,7 +1089,9 @@ export default function DashboardAnalytics({
                 <span className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
                   {translateCategory(popoverCategory, tCategories)}
                 </span>
-                <span className="text-xs text-gray-500 font-medium">소비 내역 (중분류)</span>
+                <span className="text-xs text-gray-500 font-medium">
+                  {t("spendingBySubCategory")}
+                </span>
               </div>
               <button
                 type="button"
@@ -1088,13 +1104,15 @@ export default function DashboardAnalytics({
 
             <div className="space-y-3">
               {subCategoryGroupMap.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">이번 달 지출 내역이 없습니다.</p>
+                <p className="text-xs text-gray-400 text-center py-4">
+                  {t("noSpendingThisMonth")}
+                </p>
               ) : (
                 subCategoryGroupMap.map(({ subCategory, total, txs }) => (
                   <div
                     key={subCategory}
                     onClick={() => {
-                      const subVal = subCategory === "미분류" ? undefined : subCategory;
+                      const subVal = subCategory === UNCATEGORIZED_SUB ? undefined : subCategory;
                       onCategoryClick?.(popoverCategory, subVal, true);
                       setPopoverCategory(null);
                     }}
@@ -1102,7 +1120,10 @@ export default function DashboardAnalytics({
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-bold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                        {translateSubCategory(subCategory, tSubCategories)} ›
+                        {subCategory === UNCATEGORIZED_SUB
+                          ? t("uncategorized")
+                          : translateSubCategory(subCategory, tSubCategories)}{" "}
+                        ›
                       </span>
                       <span className="text-xs font-bold tabular-nums text-gray-900 dark:text-white">
                         {formatAmount(total, displayCurrency)}
@@ -1111,13 +1132,15 @@ export default function DashboardAnalytics({
                     <ul className="space-y-1 pl-1 border-t border-gray-100 dark:border-gray-700/40 pt-1.5 mt-1">
                       {txs.slice(0, 3).map((tx) => (
                         <li key={tx.id} className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                          <span className="truncate max-w-[170px]">{tx.note?.trim() || tx.merchant}</span>
+                          <span className="truncate max-w-[170px]">
+                            {tx.note?.trim() || merchantLabel(tx.merchant, tCommon)}
+                          </span>
                           <span className="tabular-nums shrink-0 font-medium">{formatAmount(effectiveExpenseAmount(tx), tx.currency)}</span>
                         </li>
                       ))}
                       {txs.length > 3 && (
                         <li className="text-[10px] text-indigo-500 font-semibold text-right pt-0.5">
-                          외 {txs.length - 3}건 더보기 (클릭)
+                          {t("moreItems", { count: txs.length - 3 })}
                         </li>
                       )}
                     </ul>

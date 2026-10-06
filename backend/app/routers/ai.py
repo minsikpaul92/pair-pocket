@@ -1,9 +1,10 @@
 import json
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
 
+from app.core.errors import AppError
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.user import UserOut
@@ -11,6 +12,7 @@ from app.models.ocr_log import OCRLogOut, FeedbackUpdateBody
 from app.services.ai import (
     ONBOARDING_MAX_IMAGES,
     ONBOARDING_STEPS,
+    ScanError,
     parse_files_in_batches,
     parse_onboarding_screenshots,
     parse_onboarding_screenshots_stream,
@@ -19,6 +21,15 @@ from app.services.ai import (
 )
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
+
+
+def _error_event(exc: Exception) -> dict:
+    """Stream event for an unexpected failure; the UI shows errors.server.<code>."""
+    return {
+        "event": "error",
+        "code": getattr(exc, "code", "aiScanFailed"),
+        "error": str(exc),
+    }
 
 
 @router.post("/parse")
@@ -32,19 +43,16 @@ async def parse_receipts_or_statements(
 ):
     prepared: list[tuple[bytes, str, str]] = []
     errors: list[str] = []
+    error_codes: list[str] = []
     normalized_flow = flow_type.strip().lower()
     if normalized_flow not in ("expense", "income"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="flow_type must be expense or income",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidScanType")
 
     for file in files:
         content_type = file.content_type or "image/jpeg"
         if not (content_type.startswith("image/") or content_type == "application/pdf"):
-            errors.append(
-                f"지원하지 않는 파일 형식입니다 ({file.filename}): {content_type}"
-            )
+            errors.append(f"{file.filename}: unsupported file type {content_type}")
+            error_codes.append("unsupportedFileType")
             continue
         content = await file.read()
         prepared.append((content, content_type, file.filename or "file"))
@@ -60,18 +68,17 @@ async def parse_receipts_or_statements(
     results = []
     for item in outcomes:
         if "error" in item:
-            errors.append(
-                f"파일 분석 중 오류 발생 ({item['file_name']}): {item['error']}"
-            )
+            errors.append(f"{item['file_name']}: {item['error']}")
+            error_codes.append(item["code"])
             continue
         parsed = item["result"]
         parsed["file_name"] = item["file_name"]
         results.append(parsed)
 
     if errors and not results:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="; ".join(errors)
-        )
+        # One shared reason (no API key, say) is worth showing as is.
+        code = error_codes[0] if len(set(error_codes)) == 1 else "aiScanFailed"
+        raise AppError(status.HTTP_400_BAD_REQUEST, code)
 
     return {
         "status": "success",
@@ -88,10 +95,7 @@ async def parse_items_endpoint(
 ):
     content_type = file.content_type or "image/jpeg"
     if not (content_type.startswith("image/") or content_type == "application/pdf"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"지원하지 않는 파일 형식입니다: {content_type}",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "unsupportedFileType")
     content = await file.read()
     items = await parse_receipt_items(
         db, current_user.id, content, content_type, file.filename or "file"
@@ -108,16 +112,10 @@ async def parse_receipts_or_statements_stream(
 ):
     content_type = file.content_type or "image/jpeg"
     if not (content_type.startswith("image/") or content_type == "application/pdf"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"지원하지 않는 파일 형식입니다: {content_type}",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "unsupportedFileType")
     normalized_flow = flow_type.strip().lower()
     if normalized_flow not in ("expense", "income"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="flow_type must be expense or income",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidScanType")
     content = await file.read()
 
     async def sse_generator():
@@ -132,9 +130,31 @@ async def parse_receipts_or_statements_stream(
             ):
                 yield f"data: {json.dumps(update)}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'event': 'error', 'error': str(e)})}\n\n"
+            yield f"data: {json.dumps(_error_event(e))}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+
+async def _read_onboarding_images(
+    step: str, files: list[UploadFile]
+) -> list[tuple[bytes, str, str]]:
+    if step not in ONBOARDING_STEPS:
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidOnboardingStep")
+    if not files:
+        raise AppError(status.HTTP_400_BAD_REQUEST, "imagesRequired")
+    if len(files) > ONBOARDING_MAX_IMAGES:
+        raise AppError(
+            status.HTTP_400_BAD_REQUEST, "tooManyImages", max=ONBOARDING_MAX_IMAGES
+        )
+
+    prepared: list[tuple[bytes, str, str]] = []
+    for file in files:
+        content_type = file.content_type or "image/jpeg"
+        if not content_type.startswith("image/"):
+            raise AppError(status.HTTP_400_BAD_REQUEST, "unsupportedFileType")
+        content = await file.read()
+        prepared.append((content, content_type, file.filename or "image.jpg"))
+    return prepared
 
 
 @router.post("/onboarding-parse")
@@ -144,45 +164,13 @@ async def parse_onboarding_step_screenshots(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    if step not in ONBOARDING_STEPS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"step must be one of: {', '.join(ONBOARDING_STEPS)}",
-        )
-    if not files:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="At least one image is required",
-        )
-    if len(files) > ONBOARDING_MAX_IMAGES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Maximum {ONBOARDING_MAX_IMAGES} images allowed",
-        )
-
-    prepared: list[tuple[bytes, str, str]] = []
-    for file in files:
-        content_type = file.content_type or "image/jpeg"
-        if not content_type.startswith("image/"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file type ({file.filename}): {content_type}",
-            )
-        content = await file.read()
-        prepared.append((content, content_type, file.filename or "image.jpg"))
-
+    prepared = await _read_onboarding_images(step, files)
     try:
         result = await parse_onboarding_screenshots(db, current_user.id, step, prepared)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+    except ScanError as e:
+        raise AppError(status.HTTP_400_BAD_REQUEST, e.code, **e.params) from e
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+        raise AppError(status.HTTP_400_BAD_REQUEST, "aiScanFailed") from e
 
     return {"status": "success", **result}
 
@@ -194,32 +182,7 @@ async def parse_onboarding_step_screenshots_stream(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    if step not in ONBOARDING_STEPS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"step must be one of: {', '.join(ONBOARDING_STEPS)}",
-        )
-    if not files:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="At least one image is required",
-        )
-    if len(files) > ONBOARDING_MAX_IMAGES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Maximum {ONBOARDING_MAX_IMAGES} images allowed",
-        )
-
-    prepared: list[tuple[bytes, str, str]] = []
-    for file in files:
-        content_type = file.content_type or "image/jpeg"
-        if not content_type.startswith("image/"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file type ({file.filename}): {content_type}",
-            )
-        content = await file.read()
-        prepared.append((content, content_type, file.filename or "image.jpg"))
+    prepared = await _read_onboarding_images(step, files)
 
     async def sse_generator():
         try:
@@ -228,7 +191,7 @@ async def parse_onboarding_step_screenshots_stream(
             ):
                 yield f"data: {json.dumps(update)}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'event': 'error', 'error': str(e)})}\n\n"
+            yield f"data: {json.dumps(_error_event(e))}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
 
@@ -271,33 +234,19 @@ async def update_ocr_log_feedback(
 ):
     # Validate feedback type
     if body.feedback not in [None, "thumbs_up", "thumbs_down"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Feedback must be 'thumbs_up', 'thumbs_down', or null",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidFeedback")
 
     try:
         oid = ObjectId(log_id)
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid log ID"
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "notFound")
 
     log_doc = await db["ocr_logs"].find_one({"_id": oid})
     if not log_doc:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_444_NOT_FOUND
-                if hasattr(status, "HTTP_444_NOT_FOUND")
-                else 404
-            ),
-            detail="Log not found",
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, "notFound")
 
     if log_doc["owner_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
+        raise AppError(status.HTTP_403_FORBIDDEN, "accessDenied")
 
     await db["ocr_logs"].update_one({"_id": oid}, {"$set": {"feedback": body.feedback}})
     return {"status": "success"}

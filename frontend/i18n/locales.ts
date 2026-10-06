@@ -1,57 +1,68 @@
-export const locales = [
-  "ko",
-  "en",
-  "fr",
-  "zh-Hans",
-  "zh-Hant",
-  "ja",
-  "es",
-  "vi",
-  "fil",
-  "pa",
-] as const;
+import registry from "./locales.json";
 
-export type AppLocale = (typeof locales)[number];
+/**
+ * Locale registry. `locales.json` is the single list of UI languages; the
+ * message pack for each lives at `messages/<code>.json`.
+ *
+ * - `ko` is the source of truth: every key is written there first.
+ * - Any other pack may be partial. Missing or empty keys fall back to `en`,
+ *   then `ko`, so a new language works as soon as its file is translated.
+ * - `beta: true` shows a Beta badge until the pack is fully translated.
+ *
+ * Add a language with `npm run i18n:new -- <code>` (see docs/I18N.md).
+ */
 
-/** Locales with full static message packs shipped in MVP. */
-export const FULL_MESSAGE_LOCALES = ["ko", "en"] as const;
+export type AppLocale = string;
 
 export type LocaleMeta = {
   code: AppLocale;
   label: string;
   native: string;
+  /** Compact label for the header toggle. */
+  short: string;
+  /** BCP 47 tag for Intl date and number formatting. */
+  intl: string;
   beta: boolean;
+  /** Extra packs to try before this one, after the base and fallback packs. */
+  fallback?: string[];
 };
 
-export const LOCALE_OPTIONS: LocaleMeta[] = [
-  { code: "en", label: "English", native: "English", beta: false },
-  { code: "ko", label: "한국어", native: "한국어", beta: false },
-  { code: "fr", label: "Français", native: "Français", beta: true },
-  {
-    code: "zh-Hans",
-    label: "中文 (Mandarin)",
-    native: "普通话",
-    beta: true,
-  },
-  {
-    code: "zh-Hant",
-    label: "中文 (Cantonese)",
-    native: "粤语",
-    beta: true,
-  },
-  { code: "ja", label: "日本語", native: "日本語", beta: true },
-  { code: "es", label: "Español", native: "Español", beta: true },
-  { code: "vi", label: "Tiếng Việt", native: "Tiếng Việt", beta: true },
-  { code: "fil", label: "Filipino", native: "Filipino", beta: true },
-  { code: "pa", label: "Punjabi", native: "ਪੰਜਾਬੀ", beta: true },
-];
+export const LOCALE_OPTIONS: LocaleMeta[] = registry.locales;
 
-export function isBetaLocale(locale: string): boolean {
-  const meta = LOCALE_OPTIONS.find((item) => item.code === locale);
-  return meta?.beta ?? true;
+export const locales: AppLocale[] = LOCALE_OPTIONS.map((item) => item.code);
+
+/** Pack every key is written in first. */
+export const BASE_LOCALE: AppLocale = registry.baseLocale;
+/** Pack shown for keys a language has not translated yet. */
+export const FALLBACK_LOCALE: AppLocale = registry.fallbackLocale;
+/** Locale for bare URLs and first visits. */
+export const DEFAULT_LOCALE: AppLocale = registry.defaultLocale;
+
+export function isAppLocale(value: string | null | undefined): value is AppLocale {
+  return Boolean(value) && locales.includes(value as AppLocale);
 }
 
-export function messagePackLocale(locale: string): "ko" | "en" {
-  if (locale === "ko") return "ko";
-  return "en";
+export function localeMeta(locale: string): LocaleMeta | undefined {
+  return LOCALE_OPTIONS.find((item) => item.code === locale);
+}
+
+export function isBetaLocale(locale: string): boolean {
+  return localeMeta(locale)?.beta ?? true;
+}
+
+/** BCP 47 tag for `Intl` / `toLocale*String` for a UI locale. */
+export function intlLocale(locale: string): string {
+  return localeMeta(locale)?.intl ?? localeMeta(FALLBACK_LOCALE)?.intl ?? "en-CA";
+}
+
+/**
+ * Packs merged for a locale, least specific first. The last pack wins for
+ * each key it defines.
+ */
+export function messageChain(locale: string): AppLocale[] {
+  const chain = [BASE_LOCALE];
+  if (locale !== BASE_LOCALE) {
+    chain.push(FALLBACK_LOCALE, ...(localeMeta(locale)?.fallback ?? []), locale);
+  }
+  return chain.filter((code, index) => chain.indexOf(code) === index);
 }

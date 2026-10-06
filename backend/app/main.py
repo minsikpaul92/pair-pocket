@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
+from app.core.errors import AppError, app_error_handler
 from app.database import close_mongo_connection, connect_to_mongo
 from app.routers import (
     account_defaults,
@@ -34,6 +35,9 @@ async def lifespan(app: FastAPI):
 settings = get_settings()
 
 app = FastAPI(title="PairPocket API", version="0.1.0", lifespan=lifespan)
+
+# Errors go out as {detail, code, params}; the UI translates the code.
+app.add_exception_handler(AppError, app_error_handler)
 
 # Authlib stores the OAuth state/nonce in the session during the login round-trip.
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)

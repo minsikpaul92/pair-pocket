@@ -1,0 +1,28 @@
+{
+  "email": {
+    "signature": "PairPocket",
+    "test": {
+      "subject": "[PairPocket] 테스트 이메일",
+      "body": "안녕하세요 {name}님,\n\nPairPocket 이메일 알림이 정상적으로 동작합니다.\n구독 프로모션/종료 알림도 이 주소로 발송됩니다."
+    },
+    "invite": {
+      "subject": "{inviter}님이 PairPocket에 초대했습니다",
+      "intro": "{inviter}님이 PairPocket 공유 가계부에 초대했습니다.",
+      "sharedStart": "공유 가계부 시작일: {date}",
+      "instructions": "아래 링크를 열고 Google로 로그인한 뒤 초대를 수락하세요.\n(초대받은 Google 계정 이메일과 초대 이메일이 같아야 합니다.)",
+      "expires": "이 링크는 {days}일 후 만료됩니다."
+    },
+    "reminder": {
+      "greeting": "안녕하세요,",
+      "view": "구독 확인: {url}",
+      "cancel": "해지하기: {url}",
+      "promoSubject": "[PairPocket] {name} 프로모션 종료 1주일 전 알림",
+      "promoTitle": "\"{name}\" 구독 프로모션이 {date}에 종료됩니다.",
+      "promoAmount": "프로모션 금액: {amount} {currency}",
+      "regularAfterPromo": "이후 정상 금액: {amount} {currency}",
+      "endSubject": "[PairPocket] {name} 구독 종료 1주일 전 알림",
+      "endTitle": "\"{name}\" 구독이 {date}에 종료됩니다.",
+      "regularAmount": "정상 금액: {amount} {currency}"
+    }
+  }
+}

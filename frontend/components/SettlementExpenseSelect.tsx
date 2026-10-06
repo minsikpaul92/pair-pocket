@@ -5,7 +5,11 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Currency, SettleableExpense, formatAmount } from "@/lib/api";
-import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import {
+  merchantLabel,
+  translateCategory,
+  translateSubCategory,
+} from "@/lib/category-i18n";
 import { dayKey, formatDayLabel, isoDayKey } from "@/lib/date";
 
 interface Props {
@@ -185,7 +189,7 @@ export default function SettlementExpenseSelect({
                       <Receipt className="h-5 w-5 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
-                          {exp.merchant || tCommon("unspecified")}
+                          {merchantLabel(exp.merchant, tCommon)}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {formatDayLabel(new Date(exp.date), locale)} ·{" "}

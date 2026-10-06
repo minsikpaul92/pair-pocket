@@ -144,6 +144,7 @@ export default function AppShell({ user, onLogout }: Props) {
   const tAccountType = useTranslations("accountType");
   const tSub = useTranslations("subscriptions");
   const tErrors = useTranslations("errors");
+  const tScan = useTranslations("scan");
   const locale = useLocale();
 
   const [view, setView] = useState<View>(() => {
@@ -220,19 +221,19 @@ export default function AppShell({ user, onLogout }: Props) {
       (f) => f.type.startsWith("image/") || f.type === "application/pdf"
     );
     if (!accepted.length) {
-      setScanQueueError("지원하지 않는 파일 형식입니다.");
+      setScanQueueError(tScan("unsupportedFile"));
       return;
     }
     setScanQueueError(null);
     setScanQueue((prev) => {
       const room = MAX_SCAN_FILES - prev.length;
       if (room <= 0) {
-        setScanQueueError(`최대 ${MAX_SCAN_FILES}장까지 올릴 수 있습니다.`);
+        setScanQueueError(tScan("maxFiles", { max: MAX_SCAN_FILES }));
         return prev;
       }
       const slice = accepted.slice(0, room);
       if (accepted.length > room) {
-        setScanQueueError(`최대 ${MAX_SCAN_FILES}장까지 올릴 수 있습니다.`);
+        setScanQueueError(tScan("maxFiles", { max: MAX_SCAN_FILES }));
       }
       return [
         ...prev,
@@ -344,11 +345,11 @@ export default function AppShell({ user, onLogout }: Props) {
         setScanQueueOpen(false);
         clearScanQueue();
       } else {
-        setScanQueueError("AI 분석 결과가 올바르지 않습니다.");
+        setScanQueueError(tScan("invalidResult"));
       }
     } catch (err: any) {
       console.error(err);
-      setScanQueueError(err.message || "AI 분석 중 오류가 발생했습니다.");
+      setScanQueueError(translateError(err, tErrors, "aiAnalysisFailed"));
     } finally {
       setAiParsing(false);
     }
@@ -993,11 +994,13 @@ export default function AppShell({ user, onLogout }: Props) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  AI 스캔 대기열
+                  {tScan("queueTitle")}
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  사진을 모은 뒤 분석을 시작하세요. ({scanQueue.length} /{" "}
-                  {MAX_SCAN_FILES})
+                  {tScan("queueHint", {
+                    count: scanQueue.length,
+                    max: MAX_SCAN_FILES,
+                  })}
                 </p>
               </div>
               <button
@@ -1030,6 +1033,7 @@ export default function AppShell({ user, onLogout }: Props) {
                       type="button"
                       disabled={aiParsing}
                       onClick={() => removeScanQueued(q.id)}
+                      aria-label={tCommon("delete")}
                       className="absolute -top-1.5 -right-1.5 rounded-full bg-gray-900/80 text-white p-0.5"
                     >
                       <X className="h-3 w-3" />
@@ -1038,7 +1042,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-gray-500">아직 파일이 없습니다.</p>
+              <p className="text-sm text-gray-500">{tScan("queueEmpty")}</p>
             )}
 
             {scanQueueError && (
@@ -1062,7 +1066,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-800 dark:text-gray-100 disabled:opacity-50"
               >
                 <ImagePlus className="h-4 w-4" />
-                추가
+                {tCommon("add")}
               </button>
               <button
                 type="button"
@@ -1075,7 +1079,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 ) : (
                   <Play className="h-4 w-4" />
                 )}
-                {aiParsing ? "분석 중…" : "분석 시작"}
+                {aiParsing ? tScan("analyzing") : tScan("start")}
               </button>
             </div>
             {scanQueue.length > 0 && !aiParsing && (
@@ -1085,7 +1089,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 className="w-full inline-flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-red-500"
               >
                 <Trash2 className="h-3 w-3" />
-                대기열 비우기
+                {tScan("clearQueue")}
               </button>
             )}
           </div>
@@ -1112,7 +1116,7 @@ export default function AppShell({ user, onLogout }: Props) {
             className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
           >
             <Camera className="h-4.5 w-4.5 text-blue-500" />
-            사진 촬영 (Take Photo)
+            {tScan("takePhoto")}
           </button>
           <button
             type="button"
@@ -1123,7 +1127,7 @@ export default function AppShell({ user, onLogout }: Props) {
             className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
           >
             <Plus className="h-4.5 w-4.5 text-green-500" />
-            사진 올리기 (갤러리)
+            {tScan("uploadPhotos")}
           </button>
           <button
             type="button"
@@ -1134,7 +1138,7 @@ export default function AppShell({ user, onLogout }: Props) {
             className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
           >
             <Repeat className="h-4.5 w-4.5 text-indigo-500" />
-            파일 올리기 (PDF/이미지)
+            {tScan("uploadFile")}
           </button>
         </div>
       )}
@@ -1155,8 +1159,12 @@ export default function AppShell({ user, onLogout }: Props) {
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center space-y-4 max-w-xs text-center border border-gray-100 dark:border-gray-700">
             <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
             <div>
-              <p className="text-sm font-bold text-gray-900 dark:text-white">AI 영수증 분석 중...</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Gemini가 항목을 판별하고 있습니다. 잠시만 기다려 주세요.</p>
+              <p className="text-sm font-bold text-gray-900 dark:text-white">
+                {tScan("overlayTitle")}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {tScan("overlayHint")}
+              </p>
             </div>
           </div>
         </div>

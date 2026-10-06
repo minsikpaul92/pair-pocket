@@ -34,6 +34,25 @@ PACIFIC = ZoneInfo("America/Los_Angeles")
 T = TypeVar("T")
 
 
+class ScanError(Exception):
+    """A failed AI scan. `code` is an API error code (errors.server.*)."""
+
+    def __init__(
+        self, code: str, detail: str | None = None, params: dict | None = None
+    ) -> None:
+        super().__init__(detail or code)
+        self.code = code
+        self.params = params or {}
+
+
+def _missing_key_event() -> dict[str, Any]:
+    return {
+        "event": "error",
+        "code": "geminiKeyMissing",
+        "error": "No Gemini API key is set.",
+    }
+
+
 async def get_user_gemini_api_key(db: AsyncIOMotorDatabase, owner_id: str) -> str | None:
     """Return the user's Gemini API key, decrypting at rest ciphertext when needed."""
     doc = await db["user_settings"].find_one({"owner_id": owner_id})
@@ -772,13 +791,7 @@ async def generate_content_with_routing(
         ]
 
     if not chain:
-        yield {
-            "event": "error",
-            "error": (
-                "Gemini API Key가 등록되어 있지 않습니다. "
-                "설정에서 키를 먼저 등록해 주세요."
-            ),
-        }
+        yield _missing_key_event()
         return
 
     last_error: str | None = None
@@ -813,6 +826,7 @@ async def generate_content_with_routing(
 
     yield {
         "event": "error",
+        "code": "aiScanFailed",
         "error": f"All models failed. Last error: {last_error}",
     }
 
@@ -833,7 +847,7 @@ async def parse_receipt_or_statement_stream(
     log_id = ObjectId()
 
     if not api_key:
-        err_msg = "Gemini API Key가 등록되어 있지 않습니다. 설정에서 키를 먼저 등록해 주세요."
+        event = _missing_key_event()
         await db["ocr_logs"].insert_one(
             {
                 "_id": log_id,
@@ -841,15 +855,11 @@ async def parse_receipt_or_statement_stream(
                 "owner_id": owner_id,
                 "file_name": file_name,
                 "status": "failed",
-                "error_message": err_msg,
+                "error_message": event["error"],
                 "feedback": None,
             }
         )
-        yield {
-            "event": "error",
-            "error": err_msg,
-            "log_id": str(log_id),
-        }
+        yield {**event, "log_id": str(log_id)}
         return
 
     payload = _build_single_file_payload(file_bytes, mime_type, flow_type=flow_type)
@@ -896,6 +906,7 @@ async def parse_receipt_or_statement_stream(
             )
             yield {
                 "event": "error",
+                "code": event.get("code", "aiScanFailed"),
                 "error": last_error,
                 "log_id": str(log_id),
             }
@@ -920,6 +931,7 @@ async def parse_receipt_or_statement(
 ) -> dict:
     """Consume the SSE stream to return the final successful result or raise an error."""
     last_error = "Unknown error"
+    last_code = "aiScanFailed"
     async for event in parse_receipt_or_statement_stream(
         db,
         owner_id,
@@ -934,9 +946,10 @@ async def parse_receipt_or_statement(
             return event["result"]
         if event["event"] == "error":
             last_error = event.get("error", last_error)
+            last_code = event.get("code", last_code)
         elif event["event"] == "failed":
             last_error = event.get("error", last_error)
-    raise Exception(last_error)
+    raise ScanError(last_code, last_error)
 
 
 async def parse_files_in_batches(
@@ -967,7 +980,13 @@ async def parse_files_in_batches(
                 )
                 outcomes.append({"file_name": file_name, "result": result})
             except Exception as e:
-                outcomes.append({"file_name": file_name, "error": str(e)})
+                outcomes.append(
+                    {
+                        "file_name": file_name,
+                        "error": str(e),
+                        "code": getattr(e, "code", "aiScanFailed"),
+                    }
+                )
         if batch_index < len(batches) - 1 and delay_seconds > 0:
             await asyncio.sleep(delay_seconds)
     return outcomes
@@ -1256,14 +1275,24 @@ async def parse_onboarding_screenshots_stream(
     Events: scanning | trying | quota_fallback | batch_done | success | error
     """
     if step not in ONBOARDING_STEPS:
-        yield {"event": "error", "error": f"Unsupported onboarding step: {step}"}
+        yield {
+            "event": "error",
+            "code": "invalidOnboardingStep",
+            "error": f"Unsupported onboarding step: {step}",
+        }
         return
     if not files:
-        yield {"event": "error", "error": "No images provided"}
+        yield {
+            "event": "error",
+            "code": "imagesRequired",
+            "error": "No images provided",
+        }
         return
     if len(files) > ONBOARDING_MAX_IMAGES:
         yield {
             "event": "error",
+            "code": "tooManyImages",
+            "params": {"max": ONBOARDING_MAX_IMAGES},
             "error": f"Maximum {ONBOARDING_MAX_IMAGES} images allowed",
         }
         return
@@ -1272,16 +1301,10 @@ async def parse_onboarding_screenshots_stream(
         chain = await resolve_gemini_api_key_chain(db, owner_id)
         api_key = chain[0]["api_key"] if chain else None
     except Exception as e:
-        yield {"event": "error", "error": str(e)}
+        yield {"event": "error", "code": "aiScanFailed", "error": str(e)}
         return
     if not api_key:
-        yield {
-            "event": "error",
-            "error": (
-                "Gemini API Key가 등록되어 있지 않습니다. "
-                "설정에서 키를 먼저 등록해 주세요."
-            ),
-        }
+        yield _missing_key_event()
         return
 
     merged = _empty_onboarding_data(step)
@@ -1372,7 +1395,7 @@ async def parse_onboarding_screenshots_stream(
             and not merged["brokerage"].get("holdings")
         )
     ):
-        yield {"event": "error", "error": "; ".join(errors)}
+        yield {"event": "error", "code": "aiScanFailed", "error": "; ".join(errors)}
         return
 
     yield {
@@ -1407,7 +1430,11 @@ async def parse_onboarding_screenshots(
         delay_seconds=delay_seconds,
     ):
         if event.get("event") == "error":
-            raise Exception(event.get("error") or "Onboarding parse failed")
+            raise ScanError(
+                event.get("code", "aiScanFailed"),
+                event.get("error"),
+                event.get("params"),
+            )
         if event.get("event") == "success":
             final = {
                 "step": event["step"],
@@ -1419,5 +1446,5 @@ async def parse_onboarding_screenshots(
                 "image_count": event.get("image_count"),
             }
     if not final:
-        raise Exception("Onboarding parse failed")
+        raise ScanError("aiScanFailed", "Onboarding parse failed")
     return final

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
+from app.core.errors import AppError
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.category_preset import CategoryPresetsOut, build_presets_response
@@ -66,10 +67,7 @@ async def list_sub_categories(
     custom = _parse_custom(doc)
     subs = get_merged_sub_categories(custom, type, category)
     if subs is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Unknown category '{category}' for type '{type.value}'.",
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, "categoryNotFound")
     return subs
 
 
@@ -81,7 +79,7 @@ async def add_custom_category(
 ) -> CategoryPresetsOut:
     name = payload.category.strip()
     if not name:
-        raise HTTPException(status_code=400, detail="대분류 이름이 비어 있습니다.")
+        raise AppError(status.HTTP_400_BAD_REQUEST, "categoryNameRequired")
 
     await _get_or_create(db, current_user.id)
     type_key = _type_key(payload.type)
@@ -102,16 +100,13 @@ async def add_custom_sub_category(
     category = payload.category.strip()
     sub = payload.sub_category.strip()
     if not category or not sub:
-        raise HTTPException(status_code=400, detail="대분류와 중분류 이름이 필요합니다.")
+        raise AppError(status.HTTP_400_BAD_REQUEST, "categoryNamesRequired")
 
     doc = await _get_or_create(db, current_user.id)
     custom = _parse_custom(doc)
     subs = get_merged_sub_categories(custom, payload.type, category)
     if subs is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"대분류 '{category}'를 찾을 수 없습니다.",
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, "categoryNotFound")
     if sub in subs:
         return merge_custom_categories(custom)
 

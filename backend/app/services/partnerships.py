@@ -4,8 +4,10 @@ import secrets
 from datetime import datetime
 
 from bson import ObjectId
-from fastapi import HTTPException
+from fastapi import status
 from pymongo.errors import ConfigurationError, OperationFailure
+
+from app.core.errors import AppError
 
 
 async def _transaction(db, callback):
@@ -13,13 +15,14 @@ async def _transaction(db, callback):
         async with await db.client.start_session() as session:
             return await session.with_transaction(callback)
     except ConfigurationError as exc:
-        raise HTTPException(
-            503, "Partnership changes require MongoDB transaction support."
+        # MongoDB without transaction support (not a replica set).
+        raise AppError(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "serverUnavailable"
         ) from exc
     except OperationFailure as exc:
         if exc.code == 20:
-            raise HTTPException(
-                503, "Partnership changes require MongoDB transaction support."
+            raise AppError(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "serverUnavailable"
             ) from exc
         raise
 
@@ -32,16 +35,16 @@ async def accept_partner_invitation(db, user, token: str) -> tuple[str, dict]:
             session=session,
         )
         if not invite:
-            raise HTTPException(404, "Invitation not found or expired.")
+            raise AppError(404, "invitationNotFound")
         if invite["invitee_email"].lower() != user.email.lower():
-            raise HTTPException(403, "Sign in with the invited email address.")
+            raise AppError(403, "invitationEmailMismatch")
         if invite["inviter_id"] == user.id:
-            raise HTTPException(400, "You cannot accept your own invitation.")
+            raise AppError(400, "cannotAcceptOwnInvitation")
         inviter = await db.users.find_one(
             {"_id": ObjectId(invite["inviter_id"])}, session=session
         )
         if not inviter:
-            raise HTTPException(404, "Inviter not found.")
+            raise AppError(404, "inviterNotFound")
 
         group_id = secrets.token_urlsafe(16)
         members = [invite["inviter_id"], user.id]
@@ -52,9 +55,7 @@ async def accept_partner_invitation(db, user, token: str) -> tuple[str, dict]:
                 session=session,
             )
             if claimed.matched_count != 1:
-                raise HTTPException(
-                    409, "One of these users is already linked. Refresh and try again."
-                )
+                raise AppError(409, "partnerLinkConflict")
 
         await db.shared_groups.insert_one(
             {
@@ -97,7 +98,7 @@ async def accept_partner_invitation(db, user, token: str) -> tuple[str, dict]:
             session=session,
         )
         if claimed.matched_count != 1:
-            raise HTTPException(409, "Invitation has already been handled.")
+            raise AppError(409, "invitationAlreadyHandled")
         await db.invitations.update_many(
             {
                 "status": "pending",
@@ -121,7 +122,7 @@ async def accept_partner_invitation(db, user, token: str) -> tuple[str, dict]:
 async def archive_partnership(db, user) -> None:
     group_id = user.shared_group_id
     if not group_id:
-        raise HTTPException(400, "No active partnership.")
+        raise AppError(400, "noActivePartnership")
 
     async def archive(session):
         member = await db.users.find_one(
@@ -129,7 +130,7 @@ async def archive_partnership(db, user) -> None:
             session=session,
         )
         if not member:
-            raise HTTPException(409, "Partnership changed. Refresh and try again.")
+            raise AppError(409, "partnershipChanged")
         members = await db.users.find(
             {"shared_group_id": group_id}, session=session
         ).to_list(length=10)

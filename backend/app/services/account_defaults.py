@@ -10,10 +10,11 @@ from datetime import datetime
 from enum import Enum
 
 from bson import ObjectId
-from fastapi import HTTPException, status
+from fastapi import status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo.errors import DuplicateKeyError
 
+from app.core.errors import AppError
 from app.models.account import DefaultRole, FinancialAccountKind
 from app.models.transaction import AccountType
 from app.models.user import UserOut
@@ -270,25 +271,14 @@ async def set_default(
     """Validate access and eligibility, then point the slot at the account."""
     scope_key = user_scope_key(user, account_type)
     if scope_key is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A partner link is required for shared defaults.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "partnerRequired")
     if currency not in SLOT_CURRENCIES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="currency must be CAD or KRW.",
-        )
+        raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "unsupportedCurrency")
     account = await _load_account(db, account_id)
     if not account or account_scope_key(account) != scope_key:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found."
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, "accountNotFound")
     if not is_eligible(account, role, currency):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="account_not_eligible",
-        )
+        raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "accountNotEligible")
     await write_slot(db, scope_key, role, currency, account_id, updated_by=user.id)
 
 
@@ -318,18 +308,14 @@ async def apply_account_roles(
     if scope_key is None:
         return
     if roles - set(applicable_roles(account)):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="account_not_eligible",
-        )
+        raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "accountNotEligible")
     account_id = str(account["_id"])
     for role in applicable_roles(account):
         currency = slot_currency(account, role)
         if role in roles:
             if not is_eligible(account, role, currency):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="account_not_eligible",
+                raise AppError(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY, "accountNotEligible"
                 )
             await write_slot(
                 db, scope_key, role, currency, account_id, updated_by=user.id

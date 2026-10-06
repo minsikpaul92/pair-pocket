@@ -2,10 +2,11 @@ import re
 from datetime import date, datetime
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
+from app.core.errors import AppError
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.transaction import (
@@ -100,10 +101,7 @@ def _month_range(month: str) -> tuple[datetime, datetime]:
         end = datetime(year + 1, 1, 1) if mon == 12 else datetime(year, mon + 1, 1)
         return start, end
     except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="month must be in 'YYYY-MM' format.",
-        )
+        raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalidMonth")
 
 
 @router.get("", response_model=list[TransactionOut])
@@ -477,14 +475,12 @@ async def _guard_settled_expense(db, session, existing: dict, document: dict) ->
         or document["account_type"] != existing.get("account_type")
         or document["currency"] != existing.get("currency")
     ):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="N빵 정산이 연결된 지출은 장부, 통화, 지출/수입 구분을 바꿀 수 없습니다.",
-        )
+        raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "settledExpenseLocked")
     if float(document["amount"]) + SETTLEMENT_EPSILON < settled:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"이미 정산된 금액({settled:.2f})보다 작게 바꿀 수 없습니다.",
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "amountBelowSettled",
+            amount=f"{settled:.2f}",
         )
 
 
@@ -544,20 +540,18 @@ async def update_transaction(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     if not ObjectId.is_valid(transaction_id):
-        raise HTTPException(status_code=404, detail="Transaction not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "transactionNotFound")
 
     existing = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
     await assert_can_access_doc(
-        db, current_user, existing, not_found_detail="Transaction not found."
+        db, current_user, existing, not_found_code="transactionNotFound"
     )
     twin = await authorized_funding_twin(db, current_user, existing)
     if (
         existing["owner_id"] != current_user.id
         and payload.account_type.value != existing["account_type"]
     ):
-        raise HTTPException(
-            status_code=403, detail="Only the owner can change the ledger scope."
-        )
+        raise AppError(status.HTTP_403_FORBIDDEN, "ownerOnlyScopeChange")
     require_shared_group_for_write(current_user, payload.account_type)
     owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
 
@@ -584,13 +578,10 @@ async def update_transaction(
             or document["type"] != existing["type"]
         )
     ):
-        raise HTTPException(
-            status_code=422,
-            detail="Linked funding entries cannot change ledger or direction.",
-        )
+        raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "linkedTransferLocked")
     if paired and not twin and existing["owner_id"] != current_user.id:
         # The other side would land in the owner's books; only they may do that.
-        raise HTTPException(status_code=403, detail="Only the owner can link this entry.")
+        raise AppError(status.HTTP_403_FORBIDDEN, "ownerOnlyLink")
     document["linked_transaction_id"] = str(twin["_id"]) if twin and paired else None
 
     oid = ObjectId(transaction_id)
@@ -653,11 +644,11 @@ async def delete_transaction(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> None:
     if not ObjectId.is_valid(transaction_id):
-        raise HTTPException(status_code=404, detail="Transaction not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "transactionNotFound")
 
     existing = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
     await assert_can_access_doc(
-        db, current_user, existing, not_found_detail="Transaction not found."
+        db, current_user, existing, not_found_code="transactionNotFound"
     )
     twin = await authorized_funding_twin(db, current_user, existing)
     oid = ObjectId(transaction_id)
@@ -666,18 +657,14 @@ async def delete_transaction(
         # Block deleting an expense that still has linked N빵 settlements.
         if existing.get("type") == TransactionType.EXPENSE.value:
             if await settled_total(db, transaction_id, session=session) > 0:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        "이 지출에 연결된 N빵 정산이 있어 삭제할 수 없습니다. "
-                        "정산을 먼저 삭제해 주세요."
-                    ),
+                raise AppError(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY, "expenseHasSettlements"
                 )
         if twin:
             await db[COLLECTION].delete_one({"_id": twin["_id"]}, session=session)
         result = await db[COLLECTION].delete_one({"_id": oid}, session=session)
         if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Transaction not found.")
+            raise AppError(status.HTTP_404_NOT_FOUND, "transactionNotFound")
 
     if twin:
         await db_transactions.run_in_transaction(db, write)
