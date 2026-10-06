@@ -62,14 +62,31 @@ The `Release source` check (`.github/workflows/branch-policy.yml`) fails any pul
 
 ## Staging for `develop`
 
-Staging uses separate infrastructure so testing never touches production data.
+Staging uses separate infrastructure so testing never touches production data. Step-by-step setup (Atlas user, Heroku config vars including `TEST_LOGIN_PASSWORD`, Vercel, checks): [STAGING.md](./STAGING.md).
 
 | Piece | Setup |
 | --- | --- |
 | Database | A separate database such as `pairpocket_staging` (same Atlas cluster is fine, or a free M0 cluster). Never point staging at the production database. |
-| API | A second Heroku app (for example `pairpocket-api-staging`) connected to this repository with automatic deploys from `develop`. Config vars: `MONGODB_URI`, `MONGODB_DB_NAME=pairpocket_staging`, a new `SECRET_KEY` and `SETTINGS_ENCRYPTION_KEY`, `FRONTEND_URL` and `CORS_ORIGINS` set to the staging frontend URL, `OAUTH_REDIRECT_URI=https://<staging-api>/api/auth/callback`. Leave `CRON_SECRET` unset so reminder emails are not sent from staging. |
+| API | A second Heroku app (for example `pairpocket-api-staging`) connected to this repository with automatic deploys from `develop`. Config vars: `MONGODB_URI`, `MONGODB_DB_NAME=pairpocket_staging`, a new `SECRET_KEY` and `SETTINGS_ENCRYPTION_KEY`, `FRONTEND_URL` and `CORS_ORIGINS` set to the staging frontend URL, `OAUTH_REDIRECT_URI=https://<staging-api>/api/auth/callback`, and `TEST_LOGIN_PASSWORD` (see below). Leave `CRON_SECRET` unset so reminder emails are not sent from staging. |
 | Frontend | Vercel already builds every branch as a preview. In the Vercel project, add a domain such as `dev.pairpocket.me` assigned to the `develop` branch, and set `NEXT_PUBLIC_API_BASE_URL` for **Preview** (scoped to branch `develop`) to the staging API URL. |
 | Google sign-in | Add the staging redirect URI to the OAuth client (Google Cloud Console → Credentials), or create a separate OAuth client for staging. |
+
+### Test accounts on staging
+
+Staging has four built-in test accounts so testers do not need Google accounts: Tester 1 and Tester 2 (Korean) and Tester 3 and Tester 4 (English), enough for two couples.
+
+- Turn them on with the `TEST_LOGIN_PASSWORD` config var on the staging API. The sign-in page then shows a "Test sign-in" box: pick an account, enter that password.
+- The API only honors it when `MONGODB_DB_NAME` ends in `_staging`, `_test` or `_dev`, so the production app (database `pairpocket`) ignores the variable even if it is set by mistake. Use a long random password anyway: the staging URL is public.
+- Each account starts like a brand-new user in its language (onboarding included). Test emails go to `tester<N>@example.com`, which never receives mail; invite a tester by that address and use the invite link the app shows when the email cannot be sent.
+- Two reset buttons (same password) first delete the four users and everything they own: ledger data, settings, sessions, invitations and their shared groups. A real user linked with a tester is unlinked and keeps their own data. Then:
+
+  | Button | Result | Use it to test |
+  | --- | --- | --- |
+  | **Reset to linked couples with accounts** (recommended) | Tester 1+2 (Korean) and Tester 3+4 (English) are linked couples, onboarding is done, ledger start dates are the first of this month. Each tester has `Test Checking` and `Test Credit Card` (CAD, personal); each couple has `Test Shared Checking` (CAD, shared). They are the default accounts. | Everyday use: transactions, transfers, settlements, subscriptions, dashboard, both languages |
+  | **Reset to empty accounts** | No users; each tester starts as a brand-new user on next sign-in. | Onboarding, partner invitation and acceptance |
+
+  Gemini keys are not part of either preset; add one in Settings to test AI scans.
+- Locally, set `MONGODB_DB_NAME=pairpocket_dev` and `TEST_LOGIN_PASSWORD` in `backend/.env` to get the same box.
 
 ## Commit and PR conventions
 

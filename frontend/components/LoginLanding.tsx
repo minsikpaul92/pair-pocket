@@ -4,6 +4,7 @@ import { Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import LocaleToggle from "@/components/LocaleToggle";
+import TestLoginPanel from "@/components/TestLoginPanel";
 import { loginUrl } from "@/lib/api";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -62,6 +63,8 @@ export default function LoginLanding() {
           <GoogleIcon className="h-5 w-5" />
           {t("loginWithGoogle")}
         </a>
+
+        <TestLoginPanel />
       </div>
     </main>
   );

@@ -84,7 +84,20 @@
     "oauthNotConfigured": "Google sign-in is not configured yet. Ask an admin, or use local preview login.",
     "invalidAccess": "Invalid access.",
     "loadFailed": "Couldn't reach PairPocket. Your sign-in is kept; check your connection and try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "testLogin": {
+      "title": "Test sign-in",
+      "notice": "Only shown on the test server. It never appears in the live app.",
+      "account": "Test account",
+      "accountOption": "{name} · {language}",
+      "password": "Password",
+      "signIn": "Sign in with test account",
+      "reset": "Reset to empty accounts",
+      "resetCouples": "Reset to linked couples with accounts",
+      "resetCouplesDone": "Reset done. Tester 1 and 2, and Tester 3 and 4, are linked couples. Each has a checking account and a credit card, and each couple a shared checking account, all set as defaults.",
+      "resetConfirm": "This deletes all data (transactions, accounts, subscriptions, partner links) of the 4 test accounts. Continue?",
+      "resetDone": "Test accounts were reset. The next sign-in starts like a brand-new user."
+    }
   },
   "invite": {
     "title": "Invite partner",
@@ -769,6 +782,7 @@
       "subscriptionCurrencyMismatch": "The payment account currency doesn't match the subscription currency.",
       "subscriptionLedgerMismatch": "The payment account is in a different ledger (personal or shared) than the subscription.",
       "subscriptionNotFound": "Subscription not found.",
+      "testLoginFailed": "Wrong test account or password.",
       "tooManyImages": "You can upload up to {max} images.",
       "tooManyLanguages": "Select at most two languages.",
       "totalInstallmentsNotAllowed": "A total number of payments only applies to installments.",

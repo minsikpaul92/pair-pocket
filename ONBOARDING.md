@@ -198,7 +198,7 @@ Other services:
 
 - [ ] Resend: verify `pairpocket.me`, set `EMAIL_FROM=PairPocket <noreply@pairpocket.me>`, send a test invitation to an outside address.
 - [ ] MongoDB Atlas: storage alerts, backups, IP access list.
-- [ ] Heroku: dyno type, `SETTINGS_ENCRYPTION_KEY` set, `ALLOW_DEV_LOGIN` unset.
+- [ ] Heroku: dyno type, `SETTINGS_ENCRYPTION_KEY` set, `ALLOW_DEV_LOGIN` and `TEST_LOGIN_PASSWORD` unset.
 - [ ] Staging soak on `develop` for at least a week with two test couples (Korean and English).
 
 ## 9. Decisions needed from you
