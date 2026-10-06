@@ -62,7 +62,7 @@ The `Release source` check (`.github/workflows/branch-policy.yml`) fails any pul
 
 ## Staging for `develop`
 
-Staging uses separate infrastructure so testing never touches production data.
+Staging uses separate infrastructure so testing never touches production data. Step-by-step setup (Atlas user, Heroku config vars including `TEST_LOGIN_PASSWORD`, Vercel, checks): [STAGING.md](./STAGING.md).
 
 | Piece | Setup |
 | --- | --- |
