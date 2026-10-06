@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     # demo JWT and redirects to the frontend. Never enable in production.
     allow_dev_login: bool = False
 
+    # --- Staging test accounts (see app/services/staging_login.py) ---
+    # Shared password for the built-in test accounts. Only takes effect when
+    # MONGODB_DB_NAME ends in _staging, _test or _dev, so it cannot open the
+    # production database. Leave unset in production.
+    test_login_password: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property
