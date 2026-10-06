@@ -84,7 +84,7 @@ export default function LanguagePicker({
         {LOCALE_OPTIONS.map((item) => (
           <option key={item.code} value={item.code}>
             {item.native}
-            {item.beta ? " (Beta)" : ""}
+            {item.beta ? ` (${t("beta")})` : ""}
           </option>
         ))}
       </select>
@@ -111,7 +111,7 @@ export default function LanguagePicker({
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
-            {item.code === "ko" ? "KO" : "EN"}
+            {item.short}
           </button>
         ))}
       </div>
@@ -123,7 +123,7 @@ export default function LanguagePicker({
       className={`space-y-2 ${className}`}
       role="listbox"
       aria-label={t("language")}
-        >
+    >
       {LOCALE_OPTIONS.map((item) => {
         const isSelected = multi ? selected[0] === item.code : locale === item.code;
 
@@ -164,7 +164,7 @@ export default function LanguagePicker({
                       : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                   }`}
                 >
-                  Beta
+                  {t("beta")}
                 </span>
               )}
             </span>

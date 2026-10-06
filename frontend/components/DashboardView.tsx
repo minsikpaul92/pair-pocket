@@ -39,6 +39,7 @@ import {
 import type { BankCountry } from "@/lib/banks";
 import { translateCategory } from "@/lib/category-i18n";
 import { monthKey, monthLabel } from "@/lib/date";
+import { useInstitutionLabel } from "@/lib/useInstitutionLabel";
 
 type StockTotalMode = "all" | "KRW" | "CAD" | "USD";
 type CreatingKind = FinancialAccountKind | null;
@@ -81,6 +82,7 @@ export default function DashboardView({
   const tLedger = useTranslations("ledger");
   const tCommon = useTranslations("common");
   const tAccountKinds = useTranslations("accountKinds");
+  const institutionName = useInstitutionLabel();
   const tCategories = useTranslations("categories");
   const tAccount = useTranslations("account");
 
@@ -890,7 +892,7 @@ export default function DashboardView({
                         <span className="flex items-center gap-1 min-w-0 text-[11px] font-bold text-gray-700 dark:text-gray-300">
                           <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-grab" />
                           <span className="truncate">
-                            {inst ? `[${inst}] ` : ""}
+                            {inst ? `[${institutionName(inst)}] ` : ""}
                             {label}
                           </span>
                         </span>

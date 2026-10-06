@@ -10,6 +10,7 @@ import CategorySelect from "@/components/CategorySelect";
 import DayPicker from "@/components/DayPicker";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import SubCategorySelect from "@/components/SubCategorySelect";
+import { CATEGORY, MERCHANT_PLACEHOLDER, SUB_CATEGORY } from "@/lib/category-values";
 import {
   AccountType,
   BillingCycle,
@@ -116,8 +117,8 @@ export default function SubscriptionRegisterModal({
   const [endReminderEnabled, setEndReminderEnabled] = useState(false);
   const [isFixedBill, setIsFixedBill] = useState(false);
   const [history, setHistory] = useState<SubscriptionHistory | null>(null);
-  const [category, setCategory] = useState("문화/취미");
-  const [subCategory, setSubCategory] = useState("정기 구독");
+  const [category, setCategory] = useState<string>(CATEGORY.culture);
+  const [subCategory, setSubCategory] = useState<string>(SUB_CATEGORY.subscriptions);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [accountId, setAccountId] = useState(ACCOUNT_NONE);
   const [counterAccountId, setCounterAccountId] = useState(ACCOUNT_NONE);
@@ -248,7 +249,7 @@ export default function SubscriptionRegisterModal({
     setEndReminderEnabled(editing.end_reminder_enabled);
     setCategory(editing.category);
     setSubCategory(editing.sub_category);
-    setMerchant(editing.merchant && editing.merchant !== "미지정" ? editing.merchant : editing.name);
+    setMerchant(editing.merchant && editing.merchant !== MERCHANT_PLACEHOLDER ? editing.merchant : editing.name);
     setAccountId(editing.account_id);
     setCounterAccountId(editing.counter_account_id || ACCOUNT_NONE);
   }, [editing]);
@@ -715,9 +716,9 @@ export default function SubscriptionRegisterModal({
                         setIsFixedBill(true);
                         setCycle("monthly");
                         setShowEndDate(false);
-                        if (!category || category === "문화/취미") {
-                          setCategory("주거/통신");
-                          setSubCategory("관리비/공과금");
+                        if (!category || category === CATEGORY.culture) {
+                          setCategory(CATEGORY.housing);
+                          setSubCategory(SUB_CATEGORY.utilities);
                         }
                       } else {
                         setIsFixedBill(false);
@@ -728,11 +729,11 @@ export default function SubscriptionRegisterModal({
                           setCycle(recurrenceRule);
                         }
                         if (
-                          (category === "주거/통신" || !category) &&
-                          (subCategory === "관리비/공과금" || !subCategory)
+                          (category === CATEGORY.housing || !category) &&
+                          (subCategory === SUB_CATEGORY.utilities || !subCategory)
                         ) {
-                          setCategory("문화/취미");
-                          setSubCategory("정기 구독");
+                          setCategory(CATEGORY.culture);
+                          setSubCategory(SUB_CATEGORY.subscriptions);
                         }
                       }
                     }}

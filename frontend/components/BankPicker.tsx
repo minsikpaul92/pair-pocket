@@ -9,9 +9,10 @@ import {
   CANADA_BANKS,
   KOREA_BANKS,
   bankLogoUrl,
+  findBank,
   type BankCountry,
-  type BankOption,
 } from "@/lib/banks";
+import { useInstitutionLabel } from "@/lib/useInstitutionLabel";
 
 function BankIcon({
   name,
@@ -50,10 +51,6 @@ function BankIcon({
   );
 }
 
-function findPreset(value: string): BankOption | undefined {
-  return BANK_OPTIONS.find((b) => b.id === value || b.name === value);
-}
-
 interface Props {
   value: string;
   onChange: (value: string) => void;
@@ -81,13 +78,14 @@ export default function BankPicker({
 }: Props) {
   const t = useTranslations("account");
   const tCommon = useTranslations("common");
+  const bankLabel = useInstitutionLabel();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const selectedPreset = findPreset(value);
+  const selectedPreset = findBank(value);
   const isCustomSelected =
     Boolean(value) && !selectedPreset && customInstitutions.includes(value);
 
@@ -167,7 +165,7 @@ export default function BankPicker({
                 color={selectedPreset.color}
                 domain={selectedPreset.domain}
               />
-              <span className="truncate">{selectedPreset.name}</span>
+              <span className="truncate">{bankLabel(selectedPreset.id)}</span>
             </>
           ) : isCustomSelected || value ? (
             <>
@@ -189,7 +187,7 @@ export default function BankPicker({
             {canadaList.length > 0 && (
               <>
                 <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                  Canada
+                  {tCommon("canada")}
                 </li>
                 {canadaList.map((bank) => (
                   <li key={bank.id}>
@@ -203,7 +201,7 @@ export default function BankPicker({
                         color={bank.color}
                         domain={bank.domain}
                       />
-                      <span className="flex-1 truncate">{bank.name}</span>
+                      <span className="flex-1 truncate">{bankLabel(bank.id)}</span>
                       {value === bank.id && (
                         <Check className="h-4 w-4 text-blue-500 shrink-0" />
                       )}
@@ -222,7 +220,7 @@ export default function BankPicker({
                       : ""
                   }`}
                 >
-                  Korea
+                  {tCommon("korea")}
                 </li>
                 {koreaList.map((bank) => (
                   <li key={bank.id}>
@@ -236,7 +234,7 @@ export default function BankPicker({
                         color={bank.color}
                         domain={bank.domain}
                       />
-                      <span className="flex-1 truncate">{bank.name}</span>
+                      <span className="flex-1 truncate">{bankLabel(bank.id)}</span>
                       {value === bank.id && (
                         <Check className="h-4 w-4 text-blue-500 shrink-0" />
                       )}

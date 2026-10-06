@@ -29,8 +29,13 @@ import {
 import {
   canonicalizeCategory,
   canonicalizeSubCategory,
+  translateCategory,
+  translateSubCategory,
 } from "@/lib/category-i18n";
-import { useTranslations } from "next-intl";
+import { CATEGORY, SUB_CATEGORY } from "@/lib/category-values";
+import { errorMessage } from "@/lib/errors";
+import { intlLocale } from "@/i18n/locales";
+import { useLocale, useMessages, useTranslations } from "next-intl";
 
 /** Excel needs a UTF-8 BOM to open Korean CSV correctly on macOS/Windows. */
 const CSV_UTF8_BOM = "\uFEFF";
@@ -80,6 +85,11 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
   const t = useTranslations("importPage");
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
+  const tErrors = useTranslations("errors");
+  const tCategories = useTranslations("categories");
+  const tSubCategories = useTranslations("subCategories");
+  const messages = useMessages();
+  const locale = useLocale();
 
   const [activeSubTab, setActiveSubTab] = useState<"csv" | "logs">("csv");
   const [loading, setLoading] = useState(false);
@@ -136,11 +146,27 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
 
   function downloadCSVTemplate() {
     // Valid expense preset pairs only — column order matches parseCSV.
+    // Sample rows use the labels of the current language; parseCSV maps them back.
+    const sample = (
+      date: string,
+      amount: string,
+      merchant: string,
+      category: string,
+      subCategory: string
+    ) =>
+      [
+        date,
+        amount,
+        "CAD",
+        merchant,
+        translateCategory(category, tCategories),
+        translateSubCategory(subCategory, tSubCategories),
+      ].join(",");
     const csvContent = [
       "date,amount,currency,merchant,category,sub_category",
-      "2026-01-15,12.50,CAD,Example Cafe,식비,카페/간식",
-      "2026-01-16,45.00,CAD,Grocery Store,식비,식재료/장보기",
-      "2026-01-17,28.00,CAD,Shoppers,생활/쇼핑,생필품",
+      sample("2026-01-15", "12.50", "Example Cafe", CATEGORY.food, SUB_CATEGORY.cafeSnacks),
+      sample("2026-01-16", "45.00", "Grocery Store", CATEGORY.food, SUB_CATEGORY.groceries),
+      sample("2026-01-17", "28.00", "Shoppers", CATEGORY.living, SUB_CATEGORY.essentials),
     ].join("\n");
 
     downloadTextCsv("PairPocket_import_template.csv", csvContent);
@@ -148,12 +174,15 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
 
   function parseCSV(file: File) {
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const text = ((event.target?.result as string) || "").replace(/^\uFEFF/, "");
       if (!text) return;
 
       const rows = text.split(/\r?\n/);
       const mapped: EditableTransaction[] = [];
+      // Accept category names in the current language and in English.
+      const english = (await import("@/messages/en.json")).default;
+      const labelSources = [messages, english];
 
       // Find header row (skip guide comments if present).
       let dataStart = 1;
@@ -176,8 +205,11 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
         const amount = parseFloat(cols[1]) || 0;
         const currency = (cols[2] || "CAD").toUpperCase() as any;
         const merchant = cols[3] || t("unspecified");
-        const category = canonicalizeCategory(cols[4] || "식비");
-        const sub_category = canonicalizeSubCategory(cols[5] || "카페/간식");
+        const category = canonicalizeCategory(cols[4] || CATEGORY.food, labelSources);
+        const sub_category = canonicalizeSubCategory(
+          cols[5] || SUB_CATEGORY.cafeSnacks,
+          labelSources
+        );
 
         mapped.push({
           id: `csv-${Date.now()}-${i}`,
@@ -230,7 +262,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
       onChanged();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || t("errCsvImport"));
+      setErrorMsg(errorMessage(err, tErrors, t("errCsvImport")));
     } finally {
       setLoading(false);
     }
@@ -556,7 +588,7 @@ export default function ImportView({ scope, accountType, presets, onChanged }: P
                   {logs.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50/50">
                       <td className="p-3 font-mono text-gray-400">
-                        {new Date(log.timestamp).toLocaleString()}
+                        {new Date(log.timestamp).toLocaleString(intlLocale(locale))}
                       </td>
                       <td className="p-3 font-semibold text-gray-800 dark:text-white">
                         {log.file_name}

@@ -86,7 +86,10 @@ import {
   type StockHolding,
   type UserSettings,
 } from "@/lib/api";
+import { CATEGORY, SUB_CATEGORY } from "@/lib/category-values";
 import { dayKey } from "@/lib/date";
+import { errorMessage } from "@/lib/errors";
+import { useInstitutionLabel } from "@/lib/useInstitutionLabel";
 
 type Step = 0 | 1 | 2 | 3;
 
@@ -158,28 +161,28 @@ type DraftSub = {
 const FIXED_BILL_OPTIONS = [
   {
     id: "rent",
-    category: "주거/통신",
-    sub_category: "월세/모기지",
+    category: CATEGORY.housing,
+    sub_category: SUB_CATEGORY.rentMortgage,
   },
   {
     id: "internet",
-    category: "주거/통신",
-    sub_category: "인터넷",
+    category: CATEGORY.housing,
+    sub_category: SUB_CATEGORY.internet,
   },
   {
     id: "mobile",
-    category: "주거/통신",
-    sub_category: "휴대폰",
+    category: CATEGORY.housing,
+    sub_category: SUB_CATEGORY.mobilePhone,
   },
   {
     id: "utilities",
-    category: "주거/통신",
-    sub_category: "관리비/공과금",
+    category: CATEGORY.housing,
+    sub_category: SUB_CATEGORY.utilities,
   },
   {
     id: "academy",
-    category: "문화/취미",
-    sub_category: "학원/교육",
+    category: CATEGORY.culture,
+    sub_category: SUB_CATEGORY.academyEducation,
   },
 ] as const;
 
@@ -202,8 +205,8 @@ function emptyDraftSub(
     promo_amount: "",
     promo_end_date: "",
     regular_amount: "",
-    category: "문화/취미",
-    sub_category: "정기 구독",
+    category: CATEGORY.culture,
+    sub_category: SUB_CATEGORY.subscriptions,
     merchant: "",
     total_installments: "",
     account_id: accountId,
@@ -486,6 +489,8 @@ function holdingToDraft(h: StockHolding): DraftHolding {
 export default function OnboardingWizard() {
   const t = useTranslations("onboarding");
   const tTx = useTranslations("transaction");
+  const tErrors = useTranslations("errors");
+  const institutionName = useInstitutionLabel();
   const locale = useLocale() as AppLocale;
   const router = useRouter();
 
@@ -904,7 +909,7 @@ export default function OnboardingWizard() {
       await ensureDraftsForStep(1);
       await goStep(1);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("saveError"));
+      setError(errorMessage(err, tErrors, t("saveError")));
     } finally {
       setSaving(false);
     }
@@ -960,7 +965,7 @@ export default function OnboardingWizard() {
       }
       await goStep(2);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("saveError"));
+      setError(errorMessage(err, tErrors, t("saveError")));
     } finally {
       setSaving(false);
     }
@@ -1014,11 +1019,11 @@ export default function OnboardingWizard() {
           const startKey = billingStartDate(baseStart, s.billing_day);
           const isFixed = s.sub_kind === "fixed";
           const category = isFixed
-            ? s.category || "주거/통신"
-            : s.category || "문화/취미";
+            ? s.category || CATEGORY.housing
+            : s.category || CATEGORY.culture;
           const subCategory = isFixed
-            ? s.sub_category || "관리비/공과금"
-            : s.sub_category || "정기 구독";
+            ? s.sub_category || SUB_CATEGORY.utilities
+            : s.sub_category || SUB_CATEGORY.subscriptions;
           const merchant =
             (isFixed ? s.merchant : "")?.trim() || s.name.trim();
           const installments = Number(s.total_installments);
@@ -1084,7 +1089,7 @@ export default function OnboardingWizard() {
       }
       await goStep(3);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("saveError"));
+      setError(errorMessage(err, tErrors, t("saveError")));
     } finally {
       setSaving(false);
     }
@@ -1130,7 +1135,7 @@ export default function OnboardingWizard() {
       clearDraftStorage();
       router.replace("/");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("saveError"));
+      setError(errorMessage(err, tErrors, t("saveError")));
     } finally {
       setSaving(false);
     }
@@ -1311,11 +1316,11 @@ export default function OnboardingWizard() {
           const category =
             s.category ||
             fixedMatch?.category ||
-            (sub_kind === "fixed" ? "주거/통신" : "문화/취미");
+            (sub_kind === "fixed" ? CATEGORY.housing : CATEGORY.culture);
           const sub_category =
             s.sub_category ||
             fixedMatch?.sub_category ||
-            (sub_kind === "fixed" ? "관리비/공과금" : "정기 구독");
+            (sub_kind === "fixed" ? SUB_CATEGORY.utilities : SUB_CATEGORY.subscriptions);
           let end_date = normalizeIsoDate(s.end_date);
           const totalNum = Number(s.total_installments);
           let total_installments =
@@ -2091,16 +2096,16 @@ export default function OnboardingWizard() {
                               return {
                                 ...x,
                                 sub_kind,
-                                category: x.category || "주거/통신",
-                                sub_category: x.sub_category || "월세/모기지",
+                                category: x.category || CATEGORY.housing,
+                                sub_category: x.sub_category || SUB_CATEGORY.rentMortgage,
                                 merchant: x.merchant || x.name,
                               };
                             }
                             const next: DraftSub = {
                               ...x,
                               sub_kind,
-                              category: "문화/취미",
-                              sub_category: "정기 구독",
+                              category: CATEGORY.culture,
+                              sub_category: SUB_CATEGORY.subscriptions,
                             };
                             if (sub_kind !== "installment") return next;
                             if (next.end_date) {
@@ -2646,7 +2651,7 @@ export default function OnboardingWizard() {
                     >
                       <PiggyBank className="h-4 w-4 text-blue-500 shrink-0" />
                       <span className="truncate">
-                        {acc.institution ? `[${acc.institution}] ` : ""}
+                        {acc.institution ? `[${institutionName(acc.institution)}] ` : ""}
                         {acc.nickname || acc.name} ({acc.currency})
                       </span>
                     </li>
@@ -2726,7 +2731,7 @@ export default function OnboardingWizard() {
                     <option value="">{t("brokerAccountPick")}</option>
                     {visibleInvestmentAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.institution ? `[${acc.institution}] ` : ""}
+                        {acc.institution ? `[${institutionName(acc.institution)}] ` : ""}
                         {acc.nickname || acc.name} ({acc.currency})
                       </option>
                     ))}

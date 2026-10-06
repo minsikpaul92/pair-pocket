@@ -72,12 +72,18 @@ import {
   fetchAllMerchants,
   lookupMerchant,
 } from "@/lib/api";
-import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import {
+  merchantLabel,
+  translateCategory,
+  translateSubCategory,
+} from "@/lib/category-i18n";
+import { CATEGORY, DEFAULT_ITEM_UNIT, SUB_CATEGORY } from "@/lib/category-values";
+import { intlLocale } from "@/i18n/locales";
 import { dayKey, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
-const TIP_SUB_CATEGORIES = new Set(["외식/배달", "카페/간식"]);
+const TIP_SUB_CATEGORIES = new Set<string>([SUB_CATEGORY.diningOut, SUB_CATEGORY.cafeSnacks]);
 const NO_SPIN =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 const ITEM_GRID =
@@ -258,7 +264,7 @@ export default function TransactionModal({
   const itemsScanInputRef = useRef<HTMLInputElement>(null);
 
   const [availableUnits, setAvailableUnits] = useState<string[]>([
-    "개",
+    DEFAULT_ITEM_UNIT,
     "g",
     "kg",
     "ml",
@@ -269,9 +275,7 @@ export default function TransactionModal({
   ]);
 
   function handleAddCustomUnit(itemIdx: number) {
-    const input = window.prompt(
-      "새로운 단위를 입력하세요 (예: 박스, 봉, 병, 캔, 롤):"
-    );
+    const input = window.prompt(tTx("addUnitPrompt"));
     if (!input) return;
     const trimmed = input.trim();
     if (!trimmed) return;
@@ -300,19 +304,19 @@ export default function TransactionModal({
       (f) => f.type.startsWith("image/") || f.type === "application/pdf"
     );
     if (!valid.length) {
-      setError("지원되는 이미지 또는 PDF 파일을 선택하세요.");
+      setError(tTx("unsupportedScanFile"));
       return;
     }
 
     setScanQueue((prev) => {
       const room = MAX_IMAGES - prev.length;
       if (room <= 0) {
-        setError(`최대 ${MAX_IMAGES}장까지 채울 수 있습니다.`);
+        setError(tTx("maxImages", { max: MAX_IMAGES }));
         return prev;
       }
       const accepted = valid.slice(0, room);
       if (valid.length > room) {
-        setError(`최대 ${MAX_IMAGES}장까지 채울 수 있습니다.`);
+        setError(tTx("maxImages", { max: MAX_IMAGES }));
       }
       const next = accepted.map((file) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -344,7 +348,7 @@ export default function TransactionModal({
     setScanning(true);
     setScanHint(
       nextRetry >= 2
-        ? "⚡ 고성능 AI 모델(gemini-3.6-flash)로 정밀 스캔 중..."
+        ? tTx("precisionScanning")
         : tTx("scanning")
     );
     setError(null);
@@ -374,13 +378,13 @@ export default function TransactionModal({
       applyParsedTransaction(flat[0]);
       setScanHint(
         flat.length > 1
-          ? `총 ${flat.length}건의 거래를 인식했습니다. 순서대로 검토 후 저장해 주세요.`
+          ? tTx("scanFoundMany", { count: flat.length })
           : nextRetry >= 2
-          ? "고성능 AI 모델로 인식 완료!"
+          ? tTx("precisionScanDone")
           : tTx("scanFilled")
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : tTx("scanFailed"));
+      setError(translateError(err, tErrors, "aiScanFailed"));
     } finally {
       setScanning(false);
     }
@@ -396,10 +400,10 @@ export default function TransactionModal({
         setItems(extracted);
         setShowItems(true);
       } else {
-        setError("세부 품목을 인식하지 못했습니다.");
+        setError(tTx("itemsNotFound"));
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "세부 품목 분석 중 오류가 발생했습니다.");
+      setError(translateError(err, tErrors, "itemsScanFailed"));
     } finally {
       setItemsScanning(false);
       if (itemsScanInputRef.current) itemsScanInputRef.current.value = "";
@@ -416,10 +420,10 @@ export default function TransactionModal({
         setItems(extracted);
         setShowItems(true);
       } else {
-        setError("기존 영수증 사진에서 세부 품목을 인식하지 못했습니다.");
+        setError(tTx("itemsNotFoundExisting"));
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "세부 품목 분석 중 오류가 발생했습니다.");
+      setError(translateError(err, tErrors, "itemsScanFailed"));
     } finally {
       setItemsScanning(false);
     }
@@ -505,34 +509,40 @@ export default function TransactionModal({
   // "to" account and counter_account_id is the "from" account.
   const fromIsPrimary = !isLedgerTransfer || type === "expense";
 
-  const isStockBuy = type === "expense" && category === "투자/저축" && subCategory === "주식 매수";
-  const isStockSell = type === "income" && category === "금융/기타" && subCategory === "주식 판매수익";
+  const isStockBuy =
+    type === "expense" &&
+    category === CATEGORY.investmentSavings &&
+    subCategory === SUB_CATEGORY.stockPurchase;
+  const isStockSell =
+    type === "income" &&
+    category === CATEGORY.financeOther &&
+    subCategory === SUB_CATEGORY.stockSale;
   const isStock = isStockBuy || isStockSell;
 
   const TAX_EXEMPT_SUB_CATEGORIES = useMemo(
     () =>
-      new Set([
-        "월세/모기지",
-        "대중교통",
-        "경조사비",
-        "주식 매수",
-        "FHSA 납입",
-        "TFSA 납입",
-        "저축성 예금",
-        "세금",
-        "카드 대금 결제",
-        "계좌 이체",
-        "투자 계좌 이체",
-        "공용 계좌 입금",
-        "개인 계좌로 인출",
-        "e-Transfer",
+      new Set<string>([
+        SUB_CATEGORY.rentMortgage,
+        SUB_CATEGORY.publicTransit,
+        SUB_CATEGORY.ceremonial,
+        SUB_CATEGORY.stockPurchase,
+        SUB_CATEGORY.fhsaContribution,
+        SUB_CATEGORY.tfsaContribution,
+        SUB_CATEGORY.savingsDeposit,
+        SUB_CATEGORY.taxPayment,
+        SUB_CATEGORY.cardRepayment,
+        SUB_CATEGORY.accountTransferLegacy,
+        SUB_CATEGORY.investmentFunding,
+        SUB_CATEGORY.sharedFunding,
+        SUB_CATEGORY.sharedWithdrawal,
+        SUB_CATEGORY.etransfer,
       ]),
     []
   );
 
   const isTaxExemptCategory =
-    category === "투자/저축" ||
-    category === "세금" ||
+    category === CATEGORY.investmentSavings ||
+    category === CATEGORY.tax ||
     category === TRANSFER_CATEGORY ||
     TAX_EXEMPT_SUB_CATEGORIES.has(subCategory);
 
@@ -542,7 +552,13 @@ export default function TransactionModal({
     !isTaxExemptCategory;
 
   const ALL_TIP_SUB_CATEGORIES = useMemo(
-    () => new Set(["외식/배달", "카페/간식", "택시/우버", "미용/뷰티"]),
+    () =>
+      new Set<string>([
+        SUB_CATEGORY.diningOut,
+        SUB_CATEGORY.cafeSnacks,
+        SUB_CATEGORY.taxiUber,
+        SUB_CATEGORY.beauty,
+      ]),
     []
   );
 
@@ -967,7 +983,7 @@ export default function TransactionModal({
       applyParsedTransaction(parsed);
       setScanHint(tTx("scanFilled"));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : tTx("scanFailed"));
+      setError(translateError(err, tErrors, "aiScanFailed"));
     } finally {
       setScanning(false);
       if (scanInputRef.current) scanInputRef.current.value = "";
@@ -1186,17 +1202,17 @@ export default function TransactionModal({
     }
     if (isStock) {
       if (!ticker.trim()) {
-        setError("주식 티커를 입력해 주세요.");
+        setError(tTx("tickerRequired"));
         return;
       }
       const numShares = parseFloat(shares);
       if (isNaN(numShares) || numShares <= 0) {
-        setError("올바른 주식 수량을 입력해 주세요.");
+        setError(tTx("sharesInvalid"));
         return;
       }
       const numPrice = parseFloat(price);
       if (isNaN(numPrice) || numPrice <= 0) {
-        setError("올바른 주가 단가를 입력해 주세요.");
+        setError(tTx("priceInvalid"));
         return;
       }
     }
@@ -1261,7 +1277,7 @@ export default function TransactionModal({
 
     const finalTicker = isStock ? (ticker.trim() || tickerSearch.trim()) : "";
     if (isStock && !finalTicker) {
-      setError("종목(티커)을 입력하거나 선택해 주세요.");
+      setError(tTx("holdingRequired"));
       return;
     }
 
@@ -1326,8 +1342,10 @@ export default function TransactionModal({
         (savedDate.getMonth() !== defaultDate.getMonth() ||
           savedDate.getFullYear() !== defaultDate.getFullYear())
       ) {
-        const formatted = `${savedDate.getFullYear()}년 ${savedDate.getMonth() + 1}월 ${savedDate.getDate()}일`;
-        alert(`거래가 ${formatted} 날짜로 저장되었습니다. (현재 화면에 선택된 월과 다른 달입니다)`);
+        const formatted = new Intl.DateTimeFormat(intlLocale(locale), {
+          dateStyle: "long",
+        }).format(savedDate);
+        alert(tTx("savedToOtherMonth", { date: formatted }));
       }
 
       const remainingQueue = parsedQueue.filter((_, i) => i !== queueIndex);
@@ -1337,7 +1355,7 @@ export default function TransactionModal({
         setQueueIndex(nextIdx);
         applyParsedTransaction(remainingQueue[nextIdx]);
         onSaved();
-        setScanHint(`저장 완료! (남은 ${remainingQueue.length}건 거래 검토 중)`);
+        setScanHint(tTx("savedQueueRemaining", { count: remainingQueue.length }));
       } else {
         clearScanQueue();
         setScannedFile(null);
@@ -1533,7 +1551,7 @@ export default function TransactionModal({
     <div className="space-y-4">
       <div>
         <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-          결제 계좌 (증권사 계좌)
+          {tTx("stockPaymentAccount")}
         </label>
         <AccountSelect
           accounts={accounts}
@@ -1551,7 +1569,7 @@ export default function TransactionModal({
           }}
           disabled={accountsLoading || !subCategory}
           allowNone={false}
-          placeholder="결제할 계좌 선택"
+          placeholder={tTx("selectStockPaymentAccount")}
           variant="field"
           filterAccounts={(acc) => acc.kind === "investment"}
         />
@@ -1596,7 +1614,7 @@ export default function TransactionModal({
       {isStockSell ? (
         <div className="relative">
           <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            보유종목 선택
+            {tTx("selectHolding")}
           </label>
           <select
             value={selectedHoldingId}
@@ -1625,13 +1643,18 @@ export default function TransactionModal({
             className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
             required
           >
-            <option value="">보유 주식 선택...</option>
+            <option value="">{tTx("selectHoldingPlaceholder")}</option>
             {visibleHoldings.map((h) => {
               const acc = accounts.find((a) => a.id === h.account_id);
-              const accName = acc ? (acc.nickname || acc.name) : "알 수 없는 계좌";
+              const accName = acc ? (acc.nickname || acc.name) : tTx("unknownAccount");
               return (
                 <option key={h.id} value={h.id}>
-                  {accName} - {h.name} ({h.ticker}) - 보유: {h.shares}주
+                  {tTx("holdingOption", {
+                    account: accName,
+                    name: h.name,
+                    ticker: h.ticker,
+                    shares: h.shares,
+                  })}
                 </option>
               );
             })}
@@ -1641,8 +1664,12 @@ export default function TransactionModal({
             if (!h) return null;
             return (
               <div className="mt-1.5 text-xs text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/30 px-3 py-1.5 rounded-lg flex items-center justify-between">
-                <span>보유 수량: {h.shares} 주</span>
-                <span>평균 단가: {formatAmount(h.avg_price, h.currency as Currency)}</span>
+                <span>{tTx("holdingSharesInfo", { shares: h.shares })}</span>
+                <span>
+                  {tTx("holdingAvgInfo", {
+                    price: formatAmount(h.avg_price, h.currency as Currency),
+                  })}
+                </span>
               </div>
             );
           })()}
@@ -1650,7 +1677,7 @@ export default function TransactionModal({
       ) : (
         <div className="relative">
           <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            종목 검색 (티커/회사명)
+            {tTx("tickerSearchLabel")}
           </label>
           <input
             type="text"
@@ -1659,7 +1686,7 @@ export default function TransactionModal({
               setTickerSearch(e.target.value);
             }}
             className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
-            placeholder="예: AAPL, 삼성전자"
+            placeholder={tTx("tickerSearchPlaceholder")}
             required
           />
           {tickerSuggestions.length > 0 && (
@@ -1697,7 +1724,7 @@ export default function TransactionModal({
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-          결제 통화
+          {tTx("tradeCurrency")}
         </label>
         <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5 max-w-[12rem]">
           {(["USD", "CAD", "KRW"] as Currency[]).map((c) => (
@@ -1720,7 +1747,7 @@ export default function TransactionModal({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            수량
+            {tTx("tradeShares")}
           </label>
           <input
             type="number"
@@ -1734,7 +1761,14 @@ export default function TransactionModal({
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            단가 ({txCurrency === "KRW" ? "원" : txCurrency === "CAD" ? "C$" : "$"})
+            {tTx("tradePrice", {
+              unit:
+                txCurrency === "KRW"
+                  ? tTx("priceUnitKrw")
+                  : txCurrency === "CAD"
+                  ? "C$"
+                  : "$",
+            })}
           </label>
           <input
             type="number"
@@ -1842,7 +1876,7 @@ export default function TransactionModal({
           onTouchMove={(e) => updateDrag(e.touches[0].clientY)}
           onTouchEnd={() => finishDrag()}
           className="w-full py-2 -mt-2 mb-1 flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none group"
-          title="아래로 드래그하여 닫기"
+          title={tTx("dragToClose")}
         >
           <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full group-hover:bg-gray-400 dark:group-hover:bg-gray-600 transition-colors" />
         </div>
@@ -2009,7 +2043,7 @@ export default function TransactionModal({
                               tSubCategories
                             )
                           : tCommon("none")}{" "}
-                        · {tx.merchant || tCommon("unspecified")}
+                        · {merchantLabel(tx.merchant, tCommon)}
                       </span>
                       <span
                         className={`shrink-0 text-sm font-semibold whitespace-nowrap ${
@@ -2092,7 +2126,7 @@ export default function TransactionModal({
               {dragOverModal && (
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-blue-500/10 dark:bg-blue-400/10">
                   <span className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
-                    영수증/명세서 이미지를 여기에 놓으세요
+                    {tTx("dropScanHere")}
                   </span>
                 </div>
               )}
@@ -2110,17 +2144,17 @@ export default function TransactionModal({
                 <div className="flex items-center gap-1.5">
                   <Camera className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
                   <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                    스크린샷 / 영수증으로 채우기
+                    {tTx("scanFillTitle")}
                   </span>
                 </div>
                 <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
-                  {scanQueue.length} / {MAX_IMAGES}장
+                  {tTx("scanQueueCount", { count: scanQueue.length, max: MAX_IMAGES })}
                 </span>
               </div>
 
               {scanQueue.length === 0 ? (
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                  사진이나 PDF 명세서를 이곳으로 드래그하거나 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 15장)
+                  {tTx("scanQueueEmptyHint", { max: MAX_IMAGES })}
                 </p>
               ) : (
                 <ul className="grid grid-cols-5 gap-1.5 pt-1">
@@ -2143,7 +2177,7 @@ export default function TransactionModal({
                         disabled={scanning}
                         onClick={() => removeQueuedScan(q.id)}
                         className="absolute -top-1 -right-1 rounded-full bg-gray-900/80 text-white p-0.5 disabled:opacity-50"
-                        aria-label="삭제"
+                        aria-label={tCommon("delete")}
                       >
                         <X className="h-2.5 w-2.5" />
                       </button>
@@ -2160,7 +2194,7 @@ export default function TransactionModal({
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold py-2 transition-colors disabled:opacity-50"
                 >
                   <ImagePlus className="h-3.5 w-3.5" />
-                  사진 추가
+                  {tTx("addPhotos")}
                 </button>
 
                 <button
@@ -2176,11 +2210,11 @@ export default function TransactionModal({
                   )}
                   {scanning
                     ? scanRetryCount >= 2
-                      ? "정밀 AI 분석 중…"
+                      ? tTx("precisionAnalyzing")
                       : tTx("scanning")
                     : parsedQueue.length > 0 || scannedFile !== null
-                    ? "다시 스캔 (재시도)"
-                    : "분석 시작"}
+                    ? tTx("rescan")
+                    : tTx("startScan")}
                 </button>
               </div>
 
@@ -2192,7 +2226,7 @@ export default function TransactionModal({
                     className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-500"
                   >
                     <Trash2 className="h-3 w-3" />
-                    초기화
+                    {tTx("clearQueue")}
                   </button>
                 </div>
               )}
@@ -2209,7 +2243,12 @@ export default function TransactionModal({
             <div className="flex items-center justify-between rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 p-3 text-xs">
               <div className="flex items-center gap-1.5 font-bold text-purple-700 dark:text-purple-300">
                 <span>📋</span>
-                <span>총 {parsedQueue.length}건 중 {queueIndex + 1}번째 거래 검토 중</span>
+                <span>
+                  {tTx("reviewProgress", {
+                    current: queueIndex + 1,
+                    total: parsedQueue.length,
+                  })}
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <button
@@ -2222,7 +2261,7 @@ export default function TransactionModal({
                   }}
                   className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
                 >
-                  이전
+                  {tTx("queuePrevious")}
                 </button>
                 <button
                   type="button"
@@ -2234,7 +2273,7 @@ export default function TransactionModal({
                   }}
                   className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
                 >
-                  다음
+                  {tTx("queueNext")}
                 </button>
                 <button
                   type="button"
@@ -2251,7 +2290,7 @@ export default function TransactionModal({
                   }}
                   className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-semibold"
                 >
-                  건너뛰기
+                  {tTx("queueSkip")}
                 </button>
               </div>
             </div>
@@ -2427,7 +2466,7 @@ export default function TransactionModal({
             </div>
           </div>
 
-          {/* Sub-items (소분류 세부항목) Expandable Section */}
+          {/* Line items (third level under the sub-category) */}
           <div className="border-t border-gray-100 dark:border-gray-800/80 pt-4 mt-2">
             <input
               ref={itemsScanInputRef}
@@ -2451,7 +2490,7 @@ export default function TransactionModal({
                           name: "",
                           standardized_name: "",
                           quantity: 1,
-                          unit: "개",
+                          unit: DEFAULT_ITEM_UNIT,
                           unit_price: 0,
                           total_price: 0,
                         },
@@ -2469,7 +2508,7 @@ export default function TransactionModal({
                     type="button"
                     disabled={!scannedFile || itemsScanning}
                     onClick={handleReParseItemsFromExisting}
-                    title="기존 사진 재분석"
+                    title={tTx("itemsReparse")}
                     className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent transition-colors"
                   >
                     {itemsScanning ? (
@@ -2482,7 +2521,7 @@ export default function TransactionModal({
                     type="button"
                     disabled={itemsScanning}
                     onClick={() => itemsScanInputRef.current?.click()}
-                    title="영수증 촬영"
+                    title={tTx("itemsTakePhoto")}
                     className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
                   >
                     <Camera className="h-4 w-4" />
@@ -2491,7 +2530,7 @@ export default function TransactionModal({
                     type="button"
                     disabled={itemsScanning}
                     onClick={() => itemsScanInputRef.current?.click()}
-                    title="사진 선택"
+                    title={tTx("itemsPickPhoto")}
                     className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
                   >
                     <ImagePlus className="h-4 w-4" />
@@ -2509,7 +2548,7 @@ export default function TransactionModal({
                       type="button"
                       disabled={!scannedFile || itemsScanning}
                       onClick={handleReParseItemsFromExisting}
-                      title="기존 사진 재분석"
+                      title={tTx("itemsReparse")}
                       className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-30 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent transition-colors"
                     >
                       {itemsScanning ? (
@@ -2522,7 +2561,7 @@ export default function TransactionModal({
                       type="button"
                       disabled={itemsScanning}
                       onClick={() => itemsScanInputRef.current?.click()}
-                      title="영수증 촬영"
+                      title={tTx("itemsTakePhoto")}
                       className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
                     >
                       <Camera className="h-4 w-4" />
@@ -2531,7 +2570,7 @@ export default function TransactionModal({
                       type="button"
                       disabled={itemsScanning}
                       onClick={() => itemsScanInputRef.current?.click()}
-                      title="사진 선택"
+                      title={tTx("itemsPickPhoto")}
                       className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
                     >
                       <ImagePlus className="h-4 w-4" />
@@ -2545,7 +2584,7 @@ export default function TransactionModal({
                             name: "",
                             standardized_name: "",
                             quantity: 1,
-                            unit: "개",
+                            unit: DEFAULT_ITEM_UNIT,
                             unit_price: 0,
                             total_price: 0,
                           },
@@ -2663,7 +2702,7 @@ export default function TransactionModal({
                               className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
                             />
                             <select
-                              value={item.unit || "개"}
+                              value={item.unit || DEFAULT_ITEM_UNIT}
                               onChange={(e) => {
                                 if (e.target.value === "__add__") {
                                   handleAddCustomUnit(itemIdx);
@@ -2675,11 +2714,11 @@ export default function TransactionModal({
                             >
                               {availableUnits.map((u) => (
                                 <option key={u} value={u} className="text-xs py-1">
-                                  {u}
+                                  {u === DEFAULT_ITEM_UNIT ? tTx("unitPiece") : u}
                                 </option>
                               ))}
                               <option value="__add__" className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 py-1">
-                                + 단위 추가
+                                {tTx("addUnit")}
                               </option>
                             </select>
                             <input

@@ -33,6 +33,7 @@ import {
   PartnerSummary,
 } from "@/lib/api";
 import { dayKey } from "@/lib/date";
+import { errorMessage } from "@/lib/errors";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
 import type { AppLocale } from "@/i18n/locales";
 
@@ -90,6 +91,7 @@ export default function SettingsView({
   const t = useTranslations("settingsPage");
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
+  const tErrors = useTranslations("errors");
   const locale = useLocale() as AppLocale;
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -147,8 +149,7 @@ export default function SettingsView({
       setSuccessMsg(t("saveSuccess"));
       onChanged();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t("saveError");
-      setErrorMsg(message || t("saveError"));
+      setErrorMsg(errorMessage(err, tErrors, t("saveError")));
     } finally {
       setSavingKey(false);
     }
@@ -172,8 +173,7 @@ export default function SettingsView({
       setSuccessMsg(t("shareKeySuccess"));
       onChanged();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t("shareKeyError");
-      setErrorMsg(message || t("shareKeyError"));
+      setErrorMsg(errorMessage(err, tErrors, t("shareKeyError")));
     } finally {
       setSharingKey(false);
     }
@@ -198,9 +198,7 @@ export default function SettingsView({
       setSuccessMsg(t("startDateSaveSuccess"));
       onChanged();
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : t("startDateSaveError");
-      setErrorMsg(message || t("startDateSaveError"));
+      setErrorMsg(errorMessage(err, tErrors, t("startDateSaveError")));
     } finally {
       setSavingStartDate(false);
     }
@@ -286,8 +284,7 @@ export default function SettingsView({
       onChanged();
       await loadSettings();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t("resetError");
-      setErrorMsg(message || t("resetError"));
+      setErrorMsg(errorMessage(err, tErrors, t("resetError")));
     } finally {
       setResetting(false);
     }

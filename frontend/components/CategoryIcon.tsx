@@ -17,24 +17,26 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { CATEGORY, SUB_CATEGORY } from "@/lib/category-values";
+
 const ICON_MAP: Record<string, LucideIcon> = {
-  식비: Utensils,
-  "주거/통신": Home,
-  "교통/차량": Bus,
-  "생활/쇼핑": ShoppingBag,
-  "건강/의료": HeartPulse,
-  "문화/취미": Popcorn,
-  "경조사/선물": Gift,
-  "투자/저축": PiggyBank,
-  세금: Receipt,
-  "자산 이동/카드": ArrowLeftRight,
-  급여: Wallet,
-  부수입: Banknote,
-  정산: TrendingUp,
-  "금융/기타": Landmark,
+  [CATEGORY.food]: Utensils,
+  [CATEGORY.housing]: Home,
+  [CATEGORY.transport]: Bus,
+  [CATEGORY.living]: ShoppingBag,
+  [CATEGORY.health]: HeartPulse,
+  [CATEGORY.culture]: Popcorn,
+  [CATEGORY.gifts]: Gift,
+  [CATEGORY.investmentSavings]: PiggyBank,
+  [CATEGORY.tax]: Receipt,
+  [CATEGORY.transfer]: ArrowLeftRight,
+  [CATEGORY.salary]: Wallet,
+  [CATEGORY.sideIncome]: Banknote,
+  [CATEGORY.settlement]: TrendingUp,
+  [CATEGORY.financeOther]: Landmark,
   // legacy
-  "자산 이동": ArrowLeftRight,
-  "카페/간식": Utensils,
+  [CATEGORY.transferLegacy]: ArrowLeftRight,
+  [SUB_CATEGORY.cafeSnacks]: Utensils,
 };
 
 export function categoryIcon(category: string): LucideIcon {

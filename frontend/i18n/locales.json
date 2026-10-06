@@ -1,0 +1,17 @@
+{
+  "baseLocale": "ko",
+  "fallbackLocale": "en",
+  "defaultLocale": "en",
+  "locales": [
+    { "code": "en", "label": "English", "native": "English", "short": "EN", "intl": "en-CA", "beta": false },
+    { "code": "ko", "label": "한국어", "native": "한국어", "short": "KO", "intl": "ko-KR", "beta": false },
+    { "code": "fr", "label": "Français", "native": "Français", "short": "FR", "intl": "fr-CA", "beta": true },
+    { "code": "zh-Hans", "label": "中文 (Mandarin)", "native": "普通话", "short": "简", "intl": "zh-Hans-CN", "beta": true },
+    { "code": "zh-Hant", "label": "中文 (Cantonese)", "native": "粤语", "short": "粵", "intl": "zh-Hant-HK", "beta": true },
+    { "code": "ja", "label": "日本語", "native": "日本語", "short": "JA", "intl": "ja-JP", "beta": true },
+    { "code": "es", "label": "Español", "native": "Español", "short": "ES", "intl": "es", "beta": true },
+    { "code": "vi", "label": "Tiếng Việt", "native": "Tiếng Việt", "short": "VI", "intl": "vi-VN", "beta": true },
+    { "code": "fil", "label": "Filipino", "native": "Filipino", "short": "FIL", "intl": "fil-PH", "beta": true },
+    { "code": "pa", "label": "Punjabi", "native": "ਪੰਜਾਬੀ", "short": "PA", "intl": "pa-Guru-IN", "beta": true }
+  ]
+}

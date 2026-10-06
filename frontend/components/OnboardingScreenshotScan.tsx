@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, Loader2, ImagePlus, Play, Trash2, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import {
   OnboardingParseStep,
   OnboardingParseResult,
   parseOnboardingScreenshots,
 } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
+import { intlLocale } from "@/i18n/locales";
 
 const MAX_IMAGES = 15;
 const MAX_EDGE = 1600;
@@ -65,7 +67,9 @@ export default function OnboardingScreenshotScan({
   onParsed,
 }: Props) {
   const t = useTranslations("onboarding");
-  const tImport = useTranslations("import");
+  const tImport = useTranslations("importPage");
+  const tErrors = useTranslations("errors");
+  const locale = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [queue, setQueue] = useState<QueuedImage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -84,7 +88,7 @@ export default function OnboardingScreenshotScan({
     if (!iso) return "—";
     try {
       const d = new Date(iso);
-      return new Intl.DateTimeFormat("ko-KR", {
+      return new Intl.DateTimeFormat(intlLocale(locale), {
         timeZone: "America/Toronto",
         year: "numeric",
         month: "2-digit",
@@ -206,8 +210,7 @@ export default function OnboardingScreenshotScan({
       onParsed(result);
       clearQueue();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t("aiError");
-      setError(message);
+      setError(errorMessage(err, tErrors, t("aiError")));
       setStatus(null);
     } finally {
       setBusy(false);

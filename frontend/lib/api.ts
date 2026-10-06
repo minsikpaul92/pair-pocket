@@ -1,4 +1,6 @@
-import { ApiError } from "@/lib/errors";
+import { KOREAN_BROKERAGE_HINTS } from "@/lib/banks";
+import { CATEGORY, SUB_CATEGORY } from "@/lib/category-values";
+import { ApiError, apiErrorFromBody, apiErrorFromEvent } from "@/lib/errors";
 import { dayKey } from "./date";
 
 export const API_BASE_URL =
@@ -6,18 +8,18 @@ export const API_BASE_URL =
 
 const TOKEN_KEY = "pairpocket_token";
 
-export const EXPENSE_CATEGORY_INVESTMENT = "투자/저축";
-export const TRANSFER_CATEGORY = "자산 이동/카드";
-export const TRANSFER_CATEGORY_LEGACY = "자산 이동";
-export const TRANSFER_SUB_CARD_REPAYMENT = "카드 대금 상환";
-export const TRANSFER_SUB_ACCOUNT_TRANSFER = "내 계좌 이동";
-export const TRANSFER_SUB_ACCOUNT_TRANSFER_LEGACY = "계좌 이체";
-export const TRANSFER_SUB_INVESTMENT_FUNDING = "투자 계좌 입금";
-export const TRANSFER_SUB_SHARED_FUNDING = "공용 계좌 입금";
-export const TRANSFER_SUB_SHARED_WITHDRAWAL = "개인 계좌로 인출";
-export const TRANSFER_SUB_ETRANSFER = "e-Transfer/계좌이체";
-export const INCOME_CATEGORY_SETTLEMENT = "정산";
-export const SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급";
+export const EXPENSE_CATEGORY_INVESTMENT = CATEGORY.investmentSavings;
+export const TRANSFER_CATEGORY = CATEGORY.transfer;
+export const TRANSFER_CATEGORY_LEGACY = CATEGORY.transferLegacy;
+export const TRANSFER_SUB_CARD_REPAYMENT = SUB_CATEGORY.cardRepayment;
+export const TRANSFER_SUB_ACCOUNT_TRANSFER = SUB_CATEGORY.accountTransfer;
+export const TRANSFER_SUB_ACCOUNT_TRANSFER_LEGACY = SUB_CATEGORY.accountTransferLegacy;
+export const TRANSFER_SUB_INVESTMENT_FUNDING = SUB_CATEGORY.investmentFunding;
+export const TRANSFER_SUB_SHARED_FUNDING = SUB_CATEGORY.sharedFunding;
+export const TRANSFER_SUB_SHARED_WITHDRAWAL = SUB_CATEGORY.sharedWithdrawal;
+export const TRANSFER_SUB_ETRANSFER = SUB_CATEGORY.etransfer;
+export const INCOME_CATEGORY_SETTLEMENT = CATEGORY.settlement;
+export const SUB_CATEGORY_SETTLEMENT = SUB_CATEGORY.splitSettlement;
 
 const CASHFLOW_TRANSFER_SUBS = new Set([
   TRANSFER_SUB_SHARED_FUNDING,
@@ -88,7 +90,7 @@ export function isSettlementTransaction(tx: {
   );
 }
 
-/** Internal transfers and N빵 settlements — grey, excluded from income/expense totals. */
+/** Internal transfers and split settlements: grey, excluded from income/expense totals. */
 export function isNonCashflowTransaction(tx: {
   kind?: TransactionKind | null;
   category: string;
@@ -325,15 +327,6 @@ export const ACCOUNT_KIND_KEYS: Record<FinancialAccountKind, string> = {
   cash: "cash",
 };
 
-/** @deprecated Use accountKinds i18n namespace with ACCOUNT_KIND_KEYS */
-export const ACCOUNT_KIND_LABEL: Record<FinancialAccountKind, string> = {
-  checking: "입출금",
-  savings: "저축",
-  credit_card: "신용카드",
-  investment: "투자",
-  cash: "현금",
-};
-
 export interface Transaction {
   id: string;
   date: string;
@@ -498,7 +491,7 @@ export async function fetchAllTransactions(
   );
 }
 
-/** Expense amount after N빵 settlements (for calendar/list display). */
+/** Expense amount after split settlements (for calendar/list display). */
 export function effectiveExpenseAmount(tx: Transaction): number {
   if (tx.type !== "expense") return tx.amount;
   return tx.effective_amount ?? tx.amount;
@@ -631,8 +624,7 @@ export async function setCategoryColor(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    if (body && typeof body.detail === "string") throw new Error(body.detail);
-    throw new ApiError("setCategoryColor");
+    throw apiErrorFromBody(body, "setCategoryColor");
   }
   const data = (await res.json()) as UserSettings;
   return {
@@ -865,10 +857,7 @@ export async function fetchNetWorth(filters: {
 
 async function readApiError(res: Response, fallbackCode: string): Promise<never> {
   const body = await res.json().catch(() => null);
-  if (body && typeof body.detail === "string") {
-    throw new Error(body.detail);
-  }
-  throw new ApiError(fallbackCode);
+  throw apiErrorFromBody(body, fallbackCode);
 }
 
 export type BillingCycle =
@@ -975,23 +964,6 @@ export interface SubscriptionOccurrence {
   sub_category?: string | null;
   merchant?: string | null;
 }
-
-export const BILLING_CYCLE_LABEL: Record<BillingCycle, string> = {
-  monthly: "매월",
-  yearly: "매년",
-  every_x_days: "X일 마다",
-  weekly: "매주",
-  biweekly: "격주",
-  installment: "할부",
-};
-
-export const SUBSCRIPTION_STATUS_LABEL: Record<SubscriptionStatus, string> = {
-  active: "진행중",
-  paused: "일시정지",
-  cancel_scheduled: "해지 예정",
-  completed: "완료",
-  cancelled: "해지",
-};
 
 export async function fetchSubscriptions(filters: {
   currency?: Currency;
@@ -1261,10 +1233,7 @@ export async function createAccount(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    if (body && typeof body.detail === "string") {
-      throw new Error(body.detail);
-    }
-    throw new ApiError("createAccount");
+    throw apiErrorFromBody(body, "createAccount");
   }
   return (await res.json()) as FinancialAccount;
 }
@@ -1408,18 +1377,6 @@ export function accountLabel(account: FinancialAccount): string {
   return account.nickname?.trim() || account.name;
 }
 
-export function accountDetail(account: FinancialAccount): string {
-  const parts = [
-    ACCOUNT_KIND_LABEL[account.kind],
-    account.kind === "credit_card" && account.last_four
-      ? `···${account.last_four}`
-      : null,
-    account.kind !== "credit_card" && account.account_number
-      ? maskAccountNumber(account.account_number)
-      : null,
-  ].filter(Boolean);
-  return parts.join(" · ");
-}
 
 /** Keep only last 4 digits for card PAN / display. */
 export function normalizeLastFour(raw: string | null | undefined): string | null {
@@ -1572,13 +1529,6 @@ export function addMonthsToDateKey(dateKey: string, months: number): string {
   return `${ny}-${nm}-${nd}`;
 }
 
-export function subscriptionSourceLabel(
-  cycle: BillingCycle | null | undefined
-): string | null {
-  if (!cycle) return null;
-  return cycle === "installment" ? "할부" : "구독";
-}
-
 export function subscriptionDisplayAmount(sub: Subscription): number {
   const regular = sub.amount;
   if (sub.promo_amount == null) return regular;
@@ -1627,9 +1577,7 @@ export function resolveAccountCountry(
   if (account.country === "CA" || account.country === "KR") return account.country;
   const hay = `${account.institution || ""} ${account.name || ""}`.toLowerCase();
   if (
-    /toss|토스|키움|kiwoom|미래에셋|mirae|삼성증권|한국투자|kb증권|nh투자|나무|shinhan invest|한투/.test(
-      hay
-    )
+    KOREAN_BROKERAGE_HINTS.test(hay)
   ) {
     return "KR";
   }
@@ -1688,29 +1636,6 @@ export function pendingMonthlyTotals(
   return { subscription, installment };
 }
 
-export function subscriptionTrackingLabel(
-  sub: Subscription,
-  viewMonth: Date = new Date()
-): string {
-  if (sub.cycle === "installment" && sub.total_installments != null) {
-    const start = new Date(sub.installment_start_date || sub.start_date);
-    const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
-    const view = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
-    const schedulePaid = Math.min(
-      monthsBetweenDates(startMonth, view),
-      sub.total_installments
-    );
-    const remaining = Math.max(sub.total_installments - schedulePaid, 0);
-    const end = sub.end_date
-      ? new Date(sub.end_date).toLocaleDateString("ko-KR")
-      : "—";
-    return `${schedulePaid}/${sub.total_installments}회 · ${remaining}회 남음 · 종료 ${end}`;
-  }
-  const start = new Date(sub.installment_start_date || sub.start_date);
-  const months = monthsBetweenDates(start, new Date());
-  if (months < 1) return "첫 달";
-  return `${months}개월째 구독`;
-}
 
 export function categoriesForType(
   presets: CategoryPresets,
@@ -1775,10 +1700,7 @@ export async function createInvitation(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    if (body && typeof body.detail === "string") {
-      throw new Error(body.detail);
-    }
-    throw new ApiError("createInvitation");
+    throw apiErrorFromBody(body, "createInvitation");
   }
   return (await res.json()) as InvitationOut;
 }
@@ -1791,10 +1713,7 @@ export async function acceptInvitation(token: string): Promise<InvitationMe> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    if (body && typeof body.detail === "string") {
-      throw new Error(body.detail);
-    }
-    throw new ApiError("acceptInvitation");
+    throw apiErrorFromBody(body, "acceptInvitation");
   }
   return (await res.json()) as InvitationMe;
 }
@@ -1806,10 +1725,7 @@ export async function revokePendingInvitation(): Promise<void> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    if (body && typeof body.detail === "string") {
-      throw new Error(body.detail);
-    }
-    throw new ApiError("revokePendingInvitation");
+    throw apiErrorFromBody(body, "revokePendingInvitation");
   }
 }
 
@@ -1820,10 +1736,7 @@ export async function unlinkPartnership(): Promise<InvitationMe> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    if (body && typeof body.detail === "string") {
-      throw new Error(body.detail);
-    }
-    throw new ApiError("unlinkPartnership");
+    throw apiErrorFromBody(body, "unlinkPartnership");
   }
   return (await res.json()) as InvitationMe;
 }
@@ -2009,7 +1922,7 @@ export async function parseReceiptsOrStatements(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "AI analysis failed");
+    throw apiErrorFromBody(err, "aiScanFailed");
   }
   const data = await res.json();
   return data.results as ParsedTransaction[];
@@ -2027,7 +1940,7 @@ export async function parseReceiptItems(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "Line items extraction failed");
+    throw apiErrorFromBody(err, "itemsScanFailed");
   }
   const data = await res.json();
   return (data.items || []) as TransactionItem[];
@@ -2041,7 +1954,7 @@ export async function saveGeminiApiKey(apiKey: string): Promise<UserSettings> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "API Key 저장에 실패했습니다.");
+    throw apiErrorFromBody(err, "saveApiKey");
   }
   return (await res.json()) as UserSettings;
 }
@@ -2056,7 +1969,7 @@ export async function setShareGeminiApiKey(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "Failed to update API key sharing");
+    throw apiErrorFromBody(err, "shareApiKey");
   }
   return (await res.json()) as UserSettings;
 }
@@ -2075,7 +1988,7 @@ export async function updateLedgerStartDate(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "Failed to update ledger start date");
+    throw apiErrorFromBody(err, "updateLedgerStartDate");
   }
   return (await res.json()) as UserSettings;
 }
@@ -2098,7 +2011,7 @@ export async function saveOnboardingBasics(payload: {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "Failed to save onboarding basics");
+    throw apiErrorFromBody(err, "saveOnboardingBasics");
   }
   return (await res.json()) as UserSettings;
 }
@@ -2116,7 +2029,7 @@ export async function updatePreferredLocales(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "Failed to update language settings");
+    throw apiErrorFromBody(err, "updateLanguage");
   }
   return (await res.json()) as UserSettings;
 }
@@ -2230,10 +2143,10 @@ export async function parseOnboardingScreenshots(
   );
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "Onboarding screenshot parse failed");
+    throw apiErrorFromBody(err, "screenshotScanFailed");
   }
   if (!res.body) {
-    throw new Error("Onboarding screenshot parse failed");
+    throw new ApiError("screenshotScanFailed");
   }
 
   const reader = res.body.getReader();
@@ -2278,7 +2191,7 @@ export async function parseOnboardingScreenshots(
           batch_count: payload.batch_count as number | undefined,
         });
       } else if (eventName === "error") {
-        throw new Error(String(payload.error || "Onboarding screenshot parse failed"));
+        throw apiErrorFromEvent(payload, "screenshotScanFailed");
       } else if (eventName === "success") {
         finalResult = {
           step: payload.step as OnboardingParseStep,
@@ -2294,7 +2207,7 @@ export async function parseOnboardingScreenshots(
   }
 
   if (!finalResult) {
-    throw new Error("Onboarding screenshot parse failed");
+    throw new ApiError("screenshotScanFailed");
   }
   return finalResult;
 }
@@ -2353,7 +2266,7 @@ export async function resetUserData(
   );
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "데이터 초기화에 실패했습니다.");
+    throw apiErrorFromBody(err, "resetData");
   }
   return (await res.json()) as {
     status: string;
@@ -2381,7 +2294,7 @@ export async function fetchOCRLogs(): Promise<OCRLog[]> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "OCR 로그 조회에 실패했습니다.");
+    throw apiErrorFromBody(err, "fetchOcrLogs");
   }
   return (await res.json()) as OCRLog[];
 }
@@ -2394,7 +2307,7 @@ export async function updateOCRLogFeedback(logId: string, feedback: "thumbs_up" 
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "피드백 업데이트에 실패했습니다.");
+    throw apiErrorFromBody(err, "updateOcrFeedback");
   }
 }
 

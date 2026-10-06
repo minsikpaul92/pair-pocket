@@ -1,5 +1,6 @@
 import type { BillingCycle, Subscription, SubscriptionStatus } from "@/lib/api";
 import { monthsBetweenDates } from "@/lib/api";
+import { intlLocale } from "@/i18n/locales";
 
 type TranslateFn = (
   key: string,
@@ -7,9 +8,7 @@ type TranslateFn = (
 ) => string;
 
 export function formatSubscriptionDate(iso: string, locale: string): string {
-  return new Date(iso).toLocaleDateString(
-    locale === "ko" ? "ko-KR" : "en-CA"
-  );
+  return new Date(iso).toLocaleDateString(intlLocale(locale));
 }
 
 export function translateBillingCycle(

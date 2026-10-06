@@ -357,7 +357,7 @@ export default function SubscriptionsView({
       setInitialParse(result);
       setShowRegister(true);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Scan failed");
+      alert(translateError(err, tErrors, "screenshotScanFailed"));
     } finally {
       setScanning(false);
       e.target.value = "";
