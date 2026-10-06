@@ -10,17 +10,14 @@ import {
 } from "@/i18n/locales";
 import { updatePreferredLocales } from "@/lib/api";
 
-const MAX_LOCALES = 2;
-
 interface Props {
   className?: string;
   /** Persist preferred locale via callback after UI switch. */
   onLocaleSelected?: (locale: AppLocale) => void | Promise<void>;
   /** Larger selectable list for onboarding / settings. */
-  variant?: "toggle" | "list";
+  variant?: "toggle" | "list" | "select";
   /**
-   * Multi-select mode (onboarding): 1 required, up to 2 languages.
-   * Order: [primary, secondary?]. First tap = primary, second = secondary.
+   * Onboarding mode: one language is selected and tapping another replaces it.
    */
   selectedLocales?: AppLocale[];
   onSelectedLocalesChange?: (locales: AppLocale[]) => void;
@@ -37,7 +34,6 @@ export default function LanguagePicker({
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations("common");
-  const tOnboarding = useTranslations("onboarding");
 
   const multi = Boolean(onSelectedLocalesChange);
   const selected = selectedLocales ?? [];
@@ -73,24 +69,26 @@ export default function LanguagePicker({
   async function toggleMulti(next: AppLocale) {
     if (!onSelectedLocalesChange) return;
 
-    const index = selected.indexOf(next);
-    let nextSelected: AppLocale[];
+    onSelectedLocalesChange([next]);
+    await applyActiveLocale(next);
+  }
 
-    if (index >= 0) {
-      // Deselect. If primary is removed, secondary (if any) becomes primary.
-      nextSelected = selected.filter((code) => code !== next);
-    } else if (selected.length >= MAX_LOCALES) {
-      // Already have primary + secondary; ignore new taps.
-      return;
-    } else {
-      // First tap → primary, second tap → secondary.
-      nextSelected = [...selected, next];
-    }
-
-    onSelectedLocalesChange(nextSelected);
-    if (nextSelected[0]) {
-      await applyActiveLocale(nextSelected[0]);
-    }
+  if (variant === "select") {
+    return (
+      <select
+        value={locale}
+        onChange={(e) => void switchLocale(e.target.value as AppLocale)}
+        aria-label={t("language")}
+        className={`input-field bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white ${className}`}
+      >
+        {LOCALE_OPTIONS.map((item) => (
+          <option key={item.code} value={item.code}>
+            {item.native}
+            {item.beta ? " (Beta)" : ""}
+          </option>
+        ))}
+      </select>
+    );
   }
 
   if (variant === "toggle") {
@@ -125,26 +123,15 @@ export default function LanguagePicker({
       className={`space-y-2 ${className}`}
       role="listbox"
       aria-label={t("language")}
-      aria-multiselectable={multi || undefined}
-    >
-      {multi && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 px-0.5">
-          {tOnboarding("languageMultiHelp")}
-        </p>
-      )}
+        >
       {LOCALE_OPTIONS.map((item) => {
-        const isPrimary = selected[0] === item.code;
-        const isSecondary = selected[1] === item.code;
-        const isSelected = isPrimary || isSecondary;
+        const isSelected = multi ? selected[0] === item.code : locale === item.code;
 
         let rowClass =
           "bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700";
-        if (isPrimary) {
+        if (isSelected) {
           rowClass =
             "bg-blue-500 text-white border border-blue-500 hover:bg-blue-600";
-        } else if (isSecondary) {
-          rowClass =
-            "bg-violet-500 text-white border border-violet-500 hover:bg-violet-600";
         }
 
         return (
@@ -169,16 +156,6 @@ export default function LanguagePicker({
               </span>
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
-              {isPrimary && (
-                <span className="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                  {tOnboarding("languagePrimary")}
-                </span>
-              )}
-              {isSecondary && (
-                <span className="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                  {tOnboarding("languageSecondary")}
-                </span>
-              )}
               {isBetaLocale(item.code) && (
                 <span
                   className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
