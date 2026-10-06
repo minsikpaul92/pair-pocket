@@ -1,9 +1,10 @@
 """Ledger access helpers for personal vs shared (group) scoping."""
 
 from bson import ObjectId
-from fastapi import HTTPException, status
+from fastapi import status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.errors import AppError
 from app.models.transaction import AccountType
 from app.models.user import UserOut
 
@@ -72,10 +73,7 @@ def owner_match(owner_ids: list[str]) -> dict:
 def require_shared_group_for_write(user: UserOut, account_type: AccountType) -> None:
     """Block creating shared ledger data before a partner link exists."""
     if account_type == AccountType.SHARED and not user.shared_group_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="공유 가계부를 쓰려면 먼저 파트너를 초대해야 합니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "partnerRequired")
 
 
 def _as_object_id(value: str) -> ObjectId | None:
@@ -119,20 +117,16 @@ async def assert_can_access_doc(
     user: UserOut,
     doc: dict | None,
     *,
-    not_found_detail: str = "Not found.",
+    not_found_code: str = "notFound",
 ) -> dict:
     """Raise 404 if missing or not accessible; return the document otherwise."""
     if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, not_found_code)
 
     if doc.get("account_type") == AccountType.SHARED and (
         not user.shared_group_id or doc.get("shared_group_id") != user.shared_group_id
     ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, not_found_code)
 
     ok = await user_can_access_owner(
         db,
@@ -141,7 +135,5 @@ async def assert_can_access_doc(
         account_type=doc.get("account_type", AccountType.PERSONAL.value),
     )
     if not ok:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=not_found_detail
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, not_found_code)
     return doc

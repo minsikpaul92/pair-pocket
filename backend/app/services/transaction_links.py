@@ -6,9 +6,10 @@ the server creates, updates, and deletes the other side with it.
 """
 
 from bson import ObjectId
-from fastapi import HTTPException
+from fastapi import status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.errors import AppError
 from app.models.ledger import (
     TRANSFER_CATEGORY,
     TransactionKind,
@@ -94,14 +95,11 @@ async def authorized_funding_twin(
     if linked_id is None:
         return None
     if not isinstance(linked_id, str) or not ObjectId.is_valid(linked_id):
-        raise HTTPException(status_code=409, detail="Invalid transaction link.")
+        raise AppError(status.HTTP_409_CONFLICT, "invalidTransactionLink")
 
     twin = await db["transactions"].find_one({"_id": ObjectId(linked_id)})
     await assert_can_access_doc(
-        db,
-        user,
-        twin,
-        not_found_detail="Linked transaction not found or not accessible.",
+        db, user, twin, not_found_code="linkedTransactionNotFound"
     )
     if (
         str(doc["_id"]) == linked_id
@@ -121,5 +119,5 @@ async def authorized_funding_twin(
         or doc["counter_account_id"] != twin.get("account_id")
         or doc.get("currency") != twin.get("currency")
     ):
-        raise HTTPException(status_code=409, detail="Invalid transaction link.")
+        raise AppError(status.HTTP_409_CONFLICT, "invalidTransactionLink")
     return twin

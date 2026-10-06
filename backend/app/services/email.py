@@ -3,12 +3,31 @@
 import logging
 
 import httpx
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import get_settings
+from app.core.i18n import resolve_locale
 
 logger = logging.getLogger(__name__)
 
 RESEND_API_URL = "https://api.resend.com/emails"
+
+
+async def recipient_locale(db: AsyncIOMotorDatabase, user_id: str) -> str:
+    """The user's first preferred UI language; Korean when none is saved."""
+    doc = (
+        await db["user_settings"].find_one(
+            {"owner_id": user_id}, {"preferred_locales": 1, "preferred_locale": 1}
+        )
+        or {}
+    )
+    preferred = doc.get("preferred_locales") or [doc.get("preferred_locale")]
+    return resolve_locale(preferred[0])
+
+
+def frontend_link(locale: str, path: str = "") -> str:
+    """Absolute web URL under the locale prefix, e.g. https://.../ko/invite/x."""
+    return f"{get_settings().frontend_url.rstrip('/')}/{locale}{path}"
 
 
 def email_configured() -> bool:

@@ -2,9 +2,10 @@
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import HTTPException, status
+from fastapi import status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.errors import AppError
 from app.models.category_preset import (
     INCOME_CATEGORY_SETTLEMENT,
     SUB_CATEGORY_SETTLEMENT,
@@ -180,14 +181,12 @@ async def check_settlement(
             session=session,
         )
     if expense is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="정산 대상 지출을 찾을 수 없습니다.",
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "settlementExpenseNotFound"
         )
     if expense.get("currency") != currency:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="정산 통화가 원래 지출의 통화와 일치하지 않습니다.",
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "settlementCurrencyMismatch"
         )
     if lock:
         await db[COLLECTION].update_one(
@@ -198,8 +197,9 @@ async def check_settlement(
     )
     remaining = max(float(expense["amount"]) - already, 0.0)
     if amount > remaining + SETTLEMENT_EPSILON:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"정산 금액이 남은 지출({remaining:.2f})을 초과합니다.",
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "settlementExceedsRemaining",
+            amount=f"{remaining:.2f}",
         )
     return remaining

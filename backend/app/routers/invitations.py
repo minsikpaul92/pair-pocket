@@ -4,10 +4,12 @@ import secrets
 from datetime import datetime, timedelta
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import get_settings
+from app.core.errors import AppError
+from app.core.i18n import translate
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.invitation import (
@@ -19,7 +21,12 @@ from app.models.invitation import (
     PartnerSummary,
 )
 from app.models.user import UserOut
-from app.services.email import email_configured, send_email
+from app.services.email import (
+    email_configured,
+    frontend_link,
+    recipient_locale,
+    send_email,
+)
 from app.services.partnerships import accept_partner_invitation, archive_partnership
 
 router = APIRouter(prefix="/api/invitations", tags=["invitations"])
@@ -53,19 +60,22 @@ def _valid_start(value: str) -> bool:
 
 def _invite_email_body(
     *,
+    locale: str,
     inviter_name: str,
     accept_url: str,
     shared_start: str | None = None,
 ) -> str:
-    start_line = f"공유 가계부 시작일: {shared_start}\n\n" if shared_start else ""
-    return (
-        f"{inviter_name}님이 PairPocket 공유 가계부에 초대했습니다.\n\n"
-        f"{start_line}"
-        f"아래 링크를 열고 Google로 로그인한 뒤 초대를 수락하세요.\n"
-        f"(초대받은 Google 계정 이메일과 초대 이메일이 같아야 합니다.)\n\n"
-        f"{accept_url}\n\n"
-        f"이 링크는 {INVITE_TTL_DAYS}일 후 만료됩니다.\n"
-    )
+    paragraphs = [translate(locale, "email.invite.intro", inviter=inviter_name)]
+    if shared_start:
+        paragraphs.append(
+            translate(locale, "email.invite.sharedStart", date=shared_start)
+        )
+    paragraphs += [
+        translate(locale, "email.invite.instructions"),
+        accept_url,
+        translate(locale, "email.invite.expires", days=INVITE_TTL_DAYS),
+    ]
+    return "\n\n".join(paragraphs) + "\n"
 
 
 @router.get("/me", response_model=InvitationMeOut)
@@ -117,31 +127,19 @@ async def create_invitation(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     if current_user.shared_group_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이미 파트너와 연결되어 있습니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "alreadyLinked")
 
     invitee_email = payload.invitee_email.lower().strip()
     if invitee_email == current_user.email.lower():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="자기 자신은 초대할 수 없습니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "cannotInviteSelf")
 
     shared_start = payload.shared_ledger_start_date.strip()
     if not _valid_start(shared_start):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="shared_ledger_start_date must be YYYY-MM-DD",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidDate")
 
     existing_user = await db[USERS_COL].find_one({"email": invitee_email})
     if existing_user and existing_user.get("shared_group_id"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="상대방이 이미 다른 파트너와 연결되어 있습니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "inviteeAlreadyLinked")
 
     # One active pending invite per inviter.
     await db[COLLECTION].update_many(
@@ -170,12 +168,17 @@ async def create_invitation(
     accept_url = f"{settings.frontend_url.rstrip('/')}/invite/{token}"
     email_sent = False
     if email_configured():
+        # The invitee may not have an account yet: write in the inviter's language.
+        locale = await recipient_locale(db, current_user.id)
         email_sent = send_email(
             to=invitee_email,
-            subject=f"{current_user.name}님이 PairPocket에 초대했습니다",
+            subject=translate(
+                locale, "email.invite.subject", inviter=current_user.name
+            ),
             body=_invite_email_body(
+                locale=locale,
                 inviter_name=current_user.name,
-                accept_url=accept_url,
+                accept_url=frontend_link(locale, f"/invite/{token}"),
                 shared_start=shared_start,
             ),
         )
@@ -235,10 +238,7 @@ async def revoke_pending_invitation(
         {"$set": {"status": InvitationStatus.REVOKED.value}},
     )
     if result.modified_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="취소할 대기 중 초대가 없습니다.",
-        )
+        raise AppError(status.HTTP_404_NOT_FOUND, "noPendingInvitation")
 
 
 @router.delete("/partnership", response_model=InvitationMeOut)

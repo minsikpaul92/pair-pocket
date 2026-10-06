@@ -1,0 +1,28 @@
+{
+  "email": {
+    "signature": "PairPocket",
+    "test": {
+      "subject": "[PairPocket] Test email",
+      "body": "Hi {name},\n\nPairPocket email notifications are working.\nSubscription promotion and end reminders will also be sent to this address."
+    },
+    "invite": {
+      "subject": "{inviter} invited you to PairPocket",
+      "intro": "{inviter} invited you to a shared PairPocket ledger.",
+      "sharedStart": "Shared ledger start date: {date}",
+      "instructions": "Open the link below, sign in with Google, and accept the invitation.\n(Use the Google account for the email address this invitation was sent to.)",
+      "expires": "This link expires in {days} days."
+    },
+    "reminder": {
+      "greeting": "Hi,",
+      "view": "View subscription: {url}",
+      "cancel": "Cancel subscription: {url}",
+      "promoSubject": "[PairPocket] {name} promotion ends in a week",
+      "promoTitle": "The promotion for \"{name}\" ends on {date}.",
+      "promoAmount": "Promotional price: {amount} {currency}",
+      "regularAfterPromo": "Regular price afterwards: {amount} {currency}",
+      "endSubject": "[PairPocket] {name} subscription ends in a week",
+      "endTitle": "Your \"{name}\" subscription ends on {date}.",
+      "regularAmount": "Regular price: {amount} {currency}"
+    }
+  }
+}

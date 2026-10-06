@@ -1,0 +1,12 @@
+[
+  { "code": "en", "label": "English", "native": "English", "beta": false },
+  { "code": "ko", "label": "한국어", "native": "한국어", "beta": false },
+  { "code": "fr", "label": "Français", "native": "Français", "beta": true },
+  { "code": "zh-Hans", "label": "中文 (Mandarin)", "native": "普通话", "beta": true },
+  { "code": "zh-Hant", "label": "中文 (Cantonese)", "native": "粤语", "beta": true },
+  { "code": "ja", "label": "日本語", "native": "日本語", "beta": true },
+  { "code": "es", "label": "Español", "native": "Español", "beta": true },
+  { "code": "vi", "label": "Tiếng Việt", "native": "Tiếng Việt", "beta": true },
+  { "code": "fil", "label": "Filipino", "native": "Filipino", "beta": true },
+  { "code": "pa", "label": "Punjabi", "native": "ਪੰਜਾਬੀ", "beta": true }
+]

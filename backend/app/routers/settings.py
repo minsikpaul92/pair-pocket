@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
 
 from app.core.crypto import encrypt_secret, is_encrypted
+from app.core.errors import AppError
 from app.core.locales import LOCALE_OPTIONS, SUPPORTED_LOCALE_CODES
 from app.core.security import get_current_user
 from app.data.canada_subscriptions import (
@@ -82,6 +83,22 @@ def _normalize_locales(raw: object, fallback: str | None = None) -> list[str]:
     if not locales and fallback:
         locales = [fallback]
     return locales[:2]
+
+
+def _validated_locales(
+    payload: PreferredLocalesBody | OnboardingBasicsBody,
+) -> list[str]:
+    locales = _normalize_locales(payload.preferred_locales, payload.preferred_locale)
+    if not locales:
+        raise AppError(status.HTTP_400_BAD_REQUEST, "languageRequired")
+    if len(locales) > 2:
+        raise AppError(status.HTTP_400_BAD_REQUEST, "tooManyLanguages")
+    for locale in locales:
+        if locale not in SUPPORTED_LOCALE_CODES:
+            raise AppError(
+                status.HTTP_400_BAD_REQUEST, "unsupportedLanguage", locale=locale
+            )
+    return locales
 
 
 def _valid_ledger_start(value: str) -> bool:
@@ -169,23 +186,7 @@ async def update_preferred_locales(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    locales = _normalize_locales(payload.preferred_locales, payload.preferred_locale)
-    if not locales:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Select at least one language",
-        )
-    if len(locales) > 2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Select at most two languages",
-        )
-    for locale in locales:
-        if locale not in SUPPORTED_LOCALE_CODES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported locale: {locale}",
-            )
+    locales = _validated_locales(payload)
 
     await _get_or_create(db, current_user.id)
     await db[COLLECTION].update_one(
@@ -221,10 +222,7 @@ async def add_institution(
 ) -> dict:
     name = payload.name.strip()
     if not name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="금융기관 이름이 비어 있습니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "institutionNameRequired")
 
     await _get_or_create(db, current_user.id)
     await db[COLLECTION].update_one(
@@ -243,10 +241,7 @@ async def remove_institution(
 ) -> dict:
     trimmed = name.strip()
     if not trimmed:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="금융기관 이름이 비어 있습니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "institutionNameRequired")
 
     await _get_or_create(db, current_user.id)
     await db[COLLECTION].update_one(
@@ -266,15 +261,9 @@ async def set_category_color(
     category = payload.category.strip()
     color = payload.color.strip()
     if not category:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="카테고리 이름이 비어 있습니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "categoryNameRequired")
     if not color.startswith("#") or len(color) not in (4, 7):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="색상은 #RGB 또는 #RRGGBB 형식이어야 합니다.",
-        )
+        raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalidColor")
 
     await _get_or_create(db, current_user.id)
     await db[COLLECTION].update_one(
@@ -299,9 +288,8 @@ async def set_expense_ratio_hidden_categories(
     for raw in payload.categories:
         name = raw.strip()
         if not name or len(name) > 100:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Category names must be 1-100 characters.",
+            raise AppError(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "invalidCategoryName", max=100
             )
         if name not in categories:
             categories.append(name)
@@ -323,18 +311,14 @@ async def save_ai_key(
 ) -> dict:
     key = payload.api_key.strip()
     if not key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="API 키가 비어 있습니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "apiKeyRequired")
 
     await _get_or_create(db, current_user.id)
     try:
         stored = key if is_encrypted(key) else encrypt_secret(key)
     except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
+        raise AppError(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, "encryptionUnavailable"
         ) from exc
 
     await db[COLLECTION].update_one(
@@ -369,16 +353,10 @@ async def update_ledger_start_date(
 ) -> dict:
     start = payload.ledger_start_date.strip()
     if not _valid_ledger_start(start):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="ledger_start_date must be YYYY-MM-DD",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidDate")
     kind = (payload.kind or "personal").strip().lower()
     if kind not in ("personal", "shared"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="kind must be personal or shared",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidLedger")
 
     await _get_or_create(db, current_user.id)
 
@@ -390,10 +368,7 @@ async def update_ledger_start_date(
         synced = [current_user.id]
     else:
         if not current_user.shared_group_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="공유 시작일을 설정하려면 파트너 연결이 필요합니다.",
-            )
+            raise AppError(status.HTTP_400_BAD_REQUEST, "partnerRequired")
         owner_ids = [current_user.id]
         partner_id = await get_partner_owner_id(db, current_user.id)
         if partner_id:
@@ -422,29 +397,10 @@ async def save_onboarding_basics(
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
-    locales = _normalize_locales(payload.preferred_locales, payload.preferred_locale)
-    if not locales:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Select at least one language",
-        )
-    if len(locales) > 2:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Select at most two languages",
-        )
-    for locale in locales:
-        if locale not in SUPPORTED_LOCALE_CODES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported locale: {locale}",
-            )
+    locales = _validated_locales(payload)
     start = payload.ledger_start_date.strip()
     if not _valid_ledger_start(start):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="ledger_start_date must be YYYY-MM-DD",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidDate")
 
     await _get_or_create(db, current_user.id)
     updates: dict = {
@@ -459,9 +415,8 @@ async def save_onboarding_basics(
         try:
             stored = key if is_encrypted(key) else encrypt_secret(key)
         except RuntimeError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(exc),
+            raise AppError(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, "encryptionUnavailable"
             ) from exc
         updates["gemini_api_key"] = stored
 
@@ -539,20 +494,11 @@ async def reset_user_data(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     if scope not in RESET_SCOPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"scope must be one of: {', '.join(RESET_SCOPES)}",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidResetScope")
     if account_type not in RESET_LEDGER_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"account_type must be one of: {', '.join(RESET_LEDGER_TYPES)}",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "invalidLedger")
     if account_type == "shared" and not current_user.shared_group_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="공유 데이터를 초기화하려면 파트너 연결이 필요합니다.",
-        )
+        raise AppError(status.HTTP_400_BAD_REQUEST, "partnerRequired")
 
     owner_id = current_user.id
     deleted: dict[str, int] = {}
@@ -648,11 +594,12 @@ async def reset_user_data(
         entity="user_data",
         detail={"deleted": deleted, "account_type": account_type},
     )
+    # The UI shows its own translated message for each scope.
     details = {
-        "all": "모든 데이터가 성공적으로 초기화되었습니다.",
-        "ledger": "가계부 거래 내역이 초기화되었습니다.",
-        "subscriptions": "구독·할부 데이터가 초기화되었습니다.",
-        "stocks": "주식 보유 데이터가 초기화되었습니다.",
+        "all": "All data was reset.",
+        "ledger": "Ledger transactions were reset.",
+        "subscriptions": "Subscriptions and installments were reset.",
+        "stocks": "Stock holdings were reset.",
     }
     return {
         "status": "success",

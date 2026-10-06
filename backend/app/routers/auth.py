@@ -2,12 +2,13 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import get_settings
+from app.core.errors import AppError, error_body
 from app.core.security import (
     bearer_scheme,
     create_access_token,
@@ -184,7 +185,7 @@ async def create_session(
     try:
         user_id = await redeem_login_code(db, body.code)
     except SessionError as exc:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc))
+        raise AppError(status.HTTP_401_UNAUTHORIZED, "signInFailed") from exc
     issued = await start_session(
         db, user_id, user_agent=request.headers.get("user-agent")
     )
@@ -201,13 +202,13 @@ async def refresh_session(
     _require_trusted_origin(request)
     token = request.cookies.get(REFRESH_COOKIE)
     if not token:
-        return _session_ended("No active session.")
+        return _session_ended()
     try:
         issued = await rotate_session(
             db, token, user_agent=request.headers.get("user-agent")
         )
-    except SessionError as exc:
-        return _session_ended(str(exc))
+    except SessionError:
+        return _session_ended()
     return _issue(response, issued)
 
 
@@ -239,16 +240,14 @@ async def upgrade_legacy_session(
     """
     payload = decode_access_token(credentials.credentials)
     if payload.get("sid"):
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, "This sign-in is already renewable."
-        )
+        raise AppError(status.HTTP_409_CONFLICT, "sessionAlreadyRenewable")
     expires_at = datetime.fromtimestamp(payload["exp"], timezone.utc)
     try:
         await claim_legacy_upgrade(
             db, credentials.credentials, expires_at.replace(tzinfo=None)
         )
     except SessionError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc))
+        raise AppError(status.HTTP_409_CONFLICT, "sessionUpgradeFailed") from exc
     issued = await start_session(
         db, current_user.id, user_agent=request.headers.get("user-agent")
     )
@@ -264,7 +263,7 @@ def _require_trusted_origin(request: Request) -> None:
     """Cookie-authenticated routes reject requests from other sites."""
     origin = request.headers.get("origin")
     if origin and origin not in settings.cors_origins_list:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Untrusted origin.")
+        raise AppError(status.HTTP_403_FORBIDDEN, "untrustedOrigin")
 
 
 def _issue(response: Response, issued: IssuedSession) -> SessionOut:
@@ -294,9 +293,9 @@ def _clear_refresh_cookie(response: Response) -> None:
     )
 
 
-def _session_ended(detail: str) -> JSONResponse:
+def _session_ended() -> JSONResponse:
     response = JSONResponse(
-        {"detail": detail}, status_code=status.HTTP_401_UNAUTHORIZED
+        error_body("sessionExpired"), status_code=status.HTTP_401_UNAUTHORIZED
     )
     _clear_refresh_cookie(response)
     return response

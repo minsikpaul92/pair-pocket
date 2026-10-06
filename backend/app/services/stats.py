@@ -2,9 +2,10 @@
 
 from datetime import date, datetime, timedelta
 
-from fastapi import HTTPException, status
+from fastapi import status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.errors import AppError
 from app.models.category_preset import (
     EXPENSE_CATEGORY_INVESTMENT,
     INCOME_CATEGORY_SETTLEMENT,
@@ -41,26 +42,15 @@ def resolve_date_range(
     """Validate an inclusive [start, end] day range and return [start, end) datetimes."""
     if start is None and end is None:
         return None
+    invalid = status.HTTP_422_UNPROCESSABLE_ENTITY
     if start is None or end is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="start and end must be provided together.",
-        )
+        raise AppError(invalid, "dateRangeIncomplete")
     if month is not None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Use either month or start/end, not both.",
-        )
+        raise AppError(invalid, "dateRangeWithMonth")
     if end < start:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="end must be on or after start.",
-        )
+        raise AppError(invalid, "dateRangeReversed")
     if (end - start).days >= MAX_RANGE_DAYS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Date range cannot exceed {MAX_RANGE_DAYS} days.",
-        )
+        raise AppError(invalid, "dateRangeTooLong", days=MAX_RANGE_DAYS)
     return (
         datetime(start.year, start.month, start.day),
         datetime(end.year, end.month, end.day) + timedelta(days=1),

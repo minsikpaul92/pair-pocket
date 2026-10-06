@@ -1,7 +1,9 @@
 """Multi-document MongoDB transactions for writes that must land together."""
 
-from fastapi import HTTPException
+from fastapi import status
 from pymongo.errors import ConfigurationError, OperationFailure
+
+from app.core.errors import AppError
 
 
 async def run_in_transaction(db, callback):
@@ -14,12 +16,13 @@ async def run_in_transaction(db, callback):
         async with await db.client.start_session() as session:
             return await session.with_transaction(callback)
     except ConfigurationError as exc:
-        raise HTTPException(
-            503, "This change requires MongoDB transaction support."
+        # MongoDB without transaction support (not a replica set).
+        raise AppError(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "serverUnavailable"
         ) from exc
     except OperationFailure as exc:
         if exc.code == 20:  # IllegalOperation: standalone server
-            raise HTTPException(
-                503, "This change requires MongoDB transaction support."
+            raise AppError(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "serverUnavailable"
             ) from exc
         raise

@@ -3,9 +3,10 @@
 from datetime import datetime
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.errors import AppError
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.account import (
@@ -167,11 +168,11 @@ async def update_account(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     if not ObjectId.is_valid(account_id):
-        raise HTTPException(status_code=404, detail="Account not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "accountNotFound")
 
     existing = await db[COLLECTION].find_one({"_id": ObjectId(account_id)})
     await assert_can_access_doc(
-        db, current_user, existing, not_found_detail="Account not found."
+        db, current_user, existing, not_found_code="accountNotFound"
     )
 
     updates = payload.model_dump(
@@ -205,14 +206,14 @@ async def delete_account(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> None:
     if not ObjectId.is_valid(account_id):
-        raise HTTPException(status_code=404, detail="Account not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "accountNotFound")
     existing = await db[COLLECTION].find_one({"_id": ObjectId(account_id)})
     if not existing:
-        raise HTTPException(status_code=404, detail="Account not found.")
+        raise AppError(status.HTTP_404_NOT_FOUND, "accountNotFound")
 
     require_shared_group_for_write(current_user, AccountType(existing["account_type"]))
     await assert_can_access_doc(
-        db, current_user, existing, not_found_detail="Account not found."
+        db, current_user, existing, not_found_code="accountNotFound"
     )
 
     await db[COLLECTION].delete_one({"_id": ObjectId(account_id)})
