@@ -66,6 +66,8 @@ const CATEGORY_DEFAULT_COLORS: Record<string, string> = {
   "경조사/선물": "#800000", // Maroon
   "투자/저축": "#008000",  // Green
   "세금": "#808080",       // Gray
+  "교육": "#FFA500",       // Orange
+  "금융/수수료": "#A52A2A", // Brown
   "이체": "#C0C0C0",       // Silver
 };
 
