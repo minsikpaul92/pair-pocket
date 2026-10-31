@@ -451,7 +451,7 @@ export default function ListView({
             className="inline-flex items-center gap-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 px-3.5 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 transition-colors shadow-sm cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>대시보드로 돌아가기</span>
+            <span>{tList("backToDashboard")}</span>
           </button>
         </div>
       )}
@@ -512,7 +512,7 @@ export default function ListView({
               setShowSearchDropdown(true);
             }}
             onFocus={() => setShowSearchDropdown(true)}
-            placeholder="사용처 / 노트 검색"
+            placeholder={tList("searchMerchantOrNote")}
             className="input-field pl-9 py-2 text-sm"
           />
           {showSearchDropdown && searchSuggestions.length > 0 && (
@@ -529,7 +529,7 @@ export default function ListView({
                       className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-950/40 text-gray-800 dark:text-gray-200 truncate flex items-center justify-between"
                     >
                       <span className="truncate">{sug}</span>
-                      <span className="text-[10px] text-blue-500 font-semibold shrink-0 ml-2">자동완성</span>
+                      <span className="text-[10px] text-blue-500 font-semibold shrink-0 ml-2">{tList("autocomplete")}</span>
                     </button>
                   </li>
                 ))}
@@ -654,10 +654,10 @@ export default function ListView({
         <div className="shrink-0 border-t border-gray-100 dark:border-gray-700/60 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-md px-4 py-2.5 flex items-center justify-between gap-3 z-10">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-              합계
+              {tList("total")}
             </span>
             <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
-              · {sorted.length}건
+              {tList("count", { count: sorted.length })}
             </span>
           </div>
           <div className="flex items-center gap-3 shrink-0">

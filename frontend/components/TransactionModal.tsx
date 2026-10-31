@@ -2200,7 +2200,7 @@ export default function TransactionModal({
               {dragOverModal && (
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-blue-500/10 dark:bg-blue-400/10">
                   <span className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
-                    영수증/명세서 이미지를 여기에 놓으세요
+                    {tTx("scanDropHere")}
                   </span>
                 </div>
               )}
@@ -2218,17 +2218,17 @@ export default function TransactionModal({
                 <div className="flex items-center gap-1.5">
                   <Camera className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
                   <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                    스크린샷 / 영수증으로 채우기
+                    {tTx("scanCardTitle")}
                   </span>
                 </div>
                 <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
-                  {scanQueue.length} / {MAX_IMAGES}장
+                  {tTx("scanCardCount", { count: scanQueue.length, max: MAX_IMAGES })}
                 </span>
               </div>
 
               {scanQueue.length === 0 ? (
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                  사진이나 PDF 명세서를 이곳으로 드래그하거나 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 15장)
+                  {tTx("scanCardHint", { max: MAX_IMAGES })}
                 </p>
               ) : (
                 <ul className="grid grid-cols-5 gap-1.5 pt-1">
@@ -2251,7 +2251,7 @@ export default function TransactionModal({
                         disabled={scanning}
                         onClick={() => removeQueuedScan(q.id)}
                         className="absolute -top-1 -right-1 rounded-full bg-gray-900/80 text-white p-0.5 disabled:opacity-50"
-                        aria-label="삭제"
+                        aria-label={tTx("scanRemove")}
                       >
                         <X className="h-2.5 w-2.5" />
                       </button>
@@ -2268,7 +2268,7 @@ export default function TransactionModal({
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold py-2 transition-colors disabled:opacity-50"
                 >
                   <ImagePlus className="h-3.5 w-3.5" />
-                  사진 추가
+                  {tTx("scanAddPhoto")}
                 </button>
 
                 <button
@@ -2284,11 +2284,11 @@ export default function TransactionModal({
                   )}
                   {scanning
                     ? scanRetryCount >= 2
-                      ? "정밀 AI 분석 중…"
+                      ? tTx("scanDeep")
                       : tTx("scanning")
                     : parsedQueue.length > 0 || scannedFile !== null
-                    ? "다시 스캔 (재시도)"
-                    : "분석 시작"}
+                    ? tTx("scanRetry")
+                    : tTx("scanStart")}
                 </button>
               </div>
 
@@ -2300,7 +2300,7 @@ export default function TransactionModal({
                     className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-500"
                   >
                     <Trash2 className="h-3 w-3" />
-                    초기화
+                    {tTx("scanClear")}
                   </button>
                 </div>
               )}
@@ -2317,7 +2317,12 @@ export default function TransactionModal({
             <div className="flex items-center justify-between rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 p-3 text-xs">
               <div className="flex items-center gap-1.5 font-bold text-purple-700 dark:text-purple-300">
                 <span>📋</span>
-                <span>총 {parsedQueue.length}건 중 {queueIndex + 1}번째 거래 검토 중</span>
+                <span>
+                  {tTx("scanQueueProgress", {
+                    total: parsedQueue.length,
+                    current: queueIndex + 1,
+                  })}
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <button
@@ -2330,7 +2335,7 @@ export default function TransactionModal({
                   }}
                   className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
                 >
-                  이전
+                  {tTx("scanPrev")}
                 </button>
                 <button
                   type="button"
@@ -2342,7 +2347,7 @@ export default function TransactionModal({
                   }}
                   className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
                 >
-                  다음
+                  {tTx("scanNext")}
                 </button>
                 <button
                   type="button"
@@ -2359,7 +2364,7 @@ export default function TransactionModal({
                   }}
                   className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-semibold"
                 >
-                  건너뛰기
+                  {tTx("scanSkip")}
                 </button>
               </div>
             </div>
