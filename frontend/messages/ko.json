@@ -208,7 +208,12 @@
     "merchant": "사용처",
     "type": "구분",
     "noTransactions": "해당 조건의 거래가 없습니다.",
-    "add": "추가하기"
+    "add": "추가하기",
+    "backToDashboard": "대시보드로 돌아가기",
+    "searchMerchantOrNote": "사용처 / 노트 검색",
+    "autocomplete": "자동완성",
+    "total": "합계",
+    "count": "· {count}건"
   },
   "transaction": {
     "new": "새 거래",

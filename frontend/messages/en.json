@@ -208,7 +208,12 @@
     "merchant": "Merchant",
     "type": "Type",
     "noTransactions": "No transactions match these filters.",
-    "add": "Add"
+    "add": "Add",
+    "backToDashboard": "Back to dashboard",
+    "searchMerchantOrNote": "Search merchant / note",
+    "autocomplete": "Autocomplete",
+    "total": "Total",
+    "count": "{count, plural, one {· # item} other {· # items}}"
   },
   "transaction": {
     "new": "New transaction",
