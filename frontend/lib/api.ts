@@ -2195,6 +2195,20 @@ export async function saveOnboardingBasics(payload: {
   return (await res.json()) as UserSettings;
 }
 
+/** Switch the UI language; the enabled languages (and countries) never shrink. */
+export async function updateActiveLocale(locale: string): Promise<UserSettings> {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/active-locale`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ preferred_locale: locale }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Failed to update language");
+  }
+  return (await res.json()) as UserSettings;
+}
+
 export async function updatePreferredLocales(
   preferred_locales: string[]
 ): Promise<UserSettings> {

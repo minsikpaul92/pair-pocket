@@ -1,0 +1,23 @@
+{
+  "hangul": {
+    "components/AppShell.tsx": 10,
+    "components/CategoryIcon.tsx": 18,
+    "components/DashboardAnalytics.tsx": 20,
+    "components/ImportView.tsx": 5,
+    "components/ListView.tsx": 6,
+    "components/MerchantSelect.tsx": 6,
+    "components/OnboardingWizard.tsx": 22,
+    "components/StocksView.tsx": 2,
+    "components/SubscriptionRegisterModal.tsx": 35,
+    "components/TransactionModal.tsx": 76,
+    "lib/api.ts": 37,
+    "lib/banks.ts": 51,
+    "lib/category-i18n.ts": 156,
+    "i18n/locales.ts": 1
+  },
+  "localeBranch": {
+    "app/[locale]/onboarding/page.tsx": 1,
+    "lib/subscription-i18n.ts": 1,
+    "i18n/locales.ts": 1
+  }
+}

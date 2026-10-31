@@ -8,7 +8,7 @@ import {
   type AppLocale,
   isBetaLocale,
 } from "@/i18n/locales";
-import { updatePreferredLocales } from "@/lib/api";
+import { updateActiveLocale, updatePreferredLocales } from "@/lib/api";
 
 const MAX_LOCALES = 2;
 
@@ -70,6 +70,17 @@ export default function LanguagePicker({
     router.replace(pathname, { locale: next });
   }
 
+  // The header KO/EN toggle only changes the language. It must not rewrite the
+  // list of chosen languages, which decides which country ledgers are enabled.
+  async function switchActiveLocale(next: AppLocale) {
+    if (next === locale) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("pairpocket_user_locale", next);
+    }
+    await updateActiveLocale(next).catch(() => null);
+    router.replace(pathname, { locale: next });
+  }
+
   async function toggleMulti(next: AppLocale) {
     if (!onSelectedLocalesChange) return;
 
@@ -105,7 +116,7 @@ export default function LanguagePicker({
           <button
             key={item.code}
             type="button"
-            onClick={() => switchLocale(item.code)}
+            onClick={() => switchActiveLocale(item.code)}
             aria-pressed={locale === item.code}
             className={`flex-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
               locale === item.code
