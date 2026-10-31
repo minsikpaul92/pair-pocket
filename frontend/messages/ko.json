@@ -80,7 +80,9 @@
     "processing": "로그인 처리 중...",
     "failed": "로그인에 실패했습니다. 다시 시도해 주세요.",
     "oauthNotConfigured": "Google 로그인이 아직 설정되지 않았습니다. 관리자에게 문의하거나 로컬 미리보기를 사용하세요.",
-    "invalidAccess": "잘못된 접근입니다."
+    "invalidAccess": "잘못된 접근입니다.",
+    "loadFailed": "PairPocket에 연결하지 못했습니다. 로그인 상태는 유지됩니다. 연결을 확인한 뒤 다시 시도해 주세요.",
+    "retry": "다시 시도"
   },
   "invite": {
     "title": "파트너 초대",
@@ -190,7 +192,12 @@
     "noExpenseData": "선택한 기간의 지출 데이터가 없습니다.",
     "noTrendData": "선택한 기간의 데이터가 없습니다.",
     "pieTooltipShare": "전체 지출의 {percent}%",
-    "pieTooltipOfTotal": "{amount} / {total}"
+    "pieTooltipOfTotal": "{amount} / {total}",
+    "periodWeek": "주간",
+    "thisWeek": "이번 주",
+    "previousWeek": "이전 주",
+    "nextWeek": "다음 주",
+    "hiddenCategoriesNote": "설정에서 숨긴 카테고리 {count}개는 제외됩니다."
   },
   "list": {
     "allCategories": "전체 대분류",
@@ -267,7 +274,15 @@
     "addCategory": "새 대분류 추가",
     "addSubCategory": "새 중분류 추가",
     "addInstitution": "새 금융기관 추가",
-    "selectInstitution": "금융기관 / 계좌명 선택"
+    "selectInstitution": "금융기관 / 계좌명 선택",
+    "setDefaultStockAccountCA": "기본 캐나다 주식 계좌로 설정",
+    "setDefaultStockAccountKR": "기본 한국 주식 계좌로 설정",
+    "defaultSaveFailed": "기본 계좌를 저장하지 못했습니다. 다시 시도해 주세요.",
+    "transferFromPersonal": "보내는 개인 계좌",
+    "transferFromShared": "보내는 공용 계좌",
+    "transferToPersonal": "받는 개인 계좌",
+    "transferToShared": "받는 공용 계좌",
+    "transferNoteSharedWithdrawal": "공용 통장에서 개인 통장으로 옮깁니다. 공용은 지출, 개인은 수입으로 기록됩니다."
   },
   "settlement": {
     "noExpenses": "정산 가능한 지출이 없습니다.",
@@ -320,7 +335,25 @@
     "deleteButton": "계좌/카드 삭제",
     "deleteAccount": "계좌를 삭제하지 못했습니다.",
     "namePlaceholderExpense": "예: TD Visa, 신한카드",
-    "namePlaceholderIncome": "예: TD Chequing, 국민은행"
+    "namePlaceholderIncome": "예: TD Chequing, 국민은행",
+    "defaultRolesTitle": "기본 계좌로 사용",
+    "defaultRolesAutoHint": "아무것도 선택하지 않아도, 아직 기본값이 없는 항목은 이 계좌가 자동으로 맡습니다.",
+    "defaultRole": {
+      "card": "기본 결제 카드",
+      "bank": "기본 은행 계좌",
+      "income": "기본 수입 계좌",
+      "subscription": "구독 결제 수단",
+      "brokerage": "기본 증권 계좌"
+    },
+    "defaultBadge": {
+      "card": "기본 카드",
+      "bank": "기본 계좌",
+      "income": "수입",
+      "subscription": "구독",
+      "brokerage": "기본 증권"
+    },
+    "defaultMenuLabel": "기본값 지정",
+    "defaultSaveFailed": "기본값을 저장하지 못했습니다. 다시 시도해 주세요."
   },
   "accountKinds": {
     "checking": "입출금",
@@ -344,12 +377,15 @@
     "salary": "급여",
     "sideIncome": "부수입",
     "settlement": "정산",
-    "financeOther": "금융/기타"
+    "financeOther": "금융/기타",
+    "education": "교육",
+    "financeFees": "금융/수수료"
   },
   "subCategories": {
     "groceries": "식재료/장보기",
     "diningOut": "외식/배달",
     "cafeSnacks": "카페/간식",
+    "alcohol": "술",
     "rentMortgage": "월세/모기지",
     "utilities": "관리비/공과금",
     "telecom": "통신비",
@@ -360,10 +396,18 @@
     "taxiUber": "택시/우버",
     "fuelCharging": "유류비/충전",
     "vehicleMaintenance": "차량 유지",
+    "flights": "비행기",
+    "parkingTolls": "주차/통행료",
     "essentials": "생필품",
     "clothing": "의류/잡화",
     "beauty": "미용/뷰티",
     "pets": "반려동물",
+    "electronics": "전자기기",
+    "tuition": "학비/등록금",
+    "schoolFees": "학교 수수료",
+    "coursebooks": "교재/강의",
+    "cardInterest": "카드 이자",
+    "feesAnnual": "수수료/연회비",
     "medical": "병원/약국",
     "fitness": "운동/헬스",
     "supplements": "영양제",
@@ -396,7 +440,8 @@
     "stockSale": "주식 판매수익",
     "dividends": "투자 배당금",
     "bankInterest": "은행 이자",
-    "taxRefund": "정부 환급금(HST/Tax Refund)"
+    "taxRefund": "정부 환급금(HST/Tax Refund)",
+    "sharedWithdrawal": "개인 계좌로 인출"
   },
   "subscriptions": {
     "title": "고정지출",
@@ -463,6 +508,9 @@
     "promoEndHint": "비워 두면 프로모가 계속 적용됩니다. 나중에 종료일을 넣으면 그날부터 정상 금액으로 바뀝니다.",
     "promoReminder": "프로모션 종료 1주일 전 이메일 알림",
     "promoReminderNeedsEnd": "종료일을 입력하면 선택할 수 있습니다",
+    "ledgerScope": "가계부 구분",
+    "scopeToSharedHint": "공유로 변경: 공유 계좌/카드를 선택하세요. 지난 결제 내역은 개인 가계부에 남습니다.",
+    "scopeToPersonalHint": "개인으로 변경: 개인 계좌/카드를 선택하세요. 지난 결제 내역은 공유 가계부에 남습니다.",
     "paymentAccount": "결제 계좌",
     "selectPaymentAccount": "결제 계좌 선택",
     "deleteConfirm": "\"{name}\" 구독을 삭제할까요?",
@@ -487,6 +535,8 @@
   },
   "errors": {
     "generic": "오류가 발생했습니다.",
+    "network": "서버에 연결하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요.",
+    "serverUnavailable": "지금은 서버를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     "fetchTransactions": "거래 내역을 불러오지 못했습니다.",
     "fetchCategories": "카테고리를 불러오지 못했습니다.",
     "addCategory": "대분류를 추가하지 못했습니다.",
@@ -794,19 +844,27 @@
     "supportTitle": "후원",
     "supportDescription": "PairPocket이 도움이 됐다면 커피 한 잔으로 응원할 수 있어요. 광고는 없습니다.",
     "supportCta": "Buy me a coffee",
-    "accountDefaults": {
-      "title": "기본 계좌",
-      "description": "새 거래·카드 결제·구독·주식 거래에 자동으로 선택될 계좌를 정합니다. 저장 즉시 반영됩니다.",
-      "ledgerPersonal": "개인",
-      "ledgerShared": "공유",
-      "expenseBank": "기본 지출 계좌",
-      "creditCard": "기본 결제 카드",
-      "incomeBank": "기본 입금 계좌",
-      "brokerageSection": "증권 계좌",
-      "brokerCanada": "캐나다 증권",
-      "brokerKorea": "한국 증권",
-      "loadError": "계좌 목록을 불러오지 못했습니다.",
-      "saveError": "기본 계좌를 저장하지 못했습니다."
+    "expenseRatioHiddenTitle": "지출 비율에서 숨길 카테고리",
+    "expenseRatioHiddenHelp": "선택한 카테고리나 중분류는 대시보드 지출 비율 차트에서 빠집니다. 월세처럼 큰 고정비를 빼면 나머지 소비 흐름이 잘 보입니다. 지출 합계와 내역에는 그대로 남습니다.",
+    "expenseRatioHiddenError": "저장하지 못했습니다. 다시 시도해 주세요.",
+    "expenseRatioHiddenSubToggle": "중분류",
+    "expenseRatioHiddenSubCount": "중분류 {count}개 숨김",
+    "accountDefaultsTitle": "기본 계좌",
+    "accountDefaultsHelp": "거래·구독·주식을 입력할 때 미리 선택될 계좌입니다. 지출과 구독은 기본 카드를 먼저 쓰고, 카드가 없으면 기본 은행 계좌를 씁니다. 계좌이체는 은행 계좌를 먼저 씁니다.",
+    "accountDefaultsPersonal": "개인",
+    "accountDefaultsShared": "공유",
+    "accountDefaultsSharedHint": "공유 기본값은 파트너와 함께 씁니다. 한 사람이 바꾸면 둘 다에게 적용됩니다.",
+    "accountDefaultsNone": "지정 안 함",
+    "accountDefaultsFollowCard": "기본 카드 → 은행 계좌",
+    "accountDefaultsNoAccount": "해당 계좌 없음",
+    "accountDefaultsInvalid": "지정된 계좌를 더 이상 쓸 수 없습니다. 다른 계좌를 선택하세요.",
+    "accountDefaultsLoadError": "기본 계좌를 불러오지 못했습니다.",
+    "accountDefaultsRoleHelp": {
+      "card": "지출과 구독에 먼저 사용",
+      "bank": "카드가 없을 때 지출, 계좌이체에 사용",
+      "income": "수입이 들어오는 계좌",
+      "subscription": "비워 두면 기본 카드 → 은행 계좌 순서",
+      "brokerage": "주식 매수·매도에 사용"
     }
   },
   "onboarding": {

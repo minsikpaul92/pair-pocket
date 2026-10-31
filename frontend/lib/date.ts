@@ -92,3 +92,12 @@ export function formatDayLabel(date: Date, locale = "ko"): string {
     weekday: "short",
   });
 }
+
+export function addDays(date: Date, delta: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + delta);
+}
+
+/** Sunday that starts the Sunday–Saturday week containing `date` (local time). */
+export function weekStart(date: Date): Date {
+  return addDays(date, -date.getDay());
+}

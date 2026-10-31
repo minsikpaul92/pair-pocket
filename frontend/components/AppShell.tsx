@@ -48,7 +48,6 @@ import {
   PartnerSummary,
   SubscriptionOccurrence,
   Transaction,
-  clearToken,
   fetchAllPendingOccurrences,
   fetchAllTransactions,
   fetchCategoryPresets,
@@ -58,6 +57,7 @@ import {
   fetchTransactions,
   fetchUserSettings,
   preferredLocalesList,
+  signOut,
   skipSubscriptionOccurrence,
   syncSubscriptions,
   parseReceiptsOrStatements,
@@ -589,8 +589,7 @@ export default function AppShell({ user, onLogout }: Props) {
   }
 
   function handleLogout() {
-    clearToken();
-    onLogout();
+    void signOut().finally(onLogout);
   }
 
   function handleInvite() {
@@ -1010,6 +1009,7 @@ export default function AppShell({ user, onLogout }: Props) {
             <SubscriptionsView
               scope={scope}
               accountType={accountType}
+              hasPartner={Boolean(currentUser.shared_group_id)}
               month={month}
               version={version}
               presets={presets}
@@ -1309,6 +1309,7 @@ export default function AppShell({ user, onLogout }: Props) {
           currency={modalCurrency}
           ledgerScope={scope}
           accountType={accountType}
+          hasPartner={Boolean(partner)}
           parsedTransaction={parsedData}
           allowCurrencyPick={scope === "ALL" && !editingTransaction}
           onCurrencyChange={setModalCurrency}

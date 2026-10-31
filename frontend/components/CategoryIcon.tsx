@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   Banknote,
   Bus,
+  GraduationCap,
   Gift,
   HeartPulse,
   Home,
@@ -32,6 +33,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   부수입: Banknote,
   정산: TrendingUp,
   "금융/기타": Landmark,
+  교육: GraduationCap,
+  "금융/수수료": Landmark,
   // legacy
   "자산 이동": ArrowLeftRight,
   "카페/간식": Utensils,
