@@ -79,6 +79,12 @@ class SetCategoryColorBody(BaseModel):
     color: str = Field(min_length=4, max_length=9)
 
 
+class ActiveLocaleBody(BaseModel):
+    """Switch the UI language without changing which languages are enabled."""
+
+    preferred_locale: str = Field(min_length=2, max_length=12)
+
+
 class PreferredLocalesBody(BaseModel):
     preferred_locales: list[str] = Field(default_factory=list)
     preferred_locale: str | None = None

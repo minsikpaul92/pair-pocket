@@ -18,6 +18,7 @@ from app.models.transaction import AccountType
 from app.models.ledger import TRANSFER_CATEGORY
 from app.models.user import UserOut
 from app.models.user_settings import (
+    ActiveLocaleBody,
     AddInstitutionBody,
     BudgetBody,
     DashboardLayoutBody,
@@ -221,6 +222,35 @@ async def update_preferred_locales(
         action="update",
         entity="preferred_locales",
         detail={"preferred_locales": locales},
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/active-locale", response_model=UserSettingsOut)
+async def update_active_locale(
+    payload: ActiveLocaleBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Make `preferred_locale` the active UI language.
+
+    The language list that decides which countries are enabled never shrinks
+    here: the chosen language moves to the front and is added when missing, so
+    flipping the KO/EN toggle cannot hide the Korea ledger.
+    """
+    locale = payload.preferred_locale.strip()
+    if locale not in SUPPORTED_LOCALE_CODES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported locale: {locale}",
+        )
+    doc = await _get_or_create(db, current_user.id)
+    current = _normalize_locales(doc.get("preferred_locales"), doc.get("preferred_locale"))
+    ordered = ([locale] + [item for item in current if item != locale])[:2]
+    await db[COLLECTION].update_one(
+        {"owner_id": current_user.id},
+        {"$set": {"preferred_locale": locale, "preferred_locales": ordered}},
     )
     doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
     return await _settings_out(db, doc)
