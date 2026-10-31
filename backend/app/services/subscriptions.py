@@ -15,6 +15,7 @@ from app.models.subscription import (
 from app.models.transaction import TransactionType
 from app.models.user import UserOut
 from app.services.access import assert_can_access_doc, shared_scope
+from app.services.notifications import notify_transaction
 
 SUBS_COL = "subscriptions"
 OCC_COL = "subscription_occurrences"
@@ -876,6 +877,9 @@ async def materialize_due_occurrences(
             "subscription_billing_cycle": sub["cycle"],
         }
         result = await db[TX_COL].insert_one(tx_doc)
+        # Backfilled past occurrences are not news to the partner.
+        if claimed["due_date"] >= datetime.utcnow() - timedelta(days=7):
+            await notify_transaction(db, {**tx_doc, "_id": result.inserted_id})
         await db[OCC_COL].update_one(
             {"_id": claimed["_id"]},
             {

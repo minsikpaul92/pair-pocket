@@ -2504,3 +2504,53 @@ export async function updateOCRLogFeedback(logId: string, feedback: "thumbs_up" 
   }
 }
 
+
+export interface AppNotification {
+  id: string;
+  transaction_id: string;
+  actor_id: string;
+  actor_name: string;
+  merchant: string;
+  amount: number;
+  currency: Currency;
+  tx_type: "income" | "expense";
+  tx_date: string | null;
+  category: string;
+  sub_category: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export async function fetchNotifications(): Promise<AppNotification[]> {
+  const res = await apiFetch(`${API_BASE_URL}/api/notifications`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("serverUnavailable");
+  return (await res.json()) as AppNotification[];
+}
+
+export async function fetchUnreadNotificationCount(): Promise<number> {
+  const res = await apiFetch(`${API_BASE_URL}/api/notifications/unread-count`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("serverUnavailable");
+  return ((await res.json()) as { count: number }).count;
+}
+
+/** Marks one notification read and returns the new unread count. */
+export async function markNotificationRead(id: string): Promise<number> {
+  const res = await apiFetch(`${API_BASE_URL}/api/notifications/${id}/read`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("serverUnavailable");
+  return ((await res.json()) as { count: number }).count;
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const res = await apiFetch(`${API_BASE_URL}/api/notifications/read-all`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("serverUnavailable");
+}
