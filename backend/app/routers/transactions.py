@@ -10,6 +10,7 @@ from app.core.security import get_current_user
 from app.database import get_database
 from app.models.transaction import (
     AccountType,
+    CrossSettlementCreate,
     Currency,
     TransactionCreate,
     TransactionOut,
@@ -30,6 +31,7 @@ from app.services.settlement import (
     get_settled_amounts,
     settled_total,
 )
+from app.services import cross_settlement
 from app.services.stats import resolve_date_range
 from app.services.transaction_links import (
     authorized_funding_twin,
@@ -89,6 +91,7 @@ def _serialize(document: dict) -> dict:
         "subtotal": document.get("subtotal"),
         "tax_amount": document.get("tax_amount"),
         "note": document.get("note"),
+        "pair_kind": document.get("pair_kind"),
     }
 
 
@@ -365,6 +368,8 @@ async def list_settleable_expenses(
             doc.get("category", ""), doc.get("sub_category", "")
         ):
             continue
+        if cross_settlement.is_settlement_pair(doc):
+            continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)
         if exclude_expense_id == exp_id:
@@ -536,6 +541,20 @@ async def create_transaction(
     return _serialize(created)
 
 
+@router.post(
+    "/cross-settlement",
+    response_model=TransactionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_cross_settlement(
+    payload: CrossSettlementCreate,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Settle an expense with money from the other ledger (personal ↔ shared)."""
+    return _serialize(await cross_settlement.create(db, current_user, payload))
+
+
 @router.put("/{transaction_id}", response_model=TransactionOut)
 async def update_transaction(
     transaction_id: str,
@@ -550,6 +569,10 @@ async def update_transaction(
     await assert_can_access_doc(
         db, current_user, existing, not_found_detail="Transaction not found."
     )
+    if cross_settlement.is_settlement_pair(existing):
+        return _serialize(
+            await cross_settlement.update(db, current_user, existing, payload)
+        )
     twin = await authorized_funding_twin(db, current_user, existing)
     if (
         existing["owner_id"] != current_user.id
@@ -659,6 +682,9 @@ async def delete_transaction(
     await assert_can_access_doc(
         db, current_user, existing, not_found_detail="Transaction not found."
     )
+    if cross_settlement.is_settlement_pair(existing):
+        await cross_settlement.delete(db, current_user, existing)
+        return
     twin = await authorized_funding_twin(db, current_user, existing)
     oid = ObjectId(transaction_id)
 
