@@ -815,7 +815,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 className="hidden min-[420px]:block md:hidden h-6 w-6 text-blue-500 shrink-0"
                 aria-hidden
               />
-              <div className="flex flex-none rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+              <div className="flex flex-none sm:min-w-0 sm:flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                 {(["personal", "shared"] as AccountType[]).map((type) => (
                   <button
                     key={type}
@@ -832,7 +832,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 ))}
               </div>
               {visibleLedgers.length > 1 && (
-                <div className="flex flex-none rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+                <div className="flex flex-none sm:min-w-0 sm:flex-[1.4] rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                   {visibleLedgers.map((l) => (
                     <button
                       key={l.scope}
