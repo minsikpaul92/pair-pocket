@@ -80,7 +80,9 @@
     "processing": "Signing in...",
     "failed": "Sign-in failed. Please try again.",
     "oauthNotConfigured": "Google sign-in is not configured yet. Ask an admin, or use local preview login.",
-    "invalidAccess": "Invalid access."
+    "invalidAccess": "Invalid access.",
+    "loadFailed": "Couldn't reach PairPocket. Your sign-in is kept; check your connection and try again.",
+    "retry": "Try again"
   },
   "invite": {
     "title": "Invite partner",
@@ -190,7 +192,12 @@
     "noExpenseData": "No expense data for the selected period.",
     "noTrendData": "No data for the selected period.",
     "pieTooltipShare": "{percent}% of expenses",
-    "pieTooltipOfTotal": "{amount} of {total}"
+    "pieTooltipOfTotal": "{amount} of {total}",
+    "periodWeek": "Week",
+    "thisWeek": "This week",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "hiddenCategoriesNote": "{count, plural, one {# category} other {# categories}} hidden in Settings."
   },
   "list": {
     "allCategories": "All categories",
@@ -267,7 +274,15 @@
     "addCategory": "Add category",
     "addSubCategory": "Add sub-category",
     "addInstitution": "Add institution",
-    "selectInstitution": "Select institution / account"
+    "selectInstitution": "Select institution / account",
+    "setDefaultStockAccountCA": "Set as default Canadian brokerage",
+    "setDefaultStockAccountKR": "Set as default Korean brokerage",
+    "defaultSaveFailed": "Couldn't save the default account. Please try again.",
+    "transferFromPersonal": "From personal account",
+    "transferFromShared": "From shared account",
+    "transferToPersonal": "To personal account",
+    "transferToShared": "To shared account",
+    "transferNoteSharedWithdrawal": "Moves money from a shared account to a personal account. Recorded as an expense on the shared ledger and as income personally."
   },
   "settlement": {
     "noExpenses": "No expenses available for settlement.",
@@ -320,7 +335,25 @@
     "deleteButton": "Delete account/card",
     "deleteAccount": "Could not delete account.",
     "namePlaceholderExpense": "e.g. TD Visa, Shinhan Card",
-    "namePlaceholderIncome": "e.g. TD Chequing, KB Bank"
+    "namePlaceholderIncome": "e.g. TD Chequing, KB Bank",
+    "defaultRolesTitle": "Use as default",
+    "defaultRolesAutoHint": "Even if nothing is checked, this account fills any default that is still empty.",
+    "defaultRole": {
+      "card": "Default payment card",
+      "bank": "Default bank account",
+      "income": "Default income account",
+      "subscription": "Subscription payment",
+      "brokerage": "Default brokerage"
+    },
+    "defaultBadge": {
+      "card": "Default card",
+      "bank": "Default account",
+      "income": "Income",
+      "subscription": "Subscriptions",
+      "brokerage": "Default brokerage"
+    },
+    "defaultMenuLabel": "Set as default",
+    "defaultSaveFailed": "Couldn't save the default. Please try again."
   },
   "accountKinds": {
     "checking": "Checking",
@@ -344,12 +377,15 @@
     "salary": "Salary",
     "sideIncome": "Side income",
     "settlement": "Settlement",
-    "financeOther": "Finance / other"
+    "financeOther": "Finance / other",
+    "education": "Education",
+    "financeFees": "Finance / fees"
   },
   "subCategories": {
     "groceries": "Groceries",
     "diningOut": "Dining / delivery",
     "cafeSnacks": "Cafe / snacks",
+    "alcohol": "Alcohol",
     "rentMortgage": "Rent / mortgage",
     "utilities": "Utilities",
     "telecom": "Telecom",
@@ -360,10 +396,18 @@
     "taxiUber": "Taxi / Uber",
     "fuelCharging": "Fuel / charging",
     "vehicleMaintenance": "Vehicle maintenance",
+    "flights": "Flights",
+    "parkingTolls": "Parking / tolls",
     "essentials": "Essentials",
     "clothing": "Clothing / goods",
     "beauty": "Beauty",
     "pets": "Pets",
+    "electronics": "Electronics",
+    "tuition": "Tuition",
+    "schoolFees": "School fees",
+    "coursebooks": "Course materials",
+    "cardInterest": "Card interest",
+    "feesAnnual": "Fees / annual fee",
     "medical": "Medical / pharmacy",
     "fitness": "Fitness",
     "supplements": "Supplements",
@@ -396,7 +440,8 @@
     "stockSale": "Stock sale proceeds",
     "dividends": "Investment dividends",
     "bankInterest": "Bank interest",
-    "taxRefund": "Government refund (HST/Tax)"
+    "taxRefund": "Government refund (HST/Tax)",
+    "sharedWithdrawal": "Shared to personal transfer"
   },
   "subscriptions": {
     "title": "Fixed expenses",
@@ -463,6 +508,9 @@
     "promoEndHint": "Leave blank to keep the promo until you set an end date. After that date, the regular amount applies.",
     "promoReminder": "Email reminder 1 week before promo ends",
     "promoReminderNeedsEnd": "Set an end date to enable this",
+    "ledgerScope": "Ledger",
+    "scopeToSharedHint": "Moving to Shared: pick a shared account or card. Past charges stay in the Personal ledger.",
+    "scopeToPersonalHint": "Moving to Personal: pick your own account or card. Past charges stay in the Shared ledger.",
     "paymentAccount": "Payment account",
     "selectPaymentAccount": "Select payment account",
     "deleteConfirm": "Delete \"{name}\" subscription?",
@@ -487,6 +535,8 @@
   },
   "errors": {
     "generic": "Something went wrong.",
+    "network": "Couldn't reach the server. Check your connection and try again.",
+    "serverUnavailable": "The server is unavailable right now. Please try again shortly.",
     "fetchTransactions": "Could not load transactions.",
     "fetchCategories": "Could not load categories.",
     "addCategory": "Could not add category.",
@@ -794,19 +844,27 @@
     "supportTitle": "Support",
     "supportDescription": "If PairPocket helps you, you can buy me a coffee. No ads in the app.",
     "supportCta": "Buy me a coffee",
-    "accountDefaults": {
-      "title": "Default accounts",
-      "description": "Choose which account is pre-selected for new transactions, card payments, subscriptions, and stock trades. Changes apply immediately.",
-      "ledgerPersonal": "Personal",
-      "ledgerShared": "Shared",
-      "expenseBank": "Default spending account",
-      "creditCard": "Default payment card",
-      "incomeBank": "Default income account",
-      "brokerageSection": "Brokerage",
-      "brokerCanada": "Canada brokerage",
-      "brokerKorea": "Korea brokerage",
-      "loadError": "Could not load accounts.",
-      "saveError": "Could not update default account."
+    "expenseRatioHiddenTitle": "Hide categories from expense mix",
+    "expenseRatioHiddenHelp": "Selected categories or sub-categories are left out of the dashboard expense mix chart. Removing a large fixed cost such as rent makes the rest of your spending easier to read. Totals and the transaction list still include them.",
+    "expenseRatioHiddenError": "Couldn't save. Please try again.",
+    "expenseRatioHiddenSubToggle": "Sub-categories",
+    "expenseRatioHiddenSubCount": "{count} hidden",
+    "accountDefaultsTitle": "Default accounts",
+    "accountDefaultsHelp": "Accounts pre-selected when you add transactions, subscriptions, and stock trades. Spending and subscriptions use the default card first, then the default bank account. Transfers use the bank account first.",
+    "accountDefaultsPersonal": "Personal",
+    "accountDefaultsShared": "Shared",
+    "accountDefaultsSharedHint": "Shared defaults are common to you and your partner. A change by either of you applies to both.",
+    "accountDefaultsNone": "Not set",
+    "accountDefaultsFollowCard": "Default card → bank account",
+    "accountDefaultsNoAccount": "No matching account",
+    "accountDefaultsInvalid": "The selected account can no longer be used. Choose another.",
+    "accountDefaultsLoadError": "Couldn't load default accounts.",
+    "accountDefaultsRoleHelp": {
+      "card": "Used first for spending and subscriptions",
+      "bank": "Spending without a card, and transfers",
+      "income": "Where income is deposited",
+      "subscription": "When empty: default card, then bank account",
+      "brokerage": "Used for stock buys and sells"
     }
   },
   "onboarding": {

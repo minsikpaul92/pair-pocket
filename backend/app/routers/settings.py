@@ -23,6 +23,7 @@ from app.models.user_settings import (
     DashboardLayoutBody,
     SpendingExclusionsBody,
     CustomCategoryMap,
+    ExpenseRatioHiddenCategoriesBody,
     LedgerStartDateBody,
     OnboardingBasicsBody,
     OnboardingCompleteBody,
@@ -133,8 +134,9 @@ async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
         "category_colors": {
             str(k): str(v) for k, v in colors.items() if isinstance(v, str)
         },
-        "default_expense_account_id": doc.get("default_expense_account_id"),
-        "default_income_account_id": doc.get("default_income_account_id"),
+        "expense_ratio_hidden_categories": [
+            str(c) for c in doc.get("expense_ratio_hidden_categories") or []
+        ],
         "has_gemini_key": has_gemini_key,
         "has_effective_gemini_key": effective,
         "partner_has_gemini_key": partner_has_gemini_key,
@@ -301,6 +303,36 @@ async def set_category_color(
     await db[COLLECTION].update_one(
         {"owner_id": current_user.id},
         {"$set": {f"category_colors.{category}": color}},
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/expense-ratio-hidden-categories", response_model=UserSettingsOut)
+async def set_expense_ratio_hidden_categories(
+    payload: ExpenseRatioHiddenCategoriesBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Replace the categories hidden from the expense-ratio chart.
+
+    Entries are a category ("주거/통신") or a sub-category ("주거/통신 › 월세/모기지").
+    """
+    categories: list[str] = []
+    for raw in payload.categories:
+        name = raw.strip()
+        if not name or len(name) > 100:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Category names must be 1-100 characters.",
+            )
+        if name not in categories:
+            categories.append(name)
+
+    await _get_or_create(db, current_user.id)
+    await db[COLLECTION].update_one(
+        {"owner_id": current_user.id},
+        {"$set": {"expense_ratio_hidden_categories": categories}},
     )
     doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
     return await _settings_out(db, doc)
@@ -673,7 +705,16 @@ async def reset_user_data(
 
     # Full reset + onboarding reopen only when wiping everything for this user.
     if scope == "all" and account_type == "all":
+        account_ids: list[str] = []
+        for base in filters:
+            async for acc in db["accounts"].find(base, {"_id": 1}):
+                account_ids.append(str(acc["_id"]))
         deleted["accounts"] = await _delete_many("accounts")
+        deleted["account_defaults"] = (
+            await db["account_defaults"].delete_many(
+                {"account_id": {"$in": account_ids}}
+            )
+        ).deleted_count
         await db[COLLECTION].update_one(
             {"owner_id": owner_id},
             {
@@ -689,7 +730,16 @@ async def reset_user_data(
             upsert=True,
         )
     elif scope == "all" and account_type in ("personal", "shared"):
+        account_ids: list[str] = []
+        for base in filters:
+            async for acc in db["accounts"].find(base, {"_id": 1}):
+                account_ids.append(str(acc["_id"]))
         deleted["accounts"] = await _delete_many("accounts")
+        deleted["account_defaults"] = (
+            await db["account_defaults"].delete_many(
+                {"account_id": {"$in": account_ids}}
+            )
+        ).deleted_count
 
     await write_audit_log(
         db,

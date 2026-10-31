@@ -20,6 +20,7 @@ from app.models.ledger import (
     TRANSFER_SUB_ETRANSFER,
     TRANSFER_SUB_INVESTMENT_FUNDING,
     TRANSFER_SUB_SHARED_FUNDING,
+    TRANSFER_SUB_SHARED_WITHDRAWAL,
     is_cashflow_transfer_sub,
     is_internal_transfer_sub,
     is_shared_funding_sub,
@@ -33,7 +34,7 @@ SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급"
 
 
 EXPENSE_PRESETS: dict[str, list[str]] = {
-    "식비": ["식재료/장보기", "외식/배달", "카페/간식"],
+    "식비": ["식재료/장보기", "외식/배달", "카페/간식", "술"],
     "주거/통신": [
         "월세/모기지",
         "관리비/공과금",
@@ -42,18 +43,21 @@ EXPENSE_PRESETS: dict[str, list[str]] = {
         "휴대폰",
         "가정 정비",
     ],
-    "교통/차량": ["대중교통", "택시/우버", "유류비/충전", "차량 유지"],
-    "생활/쇼핑": ["생필품", "의류/잡화", "미용/뷰티", "반려동물"],
+    "교통/차량": ["대중교통", "택시/우버", "유류비/충전", "차량 유지", "비행기", "주차/통행료"],
+    "생활/쇼핑": ["생필품", "의류/잡화", "미용/뷰티", "반려동물", "전자기기"],
     "건강/의료": ["병원/약국", "운동/헬스", "영양제"],
     "문화/취미": ["문화 생활", "취미/엔터", "정기 구독", "학원/교육", "여행/숙박"],
+    "교육": ["학비/등록금", "학교 수수료", "교재/강의"],
     "경조사/선물": ["경조사비", "선물/기념일", "모임/회비"],
     "투자/저축": ["주식 매수", "FHSA 납입", "TFSA 납입", "저축성 예금"],
     "세금": ["세금"],
+    "금융/수수료": ["카드 이자", "수수료/연회비"],
     TRANSFER_CATEGORY: [
         TRANSFER_SUB_CARD_REPAYMENT,
         TRANSFER_SUB_ACCOUNT_TRANSFER,
         TRANSFER_SUB_INVESTMENT_FUNDING,
         TRANSFER_SUB_SHARED_FUNDING,
+        TRANSFER_SUB_SHARED_WITHDRAWAL,
         TRANSFER_SUB_ETRANSFER,
     ],
 }
@@ -68,8 +72,8 @@ INCOME_PRESETS: dict[str, list[str]] = {
         "은행 이자",
         "정부 환급금(HST/Tax Refund)",
     ],
-    # Mirror of personal→shared funding (server-created income twin).
-    TRANSFER_CATEGORY: [TRANSFER_SUB_SHARED_FUNDING],
+    # Receiving side of personal↔shared transfers (linked to an expense twin).
+    TRANSFER_CATEGORY: [TRANSFER_SUB_SHARED_FUNDING, TRANSFER_SUB_SHARED_WITHDRAWAL],
 }
 
 PRESETS_BY_TYPE: dict[TransactionType, dict[str, list[str]]] = {

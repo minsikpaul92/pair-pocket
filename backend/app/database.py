@@ -44,6 +44,14 @@ async def _ensure_indexes() -> None:
         sparse=True,
     )
 
+    # One document per default slot: switching a default can never leave two.
+    await db.database["account_defaults"].create_index(
+        [("scope_key", 1), ("currency", 1), ("role", 1)], unique=True
+    )
+    await db.database["account_defaults"].create_index(
+        [("scope_key", 1), ("account_id", 1)]
+    )
+
     group_scoped = (
         "transactions",
         "accounts",
@@ -55,6 +63,16 @@ async def _ensure_indexes() -> None:
         await db.database[collection].create_index(
             [("shared_group_id", 1), ("owner_id", 1), ("account_type", 1)]
         )
+
+    # Sign-in sessions: lookups by credential hash; Mongo drops expired rows.
+    for collection, key in (
+        ("auth_sessions", "token_hash"),
+        ("auth_login_codes", "code_hash"),
+        ("auth_legacy_upgrades", "token_hash"),
+    ):
+        await db.database[collection].create_index(key, unique=True)
+        await db.database[collection].create_index("expires_at", expireAfterSeconds=0)
+    await db.database["auth_sessions"].create_index("family_id")
 
     # Clean up legacy duplicate auto-generated expenses before unique index.
     await dedupe_subscription_transactions(db.database)

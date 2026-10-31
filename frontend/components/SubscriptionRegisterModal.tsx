@@ -2,7 +2,7 @@
 
 import { Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
@@ -28,7 +28,7 @@ import {
   addMonthsToDateKey,
   categoriesForType,
   createSubscription,
-  defaultPaymentAccountId,
+  resolveDefaultAccountId,
   deleteSubscription,
   fetchAccounts,
   fetchSubscriptionHistory,
@@ -42,6 +42,7 @@ import {
   updateSubscription,
 } from "@/lib/api";
 import { dayKey, parseDate } from "@/lib/date";
+import { useAccountDefaults } from "@/lib/useAccountDefaults";
 import { translateError } from "@/lib/errors";
 import {
   formatSubscriptionDate,
@@ -51,6 +52,7 @@ import {
 interface Props {
   currency: Currency;
   accountType?: AccountType;
+  hasPartner?: boolean;
   presets: CategoryPresets;
   editing?: Subscription | null;
   initialParse?: OnboardingParseResult | null;
@@ -69,7 +71,8 @@ function dateInputFromIso(iso: string | null | undefined): string {
 
 export default function SubscriptionRegisterModal({
   currency,
-  accountType = "personal",
+  accountType: initialAccountType = "personal",
+  hasPartner = false,
   presets,
   editing = null,
   initialParse = null,
@@ -82,9 +85,15 @@ export default function SubscriptionRegisterModal({
   const tCommon = useTranslations("common");
   const tTx = useTranslations("transaction");
   const tErrors = useTranslations("errors");
+  const tAccountType = useTranslations("accountType");
   const locale = useLocale();
 
   const isEditing = Boolean(editing);
+  // Editing may move the item between the personal and shared ledgers.
+  const [accountType, setAccountType] = useState<AccountType>(
+    editing?.account_type ?? initialAccountType
+  );
+  const scopeChanged = isEditing && accountType !== editing?.account_type;
 
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -254,16 +263,42 @@ export default function SubscriptionRegisterModal({
       .catch(() => setHistory(null));
   }, [editing]);
 
+  const { defaults: accountDefaults } = useAccountDefaults(accountType);
+  // Defaults load asynchronously; keep an account the user already chose.
+  const accountContextKey = `${currency}|${accountType}`;
+  const manualAccountPickRef = useRef<string | null>(null);
+  const pickAccount = useCallback(
+    (id: string) => {
+      manualAccountPickRef.current = accountContextKey;
+      setAccountId(id);
+    },
+    [accountContextKey]
+  );
+
+  function switchScope(next: AccountType) {
+    if (next === accountType) return;
+    setAccountType(next);
+    // Payment accounts belong to one ledger, so the old pick no longer applies.
+    manualAccountPickRef.current = null;
+    setAccountId(ACCOUNT_NONE);
+    setCounterAccountId(ACCOUNT_NONE);
+    setAccounts([]);
+  }
+
   useEffect(() => {
     fetchAccounts({ currency, accountType })
-      .then((list) => {
-        setAccounts(list);
-        if (!editing) {
-          setAccountId(defaultPaymentAccountId(list) || ACCOUNT_NONE);
-        }
-      })
+      .then(setAccounts)
       .catch(() => setAccounts([]));
-  }, [currency, accountType, editing]);
+  }, [currency, accountType]);
+
+  // Subscriptions: subscription slot → default card → default bank account.
+  useEffect(() => {
+    if ((editing && !scopeChanged) || manualAccountPickRef.current === accountContextKey) return;
+    setAccountId(
+      resolveDefaultAccountId(accountDefaults, currency, "subscription", accounts) ||
+        ACCOUNT_NONE
+    );
+  }, [accountDefaults, accounts, currency, editing, scopeChanged, accountContextKey]);
 
   useEffect(() => {
     if (editing) return;
@@ -857,6 +892,39 @@ export default function SubscriptionRegisterModal({
             />
           </div>
 
+          {isEditing && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t("ledgerScope")}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["personal", "shared"] as const).map((value) => {
+                  const disabled = value === "shared" && !hasPartner && accountType !== "shared";
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => switchScope(value)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-40 ${
+                        accountType === value
+                          ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                          : "border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {tAccountType(value)}
+                    </button>
+                  );
+                })}
+              </div>
+              {scopeChanged && (
+                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  {t(accountType === "shared" ? "scopeToSharedHint" : "scopeToPersonalHint")}
+                </p>
+              )}
+            </div>
+          )}
+
           {isTransfer ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -866,7 +934,7 @@ export default function SubscriptionRegisterModal({
                 <AccountSelect
                   accounts={transferFromAccounts}
                   value={accountId}
-                  onChange={setAccountId}
+                  onChange={pickAccount}
                   onRegister={() => setShowAccountRegister(true)}
                   allowNone={false}
                   placeholder={tTx("selectFromAccount") || "출금 계좌 선택"}
@@ -896,7 +964,7 @@ export default function SubscriptionRegisterModal({
               <AccountSelect
                 accounts={accounts}
                 value={accountId}
-                onChange={setAccountId}
+                onChange={pickAccount}
                 onRegister={() => setShowAccountRegister(true)}
                 allowNone={false}
                 placeholder={t("selectPaymentAccount")}
@@ -1171,7 +1239,7 @@ export default function SubscriptionRegisterModal({
           onClose={() => setShowAccountRegister(false)}
           onCreated={(created) => {
             setAccounts((prev) => [...prev, created]);
-            setAccountId(created.id);
+            pickAccount(created.id);
             setShowAccountRegister(false);
           }}
         />

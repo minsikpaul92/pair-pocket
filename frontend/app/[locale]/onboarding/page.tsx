@@ -30,7 +30,8 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     (async () => {
-      const user = await fetchCurrentUser();
+      // Home shows the retry screen when the server is unreachable.
+      const user = await fetchCurrentUser().catch(() => null);
       if (!user) {
         router.replace("/");
         return;

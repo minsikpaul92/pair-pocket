@@ -1,4 +1,4 @@
-"""Financial account CRUD and default selection."""
+"""Financial account CRUD. Default selection lives in `account_defaults`."""
 
 from datetime import datetime
 
@@ -12,6 +12,7 @@ from app.models.account import (
     AccountCreate,
     AccountOut,
     AccountUpdate,
+    DefaultRole,
     FinancialAccountKind,
     NetWorthSummary,
 )
@@ -24,6 +25,15 @@ from app.services.access import (
     require_shared_group_for_write,
     resolve_owner_ids,
 )
+from app.services.account_defaults import (
+    LEGACY_FLAG_ROLES,
+    account_scope_key,
+    applicable_roles,
+    apply_account_roles,
+    on_account_removed,
+    on_account_saved,
+    roles_by_account,
+)
 from app.services.accounts import _serialize_account, compute_net_worth
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
@@ -34,6 +44,39 @@ SETTINGS_COL = "user_settings"
 
 def _infer_liability(kind: FinancialAccountKind) -> bool:
     return kind == FinancialAccountKind.CREDIT_CARD
+
+
+async def _with_roles(db: AsyncIOMotorDatabase, docs: list[dict]) -> list[dict]:
+    keys = {k for k in (account_scope_key(d) for d in docs) if k}
+    roles = await roles_by_account(db, keys)
+    return [_serialize_account(d, roles.get(str(d["_id"]), [])) for d in docs]
+
+
+async def _apply_requested_roles(db, user, payload, account: dict) -> None:
+    """Apply `default_roles`, or deprecated is_default_* flags from older clients."""
+    if payload.default_roles is not None:
+        await apply_account_roles(db, user, account, set(payload.default_roles))
+        return
+    flags = {
+        name: value
+        for name in LEGACY_FLAG_ROLES
+        if (value := getattr(payload, name)) is not None
+    }
+    if not flags:
+        return
+    applicable = set(applicable_roles(account))
+    held = (await roles_by_account(db, {account_scope_key(account)})).get(
+        str(account["_id"]), []
+    )
+    target = {DefaultRole(r) for r in held}
+    for name, value in flags.items():
+        role = LEGACY_FLAG_ROLES[name]
+        # Older clients sent is_default_expense on cards to mean "default card".
+        if role == DefaultRole.BANK and DefaultRole.CARD in applicable:
+            role = DefaultRole.CARD
+        if role in applicable:
+            (target.add if value else target.discard)(role)
+    await apply_account_roles(db, user, account, target)
 
 
 @router.get("", response_model=list[AccountOut])
@@ -56,7 +99,7 @@ async def list_accounts(
         query["is_active"] = True
 
     docs = await db[COLLECTION].find(query).sort("name", 1).to_list(length=100)
-    return [_serialize_account(d) for d in docs]
+    return await _with_roles(db, docs)
 
 
 @router.post("", response_model=AccountOut, status_code=status.HTTP_201_CREATED)
@@ -68,64 +111,10 @@ async def create_account(
     require_shared_group_for_write(current_user, payload.account_type)
     now = datetime.utcnow()
     is_liability = payload.is_liability or _infer_liability(payload.kind)
-    owner_ids = await resolve_owner_ids(db, current_user, payload.account_type)
 
-    if payload.is_default_expense:
-        # Bank/cash defaults must not wipe credit-card defaults.
-        await db[COLLECTION].update_many(
-            {
-                **owner_match(owner_ids),
-                "account_type": payload.account_type.value,
-                **shared_scope(
-                    payload.account_type.value, current_user.shared_group_id
-                ),
-                "currency": payload.currency.value,
-                "kind": {"$ne": FinancialAccountKind.CREDIT_CARD.value},
-            },
-            {"$set": {"is_default_expense": False}},
-        )
-    if payload.is_default_credit:
-        await db[COLLECTION].update_many(
-            {
-                **owner_match(owner_ids),
-                "account_type": payload.account_type.value,
-                **shared_scope(
-                    payload.account_type.value, current_user.shared_group_id
-                ),
-                "currency": payload.currency.value,
-                "kind": FinancialAccountKind.CREDIT_CARD.value,
-            },
-            {"$set": {"is_default_credit": False}},
-        )
-    if payload.is_default_investment:
-        inv_filter: dict = {
-            **owner_match(owner_ids),
-            "account_type": payload.account_type.value,
-            **shared_scope(payload.account_type.value, current_user.shared_group_id),
-            "kind": FinancialAccountKind.INVESTMENT.value,
-        }
-        if payload.country is not None:
-            inv_filter["country"] = payload.country.value
-        else:
-            inv_filter["currency"] = payload.currency.value
-        await db[COLLECTION].update_many(
-            inv_filter,
-            {"$set": {"is_default_investment": False}},
-        )
-    if payload.is_default_income:
-        await db[COLLECTION].update_many(
-            {
-                **owner_match(owner_ids),
-                "account_type": payload.account_type.value,
-                **shared_scope(
-                    payload.account_type.value, current_user.shared_group_id
-                ),
-                "currency": payload.currency.value,
-            },
-            {"$set": {"is_default_income": False}},
-        )
-
-    doc = payload.model_dump()
+    doc = payload.model_dump(
+        exclude={"default_roles", *LEGACY_FLAG_ROLES.keys()}
+    )
     doc["kind"] = payload.kind.value
     doc["currency"] = payload.currency.value
     doc["account_type"] = payload.account_type.value
@@ -136,12 +125,6 @@ async def create_account(
     )
     if payload.country is not None:
         doc["country"] = payload.country.value
-    # Investment never acts as expense/credit wallet; use is_default_investment.
-    if payload.kind == FinancialAccountKind.INVESTMENT:
-        doc["is_default_expense"] = False
-        doc["is_default_credit"] = False
-    else:
-        doc["is_default_investment"] = False
     doc["is_liability"] = is_liability
     doc["owner_id"] = current_user.id
     doc["created_at"] = now
@@ -149,7 +132,10 @@ async def create_account(
 
     result = await db[COLLECTION].insert_one(doc)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
-    return _serialize_account(created)
+    await _apply_requested_roles(db, current_user, payload, created)
+    # A new account becomes the default wherever no default exists yet.
+    await on_account_saved(db, created, updated_by=current_user.id, claim_empty=True)
+    return (await _with_roles(db, [created]))[0]
 
 
 @router.get("/net-worth", response_model=NetWorthSummary)
@@ -188,68 +174,28 @@ async def update_account(
         db, current_user, existing, not_found_detail="Account not found."
     )
 
-    updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
-    if not updates:
-        return _serialize_account(existing)
-
-    owner_ids = await resolve_owner_ids(
-        db, current_user, AccountType(existing["account_type"])
+    updates = payload.model_dump(
+        exclude_unset=True, exclude={"default_roles", *LEGACY_FLAG_ROLES.keys()}
     )
-    if updates.get("is_default_expense"):
-        await db[COLLECTION].update_many(
-            {
-                **owner_match(owner_ids),
-                "account_type": existing["account_type"],
-                **shared_scope(existing["account_type"], current_user.shared_group_id),
-                "currency": existing["currency"],
-                "kind": {"$ne": FinancialAccountKind.CREDIT_CARD.value},
-            },
-            {"$set": {"is_default_expense": False}},
+    if "country" in updates and updates["country"] is not None:
+        updates["country"] = updates["country"].value
+    if updates:
+        updates["updated_at"] = datetime.utcnow()
+        await db[COLLECTION].update_one(
+            {"_id": ObjectId(account_id)}, {"$set": updates}
         )
-    if updates.get("is_default_credit"):
-        await db[COLLECTION].update_many(
-            {
-                **owner_match(owner_ids),
-                "account_type": existing["account_type"],
-                **shared_scope(existing["account_type"], current_user.shared_group_id),
-                "currency": existing["currency"],
-                "kind": FinancialAccountKind.CREDIT_CARD.value,
-            },
-            {"$set": {"is_default_credit": False}},
-        )
-    if updates.get("is_default_investment"):
-        inv_filter: dict = {
-            **owner_match(owner_ids),
-            "account_type": existing["account_type"],
-            **shared_scope(existing["account_type"], current_user.shared_group_id),
-            "kind": FinancialAccountKind.INVESTMENT.value,
-        }
-        country = updates.get("country") or existing.get("country")
-        if country:
-            inv_filter["country"] = (
-                country.value if hasattr(country, "value") else country
-            )
-        else:
-            inv_filter["currency"] = existing["currency"]
-        await db[COLLECTION].update_many(
-            inv_filter,
-            {"$set": {"is_default_investment": False}},
-        )
-    if updates.get("is_default_income"):
-        await db[COLLECTION].update_many(
-            {
-                **owner_match(owner_ids),
-                "account_type": existing["account_type"],
-                **shared_scope(existing["account_type"], current_user.shared_group_id),
-                "currency": existing["currency"],
-            },
-            {"$set": {"is_default_income": False}},
-        )
-
-    updates["updated_at"] = datetime.utcnow()
-    await db[COLLECTION].update_one({"_id": ObjectId(account_id)}, {"$set": updates})
     updated = await db[COLLECTION].find_one({"_id": ObjectId(account_id)})
-    return _serialize_account(updated)
+    if updated.get("is_active", True):
+        await _apply_requested_roles(db, current_user, payload, updated)
+    # Deactivation / country change hands slots to the most recently used
+    # alternative; reactivation claims empty slots like a new account.
+    reactivated = not existing.get("is_active", True) and updated.get(
+        "is_active", True
+    )
+    await on_account_saved(
+        db, updated, updated_by=current_user.id, claim_empty=reactivated
+    )
+    return (await _with_roles(db, [updated]))[0]
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -271,3 +217,4 @@ async def delete_account(
 
     await db[COLLECTION].delete_one({"_id": ObjectId(account_id)})
     await db.holdings.delete_many({"account_id": account_id})
+    await on_account_removed(db, existing)

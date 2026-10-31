@@ -15,7 +15,9 @@ ACCOUNTS_COL = "accounts"
 TX_COL = "transactions"
 
 
-def _serialize_account(doc: dict) -> dict:
+def _serialize_account(doc: dict, roles: list[str] | None = None) -> dict:
+    """Account payload; defaults come from `account_defaults` slots, not the doc."""
+    roles = roles or []
     return {
         "id": str(doc["_id"]),
         "owner_id": doc["owner_id"],
@@ -27,10 +29,12 @@ def _serialize_account(doc: dict) -> dict:
         "country": doc.get("country"),
         "opening_balance": doc.get("opening_balance", 0.0),
         "is_liability": doc.get("is_liability", False),
-        "is_default_expense": doc.get("is_default_expense", False),
-        "is_default_income": doc.get("is_default_income", False),
-        "is_default_credit": doc.get("is_default_credit", False),
-        "is_default_investment": doc.get("is_default_investment", False),
+        "default_roles": roles,
+        # Deprecated mirrors for clients built before default slots.
+        "is_default_expense": "bank" in roles,
+        "is_default_income": "income" in roles,
+        "is_default_credit": "card" in roles,
+        "is_default_investment": "brokerage" in roles,
         "is_active": doc.get("is_active", True),
         "institution": doc.get("institution"),
         "last_four": doc.get("last_four"),

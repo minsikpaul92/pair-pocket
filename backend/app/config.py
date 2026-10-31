@@ -15,7 +15,19 @@ class Settings(BaseSettings):
     # Used to sign both the Starlette session (OAuth state) and the app JWT.
     secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+    # Short-lived; the frontend renews it with the refresh cookie.
+    access_token_expire_minutes: int = 30
+
+    # --- Sign-in sessions (rotating refresh credential in an HttpOnly cookie) ---
+    refresh_token_expire_days: int = 30
+    # A rotated credential presented again within this window (another tab
+    # refreshing at the same moment) gets an access token instead of revoking
+    # the session.
+    refresh_reuse_grace_seconds: int = 30
+    # One-time code the OAuth callback hands the frontend in place of a token.
+    login_code_expire_seconds: int = 120
+    # Safari rejects Secure cookies on http://localhost; set false locally there.
+    session_cookie_secure: bool = True
 
     # --- Google OAuth ---
     google_client_id: str = ""
