@@ -29,6 +29,22 @@ import { parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
+/** The add-transaction form saves the localized "unspecified" label when merchant is left empty. */
+const UNSPECIFIED_MERCHANTS = new Set(["미지정", "Unspecified"]);
+
+/** Merchant wins over note; a placeholder merchant counts as missing. */
+function rowTitle(tx: Transaction, fallback: string): string {
+  const merchant = tx.merchant?.trim();
+  if (merchant && !UNSPECIFIED_MERCHANTS.has(merchant)) return merchant;
+  return tx.note?.trim() || merchant || fallback;
+}
+
+/** The note shown beside the category, unless it is already the row title. */
+function rowNote(tx: Transaction, title: string): string {
+  const note = tx.note?.trim();
+  return note && note !== title ? note : "";
+}
+
 interface Props {
   scope: LedgerScope;
   presets: CategoryPresets | null;
@@ -204,7 +220,8 @@ export default function ListView({
     for (const item of combinedItems) set.add(item.category);
     const expense = categoriesForType(presets, "expense");
     const income = categoriesForType(presets, "income");
-    return [...expense, ...income].filter((c) => set.has(c));
+    // Some categories (e.g. transfers) exist for both types; keep each once.
+    return Array.from(new Set([...expense, ...income])).filter((c) => set.has(c));
   }, [presets, combinedItems]);
 
   const subCategoryOptions = useMemo(() => {
@@ -581,6 +598,8 @@ export default function ListView({
               const tx = item.tx;
               const settled = hasSettlement(tx);
               const transfer = isNonCashflowTransaction(tx);
+              const title = rowTitle(tx, tCommon("unspecified"));
+              const note = rowNote(tx, title);
               const subscription = isSubscriptionTransaction(tx);
               const effective = item.effectiveAmount;
               return (
@@ -598,13 +617,14 @@ export default function ListView({
                         <p className="text-sm font-bold truncate text-gray-900 dark:text-white">
                           {showCurrencyCol &&
                             (tx.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
-                          {tx.note?.trim() || tx.merchant || tCommon("unspecified")}
+                          {title}
                         </p>
                         <p className="text-[11px] text-gray-400 truncate">
                           {formatDay(tx.date)} · {translateCategory(tx.category, tCategories)}
                           {tx.sub_category
                             ? ` › ${translateSubCategory(tx.sub_category, tSubCategories)}`
                             : ""}
+                          {note ? ` - ${note}` : ""}
                         </p>
                       </div>
                       <p
