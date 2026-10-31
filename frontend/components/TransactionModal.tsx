@@ -248,6 +248,7 @@ export default function TransactionModal({
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [dragOverModal, setDragOverModal] = useState(false);
   const dragDepthRef = useRef(0);
+  const pressStartedOnBackdrop = useRef(false);
   const [tipPercent, setTipPercent] = useState("");
   const [tipAmount, setTipAmount] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -1923,8 +1924,15 @@ export default function TransactionModal({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
-      onDoubleClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+      // Close only when the press also started on the backdrop, so dragging a
+      // text selection out of an input does not dismiss the form.
+      onMouseDown={(e) => {
+        pressStartedOnBackdrop.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (pressStartedOnBackdrop.current && e.target === e.currentTarget) {
+          onClose();
+        }
       }}
     >
       <div
