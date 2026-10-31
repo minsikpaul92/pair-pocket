@@ -1035,6 +1035,7 @@ export default function AppShell({ user, onLogout }: Props) {
               scope={scope}
               accountType={accountType}
               presets={presets}
+              month={month}
               onChanged={bumpVersion}
             />
           ) : view === "settings" ? (
