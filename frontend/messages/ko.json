@@ -893,7 +893,8 @@
       "income": "수입이 들어오는 계좌",
       "subscription": "비워 두면 기본 카드 → 은행 계좌 순서",
       "brokerage": "주식 매수·매도에 사용"
-    }
+    },
+    "languageHelp": "앱에 표시되는 언어를 바꿉니다. 사용 중인 국가와 데이터는 그대로예요."
   },
   "onboarding": {
     "title": "시작하기",
@@ -1029,5 +1030,41 @@
     "fixedBillAcademy": "학원비",
     "merchant": "사용처",
     "ticker": "티커"
+  },
+  "notifications": {
+    "title": "알림",
+    "open": "알림",
+    "tabAlerts": "알림",
+    "tabWhatsNew": "새 소식",
+    "markAllRead": "모두 읽음",
+    "empty": "아직 알림이 없어요. 공유 가계부에 새 내역이 생기면 여기에 표시돼요.",
+    "loadFailed": "알림을 불러오지 못했어요. 다시 시도해 주세요.",
+    "partnerFallback": "파트너",
+    "addedExpense": "{name}님이 지출을 등록했어요",
+    "addedIncome": "{name}님이 수입을 등록했어요"
+  },
+  "whatsNew": {
+    "items": {
+      "notifications": {
+        "title": "알림과 새 소식",
+        "description": "상단의 종 아이콘으로 파트너가 공유 가계부에 내역을 등록하면 바로 알려드려요. 이런 업데이트 내용도 여기에서 볼 수 있어요."
+      },
+      "languageSettings": {
+        "title": "언어 설정이 설정 화면으로 이동",
+        "description": "설정의 일반 탭에서 영어 또는 한국어를 고를 수 있어요. 상단 바가 한결 여유로워졌어요."
+      },
+      "crossSettlement": {
+        "title": "다른 가계부와 정산",
+        "description": "공유 지출을 개인 통장의 돈으로, 또는 그 반대로 정산할 수 있어요. 양쪽 내역이 함께 기록돼요."
+      },
+      "merchantFirstList": {
+        "title": "사용처 우선 목록",
+        "description": "목록에 사용처가 먼저 보이고 메모는 그 아래에 표시돼요. 마지막으로 본 탭도 기억해요."
+      },
+      "newDashboard": {
+        "title": "새 대시보드와 예산",
+        "description": "월 예산, 국가별 카드, 기본 통장 설정이 있는 더 간단한 대시보드예요."
+      }
+    }
   }
 }

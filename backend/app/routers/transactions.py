@@ -32,6 +32,7 @@ from app.services.settlement import (
     settled_total,
 )
 from app.services import cross_settlement
+from app.services.notifications import notify_transaction
 from app.services.stats import resolve_date_range
 from app.services.transaction_links import (
     authorized_funding_twin,
@@ -493,6 +494,16 @@ async def _guard_settled_expense(db, session, existing: dict, document: dict) ->
         )
 
 
+async def _notify_entries(db, created: dict, actor_id: str) -> None:
+    """Notify for the entry and its server-made twin; only the shared one notifies."""
+    await notify_transaction(db, created, actor_id=actor_id)
+    linked = created.get("linked_transaction_id")
+    if isinstance(linked, str) and ObjectId.is_valid(linked):
+        await notify_transaction(
+            db, await db[COLLECTION].find_one({"_id": ObjectId(linked)}), actor_id=actor_id
+        )
+
+
 @router.post("", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     payload: TransactionCreate,
@@ -533,10 +544,13 @@ async def create_transaction(
             return result.inserted_id
 
         inserted_id = await db_transactions.run_in_transaction(db, write)
-        return _serialize(await db[COLLECTION].find_one({"_id": inserted_id}))
+        created = await db[COLLECTION].find_one({"_id": inserted_id})
+        await _notify_entries(db, created, current_user.id)
+        return _serialize(created)
 
     result = await db[COLLECTION].insert_one(document)
     created = await db[COLLECTION].find_one({"_id": result.inserted_id})
+    await notify_transaction(db, created, actor_id=current_user.id)
     await _sync_stock_holding(db, created)
     return _serialize(created)
 
@@ -552,7 +566,9 @@ async def create_cross_settlement(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     """Settle an expense with money from the other ledger (personal ↔ shared)."""
-    return _serialize(await cross_settlement.create(db, current_user, payload))
+    created = await cross_settlement.create(db, current_user, payload)
+    await _notify_entries(db, created, current_user.id)
+    return _serialize(created)
 
 
 @router.put("/{transaction_id}", response_model=TransactionOut)

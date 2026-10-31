@@ -29,7 +29,8 @@ import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
 import InviteModal from "@/components/InviteModal";
 import ListView from "@/components/ListView";
-import LocaleToggle from "@/components/LocaleToggle";
+import NotificationBell from "@/components/NotificationBell";
+import NotificationsView from "@/components/NotificationsView";
 import ThemeToggle from "@/components/ThemeToggle";
 import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
@@ -43,6 +44,7 @@ import {
   AccountType,
   CategoryPresets,
   Currency,
+  AppNotification,
   CurrentUser,
   LedgerScope,
   PartnerSummary,
@@ -55,6 +57,7 @@ import {
   fetchInvitationMe,
   fetchPendingOccurrences,
   fetchTransactions,
+  fetchUnreadNotificationCount,
   fetchUserSettings,
   preferredLocalesList,
   signOut,
@@ -70,7 +73,15 @@ import {
   ledgerScopesForCountries,
 } from "@/lib/locale-countries";
 
-type View = "calendar" | "list" | "dashboard" | "subscriptions" | "stocks" | "settings" | "import";
+type View =
+  | "calendar"
+  | "list"
+  | "dashboard"
+  | "subscriptions"
+  | "stocks"
+  | "settings"
+  | "import"
+  | "notifications";
 
 const ACTIVE_VIEW_KEY = "pairpocket.activeView";
 
@@ -82,6 +93,7 @@ const VALID_VIEWS: View[] = [
   "stocks",
   "settings",
   "import",
+  "notifications",
 ];
 
 function isView(value: string | null): value is View {
@@ -174,6 +186,7 @@ export default function AppShell({ user, onLogout }: Props) {
     return isView(stored) ? stored : "calendar";
   });
   const [previousView, setPreviousView] = useState<View>("calendar");
+  const [unreadCount, setUnreadCount] = useState(0);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [scope, setScope] = useState<LedgerScope>("CAD");
   // The dashboard shows one country at a time; under "All" it falls back to
@@ -501,6 +514,45 @@ export default function AppShell({ user, onLogout }: Props) {
       setPreviousView(view);
       setView("settings");
     }
+  }
+
+  function toggleNotifications() {
+    if (view === "notifications") {
+      setView(previousView === "notifications" ? "calendar" : previousView);
+    } else {
+      setPreviousView(view);
+      setView("notifications");
+    }
+  }
+
+  // Keep the bell badge fresh: on load, every minute, and when the tab returns.
+  useEffect(() => {
+    let active = true;
+    const refresh = () =>
+      fetchUnreadNotificationCount()
+        .then((count) => {
+          if (active) setUnreadCount(count);
+        })
+        .catch(() => null);
+    void refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  function openNotification(item: AppNotification) {
+    const target: LedgerScope = item.currency === "KRW" ? "KRW" : "CAD";
+    setAccountType("shared");
+    if (enabledScopes.includes(target)) setScope(target);
+    if (item.tx_date) setMonth(parseDate(item.tx_date));
+    setView("list");
   }
 
   function openView(next: View) {
@@ -864,15 +916,19 @@ export default function AppShell({ user, onLogout }: Props) {
               </button>
             </div>
 
+            <NotificationBell
+              count={unreadCount}
+              active={view === "notifications"}
+              onClick={toggleNotifications}
+            />
             <div className="hidden md:flex items-center gap-2 shrink-0">
-              <LocaleToggle />
               <ThemeToggle />
             </div>
           </div>
         </header>
 
         <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-32 md:pb-10">
-          {view === "settings" ? (
+          {view === "notifications" ? null : view === "settings" ? (
             <div className="mb-4">
               <div className="flex md:hidden items-center gap-2.5">
                 <Wallet
@@ -960,7 +1016,12 @@ export default function AppShell({ user, onLogout }: Props) {
           </div>
           )}
 
-          {accountType === "shared" && !currentUser.shared_group_id ? (
+          {view === "notifications" ? (
+            <NotificationsView
+              onUnreadChange={setUnreadCount}
+              onOpenNotification={openNotification}
+            />
+          ) : accountType === "shared" && !currentUser.shared_group_id ? (
             <div className="card-inset p-6 text-center space-y-4">
               <p className="text-base text-gray-700 dark:text-gray-300">
                 {tInvite("sharedEmpty")}

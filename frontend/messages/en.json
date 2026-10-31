@@ -893,7 +893,8 @@
       "income": "Where income is deposited",
       "subscription": "When empty: default card, then bank account",
       "brokerage": "Used for stock buys and sells"
-    }
+    },
+    "languageHelp": "Changes the language of the app. Your countries and data stay the same."
   },
   "onboarding": {
     "title": "Get started",
@@ -1029,5 +1030,41 @@
     "fixedBillAcademy": "Academy / tutoring",
     "merchant": "Merchant",
     "ticker": "Ticker"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "open": "Notifications",
+    "tabAlerts": "Alerts",
+    "tabWhatsNew": "What's New",
+    "markAllRead": "Read all",
+    "empty": "No notifications yet. New entries in your shared ledger show up here.",
+    "loadFailed": "Couldn't load notifications. Please try again.",
+    "partnerFallback": "Your partner",
+    "addedExpense": "{name} added an expense",
+    "addedIncome": "{name} added income"
+  },
+  "whatsNew": {
+    "items": {
+      "notifications": {
+        "title": "Notifications and What's New",
+        "description": "A bell in the top bar tells you when your partner adds an entry to the shared ledger. Updates like this one are listed here."
+      },
+      "languageSettings": {
+        "title": "Language moved to Settings",
+        "description": "Pick English or Korean from the General tab in Settings. The top bar now has more room."
+      },
+      "crossSettlement": {
+        "title": "Settle with the other ledger",
+        "description": "Settle a shared expense with money from a personal account, or the other way around. Both sides are recorded together."
+      },
+      "merchantFirstList": {
+        "title": "Merchant-first list",
+        "description": "The list shows the merchant first, with your note underneath, and remembers the tab you were on."
+      },
+      "newDashboard": {
+        "title": "New dashboard and budget",
+        "description": "A simpler dashboard with a monthly budget, a card for each country and default accounts."
+      }
+    }
   }
 }

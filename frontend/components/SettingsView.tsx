@@ -13,12 +13,12 @@ import {
   Settings,
   CalendarDays,
   Coffee,
+  Languages,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
 import AccountDefaultsSettings from "@/components/AccountDefaultsSettings";
 import DashboardSettings from "@/components/DashboardSettings";
-import LocaleToggle from "@/components/LocaleToggle";
 import ThemeToggle from "@/components/ThemeToggle";
 import DayPicker from "@/components/DayPicker";
 import ExpenseRatioHiddenSettings from "@/components/ExpenseRatioHiddenSettings";
@@ -28,17 +28,18 @@ import {
   setShareGeminiApiKey,
   updateLedgerStartDate,
   resetUserData,
+  updateActiveLocale,
   ResetScope,
   ResetAccountType,
   AccountType,
   LedgerScope,
   UserSettings,
   PartnerSummary,
-  shouldShowLocaleToggle,
 } from "@/lib/api";
 import { dayKey } from "@/lib/date";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
-import type { AppLocale } from "@/i18n/locales";
+import { usePathname, useRouter } from "@/i18n/navigation";
+import { LOCALE_OPTIONS, type AppLocale } from "@/i18n/locales";
 
 interface Props {
   onChanged: () => void;
@@ -105,6 +106,22 @@ export default function SettingsView({
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
   const locale = useLocale() as AppLocale;
+  const pathname = usePathname();
+  const router = useRouter();
+  const [changingLanguage, setChangingLanguage] = useState(false);
+
+  // Only the active language changes; the chosen countries stay as they are.
+  async function changeLanguage(next: AppLocale) {
+    if (next === locale) return;
+    setChangingLanguage(true);
+    try {
+      window.localStorage.setItem("pairpocket_user_locale", next);
+    } catch {
+      /* storage unavailable; the server still remembers the choice */
+    }
+    await updateActiveLocale(next).catch(() => null);
+    router.replace(pathname, { locale: next });
+  }
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -369,21 +386,7 @@ export default function SettingsView({
           </h2>
         </div>
 
-        {shouldShowLocaleToggle(settings) && (
-          <div className="flex items-center justify-between gap-3 py-3">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-              {t("languageLabel")}
-            </span>
-            <LocaleToggle />
-          </div>
-        )}
-        <div
-          className={`flex items-center justify-between gap-3 py-3 ${
-            shouldShowLocaleToggle(settings)
-              ? "border-t border-gray-100 dark:border-gray-800"
-              : ""
-          }`}
-        >
+        <div className="flex items-center justify-between gap-3 py-3">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
             {t("themeLabel")}
           </span>
@@ -605,6 +608,31 @@ export default function SettingsView({
           onChanged();
         }}
       />
+
+      <section className="card-inset p-5 space-y-3">
+        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+          <Languages className="h-5 w-5 text-blue-500" />
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {t("languageLabel")}
+          </h2>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+          {t("languageHelp")}
+        </p>
+        <select
+          value={locale}
+          onChange={(e) => void changeLanguage(e.target.value as AppLocale)}
+          disabled={changingLanguage}
+          aria-label={t("languageLabel")}
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+        >
+          {LOCALE_OPTIONS.filter((item) => !item.beta).map((item) => (
+            <option key={item.code} value={item.code}>
+              {item.native}
+            </option>
+          ))}
+        </select>
+      </section>
 
       <section className="card-inset p-5 space-y-3">
         <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
