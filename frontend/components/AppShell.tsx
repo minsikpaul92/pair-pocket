@@ -34,7 +34,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
 import StocksView from "@/components/StocksView";
-import SettingsView from "@/components/SettingsView";
+import SettingsView, { type SettingsTab } from "@/components/SettingsView";
 import ImportView from "@/components/ImportView";
 import MonthPicker from "@/components/MonthPicker";
 import FloatingActionStack from "@/components/FloatingActionStack";
@@ -113,6 +113,8 @@ const LEDGERS: { scope: LedgerScope; labelKey: "all" | "canada" | "korea" }[] = 
   { scope: "KRW", labelKey: "korea" },
 ];
 
+const LAST_COUNTRY_KEY = "pairpocket:lastCountry";
+
 const SCOPE_LABEL_KEY: Record<LedgerScope, "allLedger" | "canadaLedger" | "koreaLedger"> = {
   ALL: "allLedger",
   CAD: "canadaLedger",
@@ -152,15 +154,38 @@ export default function AppShell({ user, onLogout }: Props) {
     return isView(stored) ? stored : "calendar";
   });
   const [previousView, setPreviousView] = useState<View>("calendar");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [scope, setScope] = useState<LedgerScope>("CAD");
+  // The dashboard shows one country at a time; under "All" it falls back to
+  // the Canada/Korea tab picked most recently.
+  const [lastCountry, setLastCountry] = useState<"CAD" | "KRW">(() => {
+    try {
+      return window.localStorage.getItem(LAST_COUNTRY_KEY) === "KRW" ? "KRW" : "CAD";
+    } catch {
+      return "CAD";
+    }
+  });
+  const scopeChanged = useRef(false);
   const [enabledScopes, setEnabledScopes] = useState<LedgerScope[]>([
     "ALL",
     "CAD",
     "KRW",
   ]);
+  const dashboardScope: LedgerScope =
+    scope !== "ALL"
+      ? scope
+      : enabledScopes.includes(lastCountry)
+        ? lastCountry
+        : (enabledScopes.find((s) => s === "CAD" || s === "KRW") ?? "CAD");
+  // Dashboard settings are per country, so "All" is not offered there.
+  const countryOnly = view === "settings" && settingsTab === "dashboard";
   const visibleLedgers = useMemo(
-    () => LEDGERS.filter((l) => enabledScopes.includes(l.scope)),
-    [enabledScopes]
+    () =>
+      LEDGERS.filter(
+        (l) =>
+          enabledScopes.includes(l.scope) && !(countryOnly && l.scope === "ALL")
+      ),
+    [enabledScopes, countryOnly]
   );
   const [accountType, setAccountType] = useState<AccountType>("personal");
   const [currentUser, setCurrentUser] = useState(user);
@@ -439,6 +464,33 @@ export default function AppShell({ user, onLogout }: Props) {
     setView(next);
   }
 
+  // Opening the dashboard from "All" switches to the last used country.
+  useEffect(() => {
+    if (view === "dashboard" && scope === "ALL") setScope(dashboardScope);
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (countryOnly && scope === "ALL") setScope(dashboardScope);
+  }, [countryOnly, scope, dashboardScope]);
+
+  useEffect(() => {
+    if (!scopeChanged.current) {
+      scopeChanged.current = true;
+      return;
+    }
+    if (scope !== "CAD" && scope !== "KRW") return;
+    setLastCountry(scope);
+    try {
+      window.localStorage.setItem(LAST_COUNTRY_KEY, scope);
+    } catch {
+      /* storage unavailable: keep it in memory only */
+    }
+  }, [scope]);
+
+  useEffect(() => {
+    if (view !== "settings") setSettingsTab("general");
+  }, [view]);
+
   // Materialize due subscriptions when ledger type changes (not on every data bump).
   useEffect(() => {
     syncSubscriptions(accountType).catch(() => {
@@ -579,6 +631,11 @@ export default function AppShell({ user, onLogout }: Props) {
 
   const sidebarWidth = navCollapsed ? "md:w-16" : "md:w-60";
   const mainPad = navCollapsed ? "md:pl-16" : "md:pl-60";
+
+  const dashboardTransactions =
+    scope === "ALL"
+      ? transactions.filter((t) => t.currency === dashboardScope)
+      : transactions;
 
   return (
     <div className="min-h-dvh bg-gray-50 dark:bg-black">
@@ -865,7 +922,10 @@ export default function AppShell({ user, onLogout }: Props) {
                 {tInvite("sharedEmptyCta")}
               </button>
             </div>
-          ) : loading && view !== "dashboard" && view !== "subscriptions" ? (
+          ) : loading &&
+          view !== "dashboard" &&
+          view !== "subscriptions" &&
+          view !== "settings" ? (
             <div className="h-64 w-full animate-pulse rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ) : view === "calendar" ? (
             <CalendarView
@@ -931,15 +991,23 @@ export default function AppShell({ user, onLogout }: Props) {
               onInvite={handleInvite}
               onLogout={handleLogout}
               partner={partner}
+              accountType={accountType}
+              scope={scope}
+              tab={settingsTab}
+              onTabChange={setSettingsTab}
             />
           ) : (
             <DashboardView
               month={month}
               version={version}
-              scope={scope}
+              scope={dashboardScope}
               accountType={accountType}
-              transactions={transactions}
+              transactions={dashboardTransactions}
               onChanged={bumpVersion}
+              onOpenSettings={() => {
+                setSettingsTab("dashboard");
+                setView("settings");
+              }}
               onNavigateToList={(cat, subCat, fromChart) => {
                 setListCategoryFilter(cat);
                 setListSubCategoryFilter(subCat || "all");

@@ -4,6 +4,7 @@ import { Camera, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateC
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { defaultStockBrokerageAccountId } from "@/lib/account-defaults";
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
 import AddableSelect from "@/components/AddableSelect";
@@ -199,7 +200,6 @@ export default function TransactionModal({
   const [txCurrency, setTxCurrency] = useState<Currency>(currency);
   const [transactionCurrency, setTransactionCurrency] = useState<Currency>(currency);
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null);
-  const [dummyTrigger, setDummyTrigger] = useState(0);
   const [merchantHints, setMerchantHints] = useState<string[]>([]);
   const [institutionOptions, setInstitutionOptions] = useState<string[]>([]);
   const [settleableExpenses, setSettleableExpenses] = useState<SettleableExpense[]>(
@@ -958,22 +958,15 @@ export default function TransactionModal({
   useEffect(() => {
     if (isEditing || isTransfer) return;
     if (isStock) {
-      const key = currency === "CAD" ? "default_stock_cad_account_id" : "default_stock_krw_account_id";
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        setAccountId(saved);
-        const selected = accounts.find((a) => a.id === saved);
+      const defId = defaultStockBrokerageAccountId(accounts, currency);
+      if (defId) {
+        setAccountId(defId);
+        const selected = accounts.find((a) => a.id === defId);
         if (selected) {
           setInstitution(selected.institution || selected.name);
         }
       } else {
-        const firstInv = accounts.find((a) => a.kind === "investment" && a.currency === currency);
-        if (firstInv) {
-          setAccountId(firstInv.id);
-          setInstitution(firstInv.institution || firstInv.name);
-        } else {
-          setAccountId(ACCOUNT_NONE);
-        }
+        setAccountId(ACCOUNT_NONE);
       }
     } else {
       setAccountId(defaultAccountId(accounts, type));
@@ -1509,29 +1502,6 @@ export default function TransactionModal({
           variant="field"
           filterAccounts={(acc) => acc.kind === "investment"}
         />
-        {accountId && accountId !== ACCOUNT_NONE && (
-          <label className="flex items-center gap-1.5 mt-2 text-xs text-gray-500 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={
-                currency === "CAD"
-                  ? accountId === localStorage.getItem("default_stock_cad_account_id")
-                  : accountId === localStorage.getItem("default_stock_krw_account_id")
-              }
-              onChange={(e) => {
-                const key = currency === "CAD" ? "default_stock_cad_account_id" : "default_stock_krw_account_id";
-                if (e.target.checked) {
-                  localStorage.setItem(key, accountId);
-                } else {
-                  localStorage.removeItem(key);
-                }
-                setDummyTrigger((p) => p + 1);
-              }}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            {currency === "CAD" ? "기본 캐나다 주식 계좌로 설정" : "기본 한국 주식 계좌로 설정"}
-          </label>
-        )}
       </div>
 
       {isStockSell ? (

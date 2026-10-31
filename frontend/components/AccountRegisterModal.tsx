@@ -194,30 +194,37 @@ export default function AccountRegisterModal({
     const cardLastFour = isCreditCard ? normalizeLastFour(lastFour) : null;
     setSubmitting(true);
     try {
-      const defaultFlags = {
-        is_default_expense:
-          !isInvestment && !isCreditCard && preferredType === "expense"
-            ? isDefault
-            : isEdit && account
-              ? account.is_default_expense
-              : false,
-        is_default_income:
-          !isInvestment && !isCreditCard && preferredType === "income"
-            ? isDefault
-            : isEdit && account
-              ? account.is_default_income
-              : false,
-        is_default_credit: isCreditCard
-          ? isDefault
-          : isEdit && account
-            ? account.is_default_credit
-            : false,
-        is_default_investment: isInvestment
-          ? isDefault
-          : isEdit && account
-            ? account.is_default_investment
-            : false,
-      };
+      const defaultFlags = isEdit && account
+        ? {
+            is_default_expense:
+              !isInvestment && !isCreditCard
+                ? preferredType === "expense"
+                  ? isDefault
+                  : account.is_default_expense
+                : false,
+            is_default_income:
+              !isInvestment && !isCreditCard
+                ? preferredType === "income"
+                  ? isDefault
+                  : account.is_default_income
+                : false,
+            is_default_credit: isCreditCard ? isDefault : account.is_default_credit,
+            is_default_investment: isInvestment
+              ? isDefault
+              : account.is_default_investment,
+          }
+        : {
+            is_default_expense:
+              !isInvestment && !isCreditCard && preferredType === "expense"
+                ? isDefault
+                : false,
+            is_default_income:
+              !isInvestment && !isCreditCard && preferredType === "income"
+                ? isDefault
+                : false,
+            is_default_credit: isCreditCard ? isDefault : false,
+            is_default_investment: isInvestment ? isDefault : false,
+          };
 
       if (isEdit && account) {
         const updated = await updateAccount(account.id, {

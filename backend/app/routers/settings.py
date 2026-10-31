@@ -15,9 +15,13 @@ from app.data.korea_subscriptions import (
 )
 from app.database import get_database
 from app.models.transaction import AccountType
+from app.models.ledger import TRANSFER_CATEGORY
 from app.models.user import UserOut
 from app.models.user_settings import (
     AddInstitutionBody,
+    BudgetBody,
+    DashboardLayoutBody,
+    SpendingExclusionsBody,
     CustomCategoryMap,
     LedgerStartDateBody,
     OnboardingBasicsBody,
@@ -144,6 +148,25 @@ async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
         "ledger_start_date_locked": False,
         "onboarding_personal_completed": onboarded,
         "onboarding_personal_step": int(doc.get("onboarding_personal_step") or 0),
+        "budgets": doc.get("budgets") or {},
+        "dashboard_layout": {
+            "order": list((doc.get("dashboard_layout") or {}).get("order", [])),
+            "hidden": list((doc.get("dashboard_layout") or {}).get("hidden", [])),
+            "sizes": dict((doc.get("dashboard_layout") or {}).get("sizes", {})),
+        },
+        "spending_excluded_categories": (
+            doc["spending_excluded_categories"]
+            if doc.get("spending_excluded_categories") is not None
+            else [TRANSFER_CATEGORY]
+        ),
+        "dashboard_layouts": {
+            str(country): {
+                "order": list((layout or {}).get("order", [])),
+                "hidden": list((layout or {}).get("hidden", [])),
+                "sizes": dict((layout or {}).get("sizes", {})),
+            }
+            for country, layout in (doc.get("dashboard_layouts") or {}).items()
+        },
     }
 
 
@@ -379,6 +402,83 @@ async def update_ledger_start_date(
         action="update",
         entity=f"ledger_start_date:{kind}",
         detail={"ledger_start_date": start, "synced_owners": synced},
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/budget", response_model=UserSettingsOut)
+async def update_budget(
+    payload: BudgetBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    await _get_or_create(db, current_user.id)
+    field = f"budgets.{payload.kind}.{payload.currency}"
+
+    if payload.kind == "personal":
+        owner_ids = [current_user.id]
+    else:
+        if not current_user.shared_group_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="공유 예산을 설정하려면 파트너 연결이 필요합니다.",
+            )
+        owner_ids = [current_user.id]
+        partner_id = await get_partner_owner_id(db, current_user.id)
+        if partner_id:
+            owner_ids.append(partner_id)
+            await _get_or_create(db, partner_id)
+
+    await db[COLLECTION].update_many(
+        {"owner_id": {"$in": owner_ids}},
+        {"$set": {field: payload.amount}},
+    )
+    await write_audit_log(
+        db,
+        owner_id=current_user.id,
+        action="update",
+        entity=f"budget:{payload.kind}",
+        detail={"currency": payload.currency, "amount": payload.amount},
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/spending-exclusions", response_model=UserSettingsOut)
+async def update_spending_exclusions(
+    payload: SpendingExclusionsBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    await _get_or_create(db, current_user.id)
+    categories = list(dict.fromkeys(c.strip() for c in payload.categories if c.strip()))
+    await db[COLLECTION].update_one(
+        {"owner_id": current_user.id},
+        {"$set": {"spending_excluded_categories": categories}},
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/dashboard-layout", response_model=UserSettingsOut)
+async def update_dashboard_layout(
+    payload: DashboardLayoutBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    await _get_or_create(db, current_user.id)
+    await db[COLLECTION].update_one(
+        {"owner_id": current_user.id},
+        {
+            "$set": {
+                f"dashboard_layouts.{payload.country}": {
+                    "order": payload.order,
+                    "hidden": payload.hidden,
+                    "sizes": payload.sizes,
+                }
+            }
+        },
     )
     doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
     return await _settings_out(db, doc)

@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
+import AccountDefaultsSettings from "@/components/AccountDefaultsSettings";
+import DashboardSettings from "@/components/DashboardSettings";
 import LocaleToggle from "@/components/LocaleToggle";
 import ThemeToggle from "@/components/ThemeToggle";
 import DayPicker from "@/components/DayPicker";
@@ -27,6 +29,8 @@ import {
   resetUserData,
   ResetScope,
   ResetAccountType,
+  AccountType,
+  LedgerScope,
   UserSettings,
   PartnerSummary,
   shouldShowLocaleToggle,
@@ -40,7 +44,13 @@ interface Props {
   onInvite?: () => void;
   onLogout?: () => void;
   partner?: PartnerSummary | null;
+  accountType: AccountType;
+  scope: LedgerScope;
+  tab: SettingsTab;
+  onTabChange: (tab: SettingsTab) => void;
 }
+
+export type SettingsTab = "general" | "dashboard";
 
 const RESET_SCOPES: ResetScope[] = [
   "all",
@@ -85,6 +95,10 @@ export default function SettingsView({
   onInvite,
   onLogout,
   partner = null,
+  accountType,
+  scope,
+  tab,
+  onTabChange,
 }: Props) {
   const t = useTranslations("settingsPage");
   const tCommon = useTranslations("common");
@@ -300,8 +314,37 @@ export default function SettingsView({
     );
   }
 
+  const tabBar = (
+    <div className="flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+      {(["general", "dashboard"] as SettingsTab[]).map((k) => (
+        <button
+          key={k}
+          type="button"
+          onClick={() => onTabChange(k)}
+          className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+            tab === k
+              ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white"
+              : "text-gray-500"
+          }`}
+        >
+          {t(k === "general" ? "tabGeneral" : "tabDashboard")}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (tab === "dashboard") {
+    return (
+      <div className="space-y-6">
+        {tabBar}
+        <DashboardSettings accountType={accountType} scope={scope} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {tabBar}
       {successMsg && (
         <div className="flex items-center gap-2 rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50 p-4 text-sm text-green-700 dark:text-green-400">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
@@ -391,6 +434,12 @@ export default function SettingsView({
           </div>
         )}
       </section>
+
+      <AccountDefaultsSettings
+        accountType={accountType}
+        scope={scope}
+        onChanged={onChanged}
+      />
 
       <section className="card-inset p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
