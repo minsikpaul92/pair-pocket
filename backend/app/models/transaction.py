@@ -111,3 +111,20 @@ class TransactionCreate(TransactionBase):
 class TransactionOut(TransactionBase):
     id: str
     owner_id: str
+    # "settlement" for the two entries of a settlement paid across ledgers.
+    pair_kind: str | None = None
+
+
+class CrossSettlementCreate(BaseModel):
+    """Settle an expense with money from the other ledger (personal ↔ shared).
+
+    `receive_account_id` is in the expense's ledger and receives the money;
+    `pay_account_id` is in the other ledger and pays it.
+    """
+
+    expense_id: str
+    amount: float = Field(gt=0)
+    date: datetime
+    receive_account_id: str
+    pay_account_id: str
+    note: str | None = None

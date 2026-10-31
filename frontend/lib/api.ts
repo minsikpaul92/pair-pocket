@@ -336,6 +336,8 @@ export const ACCOUNT_KIND_LABEL: Record<FinancialAccountKind, string> = {
 
 export interface Transaction {
   id: string;
+  /** "settlement" for the two entries of a settlement paid across ledgers. */
+  pair_kind?: string | null;
   date: string;
   amount: number;
   currency: Currency;
@@ -1219,6 +1221,32 @@ export async function createTransaction(
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(tx),
+  });
+  if (!res.ok) {
+    throw await readApiError(res, "saveTransaction");
+  }
+  return (await res.json()) as Transaction;
+}
+
+export interface NewCrossSettlement {
+  expense_id: string;
+  amount: number;
+  date: string;
+  /** Account in the expense's ledger that receives the money. */
+  receive_account_id: string;
+  /** Account in the other ledger that pays it. */
+  pay_account_id: string;
+  note?: string;
+}
+
+/** Settle an expense with money from the other ledger (personal ↔ shared). */
+export async function createCrossSettlement(
+  settlement: NewCrossSettlement
+): Promise<Transaction> {
+  const res = await apiFetch(`${API_BASE_URL}/api/transactions/cross-settlement`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(settlement),
   });
   if (!res.ok) {
     throw await readApiError(res, "saveTransaction");
