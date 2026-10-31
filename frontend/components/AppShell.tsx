@@ -809,19 +809,19 @@ export default function AppShell({ user, onLogout }: Props) {
 
       <div className={`${mainPad} transition-all duration-200`}>
         <header className="sticky top-0 z-40 glass-bar border-b pt-[env(safe-area-inset-top)]">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center gap-2 flex-nowrap">
+          <div className="mx-auto max-w-3xl px-3 sm:px-6 py-3 flex items-center gap-2 flex-nowrap">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <Wallet
-                className="md:hidden h-6 w-6 text-blue-500 shrink-0"
+                className="hidden min-[420px]:block md:hidden h-6 w-6 text-blue-500 shrink-0"
                 aria-hidden
               />
-              <div className="flex flex-1 min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+              <div className="flex flex-none rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                 {(["personal", "shared"] as AccountType[]).map((type) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => setAccountType(type)}
-                    className={`flex-1 rounded-lg px-2.5 sm:px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                    className={`flex-1 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                       accountType === type
                         ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                         : "text-gray-500 dark:text-gray-400"
@@ -832,13 +832,13 @@ export default function AppShell({ user, onLogout }: Props) {
                 ))}
               </div>
               {visibleLedgers.length > 1 && (
-                <div className="flex flex-[1.4] min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+                <div className="flex flex-none rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                   {visibleLedgers.map((l) => (
                     <button
                       key={l.scope}
                       type="button"
                       onClick={() => setScope(l.scope)}
-                      className={`flex-1 rounded-lg px-1.5 sm:px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                      className={`flex-1 rounded-lg px-1.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                         scope === l.scope
                           ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                           : "text-gray-500 dark:text-gray-400"

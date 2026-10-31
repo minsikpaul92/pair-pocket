@@ -1166,9 +1166,9 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           </div>
         )}
       </div>      {/* 4. Sorting & Filter Controls Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-2">
         {/* Toggle selectors */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {/* Active Account Filter Badge */}
           <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-xl text-xs font-bold select-none">
             {selectedAccountIdFilter === "ALL" ? (
@@ -1198,7 +1198,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
               onClick={() => setViewMode("valuation")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 viewMode === "valuation"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1208,7 +1208,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
             <button
               onClick={() => setViewMode("price")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 viewMode === "price"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1223,7 +1223,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
               onClick={() => setDisplayCurrency("CAD")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 displayCurrency === "CAD"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1233,7 +1233,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
             <button
               onClick={() => setDisplayCurrency("KRW")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 displayCurrency === "KRW"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1247,7 +1247,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
               onClick={() => setDisplayCurrency("KRW")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 displayCurrency === "KRW"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1257,7 +1257,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
             <button
               onClick={() => setDisplayCurrency("USD")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 displayCurrency === "USD"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1271,7 +1271,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
               onClick={() => setCadViewMode("ALL")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 cadViewMode === "ALL"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1281,7 +1281,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
             <button
               onClick={() => setCadViewMode("CAD")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 cadViewMode === "CAD"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1291,7 +1291,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
             <button
               onClick={() => setCadViewMode("USD")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 cadViewMode === "USD"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1304,7 +1304,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         </div>
 
         {/* Sort selector & Add Button */}
-        <div className="flex items-center justify-between sm:justify-end gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-3 whitespace-nowrap">
           <label className="relative inline-flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-600 dark:text-gray-300">
             <select
               value={sortBy}
@@ -1327,7 +1327,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               resetAddForm();
               setShowAddModal(true);
             }}
-            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
           >
             <Plus className="h-3.5 w-3.5" />
             {t("addHolding")}
