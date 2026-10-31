@@ -894,7 +894,7 @@
       "subscription": "비워 두면 기본 카드 → 은행 계좌 순서",
       "brokerage": "주식 매수·매도에 사용"
     },
-    "languageHelp": "앱에 표시되는 언어를 바꿉니다. 사용 중인 국가와 데이터는 그대로예요."
+    "languageHelp": "앱에 표시되는 언어를 바꿉니다."
   },
   "onboarding": {
     "title": "시작하기",

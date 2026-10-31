@@ -894,7 +894,7 @@
       "subscription": "When empty: default card, then bank account",
       "brokerage": "Used for stock buys and sells"
     },
-    "languageHelp": "Changes the language of the app. Your countries and data stay the same."
+    "languageHelp": "Changes the language of the app."
   },
   "onboarding": {
     "title": "Get started",
