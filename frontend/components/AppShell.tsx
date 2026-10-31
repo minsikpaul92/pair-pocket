@@ -123,6 +123,26 @@ const SCOPE_LABEL_KEY: Record<LedgerScope, "allLedger" | "canadaLedger" | "korea
 };
 
 const NAV_COLLAPSED_KEY = "pairpocket_nav_collapsed";
+const ACCOUNT_TYPE_KEY = "pairpocket.accountType";
+const SCOPE_KEY = "pairpocket.scope";
+
+const REMEMBERED_SCOPES: LedgerScope[] = ["ALL", "CAD", "KRW"];
+
+function readStored(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable; the selection just isn't remembered */
+  }
+}
 
 function ledgerTabLabel(
   labelKey: "all" | "canada" | "korea",
@@ -189,6 +209,8 @@ export default function AppShell({ user, onLogout }: Props) {
   );
   const [accountType, setAccountType] = useState<AccountType>("personal");
   const [currentUser, setCurrentUser] = useState(user);
+  // Remembered tabs are read after mount so server and first client render match.
+  const [tabsReady, setTabsReady] = useState(false);
   const [partner, setPartner] = useState<PartnerSummary | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
@@ -388,6 +410,32 @@ export default function AppShell({ user, onLogout }: Props) {
   }, []);
 
   useEffect(() => {
+    const storedType = readStored(ACCOUNT_TYPE_KEY);
+    if (
+      storedType === "shared" &&
+      currentUser.shared_group_id
+    ) {
+      setAccountType("shared");
+    }
+    const storedScope = readStored(SCOPE_KEY) as LedgerScope | null;
+    if (storedScope && REMEMBERED_SCOPES.includes(storedScope)) {
+      setScope(storedScope);
+    }
+    setTabsReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!tabsReady) return;
+    writeStored(ACCOUNT_TYPE_KEY, accountType);
+  }, [tabsReady, accountType]);
+
+  useEffect(() => {
+    if (!tabsReady) return;
+    writeStored(SCOPE_KEY, scope);
+  }, [tabsReady, scope]);
+
+  useEffect(() => {
     fetchInvitationMe()
       .then((status) => {
         setPartner(status.partner);
@@ -466,8 +514,10 @@ export default function AppShell({ user, onLogout }: Props) {
 
   // Opening the dashboard from "All" switches to the last used country.
   useEffect(() => {
-    if (view === "dashboard" && scope === "ALL") setScope(dashboardScope);
-  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (tabsReady && view === "dashboard" && scope === "ALL") {
+      setScope(dashboardScope);
+    }
+  }, [view, tabsReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (countryOnly && scope === "ALL") setScope(dashboardScope);
@@ -493,13 +543,15 @@ export default function AppShell({ user, onLogout }: Props) {
 
   // Materialize due subscriptions when ledger type changes (not on every data bump).
   useEffect(() => {
+    if (!tabsReady) return;
     syncSubscriptions(accountType).catch(() => {
       /* non-blocking */
     });
-  }, [accountType]);
+  }, [accountType, tabsReady]);
 
   // Load ledger transactions / pending for the selected month & scope.
   useEffect(() => {
+    if (!tabsReady) return;
     let active = true;
     setLoading(true);
     const monthStr = monthKey(month);
@@ -526,7 +578,7 @@ export default function AppShell({ user, onLogout }: Props) {
     return () => {
       active = false;
     };
-  }, [scope, accountType, month, version]);
+  }, [scope, accountType, month, version, tabsReady]);
 
   function toggleNavCollapsed() {
     setNavCollapsed((v) => {
