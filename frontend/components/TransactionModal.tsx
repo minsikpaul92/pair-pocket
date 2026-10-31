@@ -38,6 +38,7 @@ import {
   addInstitution,
   accountLabel,
   categoriesForType,
+  createCrossSettlement,
   createTransaction,
   deleteTransaction,
   fetchAccounts,
@@ -157,6 +158,7 @@ export default function TransactionModal({
   const locale = useLocale();
   const tTx = useTranslations("transaction");
   const tLedger = useTranslations("ledger");
+  const tAccountType = useTranslations("accountType");
   const tCommon = useTranslations("common");
   const tErrors = useTranslations("errors");
   const tCategories = useTranslations("categories");
@@ -210,6 +212,9 @@ export default function TransactionModal({
   const [settleableExpenses, setSettleableExpenses] = useState<SettleableExpense[]>(
     []
   );
+  // Settling from the other ledger's account (personal ↔ shared).
+  const [payAccounts, setPayAccounts] = useState<FinancialAccount[]>([]);
+  const [payFromId, setPayFromId] = useState("");
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [sharedAccounts, setSharedAccounts] = useState<FinancialAccount[]>([]);
   const [personalAccounts, setPersonalAccounts] = useState<FinancialAccount[]>(
@@ -1112,6 +1117,29 @@ export default function TransactionModal({
     };
   }, [isSettlement, currency, accountType, isEditing, editingTransaction?.id]);
 
+  useEffect(() => {
+    if (!isSettlement || isEditing || !hasPartner) {
+      setPayAccounts([]);
+      setPayFromId("");
+      return;
+    }
+    let active = true;
+    fetchAccounts({ currency, accountType: otherLedger })
+      .then((list) => {
+        if (active) {
+          setPayAccounts(
+            list.filter((a) => a.is_active && !a.is_liability && a.kind !== "investment")
+          );
+        }
+      })
+      .catch(() => {
+        if (active) setPayAccounts([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isSettlement, isEditing, hasPartner, currency, otherLedger]);
+
   function handleTypeChange(next: TransactionType) {
     setType(next);
     setCategory("");
@@ -1244,6 +1272,11 @@ export default function TransactionModal({
       return;
     }
 
+    if (isSettlement && payFromId && !accountId) {
+      setError(tErrors("settlementReceiveAccountRequired"));
+      return;
+    }
+
     const fromLabel = transferFromAccounts.find((a) => a.id === accountId);
     const toLabel = transferToAccounts.find((a) => a.id === counterAccountId);
     const transferFallbackMerchant = translateCategory(
@@ -1320,6 +1353,15 @@ export default function TransactionModal({
     try {
       if (editingTransaction) {
         await updateTransaction(editingTransaction.id, payload);
+      } else if (isSettlement && payFromId) {
+        await createCrossSettlement({
+          expense_id: settlesExpenseId,
+          amount: numericAmount,
+          date: payload.date,
+          receive_account_id: accountId,
+          pay_account_id: payFromId,
+          note: payload.note ?? undefined,
+        });
       } else {
         await createTransaction(payload);
       }
@@ -1407,6 +1449,61 @@ export default function TransactionModal({
             )}
           </span>
         </p>
+      )}
+      {!isEditing && hasPartner && payAccounts.length > 0 && (
+        <div className="mt-3">
+          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            {tTx("settlementPaidFrom")}
+          </label>
+          <select
+            value={payFromId}
+            onChange={(e) => setPayFromId(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+          >
+            <option value="">{tTx("settlementPaidExternal")}</option>
+            {payAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {tTx(
+                  otherLedger === "personal"
+                    ? "settlementPaidFromPersonal"
+                    : "settlementPaidFromShared"
+                )}
+                {" · "}
+                {accountLabel(a)}
+              </option>
+            ))}
+          </select>
+          {payFromId && (
+            <>
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {tTx("settlementPaidHint", { ledger: tAccountType(otherLedger) })}
+              </p>
+              <label className="mb-1.5 mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("settlementReceiveAccount")}
+              </label>
+              <select
+                value={accountId}
+                onChange={(e) => pickAccount(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+              >
+                <option value="">{tTx("settlementSelectReceiveAccount")}</option>
+                {accounts
+                  .filter(
+                    (a) =>
+                      a.is_active &&
+                      !a.is_liability &&
+                      a.kind !== "investment" &&
+                      a.currency === currency
+                  )
+                  .map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {accountLabel(a)}
+                    </option>
+                  ))}
+              </select>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -2742,6 +2839,11 @@ export default function TransactionModal({
             )}
           </div>
 
+          {editingTransaction?.pair_kind === "settlement" && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {tTx("settlementPairNote")}
+            </p>
+          )}
           {error && <p className="text-sm text-red-500">{error}</p>}
 
           <div className="flex gap-2">
