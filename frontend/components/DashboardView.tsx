@@ -9,11 +9,19 @@ import {
   Wallet,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import { DefaultRoleBadges, DefaultRoleMenu } from "@/components/DefaultRoleControls";
 import DashboardAnalytics from "@/components/DashboardAnalytics";
+import SortableCardGrid from "@/components/SortableCardGrid";
 import {
   ACCOUNT_KIND_KEYS,
   AccountBalance,
@@ -26,19 +34,36 @@ import {
   NetWorthSummary,
   StatsSummary,
   TRANSFER_CATEGORY,
+  normalizeTransferCategory,
   Transaction,
   fetchAccounts,
   fetchExchangeRate,
   fetchNetWorth,
   fetchStatsSummary,
   fetchStockHoldings,
+  fetchSubscriptions,
+  fetchUserSettings,
+  saveDashboardLayout,
+  Subscription,
+  UserSettings,
   StockHolding,
+  accountLabel,
+  resolveDefaultAccountId,
   formatAmount,
   resolveAccountCountry,
 } from "@/lib/api";
 import type { BankCountry } from "@/lib/banks";
 import { translateCategory } from "@/lib/category-i18n";
-import { monthKey, monthLabel } from "@/lib/date";
+import { useAccountDefaults } from "@/lib/useAccountDefaults";
+import {
+  BudgetCurrency,
+  DashboardCardId,
+  ResolvedLayout,
+  isHalfWidth,
+  resolveLayout,
+  scopeCurrencies,
+} from "@/lib/dashboard-layout";
+import { addMonths, monthKey, monthLabel } from "@/lib/date";
 
 type StockTotalMode = "all" | "KRW" | "CAD" | "USD";
 type CreatingKind = FinancialAccountKind | null;
@@ -50,11 +75,39 @@ interface Props {
   accountType?: AccountType;
   transactions?: Transaction[];
   onChanged?: () => void;
+  onOpenSettings?: () => void;
   onNavigateToList?: (
     category?: string,
     subCategory?: string,
     fromExpenseChart?: boolean
   ) => void;
+}
+
+function ListCard({
+  title,
+  emptyLabel,
+  isEmpty,
+  children,
+}: {
+  title: string;
+  emptyLabel: string;
+  isEmpty: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className="card-inset flex h-72 flex-col p-4">
+      <h2 className="pr-4 text-sm font-semibold text-gray-700 dark:text-gray-200">
+        {title}
+      </h2>
+      {isEmpty ? (
+        <p className="mt-3 text-xs text-gray-400">{emptyLabel}</p>
+      ) : (
+        <ul className="mt-2 -mr-1 flex-1 divide-y divide-gray-100 overflow-y-auto pr-1 dark:divide-gray-800">
+          {children}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function KindIcon({ kind }: { kind: FinancialAccountKind }) {
@@ -74,11 +127,11 @@ export default function DashboardView({
   accountType = "personal",
   transactions,
   onChanged,
+  onOpenSettings,
   onNavigateToList,
 }: Props) {
   const locale = useLocale();
   const tDashboard = useTranslations("dashboard");
-  const tLedger = useTranslations("ledger");
   const tCommon = useTranslations("common");
   const tAccountKinds = useTranslations("accountKinds");
   const tCategories = useTranslations("categories");
@@ -103,12 +156,36 @@ export default function DashboardView({
   const [brokerOrder, setBrokerOrder] = useState<string[]>([]);
   const [dragCardId, setDragCardId] = useState<string | null>(null);
   const [dragBrokerId, setDragBrokerId] = useState<string | null>(null);
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  const [layouts, setLayouts] = useState<
+    Partial<Record<BudgetCurrency, ResolvedLayout>>
+  >({});
+  // Card order/visibility is stored per country.
+  const layoutCountry = scopeCurrencies(scope)[0];
+  const layout =
+    layouts[layoutCountry] ??
+    resolveLayout(
+      userSettings?.dashboard_layouts?.[layoutCountry] ??
+        userSettings?.dashboard_layout
+    );
+  const [prevStats, setPrevStats] = useState<
+    Partial<Record<BudgetCurrency, StatsSummary | null>>
+  >({});
+  const [fixedBills, setFixedBills] = useState<Subscription[]>([]);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const { defaults } = useAccountDefaults(accountType, version);
+  const excluded = useMemo(
+    () => userSettings?.spending_excluded_categories ?? [TRANSFER_CATEGORY],
+    [userSettings]
+  );
+  const excludeKey = excluded.join("|");
   const suppressCardClick = useRef(false);
   const suppressBrokerClick = useRef(false);
 
   const monthStr = monthKey(month);
 
   useEffect(() => {
+    if (!settingsReady) return;
     setLoading(true);
 
     const statsJobs: Promise<StatsSummary | null>[] = [];
@@ -120,6 +197,7 @@ export default function DashboardView({
           currency: "CAD",
           month: monthStr,
           accountType,
+          excludeCategories: excluded,
         }).catch(() => null)
       );
       worthJobs.push(
@@ -136,6 +214,7 @@ export default function DashboardView({
           currency: "KRW",
           month: monthStr,
           accountType,
+          excludeCategories: excluded,
         }).catch(() => null)
       );
       worthJobs.push(
@@ -176,7 +255,48 @@ export default function DashboardView({
         else if (scope === "KRW") setDisplay("KRW");
       })
       .finally(() => setLoading(false));
-  }, [monthStr, version, scope, accountType]);
+  }, [monthStr, version, scope, accountType, settingsReady, excludeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetchUserSettings()
+      .then(setUserSettings)
+      .catch(() => {
+        /* fall back to the default layout */
+      })
+      .finally(() => setSettingsReady(true));
+  }, []);
+
+  // Previous month's spend (budget carry-over) and this month's fixed bills.
+  useEffect(() => {
+    if (!settingsReady) return;
+    let active = true;
+    const currencies = scopeCurrencies(scope);
+    const prevMonth = monthKey(addMonths(month, -1));
+    Promise.all(
+      currencies.map((c) =>
+        fetchStatsSummary({
+          currency: c,
+          month: prevMonth,
+          accountType,
+          excludeCategories: excluded,
+        }).catch(() => null)
+      )
+    ).then((list) => {
+      if (active) {
+        setPrevStats(Object.fromEntries(currencies.map((c, i) => [c, list[i]])));
+      }
+    });
+    fetchSubscriptions({
+      accountType,
+      month: monthStr,
+      currency: scope === "ALL" ? undefined : scope,
+    })
+      .then((list) => active && setFixedBills(list))
+      .catch(() => active && setFixedBills([]));
+    return () => {
+      active = false;
+    };
+  }, [monthStr, version, scope, accountType, settingsReady, excludeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const accountById = useMemo(
     () => new Map(accounts.map((a) => [a.id, a])),
@@ -474,6 +594,77 @@ export default function DashboardView({
     return ids;
   }
 
+  const budgetCurrencies = scopeCurrencies(scope);
+
+  // Balance of the default expense account for each ledger currency.
+  const balance = useMemo(() => {
+    const target: Currency = scope === "ALL" ? display : budgetCurrencies[0];
+    let total = 0;
+    let found = false;
+    const labels: string[] = [];
+    for (const c of budgetCurrencies) {
+      const id = resolveDefaultAccountId(defaults, c, "transfer", accounts);
+      const list = c === "CAD" ? cadWorth?.accounts : krwWorth?.accounts;
+      const bal = list?.find((a) => a.account_id === id)?.balance;
+      if (!id || bal === undefined) continue;
+      found = true;
+      total += convertNative(bal, c, target);
+      const account = accountById.get(id);
+      if (account) labels.push(accountLabel(account));
+    }
+    return found
+      ? { amount: total, currency: target, label: labels.join(" · ") }
+      : null;
+  }, [accounts, accountById, defaults, cadWorth, krwWorth, scope, display, convertNative]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Monthly budget; last month's overspend is deducted from this month.
+  const budget = useMemo(() => {
+    const target: Currency = scope === "ALL" ? display : budgetCurrencies[0];
+    const saved = userSettings?.budgets?.[accountType] ?? {};
+    let base = 0;
+    let carry = 0;
+    let configured = false;
+    for (const c of budgetCurrencies) {
+      const amount = saved[c] ?? 0;
+      if (amount <= 0) continue;
+      configured = true;
+      const over = Math.max(0, (prevStats[c]?.adjusted_expense ?? 0) - amount);
+      base += convertNative(amount, c, target);
+      carry += convertNative(over, c, target);
+    }
+    return {
+      configured,
+      base,
+      carry,
+      effective: Math.max(0, base - carry),
+      currency: target,
+    };
+  }, [userSettings, prevStats, accountType, scope, display, convertNative]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const expenseItems = useMemo(
+    () =>
+      (transactions ?? [])
+        .filter(
+          (t) =>
+            t.type === "expense" &&
+            t.kind !== "transfer" &&
+            !t.is_stock_trade &&
+            !excluded.includes(normalizeTransferCategory(t.category))
+        )
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [transactions, excluded]
+  );
+
+  const fixedItems = useMemo(
+    () =>
+      fixedBills
+        .filter((s) => s.status === "active" || s.status === "cancel_scheduled")
+        .sort((a, b) =>
+          (a.next_due_date ?? "9999").localeCompare(b.next_due_date ?? "9999")
+        ),
+    [fixedBills]
+  );
+
   const fmt = useCallback(
     (amount: number, currency: Currency) =>
       formatAmount(amount, currency, {
@@ -557,11 +748,195 @@ export default function DashboardView({
   }
 
   // Removed old duplicate position of hooks
-  return (
-    <div className="space-y-4">
-      {/* Net worth */}
+  const budgetCurrency = budget.currency;
+  const spentAmount = flow?.expense ?? 0;
+  const remaining = budget.effective - spentAmount;
+  const overBudget = budget.configured && remaining < 0;
+  const spentPct =
+    budget.effective > 0
+      ? Math.min(100, (spentAmount / budget.effective) * 100)
+      : spentAmount > 0
+        ? 100
+        : 0;
+  const shortDate = (d: string) => d.slice(5, 10).replace("-", ".");
+
+  const cardNodes: Partial<Record<DashboardCardId, ReactNode>> = {
+    balance: (
       <section className="card-inset p-5">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 pr-4">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            {tDashboard("balance")}
+          </p>
+          {showCombinedToggle && (
+            <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+              {(["CAD", "KRW"] as Currency[]).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setDisplay(c)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    display === c
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <p
+          className={`mt-1 text-3xl font-bold tracking-tight ${
+            (balance?.amount ?? 0) < 0
+              ? "text-red-500"
+              : "text-gray-900 dark:text-white"
+          }`}
+        >
+          {balance ? fmt(balance.amount, balance.currency) : "\u2014"}
+        </p>
+        {balance?.label && (
+          <p className="mt-1 truncate text-xs text-gray-400">{balance.label}</p>
+        )}
+        {!balance && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="mt-1 text-xs font-medium text-blue-600 hover:underline"
+          >
+            {tDashboard("balanceNoDefault")}
+          </button>
+        )}
+      </section>
+    ),
+    budget: (
+      <section className="card-inset h-full p-4">
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          {tDashboard("budget")}
+        </p>
+        <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-gray-900 dark:text-white">
+          {budget.configured ? fmt(budget.effective, budgetCurrency) : "\u2014"}
+        </p>
+        {!budget.configured ? (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="mt-1 text-[11px] font-medium text-blue-600 hover:underline"
+          >
+            {tDashboard("budgetSet")}
+          </button>
+        ) : (
+          budget.carry > 0 && (
+            <p className="mt-1 text-[11px] leading-snug text-red-500">
+              {tDashboard("budgetCarry", {
+                base: fmt(budget.base, budgetCurrency),
+                over: fmt(budget.carry, budgetCurrency),
+              })}
+            </p>
+          )
+        )}
+      </section>
+    ),
+    spent: (
+      <section className="card-inset h-full p-4">
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          {tDashboard("expense")}
+        </p>
+        <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-gray-900 dark:text-white">
+          {flow ? fmt(flow.expense, flow.currency) : "\u2014"}
+        </p>
+        {flow && budget.configured && (
+          <>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+              <div
+                className={`h-full rounded-full ${
+                  overBudget ? "bg-red-500" : "bg-blue-500"
+                }`}
+                style={{ width: `${spentPct}%` }}
+              />
+            </div>
+            <p
+              className={`mt-1 text-[11px] ${
+                overBudget ? "text-red-500" : "text-gray-400"
+              }`}
+            >
+              {overBudget
+                ? tDashboard("overBudget", {
+                    amount: fmt(-remaining, budgetCurrency),
+                  })
+                : tDashboard("remaining", {
+                    amount: fmt(remaining, budgetCurrency),
+                  })}
+            </p>
+          </>
+        )}
+      </section>
+    ),
+    expenseRatio: (
+      <div id="expense-ratio-section">
+        <DashboardAnalytics
+          part="expense"
+          month={month}
+          version={version}
+          scope={scope}
+          accountType={accountType}
+          displayCurrency={heroCurrency}
+          rate={rate}
+          cadStats={cadStats}
+          krwStats={krwStats}
+          transactions={transactions}
+          excludeCategories={excluded}
+          onCategoryClick={onNavigateToList}
+        />
+      </div>
+    ),
+    fixedList: (
+      <ListCard
+        title={tDashboard("fixedExpenses")}
+        emptyLabel={tDashboard("emptyFixed")}
+        isEmpty={fixedItems.length === 0}
+      >
+        {fixedItems.map((s) => (
+          <li key={s.id} className="py-2">
+            <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-100">
+              {s.name}
+            </p>
+            <div className="mt-0.5 flex items-baseline justify-between gap-1 text-[11px]">
+              <span className="text-gray-400">
+                {s.next_due_date ? shortDate(s.next_due_date) : ""}
+              </span>
+              <span className="font-semibold tabular-nums text-gray-700 dark:text-gray-200">
+                {fmt(s.amount, s.currency)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ListCard>
+    ),
+    expenseList: (
+      <ListCard
+        title={tDashboard("expenseHistory")}
+        emptyLabel={tDashboard("emptyExpenses")}
+        isEmpty={expenseItems.length === 0}
+      >
+        {expenseItems.map((tx) => (
+          <li key={tx.id} className="py-2">
+            <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-100">
+              {tx.merchant || translateCategory(tx.category, tCategories)}
+            </p>
+            <div className="mt-0.5 flex items-baseline justify-between gap-1 text-[11px]">
+              <span className="text-gray-400">{shortDate(tx.date)}</span>
+              <span className="font-semibold tabular-nums text-gray-700 dark:text-gray-200">
+                {fmt(tx.effective_amount ?? tx.amount, tx.currency)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ListCard>
+    ),
+    netWorth: (
+      <section className="card-inset p-5">
+        <div className="flex items-center justify-between gap-2 pr-4">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
             {tDashboard("netWorth")}
           </p>
@@ -628,8 +1003,9 @@ export default function DashboardView({
           </div>
         </div>
       </section>
-
-      {/* Monthly cashflow */}
+    ),
+    monthlyFlow: (
+      <div className="space-y-4">
       <section className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white shadow-sm">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-blue-100">
@@ -668,7 +1044,6 @@ export default function DashboardView({
           </p>
         )}
       </section>
-
       {flow && (
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <MetricCard
@@ -685,9 +1060,11 @@ export default function DashboardView({
           />
         </section>
       )}
-
-      <div id="expense-ratio-section">
-        <DashboardAnalytics
+      </div>
+    ),
+    trend: (
+      <DashboardAnalytics
+          part="trend"
           month={month}
           version={version}
           scope={scope}
@@ -699,8 +1076,8 @@ export default function DashboardView({
           transactions={transactions}
           onCategoryClick={onNavigateToList}
         />
-      </div>
-
+    ),
+    cards: (
       <section className="card-inset p-4">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
@@ -787,7 +1164,8 @@ export default function DashboardView({
           )}
         </ul>
       </section>
-
+    ),
+    stocks: (
       <section className="card-inset p-4">
         <div className="flex flex-col gap-2.5 border-b border-gray-100 dark:border-gray-800 pb-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -935,7 +1313,8 @@ export default function DashboardView({
           )}
         </ul>
       </section>
-
+    ),
+    assets: (
       <AccountGroup
         title={tDashboard("assets")}
         accounts={assetAccounts}
@@ -949,31 +1328,50 @@ export default function DashboardView({
         addLabel={tDashboard("addGeneric")}
         formatAmountFn={fmt}
       />
+    ),
+  };
 
-      {scope === "ALL" && (
-        <div className="grid grid-cols-2 gap-3">
-          {cadStats && (
-            <LedgerStatsCard
-              title={tLedger("canadaLedgerShort")}
-              currency="CAD"
-              stats={cadStats}
-              expenseLabel={tDashboard("expense")}
-              incomeLabel={tDashboard("income")}
-              investmentSavingsLabel={tDashboard("investmentSavings")}
-            />
-          )}
-          {krwStats && (
-            <LedgerStatsCard
-              title={tLedger("koreaLedgerShort")}
-              currency="KRW"
-              stats={krwStats}
-              expenseLabel={tDashboard("expense")}
-              incomeLabel={tDashboard("income")}
-              investmentSavingsLabel={tDashboard("investmentSavings")}
-            />
-          )}
-        </div>
-      )}
+  const renderableIds = layout.order.filter(
+    (id) => !layout.hidden.includes(id) && cardNodes[id]
+  );
+  const renderable = new Set<string>(renderableIds);
+  const visibleItems = renderableIds.map((id) => ({
+    id,
+    half: isHalfWidth(layout, id),
+    node: cardNodes[id],
+  }));
+
+  function handleReorder(visibleIds: string[]) {
+    let i = 0;
+    const order = layout.order.map((id) =>
+      renderable.has(id) ? (visibleIds[i++] as DashboardCardId) : id
+    );
+    commitLayout({ ...layout, order });
+  }
+
+  function handleToggleSize(id: string) {
+    const cardId = id as DashboardCardId;
+    const size = isHalfWidth(layout, cardId) ? "full" : "half";
+    commitLayout({ ...layout, sizes: { ...layout.sizes, [cardId]: size } });
+  }
+
+  function commitLayout(next: ResolvedLayout) {
+    setLayouts((prev) => ({ ...prev, [layoutCountry]: next }));
+    saveDashboardLayout(layoutCountry, next).catch(() => {
+      /* keep the optimistic layout; it is saved again on the next change */
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <SortableCardGrid
+        items={visibleItems}
+        handleLabel={tDashboard("dragHandle")}
+        expandLabel={tDashboard("expandCard")}
+        shrinkLabel={tDashboard("shrinkCard")}
+        onReorder={handleReorder}
+        onToggleSize={handleToggleSize}
+      />
       {editingAccount && (
         <AccountRegisterModal
           currency={editingAccount.currency}
@@ -1141,57 +1539,6 @@ function MetricCard({ label, value }: { label: string; value: string }) {
     <div className="card-inset p-4">
       <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
       <p className="mt-1 text-lg font-bold tracking-tight truncate">{value}</p>
-    </div>
-  );
-}
-
-function LedgerStatsCard({
-  title,
-  currency,
-  stats,
-  expenseLabel,
-  incomeLabel,
-  investmentSavingsLabel,
-}: {
-  title: string;
-  currency: Currency;
-  stats: StatsSummary;
-  expenseLabel: string;
-  incomeLabel: string;
-  investmentSavingsLabel: string;
-}) {
-  return (
-    <div className="card-inset p-5">
-      <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-      <p
-        className={`mt-1 text-xl font-bold tracking-tight truncate ${
-          stats.net_cashflow < 0
-            ? "text-red-500"
-            : "text-gray-900 dark:text-white"
-        }`}
-      >
-        {formatAmount(stats.net_cashflow, currency)}
-      </p>
-      <div className="mt-3 space-y-1 text-xs">
-        <div className="flex justify-between">
-          <span className="text-gray-400">{incomeLabel}</span>
-          <span className="text-blue-500">
-            +{formatAmount(stats.total_income, currency)}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">{expenseLabel}</span>
-          <span className="text-gray-600 dark:text-gray-300">
-            -{formatAmount(stats.adjusted_expense, currency)}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">{investmentSavingsLabel}</span>
-          <span className="text-gray-600 dark:text-gray-300">
-            {formatAmount(stats.investment_savings_total, currency)}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

@@ -133,12 +133,15 @@ async def compute_stats(
     sub_category: str | None = None,
     merchant: str | None = None,
     institution: str | None = None,
+    exclude_categories: list[str] | None = None,
 ) -> dict:
     """Aggregate income/expense totals with adjusted metrics.
 
     - adjusted_expense: total_expense − N빵 정산/환급 (actual out-of-pocket spend)
     - pure_consumption: total_expense − 투자/저축 (spending charts, excludes transfers)
+    - exclude_categories: expense categories left out of every expense figure
     """
+    excluded = {normalize_transfer_category(c) for c in (exclude_categories or [])}
     ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
     base_filter = build_transaction_filter(
         owner_ids=ids,
@@ -200,6 +203,8 @@ async def compute_stats(
                 by_sub_category.get(f"{cat} › {sub}", 0) + amount
             )
         elif tx_type == TransactionType.EXPENSE.value:
+            if normalize_transfer_category(cat) in excluded:
+                continue
             total_expense += amount
             if is_investment_expense(cat):
                 investment_savings_total += amount
@@ -241,6 +246,8 @@ async def compute_stats(
         cat = doc.get("category", "")
         sub = doc.get("sub_category", "")
         if is_non_cashflow_transfer(cat, sub):
+            continue
+        if normalize_transfer_category(cat) in excluded:
             continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)

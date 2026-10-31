@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -6,6 +8,15 @@ class CustomCategoryMap(BaseModel):
 
     expense: dict[str, list[str]] = Field(default_factory=dict)
     income: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class DashboardLayout(BaseModel):
+    """Dashboard card order and which cards are hidden (card ids)."""
+
+    order: list[str] = Field(default_factory=list)
+    hidden: list[str] = Field(default_factory=list)
+    # Width override per card id; cards not listed keep their default width.
+    sizes: dict[str, Literal["half", "full"]] = Field(default_factory=dict)
 
 
 class UserSettingsBase(BaseModel):
@@ -23,6 +34,13 @@ class UserSettingsBase(BaseModel):
     shared_ledger_start_date: str | None = None
     onboarding_personal_completed: bool = False
     onboarding_personal_step: int = 0
+    # { "personal" | "shared": { "CAD" | "KRW": monthly budget } }
+    budgets: dict[str, dict[str, float]] = Field(default_factory=dict)
+    # Legacy single layout (read-only fallback) and the per-country layouts.
+    dashboard_layout: DashboardLayout = Field(default_factory=DashboardLayout)
+    dashboard_layouts: dict[str, DashboardLayout] = Field(default_factory=dict)
+    # Expense categories left out of dashboard spending; None = default (transfers).
+    spending_excluded_categories: list[str] | None = None
 
 
 class UserSettingsInDB(UserSettingsBase):
@@ -84,3 +102,20 @@ class OnboardingCompleteBody(BaseModel):
     """Mark personal onboarding finished after Step 3 or skip-to-end."""
 
     completed: bool = True
+
+
+class BudgetBody(BaseModel):
+    kind: str = Field(default="personal", pattern="^(personal|shared)$")
+    currency: str = Field(pattern="^(CAD|KRW)$")
+    amount: float = Field(ge=0)
+
+
+class DashboardLayoutBody(BaseModel):
+    country: str = Field(pattern="^(CAD|KRW)$")
+    order: list[str] = Field(default_factory=list, max_length=30)
+    hidden: list[str] = Field(default_factory=list, max_length=30)
+    sizes: dict[str, Literal["half", "full"]] = Field(default_factory=dict, max_length=30)
+
+
+class SpendingExclusionsBody(BaseModel):
+    categories: list[str] = Field(default_factory=list, max_length=100)

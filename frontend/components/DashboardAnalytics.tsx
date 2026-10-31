@@ -252,6 +252,10 @@ interface Props {
   cadStats: StatsSummary | null;
   krwStats: StatsSummary | null;
   transactions?: Transaction[];
+  /** Expense categories left out of the charts. */
+  excludeCategories?: string[];
+  /** Render only one chart; both when omitted. */
+  part?: "expense" | "trend";
   onCategoryClick?: (
     category: string,
     subCategory?: string,
@@ -425,8 +429,13 @@ export default function DashboardAnalytics({
   cadStats,
   krwStats,
   transactions,
+  excludeCategories,
+  part,
   onCategoryClick,
 }: Props) {
+  const excludeKey = (excludeCategories ?? []).join("|");
+  const showExpense = !part || part === "expense";
+  const showTrend = !part || part === "trend";
   const locale = useLocale();
   const t = useTranslations("dashboard");
   const tCategories = useTranslations("categories");
@@ -573,6 +582,7 @@ export default function DashboardAnalytics({
           ...period,
           currency: "CAD",
           accountType,
+          excludeCategories,
         }).catch(() => null);
         maps.push(
           statsToExpenseMap(cad, "CAD", displayCurrency, rate, hiddenCategories)
@@ -583,6 +593,7 @@ export default function DashboardAnalytics({
           ...period,
           currency: "KRW",
           accountType,
+          excludeCategories,
         }).catch(() => null);
         maps.push(
           statsToExpenseMap(krw, "KRW", displayCurrency, rate, hiddenCategories)
@@ -621,6 +632,7 @@ export default function DashboardAnalytics({
     displayCurrency,
     rate,
     categoryColors,
+    excludeKey,
     hiddenCategories,
   ]);
 
@@ -642,6 +654,7 @@ export default function DashboardAnalytics({
             currency: "CAD",
             month: monthStr,
             accountType,
+            excludeCategories,
           }).catch(() => null)
         );
       } else {
@@ -653,6 +666,7 @@ export default function DashboardAnalytics({
             currency: "KRW",
             month: monthStr,
             accountType,
+            excludeCategories,
           }).catch(() => null)
         );
       } else {
@@ -702,7 +716,7 @@ export default function DashboardAnalytics({
     return () => {
       active = false;
     };
-  }, [month, version, scope, accountType, displayCurrency, rate, trendRange, locale]);
+  }, [month, version, scope, accountType, displayCurrency, rate, trendRange, locale, excludeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleColorChange(category: string, color: string) {
     setCategoryColors((prev) => ({ ...prev, [category]: color }));
@@ -726,6 +740,7 @@ export default function DashboardAnalytics({
 
   return (
     <div className="space-y-4">
+      {showExpense && (
       <section className="card-inset p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
@@ -970,7 +985,9 @@ export default function DashboardAnalytics({
           </div>
         )}
       </section>
+      )}
 
+      {showTrend && (
       <section className="card-inset p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
@@ -1062,8 +1079,9 @@ export default function DashboardAnalytics({
           </div>
         )}
       </section>
+      )}
 
-      {popoverCategory && (
+      {showExpense && popoverCategory && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
           onClick={() => setPopoverCategory(null)}

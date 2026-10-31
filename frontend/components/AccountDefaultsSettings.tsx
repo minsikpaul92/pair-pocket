@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 
 import {
   AccountType,
+  LedgerScope,
   DEFAULT_ROLES,
   DefaultRole,
   FinancialAccount,
@@ -47,20 +48,24 @@ function Segmented<T extends string>({
   );
 }
 
-export default function AccountDefaultsSettings({ hasPartner }: { hasPartner: boolean }) {
+interface Props {
+  accountType: AccountType;
+  scope: LedgerScope;
+}
+
+export default function AccountDefaultsSettings({ accountType, scope }: Props) {
   const t = useTranslations("settingsPage");
   const tAccount = useTranslations("account");
 
-  const [accountType, setAccountType] = useState<AccountType>("personal");
-  const [currency, setCurrency] = useState<SlotCurrency>("CAD");
+  // The ledger and country follow the tabs at the top; under "All" the
+  // currency can be picked here.
+  const [pickedCurrency, setPickedCurrency] = useState<SlotCurrency>("CAD");
+  const currency: SlotCurrency =
+    scope === "CAD" || scope === "KRW" ? scope : pickedCurrency;
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [saving, setSaving] = useState<DefaultRole | null>(null);
   const [failed, setFailed] = useState(false);
   const { defaults, setDefaults, loading, error } = useAccountDefaults(accountType);
-
-  useEffect(() => {
-    if (!hasPartner) setAccountType("personal");
-  }, [hasPartner]);
 
   useEffect(() => {
     fetchAccounts({ accountType })
@@ -93,6 +98,11 @@ export default function AccountDefaultsSettings({ hasPartner }: { hasPartner: bo
         <Star className="h-5 w-5 text-blue-500" />
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">
           {t("accountDefaultsTitle")}
+          <span className="ml-2 rounded-md bg-gray-100 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+            {accountType === "personal"
+              ? t("accountDefaultsPersonal")
+              : t("accountDefaultsShared")}
+          </span>
         </h2>
         {(loading || saving) && (
           <Loader2 className="ml-auto h-4 w-4 animate-spin text-blue-500" />
@@ -102,23 +112,13 @@ export default function AccountDefaultsSettings({ hasPartner }: { hasPartner: bo
         {t("accountDefaultsHelp")}
       </p>
 
-      <div className="flex flex-col gap-2 min-[420px]:flex-row">
-        {hasPartner && (
-          <Segmented
-            value={accountType}
-            onChange={setAccountType}
-            options={[
-              { value: "personal", label: t("accountDefaultsPersonal") },
-              { value: "shared", label: t("accountDefaultsShared") },
-            ]}
-          />
-        )}
+      {scope === "ALL" && (
         <Segmented
           value={currency}
-          onChange={setCurrency}
+          onChange={setPickedCurrency}
           options={CURRENCIES.map((c) => ({ value: c, label: c }))}
         />
-      </div>
+      )}
       {accountType === "shared" && (
         <p className="text-[11px] text-gray-400 dark:text-gray-500">
           {t("accountDefaultsSharedHint")}

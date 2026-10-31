@@ -593,6 +593,16 @@ export interface UserSettings {
   ledger_start_date_locked?: boolean;
   onboarding_personal_completed?: boolean;
   onboarding_personal_step?: number;
+  budgets?: Partial<Record<AccountType, Partial<Record<"CAD" | "KRW", number>>>>;
+  dashboard_layout?: DashboardLayout;
+  dashboard_layouts?: Partial<Record<"CAD" | "KRW", DashboardLayout>>;
+  spending_excluded_categories?: string[];
+}
+
+export interface DashboardLayout {
+  order: string[];
+  hidden: string[];
+  sizes?: Record<string, "half" | "full">;
 }
 
 /** Preferred UI languages from settings (primary first). */
@@ -789,6 +799,8 @@ export interface StatsFilters {
   sub_category?: string;
   merchant?: string;
   institution?: string;
+  /** Expense categories left out of every expense figure. */
+  excludeCategories?: string[];
 }
 
 export async function fetchStatsSummary(
@@ -804,6 +816,9 @@ export async function fetchStatsSummary(
   if (filters.sub_category) params.set("sub_category", filters.sub_category);
   if (filters.merchant) params.set("merchant", filters.merchant);
   if (filters.institution) params.set("institution", filters.institution);
+  for (const c of filters.excludeCategories ?? []) {
+    params.append("exclude_categories", c);
+  }
 
   const res = await apiFetch(
     `${API_BASE_URL}/api/stats/summary?${params.toString()}`,
@@ -2084,6 +2099,48 @@ export async function updateLedgerStartDate(
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || "Failed to update ledger start date");
   }
+  return (await res.json()) as UserSettings;
+}
+
+export async function updateBudget(payload: {
+  kind: AccountType;
+  currency: "CAD" | "KRW";
+  amount: number;
+}): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/budget`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || "Failed to update budget");
+  }
+  return (await res.json()) as UserSettings;
+}
+
+export async function saveSpendingExclusions(
+  categories: string[]
+): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/spending-exclusions`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ categories }),
+  });
+  if (!res.ok) throw new ApiError("saveSpendingExclusions");
+  return (await res.json()) as UserSettings;
+}
+
+export async function saveDashboardLayout(
+  country: "CAD" | "KRW",
+  layout: DashboardLayout
+): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/dashboard-layout`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ country, ...layout }),
+  });
+  if (!res.ok) throw new ApiError("saveDashboardLayout");
   return (await res.json()) as UserSettings;
 }
 
