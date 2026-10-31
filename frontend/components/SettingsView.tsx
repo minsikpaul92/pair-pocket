@@ -19,6 +19,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import AccountDefaultsSettings from "@/components/AccountDefaultsSettings";
 import DashboardSettings from "@/components/DashboardSettings";
+import LanguageSelect from "@/components/LanguageSelect";
 import ThemeToggle from "@/components/ThemeToggle";
 import DayPicker from "@/components/DayPicker";
 import ExpenseRatioHiddenSettings from "@/components/ExpenseRatioHiddenSettings";
@@ -619,19 +620,16 @@ export default function SettingsView({
         <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
           {t("languageHelp")}
         </p>
-        <select
+        <LanguageSelect
           value={locale}
-          onChange={(e) => void changeLanguage(e.target.value as AppLocale)}
+          options={LOCALE_OPTIONS.filter((item) => !item.beta).map((item) => ({
+            code: item.code,
+            native: item.native,
+          }))}
+          onChange={(code) => void changeLanguage(code as AppLocale)}
           disabled={changingLanguage}
-          aria-label={t("languageLabel")}
-          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-        >
-          {LOCALE_OPTIONS.filter((item) => !item.beta).map((item) => (
-            <option key={item.code} value={item.code}>
-              {item.native}
-            </option>
-          ))}
-        </select>
+          ariaLabel={t("languageLabel")}
+        />
       </section>
 
       <section className="card-inset p-5 space-y-3">
