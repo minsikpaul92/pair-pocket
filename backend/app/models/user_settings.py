@@ -19,6 +19,12 @@ class DashboardLayout(BaseModel):
     sizes: dict[str, Literal["half", "full"]] = Field(default_factory=dict)
 
 
+CanadaProvince = Literal[
+    "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"
+]
+DEFAULT_SALES_TAX_PROVINCE = "ON"
+
+
 class UserSettingsBase(BaseModel):
     merchants: list[str] = Field(default_factory=list)
     institutions: list[str] = Field(default_factory=list)
@@ -41,6 +47,8 @@ class UserSettingsBase(BaseModel):
     dashboard_layouts: dict[str, DashboardLayout] = Field(default_factory=dict)
     # Expense categories left out of dashboard spending; None = default (transfers).
     spending_excluded_categories: list[str] | None = None
+    # Province whose sales tax rate is used to estimate tax on CAD expenses.
+    sales_tax_province: CanadaProvince = DEFAULT_SALES_TAX_PROVINCE
 
 
 class UserSettingsInDB(UserSettingsBase):
@@ -68,6 +76,10 @@ class LedgerStartDateBody(BaseModel):
 
 class ExpenseRatioHiddenCategoriesBody(BaseModel):
     categories: list[str] = Field(default_factory=list, max_length=100)
+
+
+class SalesTaxProvinceBody(BaseModel):
+    province: CanadaProvince
 
 
 class AddInstitutionBody(BaseModel):

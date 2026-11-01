@@ -18,6 +18,7 @@ from app.models.transaction import AccountType
 from app.models.ledger import TRANSFER_CATEGORY
 from app.models.user import UserOut
 from app.models.user_settings import (
+    DEFAULT_SALES_TAX_PROVINCE,
     ActiveLocaleBody,
     AddInstitutionBody,
     BudgetBody,
@@ -30,6 +31,7 @@ from app.models.user_settings import (
     OnboardingCompleteBody,
     OnboardingStepBody,
     PreferredLocalesBody,
+    SalesTaxProvinceBody,
     SetCategoryColorBody,
     ShareGeminiKeyBody,
     UserSettingsOut,
@@ -152,6 +154,8 @@ async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
         "onboarding_personal_completed": onboarded,
         "onboarding_personal_step": int(doc.get("onboarding_personal_step") or 0),
         "budgets": doc.get("budgets") or {},
+        "sales_tax_province": doc.get("sales_tax_province")
+        or DEFAULT_SALES_TAX_PROVINCE,
         "dashboard_layout": {
             "order": list((doc.get("dashboard_layout") or {}).get("order", [])),
             "hidden": list((doc.get("dashboard_layout") or {}).get("hidden", [])),
@@ -363,6 +367,22 @@ async def set_expense_ratio_hidden_categories(
     await db[COLLECTION].update_one(
         {"owner_id": current_user.id},
         {"$set": {"expense_ratio_hidden_categories": categories}},
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/sales-tax-province", response_model=UserSettingsOut)
+async def set_sales_tax_province(
+    payload: SalesTaxProvinceBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Choose the province whose sales tax rate the expense form uses."""
+    await _get_or_create(db, current_user.id)
+    await db[COLLECTION].update_one(
+        {"owner_id": current_user.id},
+        {"$set": {"sales_tax_province": payload.province}},
     )
     doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
     return await _settings_out(db, doc)

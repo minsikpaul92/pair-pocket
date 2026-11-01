@@ -63,7 +63,7 @@
     "subscriptions": "고정지출",
     "stocks": "주식",
     "settings": "설정",
-    "smartImport": "스마트 가져오기",
+    "smartImport": "가져오기",
     "invite": "초대하기",
     "logout": "로그아웃",
     "expandSidebar": "사이드바 펼치기",
@@ -264,7 +264,7 @@
     "scanFailed": "AI 스캔에 실패했습니다.",
     "scanCardTitle": "스크린샷 / 영수증으로 채우기",
     "scanCardCount": "{count} / {max}장",
-    "scanCardHint": "사진이나 PDF 명세서를 이곳으로 드래그하거나 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 {max}장)",
+    "scanCardHint": "사진이나 PDF 명세서를 드래그하거나 붙여넣기(Cmd+V)하거나, 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 {max}장)",
     "scanRemove": "삭제",
     "scanAddPhoto": "사진 추가",
     "scanDeep": "정밀 AI 분석 중…",
@@ -730,12 +730,53 @@
     "filterAccount": "필터",
     "scanPhoto": "사진으로 분석"
   },
+  "bankImport": {
+    "title": "은행 명세서",
+    "subtitle": "은행에서 받은 CSV를 올려 주세요. 이미 입력한 내역은 건너뛰고, 애매한 건 직접 확인할 수 있게 남겨 둬요.",
+    "account": "계좌",
+    "dropHere": "여기에 CSV 파일을 끌어다 놓으세요",
+    "choose": "파일 선택",
+    "csvOnly": ".csv 파일을 선택해 주세요.",
+    "undo": "되돌리기",
+    "undoConfirm": "이번에 저장한 {count}건을 삭제할까요?",
+    "undoFailed": "되돌리지 못했어요. 이미 정산된 내역이 있을 수 있어요.",
+    "file": "CSV 파일",
+    "analyze": "분석",
+    "noAccounts": "명세서를 가져오려면 먼저 계좌를 추가해 주세요.",
+    "previewFailed": "파일을 읽지 못했어요. 이 계좌의 은행 CSV가 맞는지 확인해 주세요.",
+    "saveFailed": "저장하지 못했어요. 아무것도 추가되지 않았어요.",
+    "saved": "{count}건을 저장했어요",
+    "reviewTitle": "확인이 필요해요",
+    "reviewHint": "저장할 내역에 체크하세요. AI 제안이 채워져 있어요.",
+    "autoTitle": "바로 저장해도 돼요",
+    "autoHint": "이전 입력과 맞거나 AI가 확실하게 제안한 내역이에요.",
+    "duplicateTitle": "이미 입력됨",
+    "duplicateHint": "건너뛰어요. 그래도 저장하려면 체크하세요.",
+    "merchant": "사용처",
+    "category": "대분류",
+    "subCategory": "중분류",
+    "card": "카드",
+    "pickCard": "카드를 선택하세요",
+    "needsChoice": "분류를 고르거나, 카드 대금이면 카드를 고르세요.",
+    "waiting": "아직 확인이 필요한 내역이 {count}건 있어요.",
+    "save": "{count}건 저장",
+    "cardSideNote": "카드 대금 납부예요. 은행 쪽에서 기록하므로 여기서는 제외했어요.",
+    "transferNote": "계좌 사이 이체예요. 내 계좌가 아닌 경우에만 수입/지출로 저장하세요.",
+    "etransferNote": "e-Transfer예요. 수입인지 지출인지 골라 주세요.",
+    "similarTo": "{date}의 {merchant}와 비슷해요"
+},
+  "scanQueue": {
+    "restored": "지난 스캔에서 못 끝낸 파일 {count}개를 다시 불러왔어요.",
+    "addRecent": "최근 스캔한 파일 다시 넣기 ({count}개, {days}일 보관)",
+    "openRecent": "최근 스캔 ({count}개)"
+  },
   "importPage": {
-    "title": "스마트 가져오기 & 파일 관리",
-    "subtitle": "가계부 CSV 가져오기·내보내기와 OCR/가져오기 로그를 관리합니다.",
+    "title": "가져오기 · 내보내기",
+    "subtitle": "은행 명세서나 CSV를 가져오고, 장부를 내보내고, 지난 AI 스캔 기록을 확인합니다.",
     "tabAi": "AI 파일 스캐너",
-    "tabCsv": "CSV 연동",
-    "tabLogs": "AI 분석 로그",
+    "tabCsv": "템플릿 CSV",
+    "tabLogs": "스캔 기록",
+    "tabBank": "은행 명세서",
     "uploadTitle": "영수증 사진 & 청구서 PDF 업로드",
     "uploadHint": "HEIC, PNG, JPEG 이미지 파일 및 PDF 지원",
     "uploadHintQueue": "파일을 먼저 모아 두고 분석을 시작하세요. 최대 15개.",
@@ -923,6 +964,10 @@
     "updateTitle": "앱 업데이트",
     "updateHelp": "Dock이나 홈 화면에 추가한 앱은 처음 열린 버전을 계속 사용해요. 새로고침하면 최신 버전으로 바뀝니다.",
     "updateCta": "앱 새로고침",
+    "salesTaxTitle": "판매세",
+    "salesTaxHelp": "거주하는 주를 고르세요. 지출을 추가할 때 그 주의 GST, HST, PST 세율로 세금을 추정해요. 세금은 직접 고칠 수도 있어요.",
+    "salesTaxRate": "세율: {rate}%",
+    "salesTaxError": "저장하지 못했습니다. 다시 시도해 주세요.",
     "expenseRatioHiddenTitle": "지출 비율에서 숨길 카테고리",
     "expenseRatioHiddenHelp": "선택한 카테고리나 중분류는 대시보드 지출 비율 차트에서 빠집니다. 월세처럼 큰 고정비를 빼면 나머지 소비 흐름이 잘 보입니다. 지출 합계와 내역에는 그대로 남습니다.",
     "expenseRatioHiddenError": "저장하지 못했습니다. 다시 시도해 주세요.",
@@ -1094,8 +1139,39 @@
     "addedExpense": "{name}님이 지출을 등록했어요",
     "addedIncome": "{name}님이 수입을 등록했어요"
   },
+  "provinces": {
+    "AB": "앨버타",
+    "BC": "브리티시컬럼비아",
+    "MB": "매니토바",
+    "NB": "뉴브런즈윅",
+    "NL": "뉴펀들랜드 래브라도",
+    "NS": "노바스코샤",
+    "NT": "노스웨스트 준주",
+    "NU": "누나부트 준주",
+    "ON": "온타리오",
+    "PE": "프린스에드워드아일랜드",
+    "QC": "퀘벡",
+    "SK": "서스캐처원",
+    "YT": "유콘 준주"
+  },
   "whatsNew": {
     "items": {
+      "bankStatementImport": {
+        "title": "은행 명세서 가져오기",
+        "description": "가져오기 메뉴에서 은행 CSV를 올리면 이미 입력한 내역은 건너뛰고, 나머지는 분류를 추천해 줘요. 애매한 것만 확인하면 돼요."
+    },
+      "scanDrafts": {
+        "title": "스캔 파일이 임시 보관돼요",
+        "description": "AI 스캔에 넣은 사진이 이 기기에 저장돼서, 실패하거나 중간에 끊겨도 다시 시도할 수 있어요. 끝난 파일은 3일 동안 보관해서 다시 스캔할 수도 있어요."
+      },
+      "provinceTax": {
+        "title": "내가 사는 주의 세금",
+        "description": "설정에서 거주하는 주를 고르면 지출 입력 시 고정 13% 대신 그 주의 세율로 세금을 추정해요. 세율은 세금 옆에 표시돼요."
+      },
+      "pasteImage": {
+        "title": "영수증 이미지 붙여넣기",
+        "description": "컴퓨터에서 영수증이나 스크린샷을 복사한 뒤 Cmd+V(Windows는 Ctrl+V)를 누르면 AI 스캔 대기열에 바로 들어가요."
+      },
       "receiptTax": {
         "title": "영수증과 딱 맞는 세금",
         "description": "입력한 총액이 이제 그대로 유지되고, 장보기는 영수증에 찍힌 세금을 그대로 적을 수 있어요. 금액은 항상 소수점 둘째 자리까지 보이고, 새 버전이 나오면 새로고침 안내가 떠요."

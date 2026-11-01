@@ -63,7 +63,7 @@
     "subscriptions": "Fixed expenses",
     "stocks": "Stock",
     "settings": "Settings",
-    "smartImport": "Smart Import",
+    "smartImport": "Import",
     "invite": "Invite",
     "logout": "Log out",
     "expandSidebar": "Expand sidebar",
@@ -264,7 +264,7 @@
     "scanFailed": "AI scan failed.",
     "scanCardTitle": "Fill from screenshot / receipt",
     "scanCardCount": "{count} / {max}",
-    "scanCardHint": "Drag photos or PDF statements here, or tap [Add photo] below. (Up to {max})",
+    "scanCardHint": "Drag, paste (Cmd+V), or tap [Add photo] below to add photos or PDF statements. (Up to {max})",
     "scanRemove": "Remove",
     "scanAddPhoto": "Add photo",
     "scanDeep": "Deep AI analysis…",
@@ -730,12 +730,53 @@
     "filterAccount": "Filter",
     "scanPhoto": "Scan photo"
   },
+  "bankImport": {
+    "title": "Bank statement",
+    "subtitle": "Upload the CSV from your bank. Entries already in the app are skipped, and anything unsure is left for you to check.",
+    "account": "Account",
+    "dropHere": "Drop the CSV here",
+    "choose": "Choose file",
+    "csvOnly": "Please choose a .csv file.",
+    "undo": "Undo",
+    "undoConfirm": "Remove the {count} entries saved by this import?",
+    "undoFailed": "Could not undo. Some entries may already be settled.",
+    "file": "CSV file",
+    "analyze": "Analyze",
+    "noAccounts": "Add an account first to import a statement.",
+    "previewFailed": "Could not read this file. Check that it is a bank CSV for this account.",
+    "saveFailed": "Could not save. Nothing was added.",
+    "saved": "{count, plural, one {# entry saved} other {# entries saved}}",
+    "reviewTitle": "Needs your check",
+    "reviewHint": "Check the box to save an entry. AI suggestions are filled in.",
+    "autoTitle": "Ready to save",
+    "autoHint": "Matched to your past entries or confidently suggested.",
+    "duplicateTitle": "Already in the app",
+    "duplicateHint": "Skipped. Check one only to save it anyway.",
+    "merchant": "Merchant",
+    "category": "Category",
+    "subCategory": "Subcategory",
+    "card": "Card",
+    "pickCard": "Choose the card",
+    "needsChoice": "Choose a category, or a card for a card payment.",
+    "waiting": "{count} entries still need your check.",
+    "save": "Save {count}",
+    "cardSideNote": "Card payment. It is recorded from the bank side, so it is left out here.",
+    "transferNote": "Transfer between accounts. Save it as income or expense only if it is not your own account.",
+    "etransferNote": "e-Transfer. Choose whether it is income or an expense.",
+    "similarTo": "Looks like {merchant} on {date}"
+},
+  "scanQueue": {
+    "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
+    "addRecent": "Scan recent files again ({count}, kept {days} days)",
+    "openRecent": "Recent scans ({count})"
+  },
   "importPage": {
-    "title": "Smart Import & files",
-    "subtitle": "Import or export ledger CSV, and review past OCR / import logs.",
+    "title": "Import & export",
+    "subtitle": "Import a bank statement or CSV, export your ledger, and review past AI scans.",
     "tabAi": "AI scanner",
-    "tabCsv": "CSV",
-    "tabLogs": "AI logs",
+    "tabCsv": "Template CSV",
+    "tabLogs": "Scan history",
+    "tabBank": "Bank statement",
     "uploadTitle": "Upload receipts & statement PDFs",
     "uploadHint": "HEIC, PNG, JPEG, and PDF supported",
     "uploadHintQueue": "Queue files first, then start analysis. Up to 15.",
@@ -923,6 +964,10 @@
     "updateTitle": "App update",
     "updateHelp": "An app added to your Dock or home screen keeps running the version it opened with. Refresh to load the latest version.",
     "updateCta": "Refresh app",
+    "salesTaxTitle": "Sales tax",
+    "salesTaxHelp": "Choose your province. Its GST, HST and PST rate is used to estimate the tax when you add an expense. You can still edit the tax.",
+    "salesTaxRate": "Rate: {rate}%",
+    "salesTaxError": "Couldn't save. Please try again.",
     "expenseRatioHiddenTitle": "Hide categories from expense mix",
     "expenseRatioHiddenHelp": "Selected categories or sub-categories are left out of the dashboard expense mix chart. Removing a large fixed cost such as rent makes the rest of your spending easier to read. Totals and the transaction list still include them.",
     "expenseRatioHiddenError": "Couldn't save. Please try again.",
@@ -1094,8 +1139,39 @@
     "addedExpense": "{name} added an expense",
     "addedIncome": "{name} added income"
   },
+  "provinces": {
+    "AB": "Alberta",
+    "BC": "British Columbia",
+    "MB": "Manitoba",
+    "NB": "New Brunswick",
+    "NL": "Newfoundland and Labrador",
+    "NS": "Nova Scotia",
+    "NT": "Northwest Territories",
+    "NU": "Nunavut",
+    "ON": "Ontario",
+    "PE": "Prince Edward Island",
+    "QC": "Quebec",
+    "SK": "Saskatchewan",
+    "YT": "Yukon"
+  },
   "whatsNew": {
     "items": {
+      "bankStatementImport": {
+        "title": "Import your bank statement",
+        "description": "Upload a CSV from your bank under Import. Entries you already added are skipped, and categories are suggested for the rest, so you only check the unsure ones."
+    },
+      "scanDrafts": {
+        "title": "Scans are kept if something goes wrong",
+        "description": "Photos you add for AI scanning are saved on this device, so a failed or interrupted scan can be retried. Finished ones stay for 3 days in case you want to scan them again."
+      },
+      "provinceTax": {
+        "title": "Tax for your province",
+        "description": "Pick your province in Settings and the expense form estimates tax with its rate instead of a fixed 13%. The rate is shown next to Tax."
+      },
+      "pasteImage": {
+        "title": "Paste a receipt image",
+        "description": "On a computer, copy a receipt or screenshot and press Cmd+V (Ctrl+V on Windows) to add it straight to the AI scan queue."
+      },
       "receiptTax": {
         "title": "Tax that matches your receipt",
         "description": "The total you type now stays put, and for groceries you can enter the tax printed on the receipt. Amounts always show two decimals, and the app offers a refresh when a new version is ready."

@@ -1,5 +1,6 @@
 "use client";
 
+import { WHATS_NEW } from "@/lib/whats-new";
 import React, { useState, useEffect } from "react";
 import {
   Key,
@@ -14,6 +15,7 @@ import {
   CalendarDays,
   Coffee,
   Languages,
+  Receipt,
   RefreshCw,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -27,6 +29,7 @@ import ExpenseRatioHiddenSettings from "@/components/ExpenseRatioHiddenSettings"
 import {
   fetchUserSettings,
   saveGeminiApiKey,
+  setSalesTaxProvince,
   setShareGeminiApiKey,
   updateLedgerStartDate,
   resetUserData,
@@ -38,6 +41,13 @@ import {
   UserSettings,
   PartnerSummary,
 } from "@/lib/api";
+import {
+  CANADA_PROVINCES,
+  DEFAULT_SALES_TAX_PROVINCE,
+  formatTaxPercent,
+  isCanadaProvince,
+  salesTaxPercent,
+} from "@/lib/canada-tax";
 import { dayKey } from "@/lib/date";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
 import { usePathname, useRouter } from "@/i18n/navigation";
@@ -107,6 +117,7 @@ export default function SettingsView({
   const t = useTranslations("settingsPage");
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
+  const tProvinces = useTranslations("provinces");
   const locale = useLocale() as AppLocale;
   const pathname = usePathname();
   const router = useRouter();
@@ -126,6 +137,26 @@ export default function SettingsView({
   }
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [savingProvince, setSavingProvince] = useState(false);
+  const [provinceError, setProvinceError] = useState(false);
+  const salesTaxProvince = isCanadaProvince(settings?.sales_tax_province)
+    ? settings.sales_tax_province
+    : DEFAULT_SALES_TAX_PROVINCE;
+
+  async function changeSalesTaxProvince(code: string) {
+    if (savingProvince || code === salesTaxProvince) return;
+    setSavingProvince(true);
+    setProvinceError(false);
+    try {
+      setSettings(await setSalesTaxProvince(code));
+      onChanged();
+    } catch {
+      setProvinceError(true);
+    } finally {
+      setSavingProvince(false);
+    }
+  }
+
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState(false);
@@ -441,6 +472,29 @@ export default function SettingsView({
         )}
       </section>
 
+      <section className="card-inset p-5 space-y-3">
+        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+          <RefreshCw className="h-5 w-5 text-blue-500" />
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {t("updateTitle")}
+          </h2>
+          <span className="ml-auto text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
+            v{WHATS_NEW[0].version}
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+          {t("updateHelp")}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
+        >
+          <RefreshCw className="h-4 w-4 shrink-0" />
+          {t("updateCta")}
+        </button>
+      </section>
+
       <section className="card-inset p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
           <div className="flex items-center gap-2">
@@ -635,22 +689,35 @@ export default function SettingsView({
 
       <section className="card-inset p-5 space-y-3">
         <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <RefreshCw className="h-5 w-5 text-blue-500" />
+          <Receipt className="h-5 w-5 text-blue-500" />
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("updateTitle")}
+            {t("salesTaxTitle")}
           </h2>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("updateHelp")}
+          {t("salesTaxHelp")}
         </p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
+        <select
+          value={salesTaxProvince}
+          onChange={(e) => void changeSalesTaxProvince(e.target.value)}
+          disabled={savingProvince}
+          aria-label={t("salesTaxTitle")}
+          className="input-field"
         >
-          <RefreshCw className="h-4 w-4 shrink-0" />
-          {t("updateCta")}
-        </button>
+          {CANADA_PROVINCES.map((p) => (
+            <option key={p.code} value={p.code}>
+              {tProvinces(p.code)}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+          {t("salesTaxRate", {
+            rate: formatTaxPercent(salesTaxPercent(salesTaxProvince)),
+          })}
+        </p>
+        {provinceError && (
+          <p className="text-xs text-red-500">{t("salesTaxError")}</p>
+        )}
       </section>
 
       <section className="card-inset p-5 space-y-3">
