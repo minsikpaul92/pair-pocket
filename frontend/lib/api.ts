@@ -1545,6 +1545,14 @@ export function accountLabel(account: FinancialAccount): string {
   return account.nickname?.trim() || account.name;
 }
 
+/** Name for pickers: credit cards also show their last four digits. */
+export function accountPickerLabel(account: FinancialAccount): string {
+  const label = accountLabel(account);
+  return account.kind === "credit_card" && account.last_four
+    ? `${label} ···${account.last_four}`
+    : label;
+}
+
 export function accountDetail(account: FinancialAccount): string {
   const parts = [
     ACCOUNT_KIND_LABEL[account.kind],

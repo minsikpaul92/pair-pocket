@@ -12,7 +12,7 @@ import {
   Currency,
   FinancialAccount,
   LedgerScope,
-  accountLabel,
+  accountPickerLabel,
   commitBankRows,
   fetchAccounts,
   formatAmount,
@@ -301,7 +301,7 @@ export default function BankImportPanel({
                 placeholder={t("pickCard")}
                 size="sm"
                 className="sm:col-span-2"
-                options={cards.map((c) => ({ value: c.id, label: accountLabel(c) }))}
+                options={cards.map((c) => ({ value: c.id, label: accountPickerLabel(c) }))}
               />
             ) : (
               <>
@@ -386,7 +386,7 @@ export default function BankImportPanel({
               value={accountId}
               onChange={setAccountId}
               ariaLabel={t("account")}
-              options={accounts.map((a) => ({ value: a.id, label: accountLabel(a) }))}
+              options={accounts.map((a) => ({ value: a.id, label: accountPickerLabel(a) }))}
             />
           </div>
         </div>

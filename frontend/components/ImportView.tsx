@@ -24,6 +24,7 @@ import {
   Transaction,
   FinancialAccount,
   accountLabel,
+  accountPickerLabel,
   fetchAccounts,
   fetchTransactions,
   fetchOCRLogs,
@@ -455,7 +456,7 @@ export default function ImportView({ scope, accountType, presets, month, onChang
 
       {/* SUB TAB 2: CSV SYNC */}
       {activeSubTab === "csv" && (
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-2">
           {/* CSV Import */}
           <div className="rounded-2xl border border-gray-150 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-4">
             <div>
@@ -598,7 +599,10 @@ export default function ImportView({ scope, accountType, presets, month, onChang
                     { value: "all", label: t("exportAllAccounts") },
                     ...exportAccounts.map((a) => ({
                       value: a.id,
-                      label: scope === "ALL" ? `${accountLabel(a)} (${a.currency})` : accountLabel(a),
+                      label:
+                        scope === "ALL"
+                          ? `${accountPickerLabel(a)} (${a.currency})`
+                          : accountPickerLabel(a),
                     })),
                   ]}
                 />
