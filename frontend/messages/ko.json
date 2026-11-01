@@ -764,6 +764,11 @@
     "transferNote": "계좌 사이 이체예요. 내 계좌가 아닌 경우에만 수입/지출로 저장하세요.",
     "etransferNote": "e-Transfer예요. 수입인지 지출인지 골라 주세요.",
     "similarTo": "{date}의 {merchant}와 비슷해요"
+},
+  "scanQueue": {
+    "restored": "지난 스캔에서 못 끝낸 파일 {count}개를 다시 불러왔어요.",
+    "addRecent": "최근 스캔한 파일 다시 넣기 ({count}개, {days}일 보관)",
+    "openRecent": "최근 스캔 ({count}개)"
   },
   "importPage": {
     "title": "가져오기 · 내보내기",
@@ -1154,6 +1159,10 @@
       "bankStatementImport": {
         "title": "은행 명세서 가져오기",
         "description": "가져오기 메뉴에서 은행 CSV를 올리면 이미 입력한 내역은 건너뛰고, 나머지는 분류를 추천해 줘요. 애매한 것만 확인하면 돼요."
+    },
+      "scanDrafts": {
+        "title": "스캔 파일이 임시 보관돼요",
+        "description": "AI 스캔에 넣은 사진이 이 기기에 저장돼서, 실패하거나 중간에 끊겨도 다시 시도할 수 있어요. 끝난 파일은 3일 동안 보관해서 다시 스캔할 수도 있어요."
       },
       "provinceTax": {
         "title": "내가 사는 주의 세금",

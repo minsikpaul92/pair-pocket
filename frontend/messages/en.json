@@ -764,6 +764,11 @@
     "transferNote": "Transfer between accounts. Save it as income or expense only if it is not your own account.",
     "etransferNote": "e-Transfer. Choose whether it is income or an expense.",
     "similarTo": "Looks like {merchant} on {date}"
+},
+  "scanQueue": {
+    "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
+    "addRecent": "Scan recent files again ({count}, kept {days} days)",
+    "openRecent": "Recent scans ({count})"
   },
   "importPage": {
     "title": "Import & export",
@@ -1154,6 +1159,10 @@
       "bankStatementImport": {
         "title": "Import your bank statement",
         "description": "Upload a CSV from your bank under Import. Entries you already added are skipped, and categories are suggested for the rest, so you only check the unsure ones."
+    },
+      "scanDrafts": {
+        "title": "Scans are kept if something goes wrong",
+        "description": "Photos you add for AI scanning are saved on this device, so a failed or interrupted scan can be retried. Finished ones stay for 3 days in case you want to scan them again."
       },
       "provinceTax": {
         "title": "Tax for your province",

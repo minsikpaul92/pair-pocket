@@ -1,5 +1,6 @@
 "use client";
 
+import { WHATS_NEW } from "@/lib/whats-new";
 import React, { useState, useEffect } from "react";
 import {
   Key,
@@ -471,6 +472,29 @@ export default function SettingsView({
         )}
       </section>
 
+      <section className="card-inset p-5 space-y-3">
+        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+          <RefreshCw className="h-5 w-5 text-blue-500" />
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {t("updateTitle")}
+          </h2>
+          <span className="ml-auto text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
+            v{WHATS_NEW[0].version}
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+          {t("updateHelp")}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
+        >
+          <RefreshCw className="h-4 w-4 shrink-0" />
+          {t("updateCta")}
+        </button>
+      </section>
+
       <section className="card-inset p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
           <div className="flex items-center gap-2">
@@ -694,26 +718,6 @@ export default function SettingsView({
         {provinceError && (
           <p className="text-xs text-red-500">{t("salesTaxError")}</p>
         )}
-      </section>
-
-      <section className="card-inset p-5 space-y-3">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <RefreshCw className="h-5 w-5 text-blue-500" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("updateTitle")}
-          </h2>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("updateHelp")}
-        </p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
-        >
-          <RefreshCw className="h-4 w-4 shrink-0" />
-          {t("updateCta")}
-        </button>
       </section>
 
       <section className="card-inset p-5 space-y-3">
