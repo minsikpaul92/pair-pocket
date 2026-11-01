@@ -739,6 +739,18 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     totalsByCurrency,
   ]);
 
+  // Shown as zero when a ledger has no holdings yet, so the cards keep their shape.
+  const emptyTotalsLine = useMemo(
+    () => ({
+      currency: (ledgerScope === "KRW" ? "KRW" : "CAD") as Currency,
+      valuation: 0,
+      invested: 0,
+      profit: 0,
+      yield: 0,
+    }),
+    [ledgerScope]
+  );
+
   const headerLines = useMemo(() => {
     if (selectedAccountIdFilter !== "ALL") {
       const acc = investmentAccounts.find(
@@ -794,7 +806,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
         },
       ];
     }
-    return totalsByCurrency;
+    return totalsByCurrency.length > 0 ? totalsByCurrency : [emptyTotalsLine];
   }, [
     selectedAccountIdFilter,
     investmentAccounts,
@@ -804,6 +816,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     convertBetween,
     totalStats,
     totalsByCurrency,
+    emptyTotalsLine,
   ]);
 
   const cashTotalLines = useMemo(() => {
@@ -924,7 +937,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               </>
             ) : (
               <div className="mt-1 space-y-1">
-                {totalsByCurrency.map((line) => (
+                {(totalsByCurrency.length > 0 ? totalsByCurrency : [emptyTotalsLine]).map((line) => (
                   <div key={line.currency}>
                     <div className="text-base font-black text-gray-900 dark:text-white tabular-nums">
                       {formatStockAmount(line.valuation, line.currency)}
@@ -940,11 +953,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                     </div>
                   </div>
                 ))}
-                {totalsByCurrency.length === 0 && (
-                  <div className="text-base font-black text-gray-900 dark:text-white mt-1 tabular-nums">
-                    {formatStockAmount(0, "CAD")}
-                  </div>
-                )}
+                
               </div>
             )}
           </button>
@@ -1055,6 +1064,24 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             {t("myInvestment")}
           </h3>
           <div className="flex items-center gap-2">
+            {ledgerScope === "ALL" && (
+              <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+                {(["CAD", "KRW"] as const).map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setDisplayCurrency(code)}
+                    className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                      displayCurrency === code
+                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {t(code === "CAD" ? "displayCad" : "displayKrw")}
+                  </button>
+                ))}
+              </div>
+            )}
             {ledgerScope === "KRW" && (
               <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
                 <button
@@ -1165,17 +1192,17 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             )}
           </div>
         )}
-      </div>      {/* 4. Holdings title with the view toggle and sort, then account and add button */}
-      <div className="space-y-3 pt-2">
+      </div>      {/* 4. Holdings: one row with the title, view toggle, sort and add button */}
+      <div className="space-y-2 pt-2">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="min-w-0 truncate text-base font-bold text-gray-800 dark:text-gray-100">
+          <h2 className="min-w-0 truncate text-sm sm:text-base font-bold text-gray-800 dark:text-gray-100">
             {t("holdingsTitle")}
           </h2>
           {/* Value / Price toggle */}
           <div className="flex shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
               onClick={() => setViewMode("valuation")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
                 viewMode === "valuation"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1185,7 +1212,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
             <button
               onClick={() => setViewMode("price")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
                 viewMode === "price"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1210,22 +1237,28 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               aria-hidden
             />
           </label>
+          <button
+            onClick={() => {
+              resetAddForm();
+              setShowAddModal(true);
+            }}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t("addShort")}
+          </button>
         </div>
 
-        {/* The CAD and KRW ledgers switch currency in the Investments card above. */}
-        <div className="flex items-center gap-3">
-          {/* Active account (a chip only while a single account is filtered) */}
+        {/* Only while a single account is filtered; the currency toggle lives in the Investments card. */}
+        {selectedAccountIdFilter !== "ALL" && (
+          <div className="flex items-center">
+            {/* Active account (a chip only while a single account is filtered) */}
           <div
-            className={`flex min-w-0 flex-1 items-center gap-1.5 text-xs select-none ${
-              selectedAccountIdFilter === "ALL"
-                ? "font-medium text-gray-500 dark:text-gray-400"
-                : "rounded-xl bg-gray-100 px-3 py-1.5 font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            className={`flex min-w-0 items-center gap-1.5 text-xs select-none ${
+              "rounded-xl bg-gray-100 px-3 py-1.5 font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-200"
             }`}
           >
-            {selectedAccountIdFilter === "ALL" ? (
-              <span className="truncate">{allAccountsLabel}</span>
-            ) : (
-              <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1">
                 <span>
                   {(() => {
                     const matchedAcc = investmentAccounts.find((a) => a.id === selectedAccountIdFilter);
@@ -1242,43 +1275,9 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   ✕
                 </button>
               </div>
-            )}
           </div>
-          {ledgerScope === "ALL" && (
-          <div className="flex shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
-            <button
-              onClick={() => setDisplayCurrency("CAD")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                displayCurrency === "CAD"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayCad")}
-            </button>
-            <button
-              onClick={() => setDisplayCurrency("KRW")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                displayCurrency === "KRW"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayKrw")}
-            </button>
           </div>
-          )}
-          <button
-            onClick={() => {
-              resetAddForm();
-              setShowAddModal(true);
-            }}
-            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t("addHolding")}
-          </button>
-        </div>
+        )}
       </div>
 
       {/* 5. Holdings List */}

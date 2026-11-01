@@ -663,6 +663,7 @@
     "sharesAvg": "{shares} sh · Avg {avg}",
     "addHolding": "Add stock",
     "holdingsTitle": "Holdings",
+    "addShort": "Add",
     "editHolding": "Edit holding",
     "holdingShares": "Shares",
     "holdingAvgPrice": "Avg. price",
