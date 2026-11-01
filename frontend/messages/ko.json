@@ -730,12 +730,42 @@
     "filterAccount": "필터",
     "scanPhoto": "사진으로 분석"
   },
+  "bankImport": {
+    "title": "은행 명세서",
+    "subtitle": "은행에서 받은 CSV를 올려 주세요. 이미 입력한 내역은 건너뛰고, 애매한 건 직접 확인할 수 있게 남겨 둬요.",
+    "account": "계좌",
+    "file": "CSV 파일",
+    "analyze": "분석",
+    "noAccounts": "명세서를 가져오려면 먼저 계좌를 추가해 주세요.",
+    "previewFailed": "파일을 읽지 못했어요. 이 계좌의 은행 CSV가 맞는지 확인해 주세요.",
+    "saveFailed": "저장하지 못했어요. 아무것도 추가되지 않았어요.",
+    "saved": "{count}건을 저장했어요",
+    "reviewTitle": "확인이 필요해요",
+    "reviewHint": "저장할 내역에 체크하세요. AI 제안이 채워져 있어요.",
+    "autoTitle": "바로 저장해도 돼요",
+    "autoHint": "이전 입력과 맞거나 AI가 확실하게 제안한 내역이에요.",
+    "duplicateTitle": "이미 입력됨",
+    "duplicateHint": "건너뛰어요. 그래도 저장하려면 체크하세요.",
+    "merchant": "사용처",
+    "category": "대분류",
+    "subCategory": "중분류",
+    "card": "카드",
+    "pickCard": "카드를 선택하세요",
+    "needsChoice": "분류를 고르거나, 카드 대금이면 카드를 고르세요.",
+    "waiting": "아직 확인이 필요한 내역이 {count}건 있어요.",
+    "save": "{count}건 저장",
+    "cardSideNote": "카드 대금 납부예요. 은행 쪽에서 기록하므로 여기서는 제외했어요.",
+    "transferNote": "계좌 사이 이체예요. 내 계좌가 아닌 경우에만 수입/지출로 저장하세요.",
+    "etransferNote": "e-Transfer예요. 수입인지 지출인지 골라 주세요.",
+    "similarTo": "{date}의 {merchant}와 비슷해요"
+  },
   "importPage": {
     "title": "스마트 가져오기 & 파일 관리",
     "subtitle": "가계부 CSV 가져오기·내보내기와 OCR/가져오기 로그를 관리합니다.",
     "tabAi": "AI 파일 스캐너",
     "tabCsv": "CSV 연동",
     "tabLogs": "AI 분석 로그",
+    "tabBank": "은행 명세서",
     "uploadTitle": "영수증 사진 & 청구서 PDF 업로드",
     "uploadHint": "HEIC, PNG, JPEG 이미지 파일 및 PDF 지원",
     "uploadHintQueue": "파일을 먼저 모아 두고 분석을 시작하세요. 최대 15개.",
@@ -1115,6 +1145,10 @@
   },
   "whatsNew": {
     "items": {
+      "bankStatementImport": {
+        "title": "은행 명세서 가져오기",
+        "description": "스마트 가져오기에서 은행 CSV를 올리면 이미 입력한 내역은 건너뛰고, 나머지는 분류를 추천해 줘요. 애매한 것만 확인하면 돼요."
+      },
       "provinceTax": {
         "title": "내가 사는 주의 세금",
         "description": "설정에서 거주하는 주를 고르면 지출 입력 시 고정 13% 대신 그 주의 세율로 세금을 추정해요. 세율은 세금 옆에 표시돼요."

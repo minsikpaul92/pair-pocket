@@ -2641,3 +2641,79 @@ export async function markAllNotificationsRead(): Promise<void> {
   });
   if (!res.ok) throw new ApiError("serverUnavailable");
 }
+
+export type BankRowHint =
+  | "normal"
+  | "card_repayment"
+  | "account_transfer"
+  | "e_transfer";
+
+export interface BankRowSuggestion {
+  merchant: string;
+  type: "expense" | "income";
+  category: string;
+  sub_category: string;
+  confidence: number;
+  source: "history" | "ai";
+}
+
+export interface BankPreviewRow {
+  index: number;
+  date: string;
+  description: string;
+  amount: number;
+  direction: "out" | "in";
+  balance: number | null;
+  hint: BankRowHint;
+  counterpart: string | null;
+  status: "new" | "duplicate" | "review";
+  match: { id: string; date: string; merchant: string | null; amount: number } | null;
+  suggestion: BankRowSuggestion | null;
+  bucket: "auto" | "review" | "duplicate";
+}
+
+export interface BankPreview {
+  account_id: string;
+  rows: BankPreviewRow[];
+  summary: { auto: number; review: number; duplicate: number };
+}
+
+export interface BankImportItem {
+  date: string;
+  amount: number;
+  direction: "out" | "in";
+  merchant: string;
+  category?: string;
+  sub_category?: string;
+  kind?: "normal" | "card_repayment";
+  counter_account_id?: string;
+}
+
+export async function previewBankCsv(
+  accountId: string,
+  file: File
+): Promise<BankPreview> {
+  const formData = new FormData();
+  formData.append("account_id", accountId);
+  formData.append("file", file);
+  const res = await apiFetch(`${API_BASE_URL}/api/import/bank/preview`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: formData,
+  });
+  if (!res.ok) throw await readApiError(res, "previewBank");
+  return (await res.json()) as BankPreview;
+}
+
+export async function commitBankRows(
+  accountId: string,
+  items: BankImportItem[]
+): Promise<{ created: number }> {
+  const res = await apiFetch(`${API_BASE_URL}/api/import/bank/commit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ account_id: accountId, items }),
+  });
+  if (!res.ok) throw await readApiError(res, "saveBank");
+  return (await res.json()) as { created: number };
+}

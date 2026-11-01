@@ -40,6 +40,7 @@ import {
   monthRanges,
   parseImportCsv,
 } from "@/lib/csv-export";
+import BankImportPanel from "@/components/BankImportPanel";
 import InfoTip from "@/components/InfoTip";
 import MonthPicker from "@/components/MonthPicker";
 import { useLocale, useTranslations } from "next-intl";
@@ -111,7 +112,14 @@ export default function ImportView({ scope, accountType, presets, month, onChang
   const tSubCategories = useTranslations("subCategories");
   const locale = useLocale();
 
-  const [activeSubTab, setActiveSubTab] = useState<"csv" | "logs">("csv");
+  const [activeSubTab, setActiveSubTab] = useState<"csv" | "bank" | "logs">(() => {
+    try {
+      // A bank import refreshes the app; stay on its tab so the result stays visible.
+      return window.sessionStorage.getItem("pairpocket.bankImportSaved") ? "bank" : "csv";
+    } catch {
+      return "csv";
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -414,6 +422,16 @@ export default function ImportView({ scope, accountType, presets, month, onChang
             {t("tabCsv")}
           </button>
           <button
+            onClick={() => setActiveSubTab("bank")}
+            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
+              activeSubTab === "bank"
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            {t("tabBank")}
+          </button>
+          <button
             onClick={() => setActiveSubTab("logs")}
             className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeSubTab === "logs"
@@ -666,6 +684,15 @@ export default function ImportView({ scope, accountType, presets, month, onChang
             </button>
           </div>
         </div>
+      )}
+
+      {activeSubTab === "bank" && (
+        <BankImportPanel
+          scope={scope}
+          accountType={accountType}
+          presets={presets}
+          onChanged={onChanged}
+        />
       )}
 
       {/* SUB TAB 3: SCAN LOGS */}
