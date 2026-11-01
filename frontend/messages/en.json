@@ -102,6 +102,7 @@
       "resetButton": "Reset",
       "resetTitle": "How do you want to reset?",
       "resetSelected": "Only {name}, as a new user",
+      "resetSelectedNone": "Only the selected account, as a new user",
       "tipResetSelected": "Deletes only the data of {name} and leaves the others as they are. The next sign-in starts at onboarding.",
       "cancel": "Cancel",
       "backToTest": "Test page",

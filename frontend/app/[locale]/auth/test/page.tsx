@@ -1,5 +1,6 @@
 import { Wallet } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import LocaleToggle from "@/components/LocaleToggle";
@@ -21,10 +22,12 @@ export default async function TestLoginPage({ params }: Props) {
     <main className="min-h-dvh bg-white dark:bg-black">
       <div className="mx-auto max-w-md px-5 pb-16 pt-[max(env(safe-area-inset-top),1.5rem)]">
         <header className="flex items-center gap-2 pb-12">
-          <Wallet className="h-6 w-6 text-blue-500" />
-          <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-            {tCommon("appName")}
-          </span>
+          <Link href={`/${locale}`} className="flex items-center gap-2">
+            <Wallet className="h-6 w-6 text-blue-500" />
+            <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
+              {tCommon("appName")}
+            </span>
+          </Link>
           <div className="ml-auto">
             <LocaleToggle forceVisible />
           </div>

@@ -17,8 +17,6 @@ import { translateError } from "@/lib/errors";
 const PASSWORD_KEY = "pairpocket.testLoginPassword";
 /** Accounts reset to "new user"; their next sign-in must not set them up again. */
 const FRESH_KEY = "pairpocket.testLoginFresh";
-/** Set after a test sign-in so other screens can link back to the test page. */
-export const TEST_LOGIN_FLAG = "pairpocket.testLogin";
 
 type Notice = { kind: "error" | "info"; text: string };
 type ResetChoice = "couples" | "empty" | "selected";
@@ -102,7 +100,6 @@ export default function TestLoginPanel() {
         !fresh.includes(account)
       );
       writeStored(PASSWORD_KEY, password);
-      writeStored(TEST_LOGIN_FLAG, "1");
       writeStored(
         FRESH_KEY,
         JSON.stringify(fresh.filter((id) => id !== account))
@@ -154,18 +151,26 @@ export default function TestLoginPanel() {
   const name = accounts.find((item) => item.id === account)?.name ?? "";
   const field =
     "w-full rounded-2xl bg-gray-100 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-gray-100";
-  const options: { choice: ResetChoice; title: string; hint: string }[] = [
+  const options: {
+    choice: ResetChoice;
+    title: string;
+    hint: string;
+    disabled?: boolean;
+  }[] = [
     { choice: "couples", title: t("resetCouples"), hint: t("tipResetCouples") },
     { choice: "empty", title: t("reset"), hint: t("tipReset") },
-    ...(account
-      ? [
-          {
-            choice: "selected" as const,
-            title: t("resetSelected", { name }),
-            hint: t("tipResetSelected", { name }),
-          },
-        ]
-      : []),
+    account
+      ? {
+          choice: "selected",
+          title: t("resetSelected", { name }),
+          hint: t("tipResetSelected", { name }),
+        }
+      : {
+          choice: "selected",
+          title: t("resetSelectedNone"),
+          hint: t("accountFirst"),
+          disabled: true,
+        },
   ];
 
   return (
@@ -303,7 +308,8 @@ export default function TestLoginPanel() {
                 <button
                   type="button"
                   onClick={() => reset(option.choice)}
-                  className="flex-1 rounded-2xl p-4 text-left text-base font-semibold text-gray-900 dark:text-white"
+                  disabled={option.disabled}
+                  className="flex-1 rounded-2xl p-4 text-left text-base font-semibold text-gray-900 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-white dark:disabled:text-gray-500"
                 >
                   {option.title}
                 </button>

@@ -6,7 +6,6 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 
 import OnboardingWizard from "@/components/OnboardingWizard";
-import { TEST_LOGIN_FLAG } from "@/components/TestLoginPanel";
 import { useRouter } from "@/i18n/navigation";
 import type { AppLocale } from "@/i18n/locales";
 import { fetchCurrentUser, fetchUserSettings } from "@/lib/api";
@@ -26,17 +25,16 @@ function readSessionLocales(): AppLocale[] {
   }
 }
 
-/** After a test sign-in: a way back to the test page, which has no other exit. */
+/** For a test account: a way back to the test page, which has no other exit. */
 function TestPageLink() {
   const t = useTranslations("auth.testLogin");
   const locale = useLocale();
   const [show, setShow] = useState(false);
   useEffect(() => {
-    try {
-      setShow(window.localStorage.getItem(TEST_LOGIN_FLAG) === "1");
-    } catch {
-      /* storage unavailable */
-    }
+    // Only for a built-in test account, never for a real sign-in.
+    fetchCurrentUser()
+      .then((user) => setShow(Boolean(user?.google_id.startsWith("test-login:"))))
+      .catch(() => null);
   }, []);
   if (!show) return null;
   return (

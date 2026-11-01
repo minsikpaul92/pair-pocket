@@ -102,6 +102,7 @@
       "resetButton": "초기화",
       "resetTitle": "어떻게 초기화할까요?",
       "resetSelected": "{name}만 처음 가입한 상태로",
+      "resetSelectedNone": "선택한 계정만 처음 가입한 상태로",
       "tipResetSelected": "{name}의 데이터만 지워요. 다른 계정은 그대로예요. 다음 로그인은 온보딩부터 시작해요.",
       "cancel": "취소",
       "backToTest": "테스트 페이지",
