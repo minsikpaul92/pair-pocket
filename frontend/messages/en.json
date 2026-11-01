@@ -264,7 +264,7 @@
     "scanFailed": "AI scan failed.",
     "scanCardTitle": "Fill from screenshot / receipt",
     "scanCardCount": "{count} / {max}",
-    "scanCardHint": "Drag photos or PDF statements here, or tap [Add photo] below. (Up to {max})",
+    "scanCardHint": "Drag, paste (Cmd+V), or tap [Add photo] below to add photos or PDF statements. (Up to {max})",
     "scanRemove": "Remove",
     "scanAddPhoto": "Add photo",
     "scanDeep": "Deep AI analysis…",
@@ -1118,6 +1118,10 @@
       "provinceTax": {
         "title": "Tax for your province",
         "description": "Pick your province in Settings and the expense form estimates tax with its rate instead of a fixed 13%. The rate is shown next to Tax."
+      },
+      "pasteImage": {
+        "title": "Paste a receipt image",
+        "description": "On a computer, copy a receipt or screenshot and press Cmd+V (Ctrl+V on Windows) to add it straight to the AI scan queue."
       },
       "receiptTax": {
         "title": "Tax that matches your receipt",
