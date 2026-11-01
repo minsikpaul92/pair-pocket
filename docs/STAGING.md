@@ -106,10 +106,10 @@ Only needed to test the real Google flow.
 
 1. `https://<staging-app>.herokuapp.com/health` returns `"status": "ok"` and `"db": "ok"`.
 2. `https://<staging-app>.herokuapp.com/api/auth/test-login` returns the four test accounts. A 404 means `TEST_LOGIN_PASSWORD` is missing or `MONGODB_DB_NAME` does not end in `_staging`.
-3. Open `https://dev.pairpocket.me/en/auth/test`: the page shows the yellow **Test sign-in** box. The normal sign-in page does not.
+3. Open `https://dev.pairpocket.me/test`: the page shows the yellow **Test sign-in** box, with one button per tester and a form to pick an account. The normal sign-in page does not.
 4. Enter the password and press **Reset to linked couples with accounts**, then sign in as Tester 1. The app opens in Korean with the shared ledger and three accounts ready. Tester 3 opens in English.
 5. In Atlas, the data appears in `pairpocket_staging`, not `pairpocket`.
-6. Production check: `https://<production-api>/api/auth/test-login` returns 404 and `www.pairpocket.me/en/auth/test` shows no test box.
+6. Production check: `https://<production-api>/api/auth/test-login` returns 404 and `www.pairpocket.me/test` shows no test box.
 
 What each reset button does, and how to use the test accounts, is in [BRANCHING.md, Test accounts on staging](./BRANCHING.md#test-accounts-on-staging).
 

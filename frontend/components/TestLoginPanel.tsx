@@ -46,10 +46,14 @@ export default function TestLoginPanel() {
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
+    await signInAs(account);
+  }
+
+  async function signInAs(accountId: string) {
     setBusy(true);
     setNotice(null);
     try {
-      const code = await signInTestAccount(account, password);
+      const code = await signInTestAccount(accountId, password);
       window.location.assign(
         `/${locale}/auth/callback?code=${encodeURIComponent(code)}`
       );
@@ -137,7 +141,21 @@ export default function TestLoginPanel() {
         </p>
       )}
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {accounts.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => signInAs(item.id)}
+            disabled={busy || !password}
+            className="rounded-xl border border-amber-600 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-300 transition-colors hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50"
+          >
+            {item.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
         <button
           type="submit"
           disabled={busy || !password}
