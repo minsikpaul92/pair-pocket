@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, FileSpreadsheet, Loader2 } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, Loader2, UploadCloud } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   AccountType,
@@ -16,6 +16,7 @@ import {
   fetchAccounts,
   formatAmount,
   previewBankCsv,
+  undoBankImport,
 } from "@/lib/api";
 import {
   categoryI18nKey,
@@ -75,16 +76,16 @@ export default function BankImportPanel({
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Saving refreshes the app, which remounts this panel, so the count survives via sessionStorage.
-  const [saved, setSaved] = useState<number | null>(() => {
+  // Saving refreshes the app, which remounts this panel, so the result survives via sessionStorage.
+  const [saved, setSaved] = useState<{ count: number; batchId: string } | null>(() => {
     try {
       const stored = window.sessionStorage.getItem(SAVED_KEY);
-      window.sessionStorage.removeItem(SAVED_KEY);
-      return stored ? Number(stored) : null;
+      return stored ? (JSON.parse(stored) as { count: number; batchId: string }) : null;
     } catch {
       return null;
     }
   });
+  const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<BankPreview | null>(null);
   const [rows, setRows] = useState<RowState[]>([]);
 
@@ -131,6 +132,32 @@ export default function BankImportPanel({
       setPreview(null);
       setRows([]);
       setError(t("previewFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function pickFile(picked: File | undefined | null) {
+    if (!picked) return;
+    if (!picked.name.toLowerCase().endsWith(".csv")) {
+      setError(t("csvOnly"));
+      return;
+    }
+    setError(null);
+    setFile(picked);
+  }
+
+  async function undo() {
+    if (!saved || !window.confirm(t("undoConfirm", { count: saved.count }))) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await undoBankImport(saved.batchId);
+      window.sessionStorage.removeItem(SAVED_KEY);
+      setSaved(null);
+      onChanged();
+    } catch {
+      setError(t("undoFailed"));
     } finally {
       setBusy(false);
     }
@@ -187,9 +214,10 @@ export default function BankImportPanel({
               }
         )
       );
-      setSaved(result.created);
+      const done = { count: result.created, batchId: result.batch_id };
+      setSaved(done);
       try {
-        window.sessionStorage.setItem(SAVED_KEY, String(result.created));
+        window.sessionStorage.setItem(SAVED_KEY, JSON.stringify(done));
       } catch {
         /* storage unavailable; the message only shows until the refresh */
       }
@@ -358,7 +386,7 @@ export default function BankImportPanel({
           </h2>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("subtitle")}</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3">
           <label className="space-y-1">
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
               {t("account")}
@@ -375,15 +403,35 @@ export default function BankImportPanel({
               ))}
             </select>
           </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-              {t("file")}
-            </span>
+        </div>
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            pickFile(e.dataTransfer.files?.[0]);
+          }}
+          className={`flex min-h-[130px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition-all ${
+            dragging
+              ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/20"
+              : "border-gray-300 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/10"
+          }`}
+        >
+          <UploadCloud className="h-7 w-7 text-gray-400" />
+          <span className="max-w-full truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
+            {file ? file.name : t("dropHere")}
+          </span>
+          <label className="cursor-pointer rounded-lg bg-gray-100 px-3.5 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-white">
+            {t("choose")}
             <input
               type="file"
               accept=".csv,text/csv"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-xs text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-indigo-700 dark:text-gray-300"
+              onChange={(e) => pickFile(e.target.files?.[0])}
+              className="hidden"
             />
           </label>
         </div>
@@ -403,9 +451,17 @@ export default function BankImportPanel({
 
       {error && <p className="text-xs text-red-500">{error}</p>}
       {saved !== null && (
-        <p className="rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-          {t("saved", { count: saved })}
-        </p>
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <span>{t("saved", { count: saved.count })}</span>
+          <button
+            type="button"
+            onClick={() => void undo()}
+            disabled={busy}
+            className="shrink-0 rounded-lg border border-emerald-300 px-2.5 py-1 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:hover:bg-emerald-950"
+          >
+            {t("undo")}
+          </button>
+        </div>
       )}
 
       {preview && (

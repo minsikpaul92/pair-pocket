@@ -259,7 +259,8 @@ def _item(**changes):
 def test_commit_saves_entries_without_notifying(env, client):
     res = _commit(client, env.accounts.personal, [_item(), _item(direction="in", amount=5,
         merchant="Refund", category="금융/기타", sub_category="은행 이자")])
-    assert res.status_code == 201 and res.json() == {"created": 2}
+    assert res.status_code == 201 and res.json()["created"] == 2
+    assert res.json()["batch_id"]
     saved = run(env.db.transactions.find({}).to_list(length=None))
     assert {d["type"] for d in saved} == {"expense", "income"}
     assert all(d["account_id"] == str(env.accounts.personal["_id"]) for d in saved)
@@ -287,3 +288,21 @@ def test_commit_card_repayment_is_a_transfer_to_the_card(env, client):
 def test_commit_rejects_raw_transfer_category(env, client):
     res = _commit(client, env.accounts.personal, [_item(category="자산 이동/카드", sub_category="내 계좌 이동")])
     assert res.status_code == 422
+
+
+def test_undo_removes_only_that_import(env, client):
+    first = _commit(client, env.accounts.personal, [_item(), _item(merchant="Other")]).json()
+    second = _commit(client, env.accounts.personal, [_item(merchant="Later")]).json()
+    res = client.delete(f"/api/import/bank/batch/{first['batch_id']}")
+    assert res.status_code == 200 and res.json() == {"deleted": 2}
+    left = run(env.db.transactions.find({}).to_list(length=None))
+    assert [d["merchant"] for d in left] == ["Later"]
+    assert client.delete(f"/api/import/bank/batch/{first['batch_id']}").status_code == 404
+    assert second["created"] == 1
+
+
+def test_undo_is_blocked_once_an_entry_is_settled(env, client):
+    batch = _commit(client, env.accounts.personal, [_item()]).json()["batch_id"]
+    saved = run(env.db.transactions.find_one({}))
+    run(env.db.transactions.insert_one({"owner_id": saved["owner_id"], "settles_expense_id": str(saved["_id"])}))
+    assert client.delete(f"/api/import/bank/batch/{batch}").status_code == 409

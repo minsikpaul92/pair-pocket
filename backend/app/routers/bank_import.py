@@ -238,5 +238,27 @@ async def commit_bank_rows(
                 payload, owner_id=current_user.id, shared_group_id=current_user.shared_group_id
             )
         )
+    batch_id = str(ObjectId())
+    for document in documents:
+        document["import_batch_id"] = batch_id
     await db["transactions"].insert_many(documents)
-    return {"created": len(documents)}
+    return {"created": len(documents), "batch_id": batch_id}
+
+
+@router.delete("/batch/{batch_id}")
+async def undo_bank_import(
+    batch_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Remove what one import saved, so a wrong import can be redone cleanly."""
+    query = {"import_batch_id": batch_id, "owner_id": current_user.id}
+    ids = [str(d["_id"]) async for d in db["transactions"].find(query, {"_id": 1})]
+    if not ids:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Import not found")
+    if await db["transactions"].count_documents({"settles_expense_id": {"$in": ids}}):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Some entries are already settled and cannot be undone"
+        )
+    result = await db["transactions"].delete_many(query)
+    return {"deleted": result.deleted_count}

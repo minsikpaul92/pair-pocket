@@ -2708,12 +2708,20 @@ export async function previewBankCsv(
 export async function commitBankRows(
   accountId: string,
   items: BankImportItem[]
-): Promise<{ created: number }> {
+): Promise<{ created: number; batch_id: string }> {
   const res = await apiFetch(`${API_BASE_URL}/api/import/bank/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ account_id: accountId, items }),
   });
   if (!res.ok) throw await readApiError(res, "saveBank");
-  return (await res.json()) as { created: number };
+  return (await res.json()) as { created: number; batch_id: string };
+}
+
+export async function undoBankImport(batchId: string): Promise<void> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/import/bank/batch/${encodeURIComponent(batchId)}`,
+    { method: "DELETE", headers: authHeaders() }
+  );
+  if (!res.ok) throw await readApiError(res, "undoBank");
 }
