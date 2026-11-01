@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t.meta.title}}</title>
+<meta name="description" content="{{t.meta.description}}">
+<meta name="theme-color" content="#ddd6c6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1d19" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="{{canonical}}">
+{{hreflang}}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pair Pocket">
+<meta property="og:title" content="{{t.meta.title}}">
+<meta property="og:description" content="{{t.meta.description}}">
+<meta property="og:url" content="{{canonical}}">
+<meta property="og:image" content="{{ogImage}}">
+<meta property="og:image:alt" content="{{t.meta.ogAlt}}">
+<meta property="og:locale" content="{{ogLocale}}">
+{{ogAlternates}}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{t.meta.title}}">
+<meta name="twitter:description" content="{{t.meta.description}}">
+<meta name="twitter:image" content="{{ogImage}}">
+<link rel="icon" href="{{base}}favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{base}}favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="{{base}}apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="{{base}}styles.css">
+{{langscript}}
+<script type="application/ld+json">{{jsonld}}</script>
+</head>
+<body data-api="{{l.repoApi}}">
+<a class="skip" href="#main">{{t.skip}}</a>
+
+<main id="main">
+<div class="split">
+  <div class="read">
+    <header class="bar">
+      <a class="wordmark" href="#top" aria-label="{{t.brand}}"><img src="{{base}}logo.svg" width="26" height="26" alt=""><span>{{t.brand}}</span></a>
+      <nav class="links" aria-label="{{t.nav.label}}">
+        <a href="#why">{{t.nav.why}}</a>
+        <a href="#features">{{t.nav.features}}</a>
+        <a href="#try">{{t.nav.try}}</a>
+        <a href="#built">{{t.nav.built}}</a>
+      </nav>
+      {{switcher}}
+      <a class="btn btn-sm" href="{{appUrl}}">{{t.nav.getStarted}}</a>
+    </header>
+
+    <section class="hero" id="top" data-stage="toggle" aria-labelledby="h1">
+      <div class="stripe" aria-hidden="true"></div>
+      <div class="hero-body">
+        <h1 id="h1">{{t.hero.h1}}</h1>
+        <p class="sub">{{t.hero.sub}}</p>
+        <p class="actions">
+          <a class="btn" href="{{appUrl}}">{{t.hero.cta}}</a>
+          <a class="btn btn-quiet" href="{{l.repo}}" rel="noopener">{{icon:star}}{{t.hero.star}}</a>
+        </p>
+      </div>
+{{clip:toggle}}
+    </section>
+
+    <section class="sec" id="why" data-stage="toggle" data-r aria-labelledby="why-h">
+      <h2 id="why-h">{{t.story.h2}}</h2>
+      <p>{{t.story.p1}}</p>
+      <p>{{t.story.p2}}</p>
+      <p>{{t.story.p3}}</p>
+    </section>
+
+    <section class="sec sec-features" id="features" data-r aria-labelledby="features-h">
+      <h2 id="features-h" class="h-small">{{t.features.h2}}</h2>
+
+      <article class="feat" data-stage="toggle" data-r>
+        <h3>{{t.ledgers.h}}</h3>
+        <p>{{t.ledgers.p1}}</p>
+        <p>{{t.ledgers.p2}}</p>
+{{clip:toggle}}
+      </article>
+
+      <article class="feat" data-stage="add-entry" data-r>
+        <h3>{{t.add.h}}</h3>
+        <p>{{t.add.p}}</p>
+{{clip:add-entry}}
+      </article>
+
+      <article class="feat" data-stage="ai-scan" data-r>
+        <h3>{{t.scan.h}}</h3>
+        <p>{{t.scan.p}}</p>
+{{clip:ai-scan}}
+      </article>
+
+      <article class="feat" data-stage="settlement" data-r>
+        <h3>{{t.settle.h}}</h3>
+        <p>{{t.settle.p}}</p>
+{{clip:settlement}}
+      </article>
+
+      <article class="feat" data-stage="moves" data-r>
+        <h3>{{t.moves.h}}</h3>
+        <p>{{t.moves.p}}</p>
+{{clip:moves}}
+      </article>
+
+      <article class="feat" data-stage="subscriptions" data-r>
+        <h3>{{t.subs.h}}</h3>
+        <p>{{t.subs.p}}</p>
+{{clip:subscriptions}}
+      </article>
+
+      <article class="feat" data-stage="stocks" data-r>
+        <h3>{{t.stocks.h}}</h3>
+        <p>{{t.stocks.p}}</p>
+{{clip:stocks}}
+      </article>
+
+      <article class="feat" data-stage="invite" data-r>
+        <h3>{{t.invite.h}}</h3>
+        <p>{{t.invite.p}}</p>
+{{clip:invite}}
+      </article>
+    </section>
+  </div>
+
+  <div class="stage" data-stage-root>
+{{stage}}
+  </div>
+</div>
+
+<section class="try" id="try" data-r aria-labelledby="try-h">
+  <div class="wrap try-grid">
+    <div class="try-copy">
+      <h2 id="try-h">{{t.try.h2}}</h2>
+      <p>{{t.try.p}}</p>
+      <p class="fallback">{{t.try.fallback}}</p>
+    </div>
+    <form class="calc" data-ui data-calc novalidate aria-describedby="calc-note" data-locale="{{lang}}">
+      <div class="calc-row">
+        <label for="calc-amount">{{t.try.expense}}</label>
+        <input id="calc-amount" name="amount" type="number" inputmode="decimal" min="0" step="any" value="86">
+      </div>
+      <fieldset class="seg">
+        <legend>{{t.try.currency}}</legend>
+        <label><input type="radio" name="cur" value="CAD" checked><span>CAD</span></label>
+        <label><input type="radio" name="cur" value="KRW"><span>KRW</span></label>
+      </fieldset>
+      <div class="calc-row">
+        <label for="calc-pct">{{t.try.slider}} <output id="calc-pct-out" for="calc-pct">100%</output></label>
+        <input id="calc-pct" name="pct" type="range" min="0" max="100" step="1" value="100">
+      </div>
+      <dl class="calc-out" aria-live="polite">
+        <div><dt>{{t.try.spending}}</dt><dd data-out="spending">CA$86.00</dd></div>
+        <div><dt>{{t.try.personal}}</dt><dd data-out="personal">+CA$86.00</dd></div>
+        <div><dt>{{t.try.shared}}</dt><dd data-out="shared">-CA$86.00</dd></div>
+        <div><dt>{{t.try.left}}</dt><dd data-out="left">CA$0.00</dd></div>
+      </dl>
+      <p id="calc-note" class="calc-note">{{t.try.note}}</p>
+    </form>
+  </div>
+</section>
+
+<section class="free" id="free" data-r aria-labelledby="free-h">
+  <div class="wrap">
+    <h2 id="free-h">{{t.free.h2}}</h2>
+    <dl class="figs">
+{{freeRows}}
+    </dl>
+  </div>
+</section>
+
+<section class="built" id="built" data-r aria-labelledby="built-h">
+  <div class="wrap built-grid">
+    <div class="built-copy">
+      <h2 id="built-h">{{t.built.h2}}</h2>
+      <p>{{t.built.p}}</p>
+      <ol class="flow" aria-label="{{t.built.stack}}">
+        <li>Browser</li><li>Next.js<small>Vercel</small></li><li>FastAPI<small>Heroku</small></li><li>MongoDB<small>Atlas</small></li>
+      </ol>
+      <p class="stack">{{t.built.stack}}</p>
+      <p class="by">{{t.built.by}} <a href="{{l.linkedin}}" rel="noopener">{{t.built.hello}}</a></p>
+    </div>
+    <dl class="notes">
+{{builtItems}}
+    </dl>
+  </div>
+</section>
+
+<section class="cta" id="start" aria-labelledby="cta-h">
+  <div class="cta-grid">
+    <div class="cta-copy">
+      <h2 id="cta-h">{{t.cta.h2}}</h2>
+      <p>{{t.cta.p}}</p>
+    </div>
+    <div class="dialog" data-ui>
+      <img src="{{base}}logo.svg" width="40" height="40" alt="">
+      <p class="dialog-title">{{t.cta.dialogTitle}}</p>
+      <p class="dialog-tag">{{t.cta.dialogTagline}}</p>
+      <p class="dialog-desc">{{t.cta.dialogDesc}}</p>
+      <a class="btn btn-block" href="{{appUrl}}">{{t.cta.button}}</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="stripe stripe-thin" aria-hidden="true"></div>
+  <section class="star" aria-labelledby="star-h">
+    <div class="star-copy">
+      <h2 id="star-h">{{t.footer.starH}}</h2>
+      <p>{{t.footer.starP}}</p>
+    </div>
+    <a class="btn btn-star" href="{{l.repo}}" rel="noopener" data-star>{{icon:star}}<span>{{t.footer.star}}</span><span class="star-count" data-star-count data-tpl="{{t.footer.starCount}}" hidden></span></a>
+  </section>
+  <div class="line">
+    <p class="line-a">{{t.footer.tagline}}</p>
+    <nav class="line-b" aria-label="{{t.footer.links}}">
+      <a href="{{l.repo}}" rel="noopener">{{t.footer.github}}</a>
+      <a href="{{l.linkedin}}" rel="noopener">{{t.footer.linkedin}}</a>
+      {{portfolio}}
+      <a href="{{l.coffee}}" rel="noopener">{{t.footer.coffee}}</a>
+      <a href="{{appUrl}}">{{t.footer.app}}</a>
+    </nav>
+    <p class="line-c">&copy; {{year}} {{l.ownerFull}} · <a href="{{l.repo}}/blob/main/LICENSE" rel="noopener">{{t.footer.license}}</a></p>
+  </div>
+</footer>
+
+<script src="{{base}}main.js" defer></script>
+</body>
+</html>

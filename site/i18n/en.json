@@ -1,0 +1,191 @@
+{
+  "meta": {
+    "title": "Pair Pocket: mine, yours and ours, in two currencies",
+    "description": "A household ledger for couples who share some money and keep some apart. Personal and shared ledgers, CAD and KRW side by side, free, with no bank connection.",
+    "ogAlt": "Pair Pocket: mine, yours and ours, in two currencies"
+  },
+  "skip": "Skip to content",
+  "brand": "Pair Pocket",
+  "nav": {
+    "label": "Main",
+    "why": "Why",
+    "features": "Features",
+    "try": "Try it",
+    "built": "Tech",
+    "getStarted": "Get started",
+    "language": "Language"
+  },
+  "hero": {
+    "h1": "Mine, yours and ours, in two currencies.",
+    "sub": "A household ledger for couples who share some money and keep some apart. Canadian dollars and Korean won, side by side.",
+    "cta": "Get started",
+    "star": "Star on GitHub"
+  },
+  "story": {
+    "h2": "Most money apps assume one country and one person.",
+    "p1": "I moved to Canada and still hold money in more than one country. Every app I tried was built for a single market, or treated the two of us as one person.",
+    "p2": "I wanted mine, yours and ours in one place, in two currencies, without my private entries showing up on my partner's screen. I could not find that, so I built it.",
+    "p3": "Bank statements make it harder. They show money moving under a code nobody remembers six months later. Pair Pocket lets you record the story behind the money instead."
+  },
+  "features": {
+    "h2": "What it does"
+  },
+  "ledgers": {
+    "h": "Your book, their book, and the one you share.",
+    "p1": "Each person keeps a private personal ledger. Partners link a shared ledger on top. Switch between them with one tap, and look at Canada, Korea or both with exchange rates.",
+    "p2": "What you keep personal stays personal. If you ever unlink, the shared history never reaches a new partner."
+  },
+  "add": {
+    "h": "Entries take a few taps.",
+    "p": "Merchants and categories you used before are suggested as you type. Bring in a lot at once with a CSV file, and export one whenever you want."
+  },
+  "scan": {
+    "h": "Scan a receipt, review, save.",
+    "p": "A photo or a statement screenshot becomes a draft entry, and you check it before it is saved. AI is optional and runs on your own free Gemini key. Manual entry and CSV import work without one."
+  },
+  "settle": {
+    "h": "Settle up without a spreadsheet.",
+    "p": "Paid for a shared expense from your own account? Settle it with money from a personal account, or the other way around. Both sides are written together, so the books always agree."
+  },
+  "moves": {
+    "h": "Moving money is not spending.",
+    "p": "Card payments, transfers between your accounts and money going between the personal and shared ledgers stay in the history but are not counted as spending. Your charts show what you actually spent, not the same money twice."
+  },
+  "subs": {
+    "h": "Fixed expenses that remember themselves.",
+    "p": "Subscriptions, bills and installments, with promo pricing, skipped payments and reminder emails. Move one between personal and shared when life changes."
+  },
+  "stocks": {
+    "h": "Holdings in both countries.",
+    "p": "Track brokerage accounts with live quotes and currency conversion, right next to the rest of your money."
+  },
+  "invite": {
+    "h": "Invite your partner by email.",
+    "p": "Pick a shared ledger start date so both of you line up from day one. Once they accept, the shared ledger is ready."
+  },
+  "try": {
+    "h2": "Try a settlement.",
+    "p": "You paid for a shared grocery run with your own card. Slide to settle it from the shared account and watch where the money goes.",
+    "expense": "Shared expense",
+    "currency": "Currency",
+    "slider": "Settled from the shared account",
+    "spending": "Counted as spending",
+    "personal": "Personal account",
+    "shared": "Shared account",
+    "left": "Left to settle",
+    "note": "Charts count the expense once, however it is settled.",
+    "fallback": "Example: a CA$86.00 grocery bill paid on your card. Settle CA$86.00 from the shared account. Your personal account gets CA$86.00 back, the shared account drops by CA$86.00, nothing is left to settle, and your charts still count CA$86.00 once."
+  },
+  "free": {
+    "h2": "Free, private, and clear about it.",
+    "rows": [
+      {
+        "fig": "0",
+        "text": "ads in the app."
+      },
+      {
+        "fig": "0",
+        "text": "bank connections, on purpose. Bank aggregation is a paid service, and a free app cannot honestly offer it."
+      },
+      {
+        "fig": "0",
+        "text": "passwords stored. You sign in with Google."
+      },
+      {
+        "fig": "2",
+        "text": "currencies side by side, Canadian dollars and Korean won."
+      },
+      {
+        "fig": "2",
+        "text": "languages in full, English and Korean, and it installs on your phone like an app."
+      }
+    ]
+  },
+  "built": {
+    "h2": "Built end to end by one person.",
+    "p": "Pair Pocket is a production app, not a mockup. I designed it, built it and run it.",
+    "stack": "Next.js on Vercel, FastAPI on Heroku, MongoDB Atlas, Google Gemini.",
+    "items": [
+      {
+        "t": "Ledger isolation",
+        "d": "Every read is scoped to the person or the partnership and fails closed, so a partner's private history never reaches shared suggestions."
+      },
+      {
+        "t": "Atomic paired writes",
+        "d": "Transfers and settlements write both sides in one database transaction. If the second write fails, the first rolls back."
+      },
+      {
+        "t": "Sessions",
+        "d": "Short-lived access tokens with a rotating, revocable refresh cookie."
+      },
+      {
+        "t": "AI as a draft",
+        "d": "Model output goes through a review screen, and each person's key is encrypted at rest."
+      },
+      {
+        "t": "Tested and checked",
+        "d": "Every pull request runs lint, a translation check, a production build and the backend tests."
+      }
+    ],
+    "by": "Built by Paul.",
+    "hello": "Say hello on LinkedIn"
+  },
+  "cta": {
+    "h2": "Start with yours.",
+    "p": "Sign in with Google. Link your partner whenever you are ready.",
+    "dialogTitle": "Pair Pocket",
+    "dialogTagline": "Shared expense tracker",
+    "dialogDesc": "Dual-currency (KRW/CAD) shared and personal ledgers. Sign in with your Google account.",
+    "button": "Get started"
+  },
+  "footer": {
+    "starH": "Like what you see? Star it on GitHub.",
+    "starP": "The code is on GitHub, and a star helps other couples find it.",
+    "star": "Star on GitHub",
+    "starCount": "{n}",
+    "tagline": "Pair Pocket, a ledger for two",
+    "links": "Links",
+    "github": "GitHub",
+    "linkedin": "LinkedIn",
+    "portfolio": "Portfolio",
+    "portfolioSoon": "Portfolio (coming soon)",
+    "coffee": "Buy me a coffee",
+    "app": "Open the app",
+    "license": "License"
+  },
+  "clips": {
+    "toggle": {
+      "title": "Personal and shared toggle",
+      "alt": "The app switching between the personal and the shared ledger."
+    },
+    "add-entry": {
+      "title": "Adding an entry",
+      "alt": "Adding a transaction in the app."
+    },
+    "ai-scan": {
+      "title": "Receipt scan",
+      "alt": "A receipt is scanned and turned into a draft entry to review."
+    },
+    "settlement": {
+      "title": "Settlement",
+      "alt": "Settling a shared expense with money from a personal account."
+    },
+    "moves": {
+      "title": "Moves are not spending",
+      "alt": "A card payment and an account move appear in the list while the spending chart stays the same."
+    },
+    "subscriptions": {
+      "title": "Fixed expenses",
+      "alt": "Adding a subscription with a promo price and seeing what is due this month."
+    },
+    "stocks": {
+      "title": "Stocks",
+      "alt": "Brokerage holdings with live prices and totals in two currencies."
+    },
+    "invite": {
+      "title": "Partner invite",
+      "alt": "The invite partner dialog with an email and a shared ledger start date."
+    }
+  },
+  "placeholder": "Recording placeholder"
+}
