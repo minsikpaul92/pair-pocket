@@ -1,0 +1,10 @@
+{
+  "toggle":        { "file": "toggle",        "w": 800, "h": 364, "status": "interim", "shot": "Personal and Shared toggle. Interim clip from the README; re-record." },
+  "add-entry":     { "file": "add-entry",     "w": 800, "h": 364, "status": "interim", "shot": "Adding a transaction. Interim clip from the README; re-record." },
+  "ai-scan":       { "file": "ai-scan",       "w": 800, "h": 434, "status": "interim", "shot": "AI receipt scan to review screen. Interim clip from the README; re-record." },
+  "settlement":    { "file": "settlement",    "w": 1280, "h": 800, "status": "todo", "shot": "Settle a shared expense with a personal account. Both sides appear, the expense shows Settled." },
+  "moves":         { "file": "moves",         "w": 1280, "h": 800, "status": "todo", "shot": "A card payment and an account move sit in the list but the spending chart does not change." },
+  "subscriptions": { "file": "subscriptions", "w": 1280, "h": 800, "status": "todo", "shot": "Add a fixed expense with promo price, then see Due this month." },
+  "stocks":        { "file": "stocks",        "w": 1280, "h": 800, "status": "todo", "shot": "Brokerage holdings with live prices and CAD/KRW totals." },
+  "invite":        { "file": "invite",        "w": 1024, "h": 466, "status": "interim", "kind": "image", "shot": "Invite partner modal. Interim still from the README; re-record as a short clip." }
+}

@@ -1,0 +1,4 @@
+[
+  { "code": "en", "label": "English", "short": "EN", "path": "", "default": true, "ogLocale": "en_CA", "appPath": "en" },
+  { "code": "ko", "label": "한국어", "short": "한국어", "path": "ko", "ogLocale": "ko_KR", "appPath": "ko" }
+]

@@ -1,0 +1,206 @@
+{
+  "meta": {
+    "title": "Pair Pocket: mine, yours and ours, in any currency",
+    "description": "A household ledger and asset tracker for couples who share some money and keep some apart. Personal and shared ledgers, your own currencies side by side, free, with no bank connection.",
+    "ogAlt": "Pair Pocket: mine, yours and ours, in any currency"
+  },
+  "skip": "Skip to content",
+  "brand": "Pair Pocket",
+  "nav": {
+    "label": "Main",
+    "why": "Why",
+    "features": "Features",
+    "try": "Try it",
+    "built": "Tech",
+    "getStarted": "Get started",
+    "language": "Language"
+  },
+  "hero": {
+    "h1": "Mine, yours and ours, in any currency.",
+    "sub": "A ledger for couples who share some money and keep some apart, and for money that lives in more than one country.",
+    "cta": "Get started",
+    "star": "Star on GitHub",
+    "mine": "Mine",
+    "yours": "Yours",
+    "ours": "Ours"
+  },
+  "story": {
+    "h2": "I wanted all my money in one place.",
+    "p1": "I moved from Korea to Canada, so I have money in both countries. I wanted to see all of it in one place. Anyone who has immigrated probably has money on both sides too.",
+    "p2": "As a couple, we wanted one shared ledger and one private ledger each. I wanted receipts to write themselves, subscriptions to track themselves, and my stocks counted too. I could not find an app that did all of it, so I built it.",
+    "p3": "That is why Pair Pocket goes beyond a ledger. It is where your whole financial picture lives."
+  },
+  "features": {
+    "h2": "What it does"
+  },
+  "ledgers": {
+    "h": "Your book, their book, and the one you share.",
+    "p1": "Each person keeps a private personal ledger, and partners link a shared one on top. Switch with one tap, keep your own currencies side by side, and see a combined total with exchange rates.",
+    "p2": "What you keep personal stays personal. If you ever unlink, the shared history never reaches a new partner."
+  },
+  "add": {
+    "h": "Entries take a few taps.",
+    "p": "Merchants and categories you used before are suggested as you type. Bring in a lot at once with a CSV file, and export one whenever you want."
+  },
+  "scan": {
+    "h": "One photo, one finished entry.",
+    "p": "Take a photo of a receipt or a screenshot, and the entry fills itself in. Check it once and save. Manual entry and CSV import work too."
+  },
+  "settle": {
+    "h": "Split a bill, record only your share.",
+    "p": "Paid for a dinner with friends? As they pay you back, settle it, and your expense drops to exactly what you spent. Settle from a personal account or the shared one. Both sides are recorded together."
+  },
+  "moves": {
+    "h": "Moving money is not spending.",
+    "p": "Card payments, transfers between your accounts and money going between the personal and shared ledgers stay in the history but are not counted as spending. Your charts show what you actually spent, not the same money twice."
+  },
+  "subs": {
+    "h": "Fixed expenses that track themselves.",
+    "p": "Subscriptions, bills and installments are recorded on their due dates. See how much you pay each month, which account it comes from, how long a plan runs and when a promo price ends. Reminder emails and personal or shared moves included."
+  },
+  "stocks": {
+    "h": "Your stocks count too.",
+    "p": "Holdings per brokerage account, with live quotes and currency conversion, sit next to your cash and cards. You see your total assets, not just your spending."
+  },
+  "invite": {
+    "h": "Invite your partner by email.",
+    "p": "Pick a shared ledger start date so both of you line up from day one. Once they accept, the shared ledger is ready."
+  },
+  "try": {
+    "h2": "Split the bill, keep your share.",
+    "p": "Dinner with friends came to $100.00 and you paid. Tap each friend as their e-transfer arrives and watch your spending shrink to what you really spent.",
+    "note": "Your charts count only your own share.",
+    "fallback": "Example: dinner with friends comes to $100.00. Three friends each send you $25.00 by e-transfer. After the first, your spending is $75.00. After the second, $50.00. After the third, $25.00, exactly your share.",
+    "title": "Dinner with friends",
+    "bill": "Bill you paid",
+    "received": "Received",
+    "mine": "My spending",
+    "get": "Get from {name}",
+    "got": "Got {amount} from {name}",
+    "hint": "Tap again to undo."
+  },
+  "free": {
+    "h2": "Free, private, and clear about it.",
+    "rows": [
+      {
+        "fig": "0",
+        "text": "ads in the app."
+      },
+      {
+        "fig": "0",
+        "text": "bank connections, on purpose. Bank aggregation is a paid service, and a free app cannot honestly offer it."
+      },
+      {
+        "fig": "0",
+        "text": "passwords stored. You sign in with Google."
+      },
+      {
+        "fig": "$0",
+        "text": "to use the AI features. They run on your own Gemini key, and Google's free credit covers everyday use (subject to Google's current free-tier terms)."
+      },
+      {
+        "fig": "Any",
+        "text": "currency. Keep the money you have, wherever it lives."
+      },
+      {
+        "fig": "2",
+        "text": "languages in full, English and Korean, and it installs on your phone like an app."
+      }
+    ]
+  },
+  "built": {
+    "h2": "Built end to end by one person.",
+    "p": "Pair Pocket is a production app, not a mockup. I designed it, built it and run it.",
+    "stack": "Next.js on Vercel, FastAPI on Heroku, MongoDB Atlas, Google Gemini.",
+    "items": [
+      {
+        "t": "Ledger isolation",
+        "d": "Every read is scoped to the person or the partnership and fails closed, so a partner's private history never reaches shared suggestions."
+      },
+      {
+        "t": "Atomic paired writes",
+        "d": "Transfers and settlements write both sides in one database transaction. If the second write fails, the first rolls back."
+      },
+      {
+        "t": "Sessions",
+        "d": "Short-lived access tokens with a rotating, revocable refresh cookie."
+      },
+      {
+        "t": "AI as a draft",
+        "d": "Model output goes through a review screen, and each person's key is encrypted at rest."
+      },
+      {
+        "t": "Tested and checked",
+        "d": "Every pull request runs lint, a translation check, a production build and the backend tests."
+      }
+    ],
+    "by": "Built by Paul.",
+    "hello": "Say hello on LinkedIn"
+  },
+  "cta": {
+    "h2": "Start with yours.",
+    "p": "Sign in with Google. Link your partner whenever you are ready.",
+    "dialogTitle": "Pair Pocket",
+    "dialogTagline": "Shared expense tracker",
+    "dialogDesc": "Dual-currency (KRW/CAD) shared and personal ledgers. Sign in with your Google account.",
+    "button": "Get started"
+  },
+  "footer": {
+    "starH": "Like what you see? Star it on GitHub.",
+    "starP": "The code is on GitHub, and a star helps other couples find it.",
+    "star": "Star on GitHub",
+    "starCount": "{n}",
+    "tagline": "Pair Pocket, a ledger for two",
+    "links": "Links",
+    "github": "GitHub",
+    "linkedin": "LinkedIn",
+    "portfolio": "Portfolio",
+    "portfolioSoon": "Portfolio (coming soon)",
+    "coffee": "Buy me a coffee",
+    "app": "Open the app",
+    "license": "License"
+  },
+  "clips": {
+    "toggle": {
+      "title": "Personal and shared toggle",
+      "alt": "The app switching between the personal and the shared ledger."
+    },
+    "add-entry": {
+      "title": "Adding an entry",
+      "alt": "Adding a transaction in the app."
+    },
+    "ai-scan": {
+      "title": "Receipt scan",
+      "alt": "A receipt is scanned and turned into a draft entry to review."
+    },
+    "settlement": {
+      "title": "Settlement",
+      "alt": "Settling a shared expense with money from a personal account."
+    },
+    "moves": {
+      "title": "Moves are not spending",
+      "alt": "A card payment and an account move appear in the list while the spending chart stays the same."
+    },
+    "subscriptions": {
+      "title": "Fixed expenses",
+      "alt": "Adding a subscription with a promo price and seeing what is due this month."
+    },
+    "stocks": {
+      "title": "Stocks",
+      "alt": "Brokerage holdings with live prices and totals in two currencies."
+    },
+    "invite": {
+      "title": "Partner invite",
+      "alt": "The invite partner dialog with an email and a shared ledger start date."
+    }
+  },
+  "placeholder": "Recording placeholder",
+  "statement": {
+    "h": "Missed some? Scan the monthly statement.",
+    "p": "Once a month, scan your bank or card statement and fill in everything you missed in a few minutes."
+  },
+  "trip": {
+    "h": "Going home? Keep the same ledger.",
+    "p": "When you visit your home country, keep writing in the same ledger instead of starting a new one for every trip. Both countries stay in one place, at a glance."
+  }
+}
