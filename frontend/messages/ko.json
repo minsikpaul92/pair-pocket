@@ -86,7 +86,32 @@
     "oauthNotConfigured": "Google 로그인이 아직 설정되지 않았습니다. 관리자에게 문의하거나 로컬 미리보기를 사용하세요.",
     "invalidAccess": "잘못된 접근입니다.",
     "loadFailed": "PairPocket에 연결하지 못했습니다. 로그인 상태는 유지됩니다. 연결을 확인한 뒤 다시 시도해 주세요.",
-    "retry": "다시 시도"
+    "retry": "다시 시도",
+    "testLogin": {
+      "title": "테스트 로그인",
+      "notice": "테스트 서버에서만 보이는 메뉴입니다. 실제 서비스에는 나타나지 않습니다.",
+      "account": "테스트 계정",
+      "password": "비밀번호",
+      "signIn": "테스트 계정으로 로그인",
+      "reset": "빈 계정으로 초기화",
+      "resetCouples": "커플 연결 + 기본 계좌로 초기화",
+      "resetCouplesDone": "초기화했습니다. Tester 1·2, Tester 3·4가 커플로 연결되어 있고, 각자 입출금 계좌와 신용카드, 커플마다 공용 입출금 계좌가 기본 계좌로 준비되어 있습니다.",
+      "resetDone": "테스트 계정을 초기화했습니다. 다음 로그인부터 처음 가입한 상태로 시작합니다.",
+      "tipLabel": "설명 보기",
+      "tipPassword": "테스트 서버 관리자가 정한 공용 비밀번호예요. 처음 한 번만 입력하면 이 브라우저가 기억해서, 다음부터는 카드를 누르면 바로 로그인돼요. 구글 계정 비밀번호가 아니에요.",
+      "tipResetCouples": "테스트 계정 4개의 데이터를 모두 지우고, 1·2와 3·4를 커플로 연결한 뒤 기본 계좌까지 만들어 둬요. 온보딩은 끝난 상태로 시작해요.",
+      "tipReset": "테스트 계정 4개의 데이터를 모두 지워요. 다음 로그인부터 처음 가입한 사용자처럼 온보딩부터 시작해요.",
+      "resetButton": "초기화",
+      "resetTitle": "어떻게 초기화할까요?",
+      "resetSelected": "{name}만 처음 가입한 상태로",
+      "resetSelectedNone": "선택한 계정만 처음 가입한 상태로",
+      "tipResetSelected": "{name}의 데이터만 지워요. 다른 계정은 그대로예요. 다음 로그인은 온보딩부터 시작해요.",
+      "cancel": "취소",
+      "backToTest": "테스트 페이지",
+      "tipTester": "{name}은 미리 만들어 둔 {language} 테스트 계정이에요. 커플 초기화를 하면 {partner}와 커플로 연결돼요. 카드를 누르면 바로 로그인돼요.",
+      "passwordFirst": "먼저 비밀번호를 입력해 주세요.",
+      "accountFirst": "먼저 계정 카드를 선택해 주세요."
+    }
   },
   "invite": {
     "title": "파트너 초대",
@@ -624,7 +649,8 @@
     "promoEndRequired": "프로모션 종료일을 입력해 주세요.",
     "promoEndAfterStart": "프로모션 종료일은 시작일 이후여야 합니다.",
     "promoAmountLessThanRegular": "프로모션 금액은 정상 금액보다 작아야 합니다.",
-    "completedLessThanTotal": "이미 납부 회차는 총 회차보다 작아야 합니다."
+    "completedLessThanTotal": "이미 납부 회차는 총 회차보다 작아야 합니다.",
+    "testLoginFailed": "테스트 계정 또는 비밀번호가 올바르지 않습니다."
   },
   "stocks": {
     "tabName": "증권",

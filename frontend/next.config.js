@@ -43,6 +43,8 @@ const nextConfig = {
         destination: "/en/auth/callback",
         permanent: false,
       },
+      // Short address for the unlisted test sign-in page.
+      { source: "/test", destination: "/en/auth/test", permanent: false },
       {
         source: "/invite/:token",
         destination: "/en/invite/:token",
