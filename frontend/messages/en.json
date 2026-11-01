@@ -264,7 +264,7 @@
     "scanFailed": "AI scan failed.",
     "scanCardTitle": "Fill from screenshot / receipt",
     "scanCardCount": "{count} / {max}",
-    "scanCardHint": "Drag photos or PDF statements here, or tap [Add photo] below. (Up to {max})",
+    "scanCardHint": "Drag, paste (Cmd+V), or tap [Add photo] below to add photos or PDF statements. (Up to {max})",
     "scanRemove": "Remove",
     "scanAddPhoto": "Add photo",
     "scanDeep": "Deep AI analysis…",

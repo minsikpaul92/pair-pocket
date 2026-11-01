@@ -264,7 +264,7 @@
     "scanFailed": "AI 스캔에 실패했습니다.",
     "scanCardTitle": "스크린샷 / 영수증으로 채우기",
     "scanCardCount": "{count} / {max}장",
-    "scanCardHint": "사진이나 PDF 명세서를 이곳으로 드래그하거나 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 {max}장)",
+    "scanCardHint": "사진이나 PDF 명세서를 드래그하거나 붙여넣기(Cmd+V)하거나, 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 {max}장)",
     "scanRemove": "삭제",
     "scanAddPhoto": "사진 추가",
     "scanDeep": "정밀 AI 분석 중…",
