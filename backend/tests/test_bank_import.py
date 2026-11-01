@@ -115,6 +115,7 @@ def test_direction_must_match_type():
 # Endpoint
 
 import pytest
+from bson import ObjectId
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -145,7 +146,7 @@ def _post(client, account, csv_text):
 def test_preview_groups_rows(env, client):
     account = env.accounts.personal
     owner = env.users["owner"].id
-    base = {"owner_id": owner, "account_type": "personal", "currency": "CAD", "type": "expense"}
+    base = {"owner_id": owner, "account_type": "personal", "currency": "CAD", "type": "expense", "category": "식비", "sub_category": "카페/간식"}
     run(
         env.db.transactions.insert_many(
             [
@@ -163,7 +164,7 @@ def test_preview_groups_rows(env, client):
     assert res.status_code == 200, res.text
     data = res.json()
     assert [r["status"] for r in data["rows"]] == ["duplicate", "review", "new"]
-    assert data["summary"] == {"new": 1, "duplicate": 1, "review": 1}
+    assert data["summary"] == {"auto": 0, "review": 2, "duplicate": 1}
     assert data["rows"][1]["match"]["merchant"] == "Cafe"
 
 
@@ -188,3 +189,101 @@ def test_preview_ignores_other_users_entries(env, client):
 def test_preview_rejects_foreign_account_and_empty_file(env, client):
     assert _post(client, env.accounts.partner_personal, "2026-10-05,X,1,,1\n").status_code in (403, 404)
     assert _post(client, env.accounts.personal, "nothing here\n").status_code == 422
+
+
+def test_confident_ai_suggestion_is_auto_and_unsure_goes_to_review(env, client, monkeypatch):
+    from app.services import ai
+
+    async def fake_json(db, owner_id, api_key, payload):
+        return (
+            {
+                "results": [
+                    {"index": 0, "merchant": "Netflix", "type": "expense", "category": "문화/취미",
+                     "sub_category": "정기 구독", "confidence": 0.95},
+                    {"index": 1, "merchant": "Unknown", "type": "expense", "category": "식비",
+                     "sub_category": "외식/배달", "confidence": 0.4},
+                    {"index": 2, "merchant": "Bad", "type": "expense", "category": "없는분류",
+                     "sub_category": "x", "confidence": 0.99},
+                ]
+            },
+            "model",
+            [],
+        )
+
+    monkeypatch.setattr(ai, "_generate_json_result", fake_json)
+    csv_text = (
+        "2026-10-01,NETFLIX.COM,9.03,,100\n"
+        "2026-10-02,POS 4412 XYZ,20.00,,80\n"
+        "2026-10-03,WEIRD,5.00,,75\n"
+    )
+    rows = _post(client, env.accounts.personal, csv_text).json()["rows"]
+    assert [r["bucket"] for r in rows] == ["auto", "review", "review"]
+    assert rows[0]["suggestion"]["sub_category"] == "정기 구독"
+    assert rows[2]["suggestion"] is None  # invalid category pair is dropped
+
+
+def test_known_merchant_uses_history_without_ai(env, client, monkeypatch):
+    from app.services import ai
+
+    async def boom(*a, **k):
+        raise AssertionError("AI should not be called")
+
+    monkeypatch.setattr(ai, "_generate_json_result", boom)
+    run(
+        env.db.transactions.insert_one(
+            {
+                "owner_id": env.users["owner"].id, "account_type": "personal",
+                "currency": "CAD", "type": "expense", "date": datetime(2026, 9, 1),
+                "amount": 9.03, "merchant": "Netflix", "category": "문화/취미",
+                "sub_category": "정기 구독",
+            }
+        )
+    )
+    rows = _post(client, env.accounts.personal, "2026-10-01,NETFLIX.COM,9.03,,100\n").json()["rows"]
+    assert rows[0]["bucket"] == "auto" and rows[0]["suggestion"]["source"] == "history"
+
+
+def _commit(client, account, items):
+    return client.post(
+        "/api/import/bank/commit", json={"account_id": str(account["_id"]), "items": items}
+    )
+
+
+def _item(**changes):
+    return {
+        "date": "2026-10-05", "amount": 9.03, "direction": "out", "merchant": "Netflix",
+        "category": "문화/취미", "sub_category": "정기 구독", **changes,
+    }
+
+
+def test_commit_saves_entries_without_notifying(env, client):
+    res = _commit(client, env.accounts.personal, [_item(), _item(direction="in", amount=5,
+        merchant="Refund", category="금융/기타", sub_category="은행 이자")])
+    assert res.status_code == 201 and res.json() == {"created": 2}
+    saved = run(env.db.transactions.find({}).to_list(length=None))
+    assert {d["type"] for d in saved} == {"expense", "income"}
+    assert all(d["account_id"] == str(env.accounts.personal["_id"]) for d in saved)
+    assert run(env.db.notifications.count_documents({})) == 0
+
+
+def test_commit_is_all_or_nothing(env, client):
+    res = _commit(client, env.accounts.personal, [_item(), _item(category="없는분류", sub_category="x")])
+    assert res.status_code == 422
+    assert run(env.db.transactions.count_documents({})) == 0
+
+
+def test_commit_card_repayment_is_a_transfer_to_the_card(env, client):
+    card = {**env.accounts.personal, "_id": ObjectId(), "kind": "credit_card", "is_liability": True,
+            "name": "card"}
+    run(env.db.accounts.insert_one(card))
+    res = _commit(client, env.accounts.personal, [
+        {"date": "2026-10-14", "amount": 507.96, "direction": "out", "merchant": "Card payment",
+         "kind": "card_repayment", "counter_account_id": str(card["_id"])}])
+    assert res.status_code == 201, res.text
+    saved = run(env.db.transactions.find_one({}))
+    assert saved["kind"] == "transfer" and saved["counter_account_id"] == str(card["_id"])
+
+
+def test_commit_rejects_raw_transfer_category(env, client):
+    res = _commit(client, env.accounts.personal, [_item(category="자산 이동/카드", sub_category="내 계좌 이동")])
+    assert res.status_code == 422

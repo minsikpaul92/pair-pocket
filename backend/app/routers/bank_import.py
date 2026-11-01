@@ -1,19 +1,32 @@
 """Bank statement import: preview what is new, already entered, or needs a look."""
 
-from datetime import datetime, time
+from datetime import date as date_type, datetime, time
+from typing import Literal
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel, Field
 
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.account import FinancialAccountKind
-from app.models.transaction import AccountType
+from app.models.ledger import TRANSFER_CATEGORY, TRANSFER_SUB_CARD_REPAYMENT
+from app.models.transaction import AccountType, Currency, TransactionCreate, TransactionType
 from app.models.user import UserOut
-from app.services import bank_import
-from app.services.access import assert_can_access_doc, owner_match, resolve_owner_ids, shared_scope
+from app.routers.settings import _get_or_create, _parse_custom
+from app.services import bank_classify, bank_import
+from app.services.access import (
+    assert_can_access_doc,
+    owner_match,
+    require_shared_group_for_write,
+    resolve_owner_ids,
+    shared_scope,
+)
+from app.services.validation import validate_transaction_payload
+
+from app.routers.transactions import _document_from_payload  # noqa: E402
 
 router = APIRouter(prefix="/api/import/bank", tags=["import"])
 
@@ -28,6 +41,18 @@ def _decode(raw: bytes) -> str:
         except UnicodeDecodeError:
             continue
     raise HTTPException(status.HTTP_400_BAD_REQUEST, "Could not read the file")
+
+
+def _bucket(row: dict, is_card: bool) -> str:
+    """auto: safe to save as suggested; review: the user decides; duplicate: skip."""
+    if row["status"] == bank_import.STATUS_DUPLICATE:
+        return "duplicate"
+    if row["status"] == bank_import.STATUS_REVIEW or row["hint"] != bank_import.HINT_NORMAL:
+        return "review"
+    suggestion = row["suggestion"]
+    if suggestion and suggestion["confidence"] >= bank_classify.AUTO_CONFIDENCE:
+        return "auto"
+    return "review"
 
 
 @router.post("/preview")
@@ -106,8 +131,112 @@ async def preview_bank_csv(
                 ),
             }
         )
+
+    # Only rows that could be saved as an ordinary entry need a category.
+    to_label = [
+        r
+        for r in out
+        if r["hint"] == bank_import.HINT_NORMAL and r["status"] != bank_import.STATUS_DUPLICATE
+    ]
+    custom = _parse_custom(await _get_or_create(db, current_user.id))
+    suggestions = await bank_classify.classify_rows(
+        db,
+        current_user.id,
+        owner_ids,
+        ledger.value,
+        shared_scope(ledger.value, current_user.shared_group_id),
+        to_label,
+        custom,
+    )
+    for r in out:
+        r["suggestion"] = suggestions.get(r["index"])
+        r["bucket"] = _bucket(r, is_card)
+
     summary = {
-        s: sum(1 for r in out if r["status"] == s)
-        for s in (bank_import.STATUS_NEW, bank_import.STATUS_DUPLICATE, bank_import.STATUS_REVIEW)
+        b: sum(1 for r in out if r["bucket"] == b) for b in ("auto", "review", "duplicate")
     }
     return {"account_id": account_id, "rows": out, "summary": summary}
+
+
+class ImportItem(BaseModel):
+    date: date_type
+    amount: float = Field(gt=0)
+    direction: Literal["out", "in"]
+    merchant: str = Field(min_length=1, max_length=120)
+    category: str = ""
+    sub_category: str = ""
+    # card_repayment: money from this bank account paying off a card account.
+    kind: Literal["normal", "card_repayment"] = "normal"
+    counter_account_id: str | None = None
+    note: str | None = Field(default=None, max_length=200)
+
+
+class CommitBody(BaseModel):
+    account_id: str
+    items: list[ImportItem] = Field(min_length=1, max_length=MAX_ROWS)
+
+
+def _payload(account: dict, item: ImportItem) -> TransactionCreate:
+    base = {
+        "date": datetime.combine(item.date, time.min),
+        "amount": item.amount,
+        "currency": Currency(account["currency"]),
+        "account_type": AccountType(account["account_type"]),
+        "account_id": str(account["_id"]),
+        "merchant": item.merchant,
+        "note": item.note,
+    }
+    if item.kind == "card_repayment":
+        if item.direction != "out" or not item.counter_account_id:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Card payment needs a card")
+        return TransactionCreate(
+            **base,
+            type=TransactionType.EXPENSE,
+            category=TRANSFER_CATEGORY,
+            sub_category=TRANSFER_SUB_CARD_REPAYMENT,
+            counter_account_id=item.counter_account_id,
+        )
+    if item.category == TRANSFER_CATEGORY:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Transfers cannot be imported this way"
+        )
+    return TransactionCreate(
+        **base,
+        type=TransactionType.EXPENSE if item.direction == "out" else TransactionType.INCOME,
+        category=item.category,
+        sub_category=item.sub_category,
+    )
+
+
+@router.post("/commit", status_code=status.HTTP_201_CREATED)
+async def commit_bank_rows(
+    body: CommitBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Save the chosen rows. Nothing is saved unless every row is valid."""
+    try:
+        account = await db["accounts"].find_one({"_id": ObjectId(body.account_id)})
+    except InvalidId:
+        account = None
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    await assert_can_access_doc(db, current_user, account)
+
+    ledger = AccountType(account["account_type"])
+    require_shared_group_for_write(current_user, ledger)
+    owner_ids = await resolve_owner_ids(db, current_user, ledger)
+
+    documents = []
+    for item in body.items:
+        payload = _payload(account, item)
+        await validate_transaction_payload(
+            payload, db, current_user.id, owner_ids=owner_ids, current_user=current_user
+        )
+        documents.append(
+            _document_from_payload(
+                payload, owner_id=current_user.id, shared_group_id=current_user.shared_group_id
+            )
+        )
+    await db["transactions"].insert_many(documents)
+    return {"created": len(documents)}
