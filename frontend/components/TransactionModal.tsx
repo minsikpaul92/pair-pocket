@@ -334,6 +334,23 @@ export default function TransactionModal({
     if (scanInputRef.current) scanInputRef.current.value = "";
   }
 
+  // Desktop: pasting an image from the clipboard fills the scan card.
+  const addScanFilesRef = useRef(addScanQueueFiles);
+  addScanFilesRef.current = addScanQueueFiles;
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const images = Array.from(e.clipboardData?.items ?? [])
+        .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+        .map((it) => it.getAsFile())
+        .filter((f): f is File => f !== null);
+      if (images.length === 0) return;
+      e.preventDefault();
+      addScanFilesRef.current(images);
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
   function removeQueuedScan(id: string) {
     setScanQueue((prev) => {
       const target = prev.find((q) => q.id === id);
