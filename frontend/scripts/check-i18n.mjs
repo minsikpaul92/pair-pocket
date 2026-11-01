@@ -8,6 +8,8 @@
  *     are counted per file in scripts/i18n-baseline.json and may only go down.
  *  3. No new rendering that branches on the UI language. What is shown must
  *     not depend on whether the user picked Korean or English.
+ *  4. Every What's New entry in lib/whats-new.ts has a title and a description
+ *     in both message files (whatsNew.items.<id>.title / .description).
  *
  * Usage: node scripts/check-i18n.mjs [--update]
  *   --update  rewrite the baseline to the current counts (use after removing
@@ -52,6 +54,19 @@ for (const key of Object.keys(ko)) {
       `messages: "${key}" uses different placeholders ` +
         `(ko: {${placeholders(ko[key])}} en: {${placeholders(en[key])}})`
     );
+  }
+}
+
+// 4. What's New entries ----------------------------------------------------
+
+const whatsNewSource = readFileSync(join(root, "lib", "whats-new.ts"), "utf8");
+for (const [, id] of whatsNewSource.matchAll(/\bid:\s*"([^"]+)"/g)) {
+  for (const [file, messages] of [["ko.json", ko], ["en.json", en]]) {
+    for (const field of ["title", "description"]) {
+      if (!messages[`whatsNew.items.${id}.${field}`]) {
+        errors.push(`whats-new: "${id}" has no ${field} in ${file} (whatsNew.items.${id}.${field})`);
+      }
+    }
   }
 }
 
