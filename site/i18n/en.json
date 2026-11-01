@@ -11,7 +11,7 @@
     "why": "Why",
     "features": "Features",
     "try": "Try it",
-    "built": "Tech",
+    "built": "About",
     "getStarted": "Get started",
     "language": "Language"
   },
@@ -109,33 +109,10 @@
     ]
   },
   "built": {
-    "h2": "Built end to end by one person.",
-    "p": "Pair Pocket is a production app, not a mockup. I designed it, built it and run it.",
-    "stack": "Next.js on Vercel, FastAPI on Heroku, MongoDB Atlas, Google Gemini.",
-    "items": [
-      {
-        "t": "Ledger isolation",
-        "d": "Every read is scoped to the person or the partnership and fails closed, so a partner's private history never reaches shared suggestions."
-      },
-      {
-        "t": "Atomic paired writes",
-        "d": "Transfers and settlements write both sides in one database transaction. If the second write fails, the first rolls back."
-      },
-      {
-        "t": "Sessions",
-        "d": "Short-lived access tokens with a rotating, revocable refresh cookie."
-      },
-      {
-        "t": "AI as a draft",
-        "d": "Model output goes through a review screen, and each person's key is encrypted at rest."
-      },
-      {
-        "t": "Tested and checked",
-        "d": "Every pull request runs lint, a translation check, a production build and the backend tests."
-      }
-    ],
-    "by": "Built by Paul.",
-    "hello": "Say hello on LinkedIn"
+    "h2": "Made by one person.",
+    "p": "Pair Pocket is a real app, not a mockup. I designed it, built it and run it myself.",
+    "feedbackH": "Feedback is always welcome.",
+    "feedbackP": "Feedback and feature requests are welcome any time. Tell me through Buy Me a Coffee."
   },
   "cta": {
     "h2": "Start with yours.",
