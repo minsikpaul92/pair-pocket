@@ -662,6 +662,7 @@
     "clearFilter": "Clear filter",
     "sharesAvg": "{shares} sh · Avg {avg}",
     "addHolding": "Add stock",
+    "holdingsTitle": "Holdings",
     "editHolding": "Edit holding",
     "holdingShares": "Shares",
     "holdingAvgPrice": "Avg. price",

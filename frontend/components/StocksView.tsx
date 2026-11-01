@@ -1165,14 +1165,86 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             )}
           </div>
         )}
-      </div>      {/* 4. Sorting & Filter Controls Header */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-2">
-        {/* Toggle selectors */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          {/* Active Account Filter Badge */}
-          <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-xl text-xs font-bold select-none">
+      </div>      {/* 4. Holdings title, view and currency toggles, account and sort */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">
+            {t("holdingsTitle")}
+          </h2>
+          <button
+            onClick={() => {
+              resetAddForm();
+              setShowAddModal(true);
+            }}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t("addHolding")}
+          </button>
+        </div>
+
+        {/* The CAD and KRW ledgers switch currency in the Investments card above. */}
+        <div className="flex items-stretch gap-2">
+          {/* Ticker / Valuation Toggle */}
+          <div className="flex flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
+            <button
+              onClick={() => setViewMode("valuation")}
+              className={`flex-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                viewMode === "valuation"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("evaluatedAmount")}
+            </button>
+            <button
+              onClick={() => setViewMode("price")}
+              className={`flex-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                viewMode === "price"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("currentPrice")}
+            </button>
+          </div>
+          {ledgerScope === "ALL" && (
+          <div className="flex flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
+            <button
+              onClick={() => setDisplayCurrency("CAD")}
+              className={`flex-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                displayCurrency === "CAD"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("displayCad")}
+            </button>
+            <button
+              onClick={() => setDisplayCurrency("KRW")}
+              className={`flex-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                displayCurrency === "KRW"
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("displayKrw")}
+            </button>
+          </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          {/* Active account (a chip only while a single account is filtered) */}
+          <div
+            className={`flex min-w-0 items-center gap-1.5 text-xs select-none ${
+              selectedAccountIdFilter === "ALL"
+                ? "font-medium text-gray-500 dark:text-gray-400"
+                : "rounded-xl bg-gray-100 px-3 py-1.5 font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            }`}
+          >
             {selectedAccountIdFilter === "ALL" ? (
-              <span className="truncate max-w-[10rem] sm:max-w-none">{allAccountsLabel}</span>
+              <span className="truncate">{allAccountsLabel}</span>
             ) : (
               <div className="flex items-center gap-1">
                 <span>
@@ -1193,119 +1265,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               </div>
             )}
           </div>
-
-          {/* Ticker / Valuation Toggle */}
-          <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
-            <button
-              onClick={() => setViewMode("valuation")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                viewMode === "valuation"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("evaluatedAmount")}
-            </button>
-            <button
-              onClick={() => setViewMode("price")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                viewMode === "price"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("currentPrice")}
-            </button>
-          </div>
-
-          {/* CAD / KRW on ALL; KRW / USD on Korea; CAD / USD / native on Canada (header card) */}
-          {ledgerScope === "ALL" && (
-          <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
-            <button
-              onClick={() => setDisplayCurrency("CAD")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                displayCurrency === "CAD"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayCad")}
-            </button>
-            <button
-              onClick={() => setDisplayCurrency("KRW")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                displayCurrency === "KRW"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayKrw")}
-            </button>
-          </div>
-          )}
-          {ledgerScope === "KRW" && (
-          <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
-            <button
-              onClick={() => setDisplayCurrency("KRW")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                displayCurrency === "KRW"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayKrw")}
-            </button>
-            <button
-              onClick={() => setDisplayCurrency("USD")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                displayCurrency === "USD"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayUsd")}
-            </button>
-          </div>
-          )}
-          {ledgerScope === "CAD" && (
-          <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
-            <button
-              onClick={() => setCadViewMode("ALL")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                cadViewMode === "ALL"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayNativeAll")}
-            </button>
-            <button
-              onClick={() => setCadViewMode("CAD")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                cadViewMode === "CAD"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayCad")}
-            </button>
-            <button
-              onClick={() => setCadViewMode("USD")}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                cadViewMode === "USD"
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-              }`}
-            >
-              {t("displayUsd")}
-            </button>
-          </div>
-          )}
-        </div>
-
-        {/* Sort selector & Add Button */}
-        <div className="ml-auto flex shrink-0 items-center gap-3 whitespace-nowrap">
-          <label className="relative inline-flex items-center gap-1 cursor-pointer text-xs font-bold text-gray-600 dark:text-gray-300">
+          <label className="relative ml-auto inline-flex shrink-0 items-center gap-1 cursor-pointer whitespace-nowrap text-xs font-bold text-gray-600 dark:text-gray-300">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -1321,17 +1281,6 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               aria-hidden
             />
           </label>
-
-          <button
-            onClick={() => {
-              resetAddForm();
-              setShowAddModal(true);
-            }}
-            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t("addHolding")}
-          </button>
         </div>
       </div>
 
