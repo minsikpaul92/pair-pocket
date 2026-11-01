@@ -100,7 +100,7 @@ a { color: inherit; text-decoration-thickness: 0.08em; text-underline-offset: 0.
 .stage {
   grid-column: 2; grid-row: 1;
   position: sticky; top: var(--gap); height: calc(100svh - 2 * var(--gap));
-  background: var(--surface); border-radius: 32px; overflow: hidden;
+  background: var(--accent); border-radius: 40px; overflow: hidden;
 }
 .stage figure {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -109,9 +109,9 @@ a { color: inherit; text-decoration-thickness: 0.08em; text-underline-offset: 0.
   transition: opacity 0.9s var(--ease), visibility 0s linear 0.9s;
 }
 .stage figure.on { opacity: 1; visibility: visible; transition-delay: 0s; }
-.stage figcaption { font-size: var(--step-small); color: var(--muted); }
+.stage figcaption { font-size: var(--step-small); color: var(--accent-ink); font-weight: 600; }
 .stage .ph { background: var(--paper); }
-.stage .shot, .stage .ph { width: 100%; max-height: calc(100svh - 190px); height: auto; border-radius: 20px; object-fit: contain; }
+.stage .shot, .stage .ph { background: var(--paper); width: 100%; max-height: calc(100svh - 190px); height: auto; border-radius: 20px; object-fit: contain; }
 .inline-clip { display: none; }
 
 .bar a, .bar span { white-space: nowrap; }
@@ -286,3 +286,32 @@ details.langs div { position: absolute; right: 0; top: 100%; background: var(--p
   .star { padding-block: 72px; }
   .btn-star { width: 100%; }
 }
+
+/* Playful decoration on the stage: coins and speech bubbles, all decorative. */
+.deco { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.coin {
+  position: absolute; width: 64px; height: 64px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 700; font-size: 28px;
+  background: var(--paper); color: var(--accent);
+  animation: bob 5s ease-in-out infinite;
+}
+.c1 { left: 6%; top: 8%; }
+.c2 { right: 8%; top: 12%; width: 52px; height: 52px; font-size: 24px; animation-delay: -1.5s; }
+.c3 { left: 10%; bottom: 10%; width: 48px; height: 48px; font-size: 22px; animation-delay: -3s; }
+.c4 { right: 7%; bottom: 14%; width: 70px; height: 70px; animation-delay: -2.2s; }
+.bubble {
+  position: absolute; padding: 10px 20px; border-radius: 999px 999px 999px 8px;
+  font-weight: 700; font-size: var(--step-body); white-space: nowrap;
+  background: var(--paper); color: var(--accent-hover);
+  animation: bob 6s ease-in-out infinite;
+}
+.b1 { left: 22%; top: 5%; transform: rotate(-5deg); }
+.b2 { right: 20%; top: 6%; border-radius: 999px 999px 8px 999px; background: var(--field); color: var(--ink); animation-delay: -2s; }
+.b3 { left: 36%; bottom: 5%; background: var(--ink); color: var(--paper); animation-delay: -4s; }
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); } 50% { transform: translateY(-10px) rotate(var(--tilt, 0deg)); } }
+.b1 { --tilt: -5deg; } .b2 { --tilt: 4deg; } .b3 { --tilt: -2deg; }
+@media (prefers-reduced-motion: reduce) { .coin, .bubble { animation: none; } }
+@media (max-width: 900px) { .deco { display: none; } }
+
+#why { background: var(--surface); border-radius: 40px; margin: 24px var(--gap) 0; padding: clamp(40px, 6vw, 72px) clamp(24px, 4vw, 48px); }
+.feat h3::before { content: ""; display: inline-block; width: 0.45em; height: 0.45em; border-radius: 50%; background: var(--accent); margin-right: 0.45em; vertical-align: 0.08em; }

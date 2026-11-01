@@ -19,7 +19,10 @@
     "h1": "Mine, yours and ours, in any currency.",
     "sub": "A ledger for couples who share some money and keep some apart, and for money that lives in more than one country.",
     "cta": "Get started",
-    "star": "Star on GitHub"
+    "star": "Star on GitHub",
+    "mine": "Mine",
+    "yours": "Yours",
+    "ours": "Ours"
   },
   "story": {
     "h2": "I wanted all my money in one place.",
