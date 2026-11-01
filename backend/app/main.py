@@ -17,6 +17,7 @@ from app.routers import (
     invitations,
     notifications,
     settings as settings_router,
+    staging_login,
     stats,
     subscriptions,
     transactions,
@@ -54,6 +55,7 @@ app.include_router(invitations.router)
 app.include_router(internal.router)
 app.include_router(email_router.router)
 app.include_router(auth.router)
+app.include_router(staging_login.router)
 app.include_router(categories.router)
 app.include_router(transactions.router)
 app.include_router(notifications.router)

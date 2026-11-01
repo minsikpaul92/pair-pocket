@@ -86,7 +86,32 @@
     "oauthNotConfigured": "Google sign-in is not configured yet. Ask an admin, or use local preview login.",
     "invalidAccess": "Invalid access.",
     "loadFailed": "Couldn't reach PairPocket. Your sign-in is kept; check your connection and try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "testLogin": {
+      "title": "Test sign-in",
+      "notice": "Only shown on the test server. It never appears in the live app.",
+      "account": "Test account",
+      "password": "Password",
+      "signIn": "Sign in with test account",
+      "reset": "Reset to empty accounts",
+      "resetCouples": "Reset to linked couples with accounts",
+      "resetCouplesDone": "Reset done. Tester 1 and 2, and Tester 3 and 4, are linked couples. Each has a checking account and a credit card, and each couple a shared checking account, all set as defaults.",
+      "resetDone": "Test accounts were reset. The next sign-in starts like a brand-new user.",
+      "tipLabel": "What is this?",
+      "tipPassword": "A shared password set by whoever runs the test server. Enter it once and this browser remembers it, so next time a card signs you in right away. It is not a Google password.",
+      "tipResetCouples": "Deletes all data of the 4 test accounts, links 1 and 2 and 3 and 4 as couples, and sets up default accounts. Onboarding is already done.",
+      "tipReset": "Deletes all data of the 4 test accounts. The next sign-in starts like a brand-new user, from onboarding.",
+      "resetButton": "Reset",
+      "resetTitle": "How do you want to reset?",
+      "resetSelected": "Only {name}, as a new user",
+      "resetSelectedNone": "Only the selected account, as a new user",
+      "tipResetSelected": "Deletes only the data of {name} and leaves the others as they are. The next sign-in starts at onboarding.",
+      "cancel": "Cancel",
+      "backToTest": "Test page",
+      "tipTester": "{name} is a ready-made test account that starts in {language}. After a couples reset it is linked with {partner} as a couple. Tap the card to sign in.",
+      "passwordFirst": "Enter the password first.",
+      "accountFirst": "Select an account card first."
+    }
   },
   "invite": {
     "title": "Invite partner",
@@ -624,7 +649,8 @@
     "promoEndRequired": "Enter a promo end date.",
     "promoEndAfterStart": "Promo end date must be after the start date.",
     "promoAmountLessThanRegular": "Promo amount must be less than the regular amount.",
-    "completedLessThanTotal": "Paid installments must be less than total installments."
+    "completedLessThanTotal": "Paid installments must be less than total installments.",
+    "testLoginFailed": "Wrong test account or password."
   },
   "stocks": {
     "tabName": "Stocks",

@@ -266,6 +266,75 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
 
 export const loginUrl = `${API_BASE_URL}/api/auth/login`;
 
+/** Built-in test account; only the staging API offers these. */
+export interface TestAccount {
+  id: string;
+  name: string;
+  locale: string;
+}
+
+/** Test accounts, or null when this deployment has test login turned off. */
+export async function fetchTestAccounts(): Promise<TestAccount[] | null> {
+  try {
+    const res = await fetch(`${SESSION_BASE}/test-login`, {
+      credentials: "same-origin",
+    });
+    if (!res.ok) return null;
+    return ((await res.json()) as { accounts: TestAccount[] }).accounts;
+  } catch {
+    return null;
+  }
+}
+
+async function postTestLogin(path: string, body: object): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fetch(`${SESSION_BASE}/test-login${path}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError("network");
+  }
+  if (!res.ok) {
+    throw new ApiError(
+      res.status === 401 || res.status === 422 ? "testLoginFailed" : "generic"
+    );
+  }
+  return res;
+}
+
+/**
+ * One-time login code for a test account, redeemed by the auth callback page.
+ * `ready`: an account that is not set up yet starts with onboarding done.
+ */
+export async function signInTestAccount(
+  account: string,
+  password: string,
+  ready: boolean
+): Promise<string> {
+  const res = await postTestLogin("", { account, password, ready });
+  return ((await res.json()) as { code: string }).code;
+}
+
+/** How test accounts start after a reset. */
+export type TestResetPreset = "empty" | "couples";
+
+/**
+ * Delete every test account and its data. "couples" then recreates Tester 1+2
+ * and 3+4 as linked couples with default accounts, onboarding done. With
+ * "empty" and an `account`, only that account is deleted.
+ */
+export async function resetTestAccounts(
+  password: string,
+  preset: TestResetPreset,
+  account?: string
+): Promise<void> {
+  await postTestLogin("/reset", { password, preset, account });
+}
+
 export type Currency = "KRW" | "CAD" | "USD";
 export type LedgerScope = Currency | "ALL";
 export type TransactionType = "income" | "expense";
