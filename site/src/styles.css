@@ -99,7 +99,7 @@ a { color: inherit; text-decoration-thickness: 0.08em; text-underline-offset: 0.
 .stage {
   grid-column: 2; grid-row: 1;
   position: sticky; top: var(--gap); height: calc(100svh - 2 * var(--gap));
-  background: var(--surface); border-radius: var(--r); overflow: hidden;
+  background: var(--field); border-radius: var(--r); overflow: hidden;
 }
 .stage figure {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -108,7 +108,8 @@ a { color: inherit; text-decoration-thickness: 0.08em; text-underline-offset: 0.
   transition: opacity 1.2s var(--ease), visibility 0s linear 1.2s;
 }
 .stage figure.on { opacity: 1; visibility: visible; transition-delay: 0s; }
-.stage figcaption { font-size: var(--step-small); color: var(--muted); }
+.stage figcaption { font-size: var(--step-small); color: var(--field-ink); }
+.stage .ph { background: var(--paper); }
 .stage .shot, .stage .ph { width: 100%; max-height: calc(100svh - 190px); height: auto; border-radius: var(--r); object-fit: contain; }
 .inline-clip { display: none; }
 
