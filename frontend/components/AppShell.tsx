@@ -25,6 +25,15 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 
+import {
+  ScanDraft,
+  deleteDrafts,
+  listDrafts,
+  markDone,
+  purgeOldDone,
+  saveDrafts,
+  DONE_KEEP_DAYS,
+} from "@/lib/scan-drafts";
 import AppUpdateWatcher from "@/components/AppUpdateWatcher";
 import { salesTaxPercent } from "@/lib/canada-tax";
 import CalendarView from "@/components/CalendarView";
@@ -181,6 +190,7 @@ export default function AppShell({ user, onLogout }: Props) {
   const tAccountType = useTranslations("accountType");
   const tSub = useTranslations("subscriptions");
   const tErrors = useTranslations("errors");
+  const tScan = useTranslations("scanQueue");
   const locale = useLocale();
 
   const [view, setView] = useState<View>(() => {
@@ -271,6 +281,8 @@ export default function AppShell({ user, onLogout }: Props) {
   >([]);
   const [scanQueueOpen, setScanQueueOpen] = useState(false);
   const [scanQueueError, setScanQueueError] = useState<string | null>(null);
+  const [recentScans, setRecentScans] = useState<ScanDraft[]>([]);
+  const [scanRestored, setScanRestored] = useState(0);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -289,27 +301,21 @@ export default function AppShell({ user, onLogout }: Props) {
       return;
     }
     setScanQueueError(null);
-    setScanQueue((prev) => {
-      const room = MAX_SCAN_FILES - prev.length;
-      if (room <= 0) {
-        setScanQueueError(`최대 ${MAX_SCAN_FILES}장까지 올릴 수 있습니다.`);
-        return prev;
-      }
-      const slice = accepted.slice(0, room);
-      if (accepted.length > room) {
-        setScanQueueError(`최대 ${MAX_SCAN_FILES}장까지 올릴 수 있습니다.`);
-      }
-      return [
-        ...prev,
-        ...slice.map((file) => ({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          file,
-          previewUrl: file.type.startsWith("image/")
-            ? URL.createObjectURL(file)
-            : null,
-        })),
-      ];
-    });
+    const room = MAX_SCAN_FILES - scanQueue.length;
+    if (room <= 0) {
+      setScanQueueError(`최대 ${MAX_SCAN_FILES}장까지 올릴 수 있습니다.`);
+      return;
+    }
+    if (accepted.length > room) {
+      setScanQueueError(`최대 ${MAX_SCAN_FILES}장까지 올릴 수 있습니다.`);
+    }
+    const entries = accepted.slice(0, room).map((file) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      file,
+      previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+    }));
+    setScanQueue((prev) => [...prev, ...entries]);
+    void saveDrafts(entries);
     setScanQueueOpen(true);
     if (cameraInputRef.current) cameraInputRef.current.value = "";
     if (photoInputRef.current) photoInputRef.current.value = "";
@@ -317,7 +323,15 @@ export default function AppShell({ user, onLogout }: Props) {
     if (scanMoreInputRef.current) scanMoreInputRef.current.value = "";
   }
 
-  function clearScanQueue() {
+  function clearScanQueue(finished = false) {
+    const ids = scanQueue.map((q) => q.id);
+    if (finished) {
+      void markDone(ids).then(() => listDrafts()).then((all) =>
+        setRecentScans(all.filter((d) => d.status === "done"))
+      );
+    } else {
+      void deleteDrafts(ids);
+    }
     setScanQueue((prev) => {
       prev.forEach((q) => {
         if (q.previewUrl) URL.revokeObjectURL(q.previewUrl);
@@ -328,6 +342,7 @@ export default function AppShell({ user, onLogout }: Props) {
   }
 
   function removeScanQueued(id: string) {
+    void deleteDrafts([id]);
     setScanQueue((prev) => {
       const target = prev.find((q) => q.id === id);
       if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
@@ -367,7 +382,7 @@ export default function AppShell({ user, onLogout }: Props) {
         setModalDate(txDate);
         setModalCurrency(parsed.currency || "CAD");
         setScanQueueOpen(false);
-        clearScanQueue();
+        clearScanQueue(true);
       } else {
         setScanQueueError("AI 분석 결과가 올바르지 않습니다.");
       }
@@ -380,6 +395,43 @@ export default function AppShell({ user, onLogout }: Props) {
   }
 
   const scopeLabel = tLedger(SCOPE_LABEL_KEY[scope]);
+
+  // Bring back files from an interrupted or failed scan, and drop old finished ones.
+  useEffect(() => {
+    let cancelled = false;
+    void purgeOldDone()
+      .then(() => listDrafts())
+      .then((all) => {
+        if (cancelled) return;
+        const pending = all.filter((d) => d.status === "pending");
+        setRecentScans(all.filter((d) => d.status === "done"));
+        if (pending.length === 0) return;
+        setScanQueue((prev) => [
+          ...prev,
+          ...pending
+            .filter((d) => !prev.some((q) => q.id === d.id))
+            .map((d) => ({
+              id: d.id,
+              file: d.file,
+              previewUrl: d.file.type.startsWith("image/")
+                ? URL.createObjectURL(d.file)
+                : null,
+            })),
+        ]);
+        setScanRestored(pending.length);
+        setScanQueueOpen(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function addRecentScans() {
+    const files = recentScans.map((d) => d.file);
+    void deleteDrafts(recentScans.map((d) => d.id));
+    setRecentScans([]);
+    enqueueScanFiles(files);
+  }
 
   // Desktop: pasting an image from the clipboard adds it to the scan queue.
   const pasteStateRef = useRef({ blocked: false });
@@ -1224,8 +1276,23 @@ export default function AppShell({ user, onLogout }: Props) {
               <p className="text-sm text-gray-500">아직 파일이 없습니다.</p>
             )}
 
+            {scanRestored > 0 && (
+              <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                {tScan("restored", { count: scanRestored })}
+              </p>
+            )}
             {scanQueueError && (
               <p className="text-xs text-red-500">{scanQueueError}</p>
+            )}
+            {recentScans.length > 0 && !aiParsing && (
+              <button
+                type="button"
+                onClick={addRecentScans}
+                disabled={scanQueue.length >= MAX_SCAN_FILES}
+                className="w-full rounded-xl border border-dashed border-gray-300 dark:border-gray-600 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 disabled:opacity-50"
+              >
+                {tScan("addRecent", { count: recentScans.length, days: DONE_KEEP_DAYS })}
+              </button>
             )}
 
             <input
@@ -1264,7 +1331,7 @@ export default function AppShell({ user, onLogout }: Props) {
             {scanQueue.length > 0 && !aiParsing && (
               <button
                 type="button"
-                onClick={clearScanQueue}
+                onClick={() => clearScanQueue()}
                 className="w-full inline-flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-red-500"
               >
                 <Trash2 className="h-3 w-3" />
@@ -1319,6 +1386,19 @@ export default function AppShell({ user, onLogout }: Props) {
             <Repeat className="h-4.5 w-4.5 text-indigo-500" />
             파일 올리기 (PDF/이미지)
           </button>
+          {recentScans.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setScanMenuOpen(false);
+                setScanQueueOpen(true);
+              }}
+              className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              <Repeat className="h-4.5 w-4.5 text-gray-400" />
+              {tScan("openRecent", { count: recentScans.length })}
+            </button>
+          )}
         </div>
       )}
 

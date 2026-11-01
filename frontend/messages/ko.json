@@ -730,6 +730,11 @@
     "filterAccount": "필터",
     "scanPhoto": "사진으로 분석"
   },
+  "scanQueue": {
+    "restored": "지난 스캔에서 못 끝낸 파일 {count}개를 다시 불러왔어요.",
+    "addRecent": "최근 스캔한 파일 다시 넣기 ({count}개, {days}일 보관)",
+    "openRecent": "최근 스캔 ({count}개)"
+  },
   "importPage": {
     "title": "스마트 가져오기 & 파일 관리",
     "subtitle": "가계부 CSV 가져오기·내보내기와 OCR/가져오기 로그를 관리합니다.",
@@ -1115,6 +1120,10 @@
   },
   "whatsNew": {
     "items": {
+      "scanDrafts": {
+        "title": "스캔 파일이 임시 보관돼요",
+        "description": "AI 스캔에 넣은 사진이 이 기기에 저장돼서, 실패하거나 중간에 끊겨도 다시 시도할 수 있어요. 끝난 파일은 3일 동안 보관해서 다시 스캔할 수도 있어요."
+      },
       "provinceTax": {
         "title": "내가 사는 주의 세금",
         "description": "설정에서 거주하는 주를 고르면 지출 입력 시 고정 13% 대신 그 주의 세율로 세금을 추정해요. 세율은 세금 옆에 표시돼요."
