@@ -273,7 +273,7 @@ export default function TestLoginPanel() {
 
       {resetOpen && (
         <div
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center"
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center"
           onClick={(event) => {
             if (event.target === event.currentTarget) setResetOpen(false);
           }}
@@ -288,19 +288,19 @@ export default function TestLoginPanel() {
               {t("resetTitle")}
             </h2>
             {options.map((option) => (
-              <button
+              <div
                 key={option.choice}
-                type="button"
-                onClick={() => reset(option.choice)}
-                className="block w-full rounded-2xl bg-gray-100 p-4 text-left transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                className="flex items-center gap-1 rounded-2xl bg-gray-100 pr-3 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
               >
-                <span className="block text-base font-semibold text-gray-900 dark:text-white">
+                <button
+                  type="button"
+                  onClick={() => reset(option.choice)}
+                  className="flex-1 rounded-2xl p-4 text-left text-base font-semibold text-gray-900 dark:text-white"
+                >
                   {option.title}
-                </span>
-                <span className="mt-1 block text-sm text-gray-600 dark:text-gray-400">
-                  {option.hint}
-                </span>
-              </button>
+                </button>
+                <InfoTip label={t("tipLabel")}>{option.hint}</InfoTip>
+              </div>
             ))}
             <button
               type="button"
