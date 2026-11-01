@@ -26,6 +26,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 
 import AppUpdateWatcher from "@/components/AppUpdateWatcher";
+import { salesTaxPercent } from "@/lib/canada-tax";
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
 import InviteModal from "@/components/InviteModal";
@@ -258,6 +259,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
   const [modalDate, setModalDate] = useState<Date | null>(null);
   const [modalCurrency, setModalCurrency] = useState<Currency>("CAD");
+  const [taxPercent, setTaxPercent] = useState(() => salesTaxPercent(null));
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
 
@@ -455,6 +457,7 @@ export default function AppShell({ user, onLogout }: Props) {
         const countries = countriesForLocales(preferredLocalesList(s));
         const scopes = ledgerScopesForCountries(countries);
         setEnabledScopes(scopes);
+        setTaxPercent(salesTaxPercent(s.sales_tax_province));
         setScope((prev) => (scopes.includes(prev) ? prev : scopes[0]));
         if (scopes[0] === "CAD" || scopes[0] === "KRW") {
           const firstCurrency: Currency = scopes[0];
@@ -1369,6 +1372,7 @@ export default function AppShell({ user, onLogout }: Props) {
       {modalDate && presets && (
         <TransactionModal
           currency={modalCurrency}
+          taxPercent={taxPercent}
           ledgerScope={scope}
           accountType={accountType}
           hasPartner={Boolean(partner)}

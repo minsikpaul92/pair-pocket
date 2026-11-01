@@ -3,6 +3,7 @@
 import { Camera, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { formatTaxPercent } from "@/lib/canada-tax";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
@@ -86,6 +87,8 @@ const ITEM_GRID =
 
 interface Props {
   currency: Currency;
+  /** Sales tax percent of the province chosen in Settings. */
+  taxPercent?: number;
   ledgerScope?: LedgerScope;
   accountType?: AccountType;
   /** Personal ↔ shared transfers need a linked partner. */
@@ -136,6 +139,7 @@ function convertCurrency(
 
 export default function TransactionModal({
   currency,
+  taxPercent = 13,
   ledgerScope = "ALL",
   accountType = "personal",
   hasPartner = false,
@@ -579,7 +583,7 @@ export default function TransactionModal({
     ALL_TIP_SUB_CATEGORIES.has(subCategory) &&
     !isTransferCategory;
 
-  const HST_RATE = 0.13;
+  const HST_RATE = taxPercent / 100;
 
   // Groceries mix taxed and untaxed items, so the tax is typed from the
   // receipt instead of being estimated at the flat rate.
@@ -963,7 +967,7 @@ export default function TransactionModal({
           const tipPctNum = parsedTipPct || 0;
           const tipRate = tipPctNum > 0 ? tipPctNum / 100 : 0;
           const preTip = round2(totAmount / (1 + tipRate));
-          const sub = round2(preTip / 1.13);
+          const sub = round2(preTip / (1 + HST_RATE));
           const tax = round2(preTip - sub);
           const tip = round2(totAmount - preTip);
 
@@ -992,7 +996,7 @@ export default function TransactionModal({
         }
       }
     },
-    [transactionCurrency, currency, onDateChange]
+    [transactionCurrency, currency, onDateChange, HST_RATE]
   );
 
   useEffect(() => {
@@ -2509,6 +2513,11 @@ export default function TransactionModal({
                   <label className="text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer select-none">
                     {tTx("taxLabel")}
                   </label>
+                  {!isMixedTaxCategory && (
+                    <span className="text-xs font-semibold tabular-nums whitespace-nowrap text-blue-600 dark:text-blue-400">
+                      {formatTaxPercent(taxPercent)}%
+                    </span>
+                  )}
                 </div>
                 <input
                   inputMode="decimal"
