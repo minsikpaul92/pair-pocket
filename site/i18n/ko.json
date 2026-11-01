@@ -111,7 +111,6 @@
   "built": {
     "h2": "한 사람이 만들고, 직접 운영해요.",
     "p": "Pair Pocket은 목업이 아니라 실제로 쓰는 앱이에요. 설계하고, 만들고, 직접 운영해요.",
-    "by": "만든 사람: Paul.",
     "feedbackH": "피드백은 언제든 환영해요.",
     "feedbackP": "피드백과 기능 요청은 언제든 가능해요. Buy Me a Coffee를 통해 말해 주세요."
   },
@@ -134,7 +133,7 @@
     "linkedin": "LinkedIn",
     "portfolio": "포트폴리오",
     "portfolioSoon": "포트폴리오 (준비 중)",
-    "coffee": "커피 사 주기",
+    "coffee": "Buy me a coffee",
     "app": "앱 열기",
     "license": "라이선스"
   },

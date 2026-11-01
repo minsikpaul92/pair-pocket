@@ -216,12 +216,13 @@ details.langs div { position: absolute; right: 0; top: 100%; background: var(--p
 .built { background: var(--inv-bg); color: var(--inv-ink); border-radius: 40px; margin: var(--gap); }
 .built-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 6vw, 96px); align-items: center; }
 .built-copy > p { margin-top: 24px; max-width: 40ch; font-size: var(--step-lead); line-height: 1.45; }
-.built-copy .by { font-size: var(--step-body); color: var(--inv-muted); }
 .feedback { background: var(--inv-surface); border-radius: 32px; padding: clamp(24px, 3vw, 40px); display: grid; gap: 14px; justify-items: start; }
 .feedback h3 { font-size: var(--step-title); }
 .feedback h3::before { content: none; }
 .feedback p { color: var(--muted); max-width: 36ch; }
-.btn-coffee { margin-top: 8px; }
+.btn-coffee { margin-top: 8px; background: #fef3c7; color: #92400e; }
+.btn-coffee:hover { background: #fde68a; }
+.coffee-link .ico { color: #b45309; }
 .coffee-link { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none; }
 .coffee-link:hover span { text-decoration: underline; }
 
