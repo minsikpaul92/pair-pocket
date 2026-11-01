@@ -64,6 +64,13 @@ async def _ensure_indexes() -> None:
             [("shared_group_id", 1), ("owner_id", 1), ("account_type", 1)]
         )
 
+    await db.database["notifications"].create_index(
+        [("recipient_id", 1), ("transaction_id", 1)], unique=True
+    )
+    await db.database["notifications"].create_index(
+        [("recipient_id", 1), ("is_read", 1), ("created_at", -1)]
+    )
+
     # Sign-in sessions: lookups by credential hash; Mongo drops expired rows.
     for collection, key in (
         ("auth_sessions", "token_hash"),
