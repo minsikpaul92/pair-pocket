@@ -379,6 +379,28 @@ export default function AppShell({ user, onLogout }: Props) {
 
   const scopeLabel = tLedger(SCOPE_LABEL_KEY[scope]);
 
+  // Desktop: pasting an image from the clipboard adds it to the scan queue.
+  const pasteStateRef = useRef({ blocked: false });
+  pasteStateRef.current.blocked = aiParsing || modalDate !== null;
+  const enqueueRef = useRef(enqueueScanFiles);
+  enqueueRef.current = enqueueScanFiles;
+
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      if (pasteStateRef.current.blocked) return;
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const images = items
+        .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+        .map((it) => it.getAsFile())
+        .filter((f): f is File => f !== null);
+      if (images.length === 0) return;
+      e.preventDefault();
+      enqueueRef.current(images);
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(NAV_COLLAPSED_KEY);
