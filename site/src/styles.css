@@ -1,20 +1,20 @@
 /* Pair Pocket landing site. Tokens first, everything below references them. */
 :root {
-  --bg: #ddd6c6;
-  --paper: #e9e8e2;
-  --surface: #d2cab8;
-  --ink: #2a2a26;
-  --muted: #55534a;
-  --accent: #4f6238;
-  --accent-hover: #3f5a2a;
+  --bg: #dfe7f3;
+  --paper: #f4f7fb;
+  --surface: #cdd9ec;
+  --ink: #111827;
+  --muted: #475266;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
   --accent-ink: #ffffff;
-  --field: #3f5a2a;
+  --field: #1d4ed8;
   --field-ink: #ffffff;
-  --inv-bg: #2a2a26;
-  --inv-ink: #e9e8e2;
-  --inv-muted: #c9c2b0;
-  --inv-surface: #3b3b35;
-  --focus: #1f4fd8;
+  --inv-bg: #0f172a;
+  --inv-ink: #f1f5f9;
+  --inv-muted: #b6c2d6;
+  --inv-surface: #1e293b;
+  --focus: #111827;
 
   --font: "Literata", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", Georgia, serif;
 
@@ -32,21 +32,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #1c1d19;
-    --paper: #25261f;
-    --surface: #2e2f27;
-    --ink: #e9e8e2;
-    --muted: #bdb7a6;
-    --accent: #a9c07f;
-    --accent-hover: #bdd392;
-    --accent-ink: #1a2110;
-    --field: #2f4420;
-    --field-ink: #f3eedf;
-    --inv-bg: #11120e;
-    --inv-ink: #e9e8e2;
-    --inv-muted: #bdb7a6;
-    --inv-surface: #25261f;
-    --focus: #8fb0ff;
+    --bg: #0b1220;
+    --paper: #111a2c;
+    --surface: #172236;
+    --ink: #e8eefb;
+    --muted: #a5b3cb;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-ink: #0b1220;
+    --field: #1e3a8a;
+    --field-ink: #ffffff;
+    --inv-bg: #060b16;
+    --inv-ink: #e8eefb;
+    --inv-muted: #a5b3cb;
+    --inv-surface: #172236;
+    --focus: #e8eefb;
   }
 }
 
@@ -134,7 +134,7 @@ details.langs div { position: absolute; right: 0; top: 100%; background: var(--p
 
 /* Stripe motif, drawn with a mask so it follows the ink colour. */
 .stripe {
-  height: 56px; background: var(--ink);
+  height: 56px; background: var(--accent);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Crect width='28' height='56'/%3E%3C/svg%3E") repeat-x;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Crect width='28' height='56'/%3E%3C/svg%3E") repeat-x;
 }
@@ -165,7 +165,7 @@ details.langs div { position: absolute; right: 0; top: 100%; background: var(--p
   background: var(--bg); color: var(--ink); padding: clamp(16px, 3vw, 32px); text-align: left;
 }
 .ph p { margin: 0 !important; max-width: none !important; }
-.ph-tag { font-size: var(--step-small); font-weight: 600; color: var(--accent); }
+.ph-tag { font-size: var(--step-small); font-weight: 600; color: var(--accent-hover); }
 .ph-title { font-size: var(--step-lead); line-height: 1.2; }
 .ph-shot { font-size: var(--step-small); color: var(--muted); max-width: 44ch !important; }
 .ph-file { font-size: var(--step-small); color: var(--muted); }
