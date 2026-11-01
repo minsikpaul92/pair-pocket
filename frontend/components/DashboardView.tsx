@@ -19,6 +19,7 @@ import {
 } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
+import BudgetQuickModal from "@/components/BudgetQuickModal";
 import { DefaultRoleBadges, DefaultRoleMenu } from "@/components/DefaultRoleControls";
 import DashboardAnalytics from "@/components/DashboardAnalytics";
 import SortableCardGrid from "@/components/SortableCardGrid";
@@ -173,6 +174,7 @@ export default function DashboardView({
   >({});
   const [fixedBills, setFixedBills] = useState<Subscription[]>([]);
   const [settingsReady, setSettingsReady] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const { defaults } = useAccountDefaults(accountType, version);
   const excluded = useMemo(
     () => userSettings?.spending_excluded_categories ?? [TRANSFER_CATEGORY],
@@ -820,7 +822,7 @@ export default function DashboardView({
         {!budget.configured ? (
           <button
             type="button"
-            onClick={onOpenSettings}
+            onClick={() => setShowBudgetModal(true)}
             className="mt-1 text-[11px] font-medium text-blue-600 hover:underline"
           >
             {tDashboard("budgetSet")}
@@ -1372,6 +1374,15 @@ export default function DashboardView({
         onReorder={handleReorder}
         onToggleSize={handleToggleSize}
       />
+      {showBudgetModal && (
+        <BudgetQuickModal
+          accountType={accountType}
+          currencies={budgetCurrencies}
+          settings={userSettings}
+          onSaved={setUserSettings}
+          onClose={() => setShowBudgetModal(false)}
+        />
+      )}
       {editingAccount && (
         <AccountRegisterModal
           currency={editingAccount.currency}

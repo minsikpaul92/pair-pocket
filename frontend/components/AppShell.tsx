@@ -68,6 +68,7 @@ import {
 import { addMonths, dayKey, isoDayKey, monthKey, monthLabel, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
+import { hasUnseenWhatsNew } from "@/lib/whats-new";
 import {
   countriesForLocales,
   ledgerScopesForCountries,
@@ -187,6 +188,7 @@ export default function AppShell({ user, onLogout }: Props) {
   });
   const [previousView, setPreviousView] = useState<View>("calendar");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [whatsNewUnseen, setWhatsNewUnseen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [scope, setScope] = useState<LedgerScope>("CAD");
   // The dashboard shows one country at a time; under "All" it falls back to
@@ -524,6 +526,10 @@ export default function AppShell({ user, onLogout }: Props) {
       setView("notifications");
     }
   }
+
+  useEffect(() => {
+    setWhatsNewUnseen(hasUnseenWhatsNew());
+  }, []);
 
   // Keep the bell badge fresh: on load, every minute, and when the tab returns.
   useEffect(() => {
@@ -867,7 +873,11 @@ export default function AppShell({ user, onLogout }: Props) {
                 className="hidden min-[420px]:block md:hidden h-6 w-6 text-blue-500 shrink-0"
                 aria-hidden
               />
-              <div className="flex flex-none sm:min-w-0 sm:flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+              <div
+                className={`flex min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 ${
+                  visibleLedgers.length > 1 ? "flex-auto sm:flex-1" : "flex-none"
+                }`}
+              >
                 {(["personal", "shared"] as AccountType[]).map((type) => (
                   <button
                     key={type}
@@ -884,7 +894,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 ))}
               </div>
               {visibleLedgers.length > 1 && (
-                <div className="flex flex-none sm:min-w-0 sm:flex-[1.4] rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+                <div className="flex min-w-0 flex-[1.4_1_auto] sm:flex-[1.4] rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
                   {visibleLedgers.map((l) => (
                     <button
                       key={l.scope}
@@ -901,26 +911,29 @@ export default function AppShell({ user, onLogout }: Props) {
                   ))}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={toggleSettings}
-                aria-label={tNav("settings")}
-                aria-pressed={view === "settings"}
-                className={`md:hidden shrink-0 rounded-xl p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                  view === "settings"
-                    ? "bg-blue-500 text-white"
-                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-white"
-                }`}
-              >
-                <Settings className="h-5 w-5" />
-              </button>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <NotificationBell
+                  count={unreadCount}
+                  dot={whatsNewUnseen}
+                  active={view === "notifications"}
+                  onClick={toggleNotifications}
+                />
+                <button
+                  type="button"
+                  onClick={toggleSettings}
+                  aria-label={tNav("settings")}
+                  aria-pressed={view === "settings"}
+                  className={`md:hidden shrink-0 rounded-xl p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                    view === "settings"
+                      ? "bg-blue-500 text-white"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-white"
+                  }`}
+                >
+                  <Settings className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
-            <NotificationBell
-              count={unreadCount}
-              active={view === "notifications"}
-              onClick={toggleNotifications}
-            />
             <div className="hidden md:flex items-center gap-2 shrink-0">
               <ThemeToggle />
             </div>
@@ -962,8 +975,8 @@ export default function AppShell({ user, onLogout }: Props) {
               </h1>
             </div>
           ) : (
-          <div className="mb-4 flex items-center justify-between">
-            <div>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="min-w-0">
               {view === "calendar" ||
               view === "list" ||
               view === "subscriptions" ||
@@ -973,9 +986,10 @@ export default function AppShell({ user, onLogout }: Props) {
                   value={month}
                   onChange={setMonth}
                   locale={locale}
+                  titleClassName="whitespace-nowrap text-2xl sm:text-3xl"
                 />
               ) : (
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                <h1 className="whitespace-nowrap text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                   {monthLabel(month, locale)}
                 </h1>
               )}
@@ -983,7 +997,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 {scopeLabel}
               </p>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
                 onClick={() => setMonth((m) => addMonths(m, -1))}
@@ -1000,7 +1014,7 @@ export default function AppShell({ user, onLogout }: Props) {
                     return new Date(n.getFullYear(), n.getMonth(), 1);
                   })
                 }
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="whitespace-nowrap rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 {tCommon("thisMonth")}
               </button>
@@ -1019,6 +1033,7 @@ export default function AppShell({ user, onLogout }: Props) {
           {view === "notifications" ? (
             <NotificationsView
               onUnreadChange={setUnreadCount}
+              onWhatsNewSeen={() => setWhatsNewUnseen(false)}
               onOpenNotification={openNotification}
             />
           ) : accountType === "shared" && !currentUser.shared_group_id ? (
