@@ -31,6 +31,14 @@ You do not need a partner or a second currency to use it. A solo user gets a ful
 - **Mobile first.** Installable PWA, light, dark and system themes, safe-area aware layout.
 - **Korean and English.** Every screen is available in both. The language picker lists more languages that are still in beta.
 
+## What makes it different
+
+- **It records the story behind the money.** A bank statement shows money moving, often under a code or a vague merchant name that nobody remembers six months later. PairPocket lets you record the flow itself: settlements between partners, moves between accounts, credit card payments, and money going between the personal and shared ledgers. Months later you can still see what happened and why.
+- **Moves do not pollute your charts.** Account transfers and card payments stay in the history but are not counted as spending, and settlements are netted against the expense they settle. Spending charts show what you actually spent, not the same money counted twice.
+- **Free, with no bank connection on purpose.** Bank aggregation is a paid service, and a free app cannot honestly offer it. PairPocket takes manual entry plus receipt photos, statement PDFs and CSV imports instead, and has no ads.
+- **AI is optional and costs you nothing.** Scanning and statement parsing use your own Gemini API key, which you can create with any Google account (subject to Google's current free-tier terms). Manual entry and CSV import work without a key.
+- **No passwords to leak.** You sign in with Google, so PairPocket never stores a password. Your ledger data is still stored in the service database.
+
 ## Demo
 
 ### Personal and shared toggle
