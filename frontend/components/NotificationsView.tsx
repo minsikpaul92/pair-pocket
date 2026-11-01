@@ -24,11 +24,14 @@ interface Props {
   /** Called after any read change with the server's unread count. */
   onUnreadChange: (count: number) => void;
   onOpenNotification: (item: AppNotification) => void;
+  /** Called once the What's New tab has been read. */
+  onWhatsNewSeen?: () => void;
 }
 
 export default function NotificationsView({
   onUnreadChange,
   onOpenNotification,
+  onWhatsNewSeen,
 }: Props) {
   const t = useTranslations("notifications");
   const tNew = useTranslations("whatsNew");
@@ -59,6 +62,7 @@ export default function NotificationsView({
     if (next === "whatsNew") {
       markWhatsNewSeen();
       setUnseenNew(false);
+      onWhatsNewSeen?.();
     }
   }
 

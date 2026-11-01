@@ -5,11 +5,13 @@ import { useTranslations } from "next-intl";
 
 interface Props {
   count: number;
+  /** Small dot for something new that is not an unread alert (What's New). */
+  dot?: boolean;
   active: boolean;
   onClick: () => void;
 }
 
-export default function NotificationBell({ count, active, onClick }: Props) {
+export default function NotificationBell({ count, dot = false, active, onClick }: Props) {
   const t = useTranslations("notifications");
   return (
     <button
@@ -28,6 +30,12 @@ export default function NotificationBell({ count, active, onClick }: Props) {
         <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center whitespace-nowrap rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none tabular-nums text-white">
           {count > 99 ? "99+" : count}
         </span>
+      )}
+      {count === 0 && dot && (
+        <span
+          aria-hidden
+          className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500"
+        />
       )}
     </button>
   );

@@ -68,6 +68,7 @@ import {
 import { addMonths, dayKey, isoDayKey, monthKey, monthLabel, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
+import { hasUnseenWhatsNew } from "@/lib/whats-new";
 import {
   countriesForLocales,
   ledgerScopesForCountries,
@@ -187,6 +188,7 @@ export default function AppShell({ user, onLogout }: Props) {
   });
   const [previousView, setPreviousView] = useState<View>("calendar");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [whatsNewUnseen, setWhatsNewUnseen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [scope, setScope] = useState<LedgerScope>("CAD");
   // The dashboard shows one country at a time; under "All" it falls back to
@@ -524,6 +526,10 @@ export default function AppShell({ user, onLogout }: Props) {
       setView("notifications");
     }
   }
+
+  useEffect(() => {
+    setWhatsNewUnseen(hasUnseenWhatsNew());
+  }, []);
 
   // Keep the bell badge fresh: on load, every minute, and when the tab returns.
   useEffect(() => {
@@ -908,6 +914,7 @@ export default function AppShell({ user, onLogout }: Props) {
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 <NotificationBell
                   count={unreadCount}
+                  dot={whatsNewUnseen}
                   active={view === "notifications"}
                   onClick={toggleNotifications}
                 />
@@ -1026,6 +1033,7 @@ export default function AppShell({ user, onLogout }: Props) {
           {view === "notifications" ? (
             <NotificationsView
               onUnreadChange={setUnreadCount}
+              onWhatsNewSeen={() => setWhatsNewUnseen(false)}
               onOpenNotification={openNotification}
             />
           ) : accountType === "shared" && !currentUser.shared_group_id ? (
