@@ -106,7 +106,8 @@
       "cancel": "취소",
       "backToTest": "테스트 페이지",
       "tipTester": "{name}은 미리 만들어 둔 {language} 테스트 계정이에요. 커플 초기화를 하면 {partner}와 커플로 연결돼요. 카드를 누르면 바로 로그인돼요.",
-      "passwordFirst": "먼저 비밀번호를 입력해 주세요."
+      "passwordFirst": "먼저 비밀번호를 입력해 주세요.",
+      "accountFirst": "먼저 계정 카드를 선택해 주세요."
     }
   },
   "invite": {

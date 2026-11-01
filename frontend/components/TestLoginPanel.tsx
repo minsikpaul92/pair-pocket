@@ -87,6 +87,10 @@ export default function TestLoginPanel() {
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
+    if (!account) {
+      setNotice({ kind: "error", text: t("accountFirst") });
+      return;
+    }
     if (needPassword()) return;
     setBusy(true);
     setNotice(null);
@@ -153,11 +157,15 @@ export default function TestLoginPanel() {
   const options: { choice: ResetChoice; title: string; hint: string }[] = [
     { choice: "couples", title: t("resetCouples"), hint: t("tipResetCouples") },
     { choice: "empty", title: t("reset"), hint: t("tipReset") },
-    {
-      choice: "selected",
-      title: t("resetSelected", { name }),
-      hint: t("tipResetSelected", { name }),
-    },
+    ...(account
+      ? [
+          {
+            choice: "selected" as const,
+            title: t("resetSelected", { name }),
+            hint: t("tipResetSelected", { name }),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -187,7 +195,7 @@ export default function TestLoginPanel() {
                 type="button"
                 role="radio"
                 aria-checked={active}
-                onClick={() => setAccount(item.id)}
+                onClick={() => setAccount(active ? "" : item.id)}
                 className={`flex w-full flex-col items-start gap-6 rounded-3xl p-4 text-left transition-colors duration-150 ${
                   active
                     ? "bg-blue-600 text-white"

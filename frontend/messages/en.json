@@ -106,7 +106,8 @@
       "cancel": "Cancel",
       "backToTest": "Test page",
       "tipTester": "{name} is a ready-made test account that starts in {language}. After a couples reset it is linked with {partner} as a couple. Tap the card to sign in.",
-      "passwordFirst": "Enter the password first."
+      "passwordFirst": "Enter the password first.",
+      "accountFirst": "Select an account card first."
     }
   },
   "invite": {
