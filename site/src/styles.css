@@ -180,19 +180,21 @@ details.langs div { position: absolute; right: 0; top: 100%; background: var(--p
 .try-copy p { margin-top: 24px; max-width: 40ch; font-size: var(--step-lead); line-height: 1.45; }
 .fallback { display: block; }
 .js .fallback { display: none; }
+.calc { display: none; }
+.js .calc { display: grid; }
 .calc {
-  gap: 20px; background: var(--paper); border-radius: 32px; padding: clamp(20px, 3vw, 36px); max-width: 560px; width: 100%; justify-self: end;
+  gap: 22px; background: var(--paper); border-radius: 32px; padding: clamp(24px, 3vw, 40px); max-width: 560px; width: 100%; justify-self: end;
   font-size: var(--step-body);
 }
 .calc-title { font-size: var(--step-lead); font-weight: 700; letter-spacing: -0.02em; }
-.calc-sum { display: grid; gap: 4px; }
+.calc-sum { display: grid; gap: 10px; }
 .calc-sum > div { display: flex; justify-content: space-between; gap: 16px; }
 .calc-sum dt { color: var(--muted); font-size: var(--step-small); align-self: center; }
 .calc-sum dd { font-variant-numeric: tabular-nums; font-weight: 600; }
-.calc-mine { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; background: var(--surface); border-radius: var(--r); padding: 16px 20px; }
-.calc-mine span { font-weight: 700; }
+.calc-mine { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: var(--surface); border-radius: var(--r); padding: 20px 24px; }
+.calc-mine span { font-weight: 700; line-height: 1; }
 .calc-mine strong { font-size: var(--step-head); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; color: var(--accent); transition: transform 0.25s var(--ease); }
-.friends { display: grid; gap: 10px; }
+.friends { display: grid; gap: 12px; }
 .friend {
   min-height: 52px; padding: 10px 20px; border-radius: 999px; border: 2px solid var(--accent); background: var(--paper); color: var(--accent-hover);
   font: inherit; font-weight: 700; cursor: pointer; text-align: center;
