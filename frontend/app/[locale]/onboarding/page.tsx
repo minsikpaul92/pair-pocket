@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+
+import Link from "next/link";
 
 import OnboardingWizard from "@/components/OnboardingWizard";
 import { useRouter } from "@/i18n/navigation";
@@ -21,6 +23,28 @@ function readSessionLocales(): AppLocale[] {
   } catch {
     return [];
   }
+}
+
+/** For a test account: a way back to the test page, which has no other exit. */
+function TestPageLink() {
+  const t = useTranslations("auth.testLogin");
+  const locale = useLocale();
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    // Only for a built-in test account, never for a real sign-in.
+    fetchCurrentUser()
+      .then((user) => setShow(Boolean(user?.google_id.startsWith("test-login:"))))
+      .catch(() => null);
+  }, []);
+  if (!show) return null;
+  return (
+    <Link
+      href={`/${locale}/auth/test`}
+      className="fixed right-4 top-[max(env(safe-area-inset-top),1rem)] z-50 whitespace-nowrap rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-gray-900"
+    >
+      {t("backToTest")}
+    </Link>
+  );
 }
 
 export default function OnboardingPage() {
@@ -77,5 +101,10 @@ export default function OnboardingPage() {
     );
   }
 
-  return <OnboardingWizard />;
+  return (
+    <>
+      <TestPageLink />
+      <OnboardingWizard />
+    </>
+  );
 }
