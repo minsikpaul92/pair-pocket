@@ -237,3 +237,20 @@ def test_ready_sign_in_sets_up_the_couple_once(env):
     assert again.status_code == 200
     assert run(env.db.accounts.count_documents({"owner_id": str(tester3["_id"])})) == accounts
     assert run(env.db.users.count_documents({})) == 2
+
+
+def test_reset_can_target_one_account(env):
+    for account in ("tester1", "tester2"):
+        sign_in(env, account)
+    res = env.client.post(
+        "/api/auth/test-login/reset",
+        json={"password": PASSWORD, "account": "tester1"},
+    )
+    assert res.status_code == 200
+    names = {u["name"] for u in run(env.db.users.find({}).to_list(None))}
+    assert names == {"Tester 2"}
+    bad = env.client.post(
+        "/api/auth/test-login/reset",
+        json={"password": PASSWORD, "account": "someone"},
+    )
+    assert bad.status_code == 422

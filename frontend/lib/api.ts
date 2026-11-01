@@ -324,13 +324,15 @@ export type TestResetPreset = "empty" | "couples";
 
 /**
  * Delete every test account and its data. "couples" then recreates Tester 1+2
- * and 3+4 as linked couples with default accounts, onboarding done.
+ * and 3+4 as linked couples with default accounts, onboarding done. With
+ * "empty" and an `account`, only that account is deleted.
  */
 export async function resetTestAccounts(
   password: string,
-  preset: TestResetPreset
+  preset: TestResetPreset,
+  account?: string
 ): Promise<void> {
-  await postTestLogin("/reset", { password, preset });
+  await postTestLogin("/reset", { password, preset, account });
 }
 
 export type Currency = "KRW" | "CAD" | "USD";

@@ -38,6 +38,8 @@ class StagingResetIn(BaseModel):
     # "empty": brand-new users. "couples": Tester 1+2 and 3+4 linked, set up,
     # with default accounts (staging_login.seed_couples).
     preset: Literal["empty", "couples"] = "empty"
+    # With "empty": reset only this account, leaving the others as they are.
+    account: str | None = None
 
 
 def _require_enabled() -> None:
@@ -74,6 +76,11 @@ async def reset_test_accounts(
 ) -> dict:
     _require_enabled()
     await _require_password(body.password)
+    if body.account is not None:
+        if body.preset != "empty" or not staging_login.is_test_account(body.account):
+            raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "testLoginFailed")
+        deleted = await staging_login.reset(db, (body.account,))
+        return {"deleted": deleted, "preset": body.preset}
     deleted = await staging_login.reset(db)
     if body.preset == "couples":
         await staging_login.seed_couples(db)
