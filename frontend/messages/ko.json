@@ -658,6 +658,7 @@
     "clearFilter": "필터 초기화",
     "sharesAvg": "{shares}주 · 평단 {avg}",
     "addHolding": "보유 주식 추가",
+    "holdingsTitle": "보유 종목",
     "editHolding": "보유 주식 수정",
     "holdingShares": "보유 주수",
     "holdingAvgPrice": "평균 매수가",
