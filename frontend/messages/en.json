@@ -80,8 +80,8 @@
     "koreaLedgerShort": "Korea"
   },
   "auth": {
-    "tagline": "Shared expense tracker",
-    "description": "Dual-currency (KRW/CAD) shared and personal ledgers. Sign in with your Google account.",
+    "tagline": "Shared and personal money, side by side",
+    "description": "Keep shared and personal pockets in one app, and settle up in a tap.",
     "loginWithGoogle": "Sign in with Google",
     "processing": "Signing in...",
     "failed": "Sign-in failed. Please try again.",
@@ -113,7 +113,16 @@
       "tipTester": "{name} is a ready-made test account that starts in {language}. After a couples reset it is linked with {partner} as a couple. Tap the card to sign in.",
       "passwordFirst": "Enter the password first.",
       "accountFirst": "Select an account card first."
-    }
+    },
+    "valueSharedTitle": "Shared and personal",
+    "valueSharedBody": "Track money you share and money that is only yours, and switch between them in a tap.",
+    "valuePartnerTitle": "Invite your partner",
+    "valuePartnerBody": "Link your partner with an invite link. You can skip this when you sign up.",
+    "valueSettleTitle": "Easy settlement",
+    "valueSettleBody": "See who paid what and the amount to settle right away.",
+    "setupNote": "Setup takes about 3 minutes. Everything after the first screen can be skipped.",
+    "googleNote": "Google only confirms who you are, using your name, email and profile photo.",
+    "currencyNote": "Works with both KRW and CAD."
   },
   "invite": {
     "title": "Invite partner",
@@ -994,13 +1003,13 @@
   },
   "onboarding": {
     "title": "Get started",
-    "subtitle": "Set your ledger start date and accounts so balances stay accurate.",
+    "subtitle": "Answer two quick things and you are in. Everything else can wait.",
     "stepOf": "{current} / {total}",
     "loadError": "Could not load onboarding.",
-    "saveError": "Could not save. Try again.",
+    "saveError": "Could not save. Your answers are kept, so please try again.",
     "languageTitle": "Language",
-    "languageHelp": "One language is enough. Optionally tap a second for Secondary. First tap is Primary.",
-    "languageMultiHelp": "Tap to select, tap again to clear. Clearing Primary promotes Secondary.",
+    "languageHelp": "One language is enough. Pick a second to add it as your backup language.",
+    "languageMultiHelp": "Tap to select, tap again to clear. Clearing the first language promotes the second.",
     "languagePrimary": "Primary",
     "languageSecondary": "Secondary (optional)",
     "languageRequired": "Select at least one language.",
@@ -1046,7 +1055,7 @@
     "unnamedAccount": "Account",
     "brokerAccountSelect": "Brokerage account",
     "brokerAccountPick": "Which account holds this stock?",
-    "noBrokerAccounts": "Add a brokerage account in Step 1 first, or add one below.",
+    "noBrokerAccounts": "Add a brokerage account in the Accounts step first, or add one below.",
     "addBrokerInline": "Add brokerage account",
     "subsTitle": "Subscriptions & fixed expenses",
     "subsHelp": "Use the country tabs, open a service account page, then enter the amount.",
@@ -1079,7 +1088,7 @@
     "aiScanningModel": "Analyzing {count} photos… ({model})",
     "aiDone": "Analyzed {count} photos. Review the list below.",
     "aiDoneModel": "Analyzed {count} photos ({model}). Review the list below.",
-    "aiNeedKey": "Save a Gemini API key in Step 0 first.",
+    "aiNeedKey": "Save a Gemini API key in the first step.",
     "aiNeedImages": "Please choose image files.",
     "aiMaxImages": "You can upload up to {max} images.",
     "aiError": "Screenshot analysis failed.",
@@ -1125,7 +1134,14 @@
     "fixedBillUtilities": "Utilities",
     "fixedBillAcademy": "Academy / tutoring",
     "merchant": "Merchant",
-    "ticker": "Ticker"
+    "ticker": "Ticker",
+    "stepBasics": "Basics",
+    "stepAccounts": "Accounts",
+    "stepBills": "Bills",
+    "stepStocks": "Stocks",
+    "optionalSteps": "Only the basics are required. You can skip the last three steps.",
+    "startDateLater": "You can change this later in Settings.",
+    "apiKeyOptionalTitle": "Optional: fill in from screenshots"
   },
   "notifications": {
     "title": "Notifications",

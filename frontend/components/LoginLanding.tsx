@@ -1,6 +1,6 @@
 "use client";
 
-import { Wallet } from "lucide-react";
+import { HandCoins, Users, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import LocaleToggle from "@/components/LocaleToggle";
@@ -28,6 +28,12 @@ function GoogleIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+const VALUE_CARDS = [
+  { key: "valueShared", Icon: Wallet },
+  { key: "valuePartner", Icon: Users },
+  { key: "valueSettle", Icon: HandCoins },
+] as const;
 
 export default function LoginLanding() {
   const t = useTranslations("auth");
@@ -62,6 +68,31 @@ export default function LoginLanding() {
           <GoogleIcon className="h-5 w-5" />
           {t("loginWithGoogle")}
         </a>
+        <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+          {t("setupNote")}
+        </p>
+
+        <ul className="mt-8 grid gap-3">
+          {VALUE_CARDS.map(({ key, Icon }) => (
+            <li
+              key={key}
+              className="flex items-start gap-3 rounded-2xl bg-white dark:bg-gray-800 p-4 shadow-sm"
+            >
+              <Icon className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" aria-hidden="true" />
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                  {t(`${key}Title`)}
+                </h2>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  {t(`${key}Body`)}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <p className="mt-6 text-xs text-gray-500 dark:text-gray-400">{t("currencyNote")}</p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("googleNote")}</p>
       </div>
     </main>
   );
