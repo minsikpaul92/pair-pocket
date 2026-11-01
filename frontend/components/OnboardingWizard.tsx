@@ -726,6 +726,7 @@ export default function OnboardingWizard() {
   }, [holdings, loading]);
 
   const progressLabel = useMemo(() => t("stepOf", { current: step + 1, total: 4 }), [step, t]);
+  const stepNames = [t("stepBasics"), t("stepAccounts"), t("stepBills"), t("stepStocks")];
 
   /** Prefer country-specific copy; fall back if message pack is stale. */
   function onboardingMsg(
@@ -1455,11 +1456,24 @@ export default function OnboardingWizard() {
     <main className="min-h-dvh bg-gray-50 dark:bg-black px-4 py-8">
       <div className="mx-auto w-full max-w-lg space-y-6">
         <header className="space-y-1">
-          <p className="text-sm font-medium text-blue-500">{progressLabel}</p>
+          <p className="text-sm font-medium text-blue-500">
+            {progressLabel} · {stepNames[step]}
+          </p>
+          <div className="flex gap-1.5 pb-1" aria-hidden="true">
+            {stepNames.map((name, i) => (
+              <span
+                key={name}
+                className={`h-1.5 flex-1 rounded-full ${
+                  i <= step ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              />
+            ))}
+          </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
             {t("title")}
           </h1>
           <p className="text-base text-gray-700 dark:text-gray-300">{t("subtitle")}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("optionalSteps")}</p>
         </header>
 
         {error && (
@@ -1496,6 +1510,9 @@ export default function OnboardingWizard() {
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {sharedStartDate ? t("startDateLockedHelp") : t("startDateHelp")}
               </p>
+              {!sharedStartDate && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("startDateLater")}</p>
+              )}
               {sharedStartDate && (
                 <div className="rounded-xl bg-blue-50 dark:bg-blue-500/10 px-4 py-3 space-y-1">
                   <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
@@ -1518,13 +1535,13 @@ export default function OnboardingWizard() {
               </OnboardingField>
             </section>
 
-            <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-5 space-y-3">
-              <div className="flex items-center gap-2">
+            <details className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-5 space-y-3">
+              <summary className="flex cursor-pointer list-none items-center gap-2">
                 <KeyRound className="h-5 w-5 text-blue-500" />
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t("apiKeyTitle")}
+                  {t("apiKeyOptionalTitle")}
                 </h2>
-              </div>
+              </summary>
               <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600 dark:text-gray-400">
                 <li>{t("apiKeyStep1")}</li>
                 <li>{t("apiKeyStep2")}</li>
@@ -1554,7 +1571,7 @@ export default function OnboardingWizard() {
                   className={inputClass}
                 />
               </OnboardingField>
-            </section>
+            </details>
 
             <button
               type="submit"
