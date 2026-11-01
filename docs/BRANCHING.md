@@ -75,7 +75,7 @@ Staging uses separate infrastructure so testing never touches production data. S
 
 Staging has four built-in test accounts so testers do not need Google accounts: Tester 1 and Tester 2 (Korean) and Tester 3 and Tester 4 (English), enough for two couples.
 
-- Turn them on with the `TEST_LOGIN_PASSWORD` config var on the staging API. The sign-in page then shows a "Test sign-in" box: pick an account, enter that password.
+- Turn them on with the `TEST_LOGIN_PASSWORD` config var on the staging API. The unlisted page `/en/auth/test` (or `/ko/auth/test`) then shows a "Test sign-in" box: pick an account, enter that password. The sign-in page itself never shows it, so keep the address to yourself.
 - The API only honors it when `MONGODB_DB_NAME` ends in `_staging`, `_test` or `_dev`, so the production app (database `pairpocket`) ignores the variable even if it is set by mistake. Use a long random password anyway: the staging URL is public.
 - Each account starts like a brand-new user in its language (onboarding included). Test emails go to `tester<N>@example.com`, which never receives mail; invite a tester by that address and use the invite link the app shows when the email cannot be sent.
 - Two reset buttons (same password) first delete the four users and everything they own: ledger data, settings, sessions, invitations and their shared groups. A real user linked with a tester is unlinked and keeps their own data. Then:
