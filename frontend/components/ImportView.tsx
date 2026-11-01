@@ -456,7 +456,7 @@ export default function ImportView({ scope, accountType, presets, month, onChang
 
       {/* SUB TAB 2: CSV SYNC */}
       {activeSubTab === "csv" && (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))]">
           {/* CSV Import */}
           <div className="rounded-2xl border border-gray-150 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-4">
             <div>
