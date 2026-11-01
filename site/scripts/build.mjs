@@ -32,6 +32,8 @@ if (/REPLACE_ME/.test(JSON.stringify(links))) {
 
 const star = `<svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.5l-5.9 3.2 1.2-6.6L2.5 9.5l6.6-.9z"/></svg>`;
 
+const coffee = `<svg class="ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>`;
+
 function media(id, loc, t, base, ctx) {
   const c = clips[id];
   if (!c) throw new Error(`Unknown clip "${id}"`);
@@ -115,7 +117,6 @@ function render(loc) {
     portfolio,
     year: new Date().getFullYear(),
     freeRows: dl(t.free.rows, "fig", "text"),
-    builtItems: dl(t.built.items, "t", "d"),
   };
 
   const out = template.replace(/\{\{([^}]+)\}\}/g, (m, key) => {
@@ -135,7 +136,7 @@ function render(loc) {
       ctx.seen.add(id);
       return `      <div class="inline-clip">${media(id, loc, t, base, ctx)}</div>`;
     }
-    if (key.startsWith("icon:")) return star;
+    if (key.startsWith("icon:")) return key.slice(5) === "coffee" ? coffee : star;
     if (key in vars) return String(vars[key]);
     throw new Error(`unknown placeholder ${m}`);
   });

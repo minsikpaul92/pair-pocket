@@ -3,6 +3,30 @@
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var safe = function (fn) { try { return fn(); } catch (e) { return null; } };
 
+  // In-page links: scroll with a loop that re-reads the target every frame, so late layout
+  // changes (fonts, media) can never leave the page short of or past the section.
+  var bar = document.querySelector(".bar");
+  var easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
+  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      var id = a.getAttribute("href").slice(1);
+      var el = id ? document.getElementById(id) : document.body;
+      if (!el) return;
+      e.preventDefault();
+      var offset = bar && getComputedStyle(bar).position === "sticky" ? bar.offsetHeight : 0;
+      var top = function () { return id ? el.getBoundingClientRect().top + window.scrollY - offset : 0; };
+      var from = window.scrollY, start = performance.now(), dur = reduced ? 0 : 600;
+      var step = function (now) {
+        var p = dur ? Math.min(1, (now - start) / dur) : 1;
+        var target = top();
+        window.scrollTo(0, from + (target - from) * easeOut(p));
+        if (p < 1) requestAnimationFrame(step);
+        else { window.scrollTo(0, top()); safe(function () { history.replaceState(null, "", "#" + id); }); if (id) el.setAttribute("tabindex", "-1"), el.focus({ preventScroll: true }); }
+      };
+      requestAnimationFrame(step);
+    });
+  });
+
   // Remember an explicit language choice; it wins over the system language next time.
   document.querySelectorAll("[data-lang]").forEach(function (a) {
     a.addEventListener("click", function () {

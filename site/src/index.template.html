@@ -183,15 +183,12 @@
     <div class="built-copy">
       <h2 id="built-h">{{t.built.h2}}</h2>
       <p>{{t.built.p}}</p>
-      <ol class="flow" aria-label="{{t.built.stack}}">
-        <li>Browser</li><li>Next.js<small>Vercel</small></li><li>FastAPI<small>Heroku</small></li><li>MongoDB<small>Atlas</small></li>
-      </ol>
-      <p class="stack">{{t.built.stack}}</p>
-      <p class="by">{{t.built.by}} <a href="{{l.linkedin}}" rel="noopener">{{t.built.hello}}</a></p>
     </div>
-    <dl class="notes">
-{{builtItems}}
-    </dl>
+    <div class="feedback" data-ui>
+      <h3>{{t.built.feedbackH}}</h3>
+      <p>{{t.built.feedbackP}}</p>
+      <a class="btn btn-coffee" href="{{l.coffee}}" rel="noopener">{{icon:coffee}}<span>{{t.footer.coffee}}</span></a>
+    </div>
   </div>
 </section>
 
@@ -227,7 +224,7 @@
       <a href="{{l.repo}}" rel="noopener">{{t.footer.github}}</a>
       <a href="{{l.linkedin}}" rel="noopener">{{t.footer.linkedin}}</a>
       {{portfolio}}
-      <a href="{{l.coffee}}" rel="noopener">{{t.footer.coffee}}</a>
+      <a class="coffee-link" href="{{l.coffee}}" rel="noopener">{{icon:coffee}}<span>{{t.footer.coffee}}</span></a>
       <a href="{{appUrl}}">{{t.footer.app}}</a>
     </nav>
     <p class="line-c">&copy; {{year}} {{l.ownerFull}} · <a href="{{l.repo}}/blob/main/LICENSE" rel="noopener">{{t.footer.license}}</a></p>
