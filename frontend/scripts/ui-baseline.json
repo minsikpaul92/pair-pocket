@@ -1,0 +1,9 @@
+{
+  "components/AccountDefaultsSettings.tsx": 1,
+  "components/AccountRegisterModal.tsx": 1,
+  "components/ListView.tsx": 2,
+  "components/OnboardingWizard.tsx": 7,
+  "components/SettingsView.tsx": 1,
+  "components/StocksView.tsx": 3,
+  "components/TransactionModal.tsx": 5
+}

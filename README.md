@@ -11,6 +11,8 @@ PairPocket is a household ledger for couples who share some money and keep some 
 
 **Try it:** [www.pairpocket.me](https://www.pairpocket.me/en) (sign in with Google)
 
+**Landing page:** [minsikpaul92.github.io/pair-pocket](https://minsikpaul92.github.io/pair-pocket/) (English and Korean, source in [`site/`](site/))
+
 ## Why I built it
 
 I immigrated to Canada and still hold money in more than one country. Most money apps are built for one market, or they treat a couple as one person. I wanted mine, yours and ours in one place, in two currencies, without my private entries showing up in my partner's view. I could not find that, so I built it end to end and run it as a production PWA.
@@ -150,6 +152,7 @@ Auth endpoints: `GET /api/auth/login`, `GET /api/auth/callback`, `POST /api/auth
 - [`PRD.md`](./PRD.md) for product requirements and [`design.md`](./design.md) for the design language.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is shipped and what is planned.
 - [`docs/i18n-and-layout.md`](docs/i18n-and-layout.md) for language and layout rules.
+- [`site/README.md`](site/README.md) for the landing page (copy, languages, links, recordings, deploy).
 
 ## Support
 

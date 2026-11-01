@@ -10,6 +10,7 @@ from app.routers import (
     account_defaults,
     accounts,
     auth,
+    bank_import,
     categories,
     email as email_router,
     exchange,
@@ -64,6 +65,7 @@ app.include_router(settings_router.router)
 app.include_router(exchange.router)
 app.include_router(stocks.router)
 app.include_router(ai_router.router)
+app.include_router(bank_import.router)
 
 
 from app.database import db

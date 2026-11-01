@@ -174,3 +174,8 @@ migration-backups/
 *.swp
 .vercel
 .env*
+
+# Landing site
+site/dist
+site/.taste-skill
+site/media/raw
