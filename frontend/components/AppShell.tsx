@@ -26,6 +26,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 
 import AppUpdateWatcher from "@/components/AppUpdateWatcher";
+import { salesTaxPercent } from "@/lib/canada-tax";
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
 import InviteModal from "@/components/InviteModal";
@@ -258,6 +259,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
   const [modalDate, setModalDate] = useState<Date | null>(null);
   const [modalCurrency, setModalCurrency] = useState<Currency>("CAD");
+  const [taxPercent, setTaxPercent] = useState(() => salesTaxPercent(null));
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
 
@@ -379,6 +381,28 @@ export default function AppShell({ user, onLogout }: Props) {
 
   const scopeLabel = tLedger(SCOPE_LABEL_KEY[scope]);
 
+  // Desktop: pasting an image from the clipboard adds it to the scan queue.
+  const pasteStateRef = useRef({ blocked: false });
+  pasteStateRef.current.blocked = aiParsing || modalDate !== null;
+  const enqueueRef = useRef(enqueueScanFiles);
+  enqueueRef.current = enqueueScanFiles;
+
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      if (pasteStateRef.current.blocked) return;
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const images = items
+        .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+        .map((it) => it.getAsFile())
+        .filter((f): f is File => f !== null);
+      if (images.length === 0) return;
+      e.preventDefault();
+      enqueueRef.current(images);
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(NAV_COLLAPSED_KEY);
@@ -433,6 +457,7 @@ export default function AppShell({ user, onLogout }: Props) {
         const countries = countriesForLocales(preferredLocalesList(s));
         const scopes = ledgerScopesForCountries(countries);
         setEnabledScopes(scopes);
+        setTaxPercent(salesTaxPercent(s.sales_tax_province));
         setScope((prev) => (scopes.includes(prev) ? prev : scopes[0]));
         if (scopes[0] === "CAD" || scopes[0] === "KRW") {
           const firstCurrency: Currency = scopes[0];
@@ -1347,6 +1372,7 @@ export default function AppShell({ user, onLogout }: Props) {
       {modalDate && presets && (
         <TransactionModal
           currency={modalCurrency}
+          taxPercent={taxPercent}
           ledgerScope={scope}
           accountType={accountType}
           hasPartner={Boolean(partner)}
