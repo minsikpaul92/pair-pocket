@@ -962,8 +962,8 @@ export default function AppShell({ user, onLogout }: Props) {
               </h1>
             </div>
           ) : (
-          <div className="mb-4 flex items-center justify-between">
-            <div>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="min-w-0">
               {view === "calendar" ||
               view === "list" ||
               view === "subscriptions" ||
@@ -973,9 +973,10 @@ export default function AppShell({ user, onLogout }: Props) {
                   value={month}
                   onChange={setMonth}
                   locale={locale}
+                  titleClassName="whitespace-nowrap text-2xl sm:text-3xl"
                 />
               ) : (
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                <h1 className="whitespace-nowrap text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                   {monthLabel(month, locale)}
                 </h1>
               )}
@@ -983,7 +984,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 {scopeLabel}
               </p>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
                 onClick={() => setMonth((m) => addMonths(m, -1))}
@@ -1000,7 +1001,7 @@ export default function AppShell({ user, onLogout }: Props) {
                     return new Date(n.getFullYear(), n.getMonth(), 1);
                   })
                 }
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="whitespace-nowrap rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 {tCommon("thisMonth")}
               </button>
