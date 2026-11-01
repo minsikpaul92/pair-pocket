@@ -1,6 +1,5 @@
 "use client";
 
-import { FlaskConical } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
@@ -81,29 +80,79 @@ export default function TestLoginPanel() {
   }
 
   const field =
-    "mt-1 w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100";
-  const resetButton =
-    "flex-1 rounded-xl border border-amber-500 px-4 py-2.5 text-sm font-medium text-amber-800 dark:text-amber-300 transition-colors hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50";
+    "w-full rounded-2xl bg-gray-100 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-gray-100";
+  const quiet =
+    "flex-1 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 active:bg-gray-300 disabled:opacity-40 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800";
 
   return (
-    <form
-      onSubmit={signIn}
-      className="mt-8 rounded-2xl border border-dashed border-amber-400 dark:border-amber-600 bg-amber-50/60 dark:bg-amber-950/30 p-4"
-    >
-      <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-        <FlaskConical className="h-4 w-4" />
+    <form onSubmit={signIn}>
+      <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
         {t("title")}
-      </div>
-      <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-300/80">
+      </h1>
+      <p className="mt-3 text-base text-gray-700 dark:text-gray-300">
         {t("notice")}
       </p>
 
-      <label className="mt-4 block text-xs font-medium text-gray-700 dark:text-gray-300">
-        {t("account")}
+      <label className="mt-10 block text-sm font-semibold text-gray-900 dark:text-white">
+        {t("password")}
+        <input
+          type="password"
+          autoComplete="current-password"
+          required
+          autoFocus
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className={`${field} mt-2`}
+        />
+      </label>
+
+      {notice && (
+        <p
+          role={notice.kind === "error" ? "alert" : "status"}
+          className={`mt-4 text-sm ${
+            notice.kind === "error"
+              ? "text-red-600 dark:text-red-400"
+              : "text-green-700 dark:text-green-400"
+          }`}
+        >
+          {notice.text}
+        </p>
+      )}
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        {accounts.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => signInAs(item.id)}
+            disabled={busy || !password}
+            className="flex flex-col items-start gap-6 rounded-3xl bg-gray-100 p-4 text-left transition-transform duration-150 hover:bg-gray-200 active:scale-[0.97] disabled:opacity-40 dark:bg-gray-900 dark:hover:bg-gray-800"
+          >
+            <span
+              className={`flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold text-white ${
+                index < 2 ? "bg-blue-600" : "bg-emerald-600"
+              }`}
+            >
+              {item.name.replace(/\D/g, "") || item.name.charAt(0)}
+            </span>
+            <span>
+              <span className="block text-lg font-semibold text-gray-900 dark:text-white">
+                {item.name}
+              </span>
+              <span className="block text-sm text-gray-600 dark:text-gray-400">
+                {localeMeta(item.locale)?.native ?? item.locale}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 flex flex-col gap-2 sm:flex-row">
         <select
+          aria-label={t("account")}
           value={account}
           onChange={(event) => setAccount(event.target.value)}
-          className={field}
+          className={`${field} flex-1`}
         >
           {accounts.map((item) => (
             <option key={item.id} value={item.id}>
@@ -114,63 +163,21 @@ export default function TestLoginPanel() {
             </option>
           ))}
         </select>
-      </label>
-
-      <label className="mt-3 block text-xs font-medium text-gray-700 dark:text-gray-300">
-        {t("password")}
-        <input
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className={field}
-        />
-      </label>
-
-      {notice && (
-        <p
-          role={notice.kind === "error" ? "alert" : "status"}
-          className={`mt-3 text-xs ${
-            notice.kind === "error"
-              ? "text-red-600 dark:text-red-400"
-              : "text-green-700 dark:text-green-400"
-          }`}
-        >
-          {notice.text}
-        </p>
-      )}
-
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        {accounts.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => signInAs(item.id)}
-            disabled={busy || !password}
-            className="rounded-xl border border-amber-600 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-300 transition-colors hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-50"
-          >
-            {item.name}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
         <button
           type="submit"
           disabled={busy || !password}
-          className="flex-1 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+          className="whitespace-nowrap rounded-2xl bg-blue-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-40"
         >
           {t("signIn")}
         </button>
       </div>
 
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+      <div className="mt-12 flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
           onClick={() => reset("couples")}
           disabled={busy || !password}
-          className={resetButton}
+          className={quiet}
         >
           {t("resetCouples")}
         </button>
@@ -178,7 +185,7 @@ export default function TestLoginPanel() {
           type="button"
           onClick={() => reset("empty")}
           disabled={busy || !password}
-          className={resetButton}
+          className={quiet}
         >
           {t("reset")}
         </button>
