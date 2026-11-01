@@ -1,8 +1,10 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
+import InfoTip from "@/components/InfoTip";
 import { localeMeta } from "@/i18n/locales";
 import {
   fetchTestAccounts,
@@ -81,6 +83,7 @@ export default function TestLoginPanel() {
 
   const field =
     "w-full rounded-2xl bg-gray-100 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-gray-100";
+  const select = `${field} appearance-none pr-11`;
   const quiet =
     "flex-1 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 active:bg-gray-300 disabled:opacity-40 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800";
 
@@ -93,9 +96,13 @@ export default function TestLoginPanel() {
         {t("notice")}
       </p>
 
-      <label className="mt-10 block text-sm font-semibold text-gray-900 dark:text-white">
-        {t("password")}
+      <div className="mt-10 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
+        <label htmlFor="test-login-password">{t("password")}</label>
+        <InfoTip label={t("tipLabel")}>{t("tipPassword")}</InfoTip>
+      </div>
+      <div>
         <input
+          id="test-login-password"
           type="password"
           autoComplete="current-password"
           required
@@ -104,7 +111,7 @@ export default function TestLoginPanel() {
           onChange={(event) => setPassword(event.target.value)}
           className={`${field} mt-2`}
         />
-      </label>
+      </div>
 
       {notice && (
         <p
@@ -119,7 +126,11 @@ export default function TestLoginPanel() {
         </p>
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <div className="mt-8 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
+        {t("quickTitle")}
+        <InfoTip label={t("tipLabel")}>{t("tipQuick")}</InfoTip>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-3">
         {accounts.map((item, index) => (
           <button
             key={item.id}
@@ -147,12 +158,17 @@ export default function TestLoginPanel() {
         ))}
       </div>
 
-      <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+      <div className="mt-8 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
+        {t("account")}
+        <InfoTip label={t("tipLabel")}>{t("tipAccount")}</InfoTip>
+      </div>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
         <select
           aria-label={t("account")}
           value={account}
           onChange={(event) => setAccount(event.target.value)}
-          className={`${field} flex-1`}
+          className={select}
         >
           {accounts.map((item) => (
             <option key={item.id} value={item.id}>
@@ -163,6 +179,11 @@ export default function TestLoginPanel() {
             </option>
           ))}
         </select>
+        <ChevronDown
+          aria-hidden
+          className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500"
+        />
+        </div>
         <button
           type="submit"
           disabled={busy || !password}
@@ -173,22 +194,28 @@ export default function TestLoginPanel() {
       </div>
 
       <div className="mt-12 flex flex-col gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={() => reset("couples")}
-          disabled={busy || !password}
-          className={quiet}
-        >
-          {t("resetCouples")}
-        </button>
-        <button
-          type="button"
-          onClick={() => reset("empty")}
-          disabled={busy || !password}
-          className={quiet}
-        >
-          {t("reset")}
-        </button>
+        <div className="flex flex-1 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => reset("couples")}
+            disabled={busy || !password}
+            className={quiet}
+          >
+            {t("resetCouples")}
+          </button>
+          <InfoTip label={t("tipLabel")}>{t("tipResetCouples")}</InfoTip>
+        </div>
+        <div className="flex flex-1 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => reset("empty")}
+            disabled={busy || !password}
+            className={quiet}
+          >
+            {t("reset")}
+          </button>
+          <InfoTip label={t("tipLabel")}>{t("tipReset")}</InfoTip>
+        </div>
       </div>
     </form>
   );
