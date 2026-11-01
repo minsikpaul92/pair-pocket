@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import InfoTip from "@/components/InfoTip";
 import { localeMeta } from "@/i18n/locales";
@@ -29,6 +29,7 @@ export default function TestLoginPanel() {
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   useEffect(() => {
@@ -51,6 +52,11 @@ export default function TestLoginPanel() {
   }
 
   async function signInAs(accountId: string) {
+    if (!password) {
+      passwordRef.current?.focus();
+      setNotice({ kind: "error", text: t("passwordFirst") });
+      return;
+    }
     setBusy(true);
     setNotice(null);
     try {
@@ -65,6 +71,11 @@ export default function TestLoginPanel() {
   }
 
   async function reset(preset: TestResetPreset) {
+    if (!password) {
+      passwordRef.current?.focus();
+      setNotice({ kind: "error", text: t("passwordFirst") });
+      return;
+    }
     if (!window.confirm(t("resetConfirm"))) return;
     setBusy(true);
     setNotice(null);
@@ -103,6 +114,7 @@ export default function TestLoginPanel() {
       <div>
         <input
           id="test-login-password"
+          ref={passwordRef}
           type="password"
           autoComplete="current-password"
           required
@@ -128,34 +140,44 @@ export default function TestLoginPanel() {
 
       <div className="mt-8 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
         {t("quickTitle")}
-        <InfoTip label={t("tipLabel")}>{t("tipQuick")}</InfoTip>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-3">
-        {accounts.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => signInAs(item.id)}
-            disabled={busy || !password}
-            className="flex flex-col items-start gap-6 rounded-3xl bg-gray-100 p-4 text-left transition-transform duration-150 hover:bg-gray-200 active:scale-[0.97] disabled:opacity-40 dark:bg-gray-900 dark:hover:bg-gray-800"
-          >
-            <span
-              className={`flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold text-white ${
-                index < 2 ? "bg-blue-600" : "bg-emerald-600"
-              }`}
-            >
-              {item.name.replace(/\D/g, "") || item.name.charAt(0)}
-            </span>
-            <span>
-              <span className="block text-lg font-semibold text-gray-900 dark:text-white">
-                {item.name}
-              </span>
-              <span className="block text-sm text-gray-600 dark:text-gray-400">
-                {localeMeta(item.locale)?.native ?? item.locale}
-              </span>
-            </span>
-          </button>
-        ))}
+        {accounts.map((item, index) => {
+          const language = localeMeta(item.locale)?.native ?? item.locale;
+          const partner = accounts[index ^ 1]?.name ?? "";
+          return (
+            <div key={item.id} className="relative">
+              <button
+                type="button"
+                onClick={() => signInAs(item.id)}
+                disabled={busy}
+                className="flex w-full flex-col items-start gap-6 rounded-3xl bg-gray-100 p-4 text-left transition-transform duration-150 hover:bg-gray-200 active:scale-[0.97] disabled:opacity-40 dark:bg-gray-900 dark:hover:bg-gray-800"
+              >
+                <span
+                  className={`flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold text-white ${
+                    index < 2 ? "bg-blue-600" : "bg-emerald-600"
+                  }`}
+                >
+                  {item.name.replace(/\D/g, "") || item.name.charAt(0)}
+                </span>
+                <span>
+                  <span className="block text-lg font-semibold text-gray-900 dark:text-white">
+                    {item.name}
+                  </span>
+                  <span className="block text-sm text-gray-600 dark:text-gray-400">
+                    {language}
+                  </span>
+                </span>
+              </button>
+              <InfoTip
+                label={t("tipLabel")}
+                className="absolute right-3 top-3"
+              >
+                {t("tipTester", { name: item.name, language, partner })}
+              </InfoTip>
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-8 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
@@ -186,7 +208,7 @@ export default function TestLoginPanel() {
         </div>
         <button
           type="submit"
-          disabled={busy || !password}
+          disabled={busy}
           className="whitespace-nowrap rounded-2xl bg-blue-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-40"
         >
           {t("signIn")}
@@ -198,7 +220,7 @@ export default function TestLoginPanel() {
           <button
             type="button"
             onClick={() => reset("couples")}
-            disabled={busy || !password}
+            disabled={busy}
             className={quiet}
           >
             {t("resetCouples")}
@@ -209,7 +231,7 @@ export default function TestLoginPanel() {
           <button
             type="button"
             onClick={() => reset("empty")}
-            disabled={busy || !password}
+            disabled={busy}
             className={quiet}
           >
             {t("reset")}

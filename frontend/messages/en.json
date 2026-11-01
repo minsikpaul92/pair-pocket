@@ -100,10 +100,11 @@
       "tipLabel": "What is this?",
       "quickTitle": "Sign in as",
       "tipPassword": "A shared password set by whoever runs the test server. Test accounts need no sign-up, so this keeps everyone else out. It is not a Google password.",
-      "tipQuick": "Tester 1 to 4 are ready-made test accounts. 1 and 2 start in Korean, 3 and 4 in English, and 1 and 2 are a couple, as are 3 and 4. Enter the password, then tap one to sign in.",
       "tipAccount": "Same result as the buttons above: pick an account from the list and press sign in.",
       "tipResetCouples": "Deletes all data of the 4 test accounts, links 1 and 2 and 3 and 4 as couples, and sets up default accounts. Onboarding is already done.",
-      "tipReset": "Deletes all data of the 4 test accounts. The next sign-in starts like a brand-new user, from onboarding."
+      "tipReset": "Deletes all data of the 4 test accounts. The next sign-in starts like a brand-new user, from onboarding.",
+      "tipTester": "{name} is a ready-made test account that starts in {language}. After a couples reset it is linked with {partner} as a couple. Tap the card to sign in.",
+      "passwordFirst": "Enter the password first."
     }
   },
   "invite": {
