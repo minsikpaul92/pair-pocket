@@ -1633,7 +1633,7 @@ export function amountToInput(amount: number, currency: Currency): string {
   const fixed = amount.toFixed(2);
   const [intPart, dec] = fixed.split(".");
   const intFormatted = Number(intPart).toLocaleString("en-US");
-  return dec === "00" ? intFormatted : `${intFormatted}.${dec}`;
+  return `${intFormatted}.${dec}`;
 }
 
 /** Compact calendar label for pending subscription names on a day. */
