@@ -63,7 +63,7 @@
     "subscriptions": "Fixed expenses",
     "stocks": "Stock",
     "settings": "Settings",
-    "smartImport": "Smart Import",
+    "smartImport": "Import",
     "invite": "Invite",
     "logout": "Log out",
     "expandSidebar": "Expand sidebar",
@@ -766,11 +766,11 @@
     "similarTo": "Looks like {merchant} on {date}"
   },
   "importPage": {
-    "title": "Smart Import & files",
-    "subtitle": "Import or export ledger CSV, and review past OCR / import logs.",
+    "title": "Import & export",
+    "subtitle": "Import a bank statement or CSV, export your ledger, and review past AI scans.",
     "tabAi": "AI scanner",
-    "tabCsv": "CSV",
-    "tabLogs": "AI logs",
+    "tabCsv": "Template CSV",
+    "tabLogs": "Scan history",
     "tabBank": "Bank statement",
     "uploadTitle": "Upload receipts & statement PDFs",
     "uploadHint": "HEIC, PNG, JPEG, and PDF supported",
@@ -1153,7 +1153,7 @@
     "items": {
       "bankStatementImport": {
         "title": "Import your bank statement",
-        "description": "Upload a CSV from your bank under Smart Import. Entries you already added are skipped, and categories are suggested for the rest, so you only check the unsure ones."
+        "description": "Upload a CSV from your bank under Import. Entries you already added are skipped, and categories are suggested for the rest, so you only check the unsure ones."
       },
       "provinceTax": {
         "title": "Tax for your province",

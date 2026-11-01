@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, FileSpreadsheet, Loader2, UploadCloud } from "lucide-react";
 import { useTranslations } from "next-intl";
+import Dropdown from "@/components/ui/dropdown";
 import {
   AccountType,
   BankPreview,
@@ -290,53 +291,43 @@ export default function BankImportPanel({
               onChange={(e) => patch(row.index, { merchant: e.target.value })}
               placeholder={t("merchant")}
               aria-label={t("merchant")}
-              className="input-field min-w-0 text-xs"
+              className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             />
             {r.cardPayment ? (
-              <select
+              <Dropdown
                 value={r.cardId}
-                onChange={(e) => patch(row.index, { cardId: e.target.value })}
-                aria-label={t("card")}
-                className="input-field min-w-0 text-xs sm:col-span-2"
-              >
-                <option value="">{t("pickCard")}</option>
-                {cards.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {accountLabel(c)}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => patch(row.index, { cardId: v })}
+                ariaLabel={t("card")}
+                placeholder={t("pickCard")}
+                size="sm"
+                className="sm:col-span-2"
+                options={cards.map((c) => ({ value: c.id, label: accountLabel(c) }))}
+              />
             ) : (
               <>
-                <select
+                <Dropdown
                   value={r.category}
-                  onChange={(e) =>
-                    patch(row.index, { category: e.target.value, subCategory: "" })
-                  }
-                  aria-label={t("category")}
-                  className="input-field min-w-0 text-xs"
-                >
-                  <option value="">{t("category")}</option>
-                  {options.map((g) => (
-                    <option key={g.category} value={g.category}>
-                      {translateCategory(g.category, tCategories)}
-                    </option>
-                  ))}
-                </select>
-                <select
+                  onChange={(v) => patch(row.index, { category: v, subCategory: "" })}
+                  ariaLabel={t("category")}
+                  placeholder={t("category")}
+                  size="sm"
+                  options={options.map((g) => ({
+                    value: g.category,
+                    label: translateCategory(g.category, tCategories),
+                  }))}
+                />
+                <Dropdown
                   value={r.subCategory}
-                  onChange={(e) => patch(row.index, { subCategory: e.target.value })}
-                  aria-label={t("subCategory")}
+                  onChange={(v) => patch(row.index, { subCategory: v })}
+                  ariaLabel={t("subCategory")}
+                  placeholder={t("subCategory")}
                   disabled={!r.category}
-                  className="input-field min-w-0 text-xs"
-                >
-                  <option value="">{t("subCategory")}</option>
-                  {subs.map((s) => (
-                    <option key={s} value={s}>
-                      {translateSubCategory(s, tSubCategories)}
-                    </option>
-                  ))}
-                </select>
+                  size="sm"
+                  options={subs.map((sub) => ({
+                    value: sub,
+                    label: translateSubCategory(sub, tSubCategories),
+                  }))}
+                />
               </>
             )}
           </div>
@@ -387,22 +378,17 @@ export default function BankImportPanel({
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("subtitle")}</p>
         </div>
         <div className="grid gap-3">
-          <label className="space-y-1">
+          <div className="space-y-1">
             <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
               {t("account")}
             </span>
-            <select
+            <Dropdown
               value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              className="input-field w-full text-xs"
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {accountLabel(a)}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={setAccountId}
+              ariaLabel={t("account")}
+              options={accounts.map((a) => ({ value: a.id, label: accountLabel(a) }))}
+            />
+          </div>
         </div>
         <div
           onDragOver={(e) => {

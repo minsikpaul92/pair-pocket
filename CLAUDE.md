@@ -17,6 +17,10 @@ The UI language only changes text. Read `docs/i18n-and-layout.md` before touchin
 - Keep tab, toggle and button labels short, and never let a label wrap.
 - Run `npm run check:i18n` in `frontend` before opening a pull request, and look at the screens you changed in both languages.
 
+## Dropdowns
+
+Choose a single value from a list with `frontend/components/ui/dropdown.tsx` (`Dropdown`), not a raw `<select>`. It keeps every list looking and behaving the same, in both themes and at phone width. Use `size="sm"` in dense rows. Existing raw selects are being replaced over time; `npm run check:ui` fails if a file gains one.
+
 ## What's New
 
 What's New is for users, not developers. Add an entry only when a user would notice the change: something they can now do, or a problem they ran into that is now fixed. Leave out anything only developers care about.

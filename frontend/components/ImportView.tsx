@@ -40,6 +40,7 @@ import {
   monthRanges,
   parseImportCsv,
 } from "@/lib/csv-export";
+import Dropdown from "@/components/ui/dropdown";
 import BankImportPanel from "@/components/BankImportPanel";
 import InfoTip from "@/components/InfoTip";
 import MonthPicker from "@/components/MonthPicker";
@@ -112,14 +113,7 @@ export default function ImportView({ scope, accountType, presets, month, onChang
   const tSubCategories = useTranslations("subCategories");
   const locale = useLocale();
 
-  const [activeSubTab, setActiveSubTab] = useState<"csv" | "bank" | "logs">(() => {
-    try {
-      // A bank import refreshes the app; stay on its tab so the result stays visible.
-      return window.sessionStorage.getItem("pairpocket.bankImportSaved") ? "bank" : "csv";
-    } catch {
-      return "csv";
-    }
-  });
+  const [activeSubTab, setActiveSubTab] = useState<"csv" | "bank" | "logs">("bank");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -412,16 +406,6 @@ export default function ImportView({ scope, accountType, presets, month, onChang
 
         <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800/60 p-1 self-start sm:self-auto overflow-x-auto max-w-full">
           <button
-            onClick={() => setActiveSubTab("csv")}
-            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-              activeSubTab === "csv"
-                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-            }`}
-          >
-            {t("tabCsv")}
-          </button>
-          <button
             onClick={() => setActiveSubTab("bank")}
             className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeSubTab === "bank"
@@ -430,6 +414,16 @@ export default function ImportView({ scope, accountType, presets, month, onChang
             }`}
           >
             {t("tabBank")}
+          </button>
+          <button
+            onClick={() => setActiveSubTab("csv")}
+            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
+              activeSubTab === "csv"
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            {t("tabCsv")}
           </button>
           <button
             onClick={() => setActiveSubTab("logs")}
@@ -592,25 +586,22 @@ export default function ImportView({ scope, accountType, presets, month, onChang
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label
-                  htmlFor="export-account"
-                  className="text-xs font-semibold text-gray-600 dark:text-gray-300"
-                >
+                <span className="block text-xs font-semibold text-gray-600 dark:text-gray-300">
                   {t("exportAccount")}
-                </label>
-                <select
-                  id="export-account"
+                </span>
+                <Dropdown
                   value={exportAccountId}
-                  onChange={(e) => setExportAccountId(e.target.value)}
-                  className="w-full min-w-0 rounded-xl border border-gray-250 bg-white p-3 text-xs font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                >
-                  <option value="all">{t("exportAllAccounts")}</option>
-                  {exportAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {scope === "ALL" ? `${accountLabel(a)} (${a.currency})` : accountLabel(a)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setExportAccountId}
+                  ariaLabel={t("exportAccount")}
+                  size="sm"
+                  options={[
+                    { value: "all", label: t("exportAllAccounts") },
+                    ...exportAccounts.map((a) => ({
+                      value: a.id,
+                      label: scope === "ALL" ? `${accountLabel(a)} (${a.currency})` : accountLabel(a),
+                    })),
+                  ]}
+                />
               </div>
 
               <div className="space-y-2">

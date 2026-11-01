@@ -63,7 +63,7 @@
     "subscriptions": "고정지출",
     "stocks": "주식",
     "settings": "설정",
-    "smartImport": "스마트 가져오기",
+    "smartImport": "가져오기",
     "invite": "초대하기",
     "logout": "로그아웃",
     "expandSidebar": "사이드바 펼치기",
@@ -766,11 +766,11 @@
     "similarTo": "{date}의 {merchant}와 비슷해요"
   },
   "importPage": {
-    "title": "스마트 가져오기 & 파일 관리",
-    "subtitle": "가계부 CSV 가져오기·내보내기와 OCR/가져오기 로그를 관리합니다.",
+    "title": "가져오기 · 내보내기",
+    "subtitle": "은행 명세서나 CSV를 가져오고, 장부를 내보내고, 지난 AI 스캔 기록을 확인합니다.",
     "tabAi": "AI 파일 스캐너",
-    "tabCsv": "CSV 연동",
-    "tabLogs": "AI 분석 로그",
+    "tabCsv": "템플릿 CSV",
+    "tabLogs": "스캔 기록",
     "tabBank": "은행 명세서",
     "uploadTitle": "영수증 사진 & 청구서 PDF 업로드",
     "uploadHint": "HEIC, PNG, JPEG 이미지 파일 및 PDF 지원",
@@ -1153,7 +1153,7 @@
     "items": {
       "bankStatementImport": {
         "title": "은행 명세서 가져오기",
-        "description": "스마트 가져오기에서 은행 CSV를 올리면 이미 입력한 내역은 건너뛰고, 나머지는 분류를 추천해 줘요. 애매한 것만 확인하면 돼요."
+        "description": "가져오기 메뉴에서 은행 CSV를 올리면 이미 입력한 내역은 건너뛰고, 나머지는 분류를 추천해 줘요. 애매한 것만 확인하면 돼요."
       },
       "provinceTax": {
         "title": "내가 사는 주의 세금",
