@@ -15,6 +15,8 @@ import {
 } from "@/lib/api";
 import { translateError } from "@/lib/errors";
 
+const PASSWORD_KEY = "pairpocket.testLoginPassword";
+
 type Notice = { kind: "error" | "info"; text: string };
 
 /**
@@ -31,6 +33,14 @@ export default function TestLoginPanel() {
   const [busy, setBusy] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+
+  useEffect(() => {
+    try {
+      setPassword(window.localStorage.getItem(PASSWORD_KEY) ?? "");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -61,6 +71,11 @@ export default function TestLoginPanel() {
     setNotice(null);
     try {
       const code = await signInTestAccount(accountId, password);
+      try {
+        window.localStorage.setItem(PASSWORD_KEY, password);
+      } catch {
+        /* storage unavailable; the password just isn't remembered */
+      }
       window.location.assign(
         `/${locale}/auth/callback?code=${encodeURIComponent(code)}`
       );
@@ -108,22 +123,45 @@ export default function TestLoginPanel() {
       </p>
 
       <div className="mt-10 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
+        <label htmlFor="test-login-account">{t("account")}</label>
+        <InfoTip label={t("tipLabel")}>{t("tipAccount")}</InfoTip>
+      </div>
+      <div className="relative mt-2">
+        <select
+          id="test-login-account"
+          value={account}
+          onChange={(event) => setAccount(event.target.value)}
+          className={select}
+        >
+          {accounts.map((item) => (
+            <option key={item.id} value={item.id}>
+              {t("accountOption", {
+                name: item.name,
+                language: localeMeta(item.locale)?.native ?? item.locale,
+              })}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          aria-hidden
+          className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500"
+        />
+      </div>
+
+      <div className="mt-6 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
         <label htmlFor="test-login-password">{t("password")}</label>
         <InfoTip label={t("tipLabel")}>{t("tipPassword")}</InfoTip>
       </div>
-      <div>
-        <input
-          id="test-login-password"
-          ref={passwordRef}
-          type="password"
-          autoComplete="current-password"
-          required
-          autoFocus
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className={`${field} mt-2`}
-        />
-      </div>
+      <input
+        id="test-login-password"
+        ref={passwordRef}
+        type="password"
+        autoComplete="current-password"
+        required
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        className={`${field} mt-2`}
+      />
 
       {notice && (
         <p
@@ -138,7 +176,15 @@ export default function TestLoginPanel() {
         </p>
       )}
 
-      <div className="mt-8 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
+      <button
+        type="submit"
+        disabled={busy}
+        className="mt-4 w-full whitespace-nowrap rounded-2xl bg-blue-600 px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-40"
+      >
+        {t("signIn")}
+      </button>
+
+      <div className="mt-10 text-sm font-semibold text-gray-900 dark:text-white">
         {t("quickTitle")}
       </div>
       <div className="mt-2 grid grid-cols-2 gap-3">
@@ -178,41 +224,6 @@ export default function TestLoginPanel() {
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-8 flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
-        {t("account")}
-        <InfoTip label={t("tipLabel")}>{t("tipAccount")}</InfoTip>
-      </div>
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-        <div className="relative flex-1">
-        <select
-          aria-label={t("account")}
-          value={account}
-          onChange={(event) => setAccount(event.target.value)}
-          className={select}
-        >
-          {accounts.map((item) => (
-            <option key={item.id} value={item.id}>
-              {t("accountOption", {
-                name: item.name,
-                language: localeMeta(item.locale)?.native ?? item.locale,
-              })}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          aria-hidden
-          className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500"
-        />
-        </div>
-        <button
-          type="submit"
-          disabled={busy}
-          className="whitespace-nowrap rounded-2xl bg-blue-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-40"
-        >
-          {t("signIn")}
-        </button>
       </div>
 
       <div className="mt-12 flex flex-col gap-2 sm:flex-row">
