@@ -1,261 +1,151 @@
 # PairPocket
 
 > "A budget is telling your money where to go instead of wondering where it went."
-> — John C. Maxwell
+> (John C. Maxwell)
 
 [![Live demo](https://img.shields.io/badge/Live-www.pairpocket.me-2563eb?style=flat-square)](https://www.pairpocket.me/en)
+[![CI](https://img.shields.io/github/actions/workflow/status/minsikpaul92/pair-pocket/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/minsikpaul92/pair-pocket/actions/workflows/ci.yml)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/minsikpaul92)
 
-A dual-currency household ledger anyone can use: personal and shared books, subscriptions and stocks in one place, with AI screenshot import tuned so scanned numbers stay trustworthy.
+PairPocket is a household ledger for couples who share some money and keep some apart, and who may live across two currencies. Each person has a private personal ledger, and partners can link a shared ledger on top. It handles CAD and KRW side by side, tracks subscriptions and stocks, and uses AI to turn receipts and statements into entries.
 
-**Live app:** [PairPocket](https://www.pairpocket.me/en)
+**Try it:** [www.pairpocket.me](https://www.pairpocket.me/en) (sign in with Google)
 
-<a href="https://buymeacoffee.com/minsikpaul92" target="_blank" rel="noopener noreferrer">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="180" />
-</a>
+## Why I built it
 
----
+I immigrated to Canada and still hold money in more than one country. Most money apps are built for one market, or they treat a couple as one person. I wanted mine, yours and ours in one place, in two currencies, without my private entries showing up in my partner's view. I could not find that, so I built it end to end and run it as a production PWA.
 
-## Why I built this
+You do not need a partner or a second currency to use it. A solo user gets a full personal ledger, with subscriptions and stocks included.
 
-I immigrated to Canada and still hold assets in more than one country. Existing money apps were either built for a single local market or too shallow for how a couple actually lives: mine, yours, and ours, across currencies, banks, subscriptions, and brokerage accounts.
+## What it does
 
-I could not find a couple-ready product that kept **personal** ledgers private while syncing a **shared** household book, and still covered the detail I needed (subscriptions, stocks, onboarding without guessing where to start). So I built PairPocket end-to-end as a production PWA.
-
-That origin story is personal, but **the app is not limited to couples or immigrants**. Solo users can run a full personal ledger (including subscriptions and stocks). Sharing with a partner is optional when you want a household book.
-
-What matters most in practice:
-
-- **One place for the whole picture** — shared household ledger plus personal ledgers, personal subscriptions, and personal stocks, without mixing private data into the partner view.
-- **AI screenshot fill with careful prompting** — brokerage and setup screens become structured fields. The hard part is not “call an OCR API”; it is prompt engineering so tickers, quantities, and balances do not get inventively wrong.
-- **Low-friction start** — first-time and couple setup can lean on AI instead of a blank spreadsheet. You bring your own Gemini key; the app does not force a paid AI plan to try the flow.
-- **Depth over generic finance UI** — many apps show balances; fewer ship the dual-ledger rules, invite + shared start date, and import paths this life actually needs.
-
-Today the product is tuned for **KRW / CAD** (Korea–Canada). The same pattern applies to many people managing money across borders; expanding currency and country support is on the roadmap, along with stronger daily stock price refresh.
-
----
+- **Personal and shared ledgers.** Switch between your own book and the shared one. Shared records belong to the partnership that created them, so unlinking and linking a new partner never exposes the earlier shared history.
+- **Two currencies.** Canada (CAD) and Korea (KRW) ledgers, plus a combined view with exchange rates.
+- **Calendar, list and dashboard.** Monthly calendar, a merchant-first list with notes, and a dashboard with a monthly budget, a card for each country, net worth and a weekly expense mix.
+- **Settlement.** Settle a shared expense with money from a personal account, or the other way around. Both sides are written together and stay consistent.
+- **Subscriptions and fixed bills.** Schedules with promo pricing, skipped payments, installments, reminder emails, and moving an item between personal and shared.
+- **Stocks.** Holdings per brokerage account with Yahoo Finance quotes and currency conversion.
+- **Smart import.** Receipt photos, card-statement PDFs and CSV files become reviewable entries. CSV export has account and month filters.
+- **Partner invite.** Invite by email with a shared ledger start date so both sides line up from day one.
+- **Notifications and What's New.** A bell tells you when your partner adds a shared entry, and a list of release notes shows what changed.
+- **Mobile first.** Installable PWA, light, dark and system themes, safe-area aware layout.
+- **Korean and English.** Every screen is available in both. The language picker lists more languages that are still in beta.
 
 ## Demo
 
-### Personal ↔ Shared ledger toggle
-
-Switch between personal and shared ledgers. Solo use stays on the personal ledger. Shared records are bound to the partnership that created them, so unlinking and linking a new partner does not expose an earlier shared history.
+### Personal and shared toggle
 
 ![Personal and Shared toggle](docs/demo/01-personal-shared-toggle.gif)
 
 ### Add a transaction
 
-Quick entry with the shared day picker and floating actions (camera for scan, plus for manual entry).
-
 ![New transaction flow](docs/demo/02-new-transaction.gif)
 
 ### Invite a partner
 
-Optional: send a Google-email invite with a **shared ledger start date** so both sides align from day one.
-
 ![Partner invite modal](docs/demo/03-partner-invite.jpg)
 
-### AI screenshot fill (stocks / onboarding)
-
-Upload brokerage (or onboarding) screenshots; Gemini fills structured fields with prompt-tuned parsing so tickers and balances stay accurate.
+### AI screenshot fill
 
 ![AI screenshot scan](docs/demo/04-ai-scan.gif)
 
----
+## How it is built
 
-## Highlights (for reviewers)
-
-| Area | What shipped |
-|------|----------------|
-| Auth | Google OAuth (Authlib) + app JWT, invite accept while logged out / logged in |
-| Dual ledger | `personal` vs `shared` with group-scoped queries (`shared_group_id`); solo-friendly |
-| Multi-currency | CAD / KRW / ALL with FX for combined views |
-| Product surface | Calendar, list, dashboard analytics, subscriptions, stocks, smart import |
-| AI | Prompt-tuned screenshot parse, user Gemini key, model fallback chain, partner key borrow / share |
-| Mobile | PWA, safe-area chrome, Apple HIG-inspired Tailwind UI (light / dark) |
-| Deploy | Frontend on **Vercel**, API on **Heroku**, MongoDB Atlas |
-
-Specs: [`PRD.md`](./PRD.md) · Design: [`design.md`](./design.md)
-
----
-
-## Improvement roadmap
-
-This is the planned work, ordered by priority. Unchecked items are not completed or guaranteed by the current release. The first phase addresses review findings and reported reliability problems before expanding analysis features.
-
-### Phase 1 — Privacy, data integrity, and reliability
-
-- [x] **Protect linked transactions.** Transaction relationships are server-managed. Updates and deletes verify ownership, ledger access, and the reciprocal relationship, with regression coverage preventing one user from mutating another user's unrelated transactions.
-- [x] **Keep personal history out of shared suggestions.** Merchant and institution lookups follow the selected ledger scope, so shared autocomplete does not include a partner's personal history.
-- [x] **Preserve historical partnership boundaries.** Shared transactions, accounts, subscriptions, occurrences, and holdings carry the stable group ID that created them. Unlinking archives that group, and a new partnership cannot read its records. Legacy active-pair records were migrated with a verified dry run and pre-change JSON backup; ambiguous records fail closed.
-- [x] **Make partnership changes atomic.** Invitation acceptance and unlinking use conditional updates inside MongoDB transactions. Concurrent or repeated acceptance cannot leave only one partner linked, and the partnership group lifecycle is recorded explicitly.
-- [x] **Make account and card defaults reliable.** Replace the current mix of account flags, unused settings fields, and browser-only stock defaults with one server-backed source of truth. Add a Settings section for personal/shared and currency-specific default spending accounts, income accounts, payment cards, subscription payment methods, and brokerage accounts. Show default badges and quick actions on dashboard account cards, and expose independent applicable choices in account editing instead of one context-dependent checkbox. Make switching atomic, validate account type/currency/group access, define fallback behavior when a default is deleted or deactivated, remove stock `localStorage` defaults, and migrate existing flags without changing account balances or history. Ensure transaction, subscription, transfer, and stock forms all resolve defaults through the same rules and retain actionable errors when no valid account exists.
-- [x] **Make paired shared-funding writes atomic.** Personal ↔ shared transfers work in both directions and can be entered from either ledger; the server creates, updates, and deletes the other side with it. Paired creates, edits, deletes, and converting an ordinary entry into a transfer run in one MongoDB transaction, with regression coverage showing a failed twin write or conversion rolls back the whole pair.
-- [x] **Validate settlements consistently.** Settlements must match the expense's currency and ledger. The expense is locked inside the transaction so concurrent settlements cannot exceed it, and expenses with settlements cannot drop below the settled total, change ledger, currency, or direction, or be deleted.
-- [ ] **Keep sessions signed in reliably.** Investigate token expiry, browser storage, and authentication error handling; the current access token lifetime is seven days. Implement renewable sessions with rotating, revocable refresh credentials and protected cookie handling suitable for the deployed frontend/API domains. Retry authentication once after refresh, keep network failures separate from expired sessions, and preserve drafts if sign-in is required.
-- [ ] **Preserve input and explain failures.** Close or clear a form only after confirmed save success. Retain drafts after failed saves, prevent duplicate submissions, and show actionable English/Korean messages for missing fields, invalid account/currency combinations, expired sessions, and server failures. Isolate any persisted drafts by user and clear sensitive drafts on logout. Distinguish failed loading from an empty ledger and provide retry controls.
-- [ ] **Add core regression coverage.** Cover authorization, partnership changes, settlements, paired transfers, balances, session renewal, and failed-save recovery. Run relevant backend tests and frontend type/build checks in CI before merging behavioral changes.
-
-### Phase 2 — Import workflows and a consistent experience
-
-- [ ] **Process multiple receipt images.** Support selecting multiple files, show progress and a separate review result for each receipt, and allow users to group images belonging to the same receipt. Preserve successful results when another receipt fails. Save reviewed receipts individually or as a batch, track saved/failed states, and retry only failed entries without duplicates.
-- [ ] **Import monthly card-statement PDFs with duplicate review.** Extract and normalize statement rows, then compare them with existing transactions using the account, currency, amount, transaction/posting dates, and normalized merchant. Label rows as new, likely duplicate, or requiring review. Do not silently discard legitimate repeated purchases. Use import identifiers to make retries safe and let users confirm which new rows to save.
-- [ ] **Unify Korean and English layouts.** Use the Korean layout as the structural baseline for both languages and countries. Separate language preference from country, currency, and account settings; move language switching into Settings. Keep controls, navigation, and feature availability consistent while allowing translated text to wrap naturally. Check both languages at mobile and desktop widths.
-- [ ] **Add release notes to Settings.** Maintain versioned English/Korean entries with a date and sections for additions, improvements, and fixes. Display the current version and release history in Settings. Update these entries as part of each release; planned work must not appear as shipped.
-- [ ] **Explain the app before sign-in.** Add a public introduction page covering who the app is for, personal versus shared ledgers, supported currencies, subscriptions, stocks, receipt imports, privacy, Gemini key requirements, and the steps to get started. Use examples and screenshots with a clear Google sign-in action. Keep this introduction separate from the existing post-login account setup and describe only available features as available.
-
-### Phase 3 — Spending detail and budgets
-
-- [ ] **Add weekly spending analysis.** *(Started in `feat/expense-ratio` ([#52](https://github.com/minsikpaul92/pair-pocket/pull/52)): the expense mix has a Sunday–Saturday week view with previous/next navigation across month boundaries; weekly trend and previous-week comparison remain.)* Provide weekly totals, a weekly trend, and previous-week comparisons in the dashboard. Define one week-boundary and user-timezone policy, label partial weeks, and handle weeks crossing month/year boundaries consistently. Reuse existing settlement and transfer rules so weekly and monthly totals reconcile.
-- [ ] **Browse item-level subcategories.** Introduce a clear hierarchy of category, subcategory, and item group; keep merchant as a separate dimension. Preserve raw receipt descriptions and add normalized item names, quantities, units, and group IDs. Let Gemini suggest reusable groups and let users correct assignments. Support filtering and totals at all three levels without double-counting receipt items and their parent transaction; account for taxes, tips, and discounts explicitly.
-- [ ] **Recognize custom categories in Gemini imports.** Include the user's current allowed categories, subcategories, descriptions, and relevant corrections in each classification request. Validate returned category IDs on the server and flag uncertain assignments for review. Offer explicit reclassification of historical items. Adding a category updates the supplied context; it does not automatically train Gemini.
-- [ ] **Set monthly budgets and explain spending.** Support personal/shared budgets with a defined currency, a monthly total, and category allocations. Calculate actual spending, remaining budget, pacing, and projected month-end spending in application code. Explain overspending and practical savings opportunities with Gemini using those verified totals. Separate recurring commitments and transfers appropriately, and make exchange-rate assumptions visible for combined-currency views.
-
-### Phase 4 — Evidence-based comparisons and shopping advice
-
-- [ ] **Compare with relevant households and personal goals.** Collect optional region, age band, occupation, gender, and household size, with clear consent for AI use and controls to edit/delete the profile. Start with the user's budget, spending history, income, assets, and savings goals. Add external peer comparisons only when credible statistics support them; show the source, year, geography, household definition, and limitations. Broaden the comparison group or state that data is unavailable when an exact group such as “Toronto students in their mid-30s” is unsupported. Averages are context, not a verdict on an individual household.
-- [ ] **Compare shopping unit prices.** Start with the user's own receipts. Normalize price per kilogram, liter, or item and compare equivalent products, accounting for package size, product cut/type, discounts, and purchase date. Show the receipts supporting each suggestion. Add external store prices only through an available, permitted, sufficiently current data source; Gemini must not invent current Metro/Costco prices or claim that a past price is available today.
-
-### Delivery and acceptance
-
-All phases are feasible as application work. External demographic benchmarks and current store-price recommendations depend on suitable data sources; Gemini alone cannot supply verified averages or live prices.
-
-For each completed item:
-
-1. Define the expected behavior and data/API changes before implementation.
-2. Include migration and recovery steps when stored data changes.
-3. Validate the affected paths, including personal/shared boundaries and English/Korean behavior where relevant.
-4. Update release notes and check off the roadmap item only after its acceptance checks pass and it ships.
-
-### Branch and pull request plan
-
-Use `main` as the release branch and short-lived `docs/`, `fix/`, and `feat/` branches for focused changes. The branch names below are proposed work units, not claims that implementation already exists.
-
-| Order | Branch | Status | Scope |
-| --- | --- | --- | --- |
-| 0 | `docs/roadmap` | Complete ([#48](https://github.com/minsikpaul92/pair-pocket/pull/48)) | Live URL and this English implementation roadmap |
-| 1 | `fix/ledger-access` | Complete ([#49](https://github.com/minsikpaul92/pair-pocket/pull/49)) | Linked-entry authorization and private lookup isolation |
-| 2 | `fix/partnership-scope` | Complete ([#50](https://github.com/minsikpaul92/pair-pocket/pull/50)) | Historical group scoping, migration, and atomic invitation lifecycle |
-| 3 | `feat/expense-ratio` | Complete ([#52](https://github.com/minsikpaul92/pair-pocket/pull/52)) | Weekly (Sun–Sat) expense mix, transfer exclusion, hideable categories |
-| 4 | `fix/account-defaults` | Complete ([#51](https://github.com/minsikpaul92/pair-pocket/pull/51)) | Server-backed account/card defaults and Settings management |
-| 5 | `fix/ledger-integrity` | Complete ([#53](https://github.com/minsikpaul92/pair-pocket/pull/53)) | Atomic paired writes, settlement validation, and shared↔personal transfers entered from either side |
-| 6 | `fix/session-persistence` | Planned | Session diagnosis, renewal, and expiry recovery |
-| 7 | `fix/save-recovery` | Planned | Draft preservation, readable errors, and safe retries |
-| 8 | `feat/receipt-batches` | Planned | Multiple-receipt review and partial-failure recovery |
-| 9 | `feat/statement-import` | Planned | PDF transaction import and duplicate review |
-| 10 | `feat/unified-layout` | Planned | Shared layout and Settings-only language preference |
-| 11 | `feat/release-notes` | Planned | Versioned release history in Settings |
-| 12 | `feat/public-introduction` | Planned | Product explanation before sign-in |
-| 13 | `feat/weekly-spending` | Planned | Weekly dashboard analysis |
-| 14 | `feat/item-classification` | Planned | Item groups and custom-category AI context |
-| 15 | `feat/monthly-budgets` | Planned | Budgets, pacing, and grounded AI explanations |
-| 16 | `feat/peer-comparisons` | Planned | Optional profile and sourced benchmarks |
-| 17 | `feat/unit-price-insights` | Planned | Receipt-based unit prices and shopping advice |
-
-Start each independent change from the latest `main`. Merge prerequisite data/model changes before starting dependent work, or explicitly use a dependent PR while its prerequisite is under review. Avoid putting the whole roadmap into one branch. Each PR should explain the problem, resulting behavior, verification, and any migration requirements. Push the branch to `origin`, open a PR into `main`, and merge after review and required checks. Enable appropriate branch protection in GitHub if it is not already configured.
-
----
-
-## Architecture
-
-```
-pair-pocket/
-├── frontend/   # Next.js 15 App Router, next-intl, Tailwind, PWA
-└── backend/    # FastAPI, Motor (async MongoDB), Authlib OAuth
+```mermaid
+flowchart LR
+  Browser["Browser / installed PWA"] --> Web["Next.js 15 on Vercel"]
+  Web -- "API calls and /api/auth/* proxy (first-party cookie)" --> API["FastAPI on Heroku"]
+  API --> DB[("MongoDB Atlas")]
+  API --> Gemini["Google Gemini (user's own key)"]
+  API --> FX["Exchange rates (Frankfurter) and stock quotes (Yahoo Finance)"]
+  API --> Mail["Email (invites, reminders)"]
 ```
 
-| Layer    | Stack |
-|----------|--------|
-| Frontend | Next.js (App Router), React, Tailwind CSS, `@ducanh2912/next-pwa`, next-intl |
-| Backend  | FastAPI, Pydantic, Motor |
-| Data     | MongoDB Atlas |
-| AI       | Google Gemini (user API key, encrypted at rest) |
-| Hosting  | Vercel + Heroku |
+| Layer | Stack |
+| --- | --- |
+| Frontend | Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS, next-intl, PWA via `@ducanh2912/next-pwa` |
+| Backend | FastAPI, Pydantic, Motor (async MongoDB driver), Authlib, PyJWT |
+| Data | MongoDB Atlas |
+| AI | Google Gemini with a model fallback chain, using each user's own API key |
+| Hosting | Vercel (frontend), Heroku (API) |
 
----
+### Engineering notes
 
-## Tech Stack (detail)
+- **Ledger isolation.** Ledger reads go through shared access helpers that scope them to the user or to the partnership group, and fail closed when a shared row has no verified group. Shared rows carry the group ID that created them, unlinking archives the group, and legacy rows were migrated with a dry run and a backup. Merchant and institution suggestions follow the selected ledger, so a partner's personal history never leaks into shared autocomplete.
+- **Atomic paired writes.** Personal and shared transfers, cross-ledger settlements and partnership changes run inside MongoDB transactions. A failed second write rolls back the whole pair. Settlements lock the expense they settle, so concurrent settlements cannot exceed it.
+- **Sessions.** Short-lived access tokens with a rotating, revocable refresh cookie (HttpOnly, 30 days). Presenting an already rotated refresh credential revokes the whole session family, apart from a short grace window for two tabs refreshing at once. The frontend proxies the session routes through its own origin so the cookie stays first-party even though the API is on another domain.
+- **AI import you can trust.** Gemini output is treated as a draft: prompts are tuned so tickers, amounts and dates are not invented, results go through a review screen, and the user's key is encrypted at rest.
+- **Internationalization.** Strings live in `ko.json` and `en.json`, and CI fails when the two drift apart or new hardcoded Korean appears. What a screen shows never depends on the language; layout rules are in [`docs/i18n-and-layout.md`](docs/i18n-and-layout.md).
+- **Tests and CI.** GitHub Actions runs frontend lint, the i18n check and a production build, and the backend pytest suite, on every pull request. The tests cover authorization, partnership scope, paired writes, settlement, sessions, notifications and account defaults.
 
-Same as the table above. Local setup needs Node 18+, Python 3.11+, and a MongoDB URI.
+## Run it locally
 
-## Getting Started
+You need Node 18 or newer (CI uses 22), Python 3.12 (what CI and Heroku run), and a MongoDB connection string. Replica set mode is needed for the transaction-backed features.
 
-### 1. Backend (FastAPI)
+### Backend
 
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env             # then edit with MongoDB + Google OAuth secrets
+cp .env.example .env             # then edit with MongoDB and Google OAuth values
 uvicorn app.main:app --reload
 ```
 
-- API docs: http://localhost:8000/docs
-- Health: http://localhost:8000/
+API docs are at http://localhost:8000/docs.
 
-### 2. Frontend (Next.js)
+### Frontend
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local       # NEXT_PUBLIC_API_BASE_URL → backend
+cp .env.example .env.local       # NEXT_PUBLIC_API_BASE_URL points at the backend
 npm run dev
 ```
 
-- App: http://localhost:3000
+The app is at http://localhost:3000. The PWA is disabled in development; use `npm run build && npm run start` to test installability.
 
-> **PWA note:** `next-pwa` is disabled in development. For installable PWA testing: `npm run build && npm run start`.
+### Checks
 
-## Environment Variables
+```bash
+cd frontend && npm run lint && npm run check:i18n && npm run build
+cd backend && PYTHONPATH=. pytest -q
+```
 
-| Location              | Variable                   | Description                                    |
-| --------------------- | -------------------------- | ---------------------------------------------- |
-| `backend/.env`        | `MONGODB_URI`              | MongoDB connection string                      |
-| `backend/.env`        | `MONGODB_DB_NAME`          | Database name (default: `pairpocket`)          |
-| `backend/.env`        | `CORS_ORIGINS`             | Comma-separated allowed frontend origins       |
-| `backend/.env`        | `SECRET_KEY`               | JWT + OAuth session secret                     |
-| `backend/.env`        | `GOOGLE_CLIENT_ID`         | Google OAuth 2.0 Client ID                     |
-| `backend/.env`        | `GOOGLE_CLIENT_SECRET`     | Google OAuth 2.0 Client Secret                 |
-| `backend/.env`        | `OAUTH_REDIRECT_URI`       | Must match the URI registered in GCP           |
-| `backend/.env`        | `FRONTEND_URL`             | Post-login redirect target                     |
-| `frontend/.env.local` | `NEXT_PUBLIC_API_BASE_URL` | FastAPI base URL                               |
+### Environment variables
 
-## Google OAuth Setup (Google Cloud Console)
+| Location | Variable | Description |
+| --- | --- | --- |
+| `backend/.env` | `MONGODB_URI` | MongoDB connection string |
+| `backend/.env` | `MONGODB_DB_NAME` | Database name (default `pairpocket`) |
+| `backend/.env` | `CORS_ORIGINS` | Comma-separated allowed frontend origins |
+| `backend/.env` | `SECRET_KEY` | JWT and OAuth session secret |
+| `backend/.env` | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 credentials |
+| `backend/.env` | `OAUTH_REDIRECT_URI` | Must match the URI registered in Google Cloud |
+| `backend/.env` | `FRONTEND_URL` | Post-login redirect target |
+| `frontend/.env.local` | `NEXT_PUBLIC_API_BASE_URL` | FastAPI base URL |
 
-The login flow is backend-driven (Authorization Code Flow via Authlib).
+### Google sign-in setup
 
-1. Create/select a project in [Google Cloud Console](https://console.cloud.google.com/).
-2. **OAuth consent screen** (External). Add test users while unpublished.
-3. **Credentials → OAuth client ID** (Web application).
-   - Authorized redirect URI example (local): `http://localhost:8000/api/auth/callback`
-4. Copy Client ID / Secret into `backend/.env` and set:
+Sign-in is backend-driven (authorization code flow through Authlib).
 
-   ```env
-   OAUTH_REDIRECT_URI=http://localhost:8000/api/auth/callback
-   FRONTEND_URL=http://localhost:3000
-   ```
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and an OAuth consent screen (External). Add yourself as a test user while the app is unpublished.
+2. Create an OAuth client ID (Web application) with the redirect URI `http://localhost:8000/api/auth/callback`.
+3. Put the client ID and secret in `backend/.env` and set `OAUTH_REDIRECT_URI` and `FRONTEND_URL=http://localhost:3000`.
+4. Generate a secret: `python -c "import secrets; print(secrets.token_hex(32))"`.
 
-5. Generate `SECRET_KEY`:
+Auth endpoints: `GET /api/auth/login`, `GET /api/auth/callback`, `POST /api/auth/session` (redeem a one-time code, set the refresh cookie), `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me`.
 
-   ```bash
-   python -c "import secrets; print(secrets.token_hex(32))"
-   ```
+## More documentation
 
-### Auth endpoints
-
-- `GET /api/auth/login` — start Google OAuth
-- `GET /api/auth/callback` — OAuth redirect; sends the frontend a one-time sign-in code
-- `POST /api/auth/session` — redeem that code: sets the `pp_refresh` cookie, returns a 30-minute access token
-- `POST /api/auth/refresh` — rotate the refresh cookie, return a new access token
-- `POST /api/auth/logout` — revoke the session and clear the cookie
-- `GET /api/auth/me` — current user (`Authorization: Bearer <token>`)
-
-The refresh cookie is HttpOnly, scoped to `/api/auth`, and valid for 30 days from the last renewal. The frontend reaches the session routes through its own origin (a rewrite in `frontend/next.config.js`), so the cookie stays first-party even though the API is on another domain. Reusing a rotated refresh credential revokes that session.
+- [`PRD.md`](./PRD.md) for product requirements and [`design.md`](./design.md) for the design language.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is shipped and what is planned.
+- [`docs/i18n-and-layout.md`](docs/i18n-and-layout.md) for language and layout rules.
 
 ## Support
 
-If PairPocket saves you time, you can [buy me a coffee](https://buymeacoffee.com/minsikpaul92). Optional, no ads in the app.
+If PairPocket saves you time, you can [buy me a coffee](https://buymeacoffee.com/minsikpaul92). It is optional, and there are no ads in the app.
 
 ## License
 
