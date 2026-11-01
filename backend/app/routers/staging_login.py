@@ -28,6 +28,9 @@ FAILED_ATTEMPT_DELAY_SECONDS = 1.0
 class StagingLoginIn(BaseModel):
     account: str
     password: str
+    # True: an account that has not finished onboarding starts set up, linked
+    # with its partner and with default accounts. False: like a new user.
+    ready: bool = False
 
 
 class StagingResetIn(BaseModel):
@@ -62,7 +65,7 @@ async def sign_in_test_account(
     await _require_password(body.password)
     if not staging_login.is_test_account(body.account):
         raise AppError(status.HTTP_422_UNPROCESSABLE_ENTITY, "testLoginFailed")
-    return {"code": await staging_login.sign_in(db, body.account)}
+    return {"code": await staging_login.sign_in(db, body.account, body.ready)}
 
 
 @router.post("/reset")

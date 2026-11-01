@@ -33,6 +33,7 @@ TEST_ACCOUNTS: tuple[dict[str, str], ...] = (
     {"id": "tester4", "name": "Tester 4", "locale": "en"},
 )
 _ACCOUNTS_BY_ID = {account["id"]: account for account in TEST_ACCOUNTS}
+COUPLES = (("tester1", "tester2"), ("tester3", "tester4"))
 
 # Ledger data owned by a user through `owner_id`.
 OWNED_COLLECTIONS = (
@@ -72,8 +73,25 @@ def is_test_account(account_id: str) -> bool:
     return account_id in _ACCOUNTS_BY_ID
 
 
-async def sign_in(db: AsyncIOMotorDatabase, account_id: str) -> str:
-    """Create the test user on first use and return a one-time login code."""
+async def sign_in(
+    db: AsyncIOMotorDatabase, account_id: str, ready: bool = False
+) -> str:
+    """Create the test user on first use and return a one-time login code.
+
+    With `ready`, an account that has not finished onboarding is first set up
+    together with its partner (linked, default accounts); one that has is kept.
+    """
+    if ready:
+        couple = next(ids for ids in COUPLES if account_id in ids)
+        user = await db["users"].find_one({"google_id": _google_id(account_id)})
+        settings = (
+            await db["user_settings"].find_one({"owner_id": str(user["_id"])})
+            if user
+            else None
+        )
+        if not (settings and settings.get("onboarding_personal_completed")):
+            await reset(db, couple)
+            await seed_couples(db, [couple])
     return await create_login_code(db, await _ensure_user(db, account_id))
 
 
@@ -124,8 +142,11 @@ PRESET_PERSONAL_ACCOUNTS = (
 PRESET_SHARED_ACCOUNTS = (("Test Shared Checking", FinancialAccountKind.CHECKING),)
 
 
-async def seed_couples(db: AsyncIOMotorDatabase) -> None:
-    """Tester 1+2 and 3+4 as linked couples, set up, with default CAD accounts.
+async def seed_couples(
+    db: AsyncIOMotorDatabase, couples: tuple[tuple[str, str], ...] | list = COUPLES
+) -> None:
+    """Tester 1+2 and 3+4 (or just the given couples) as linked couples, set up,
+    with default CAD accounts.
 
     Each tester gets a personal checking account and credit card, and each
     couple a shared checking account. They become the default accounts, the
@@ -135,8 +156,8 @@ async def seed_couples(db: AsyncIOMotorDatabase) -> None:
     from app.routers.accounts import create_account
 
     start = date.today().replace(day=1).isoformat()
-    user_ids = {a["id"]: await _ensure_user(db, a["id"]) for a in TEST_ACCOUNTS}
-    for ids in (("tester1", "tester2"), ("tester3", "tester4")):
+    user_ids = {i: await _ensure_user(db, i) for ids in couples for i in ids}
+    for ids in couples:
         members = [user_ids[i] for i in ids]
         group_id = secrets.token_urlsafe(16)
         await db["shared_groups"].insert_one(
@@ -183,9 +204,15 @@ async def seed_couples(db: AsyncIOMotorDatabase) -> None:
             )
 
 
-async def reset(db: AsyncIOMotorDatabase) -> dict[str, int]:
-    """Delete the test users and everything they own; return deleted counts."""
-    google_ids = [_google_id(account["id"]) for account in TEST_ACCOUNTS]
+async def reset(
+    db: AsyncIOMotorDatabase, account_ids: tuple[str, ...] | None = None
+) -> dict[str, int]:
+    """Delete the test users (all, or just `account_ids`) and everything they
+    own; return deleted counts."""
+    targets = [
+        a for a in TEST_ACCOUNTS if account_ids is None or a["id"] in account_ids
+    ]
+    google_ids = [_google_id(account["id"]) for account in targets]
     users = await db["users"].find({"google_id": {"$in": google_ids}}).to_list(None)
     user_ids = [str(user["_id"]) for user in users]
     deleted: dict[str, int] = {}
@@ -233,7 +260,7 @@ async def reset(db: AsyncIOMotorDatabase) -> dict[str, int]:
             "$or": [
                 {"inviter_id": {"$in": user_ids}},
                 {"accepted_by": {"$in": user_ids}},
-                {"invitee_email": {"$in": [_email(a["id"]) for a in TEST_ACCOUNTS]}},
+                {"invitee_email": {"$in": [_email(a["id"]) for a in targets]}},
             ]
         },
     )

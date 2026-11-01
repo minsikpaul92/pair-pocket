@@ -16,6 +16,8 @@ import {
 import { translateError } from "@/lib/errors";
 
 const PASSWORD_KEY = "pairpocket.testLoginPassword";
+/** Set after a test sign-in so other screens can link back to the test page. */
+export const TEST_LOGIN_FLAG = "pairpocket.testLogin";
 
 type Notice = { kind: "error" | "info"; text: string };
 
@@ -31,6 +33,7 @@ export default function TestLoginPanel() {
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [freshStart, setFreshStart] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 
@@ -70,9 +73,10 @@ export default function TestLoginPanel() {
     setBusy(true);
     setNotice(null);
     try {
-      const code = await signInTestAccount(accountId, password);
+      const code = await signInTestAccount(accountId, password, !freshStart);
       try {
         window.localStorage.setItem(PASSWORD_KEY, password);
+        window.localStorage.setItem(TEST_LOGIN_FLAG, "1");
       } catch {
         /* storage unavailable; the password just isn't remembered */
       }
@@ -183,6 +187,19 @@ export default function TestLoginPanel() {
       >
         {t("signIn")}
       </button>
+
+      <div className="mt-3 flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={freshStart}
+            onChange={(event) => setFreshStart(event.target.checked)}
+            className="h-4 w-4 accent-blue-600"
+          />
+          {t("freshStart")}
+        </label>
+        <InfoTip label={t("tipLabel")}>{t("tipFreshStart")}</InfoTip>
+      </div>
 
       <div className="mt-10 text-sm font-semibold text-gray-900 dark:text-white">
         {t("quickTitle")}

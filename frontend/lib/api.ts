@@ -306,12 +306,16 @@ async function postTestLogin(path: string, body: object): Promise<Response> {
   return res;
 }
 
-/** One-time login code for a test account, redeemed by the auth callback page. */
+/**
+ * One-time login code for a test account, redeemed by the auth callback page.
+ * `ready`: an account that is not set up yet starts with onboarding done.
+ */
 export async function signInTestAccount(
   account: string,
-  password: string
+  password: string,
+  ready: boolean
 ): Promise<string> {
-  const res = await postTestLogin("", { account, password });
+  const res = await postTestLogin("", { account, password, ready });
   return ((await res.json()) as { code: string }).code;
 }
 

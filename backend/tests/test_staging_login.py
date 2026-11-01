@@ -212,3 +212,28 @@ def test_couples_preset_links_testers_with_default_accounts(env):
     env.client.post("/api/auth/test-login/reset", json={"password": PASSWORD})
     assert run(env.db.users.count_documents({})) == 0
     assert run(env.db.accounts.count_documents({})) == 0
+
+
+def test_ready_sign_in_sets_up_the_couple_once(env):
+    res = env.client.post(
+        "/api/auth/test-login",
+        json={"account": "tester3", "password": PASSWORD, "ready": True},
+    )
+    assert res.status_code == 200
+    users = run(env.db.users.find({}).to_list(None))
+    assert {u["name"] for u in users} == {"Tester 3", "Tester 4"}
+    assert users[0]["shared_group_id"] == users[1]["shared_group_id"]
+    tester3 = next(u for u in users if u["name"] == "Tester 3")
+    settings = run(env.db.user_settings.find_one({"owner_id": str(tester3["_id"])}))
+    assert settings["onboarding_personal_completed"] is True
+    accounts = run(env.db.accounts.count_documents({"owner_id": str(tester3["_id"])}))
+    assert accounts > 0
+
+    # A second ready sign-in keeps what is there instead of starting over.
+    again = env.client.post(
+        "/api/auth/test-login",
+        json={"account": "tester3", "password": PASSWORD, "ready": True},
+    )
+    assert again.status_code == 200
+    assert run(env.db.accounts.count_documents({"owner_id": str(tester3["_id"])})) == accounts
+    assert run(env.db.users.count_documents({})) == 2
