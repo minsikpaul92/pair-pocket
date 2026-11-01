@@ -1165,7 +1165,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             )}
           </div>
         )}
-      </div>      {/* 4. Holdings title with the view toggle and add button, then account and sort */}
+      </div>      {/* 4. Holdings title with the view toggle and sort, then account and add button */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between gap-2">
           <h2 className="min-w-0 truncate text-base font-bold text-gray-800 dark:text-gray-100">
@@ -1194,16 +1194,22 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               {t("currentPrice")}
             </button>
           </div>
-          <button
-            onClick={() => {
-              resetAddForm();
-              setShowAddModal(true);
-            }}
-            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t("addHolding")}
-          </button>
+          <label className="relative inline-flex shrink-0 items-center gap-1 cursor-pointer whitespace-nowrap text-xs font-bold text-gray-600 dark:text-gray-300">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              aria-label={t("sortLabel")}
+              className="appearance-none cursor-pointer bg-transparent border-0 outline-none focus:ring-0 pr-4 text-xs font-bold text-gray-600 dark:text-gray-300"
+            >
+              <option value="valuation" className="bg-white dark:bg-gray-900">{t("sortValuation")}</option>
+              <option value="yield" className="bg-white dark:bg-gray-900">{t("sortYield")}</option>
+              <option value="shares" className="bg-white dark:bg-gray-900">{t("sortShares")}</option>
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+              aria-hidden
+            />
+          </label>
         </div>
 
         {/* The CAD and KRW ledgers switch currency in the Investments card above. */}
@@ -1262,22 +1268,16 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
           </div>
           )}
-          <label className="relative inline-flex shrink-0 items-center gap-1 cursor-pointer whitespace-nowrap text-xs font-bold text-gray-600 dark:text-gray-300">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              aria-label={t("sortLabel")}
-              className="appearance-none cursor-pointer bg-transparent border-0 outline-none focus:ring-0 pr-4 text-xs font-bold text-gray-600 dark:text-gray-300"
-            >
-              <option value="valuation" className="bg-white dark:bg-gray-900">{t("sortValuation")}</option>
-              <option value="yield" className="bg-white dark:bg-gray-900">{t("sortYield")}</option>
-              <option value="shares" className="bg-white dark:bg-gray-900">{t("sortShares")}</option>
-            </select>
-            <ChevronDown
-              className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500 dark:text-gray-400"
-              aria-hidden
-            />
-          </label>
+          <button
+            onClick={() => {
+              resetAddForm();
+              setShowAddModal(true);
+            }}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t("addHolding")}
+          </button>
         </div>
       </div>
 
