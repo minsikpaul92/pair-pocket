@@ -68,6 +68,8 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
   const [displayCurrency, setDisplayCurrency] = useState<Currency>("CAD");
   /** Canada tab: ALL = native per holding; CAD/USD = FX rollup. */
   const [cadViewMode, setCadViewMode] = useState<"ALL" | "CAD" | "USD">("ALL");
+  /** All tab: true = one total per currency; false = FX rollup into displayCurrency. */
+  const [allNative, setAllNative] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("valuation");
   const [sortBy, setSortBy] = useState<SortOption>("valuation");
   const [showAccountRegister, setShowAccountRegister] = useState(false);
@@ -79,7 +81,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
 
   /** ALL / Korea always roll up; Canada rolls up only when CAD or USD is selected (not 전체). */
   const useFxRollup =
-    ledgerScope === "ALL" ||
+    (ledgerScope === "ALL" && !allNative) ||
     ledgerScope === "KRW" ||
     (ledgerScope === "CAD" && cadViewMode !== "ALL");
   const rollupCurrency: Currency =
@@ -1066,18 +1068,38 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           <div className="flex items-center gap-2">
             {ledgerScope === "ALL" && (
               <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
-                {(["CAD", "KRW"] as const).map((code) => (
+                <button
+                  type="button"
+                  onClick={() => setAllNative(true)}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                    allNative
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {t("displayNativeAll")}
+                </button>
+                {(["USD", "CAD", "KRW"] as const).map((code) => (
                   <button
                     key={code}
                     type="button"
-                    onClick={() => setDisplayCurrency(code)}
+                    onClick={() => {
+                      setAllNative(false);
+                      setDisplayCurrency(code);
+                    }}
                     className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
-                      displayCurrency === code
+                      !allNative && displayCurrency === code
                         ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                         : "text-gray-500"
                     }`}
                   >
-                    {t(code === "CAD" ? "displayCad" : "displayKrw")}
+                    {t(
+                      code === "USD"
+                        ? "displayUsd"
+                        : code === "CAD"
+                          ? "displayCad"
+                          : "displayKrw"
+                    )}
                   </button>
                 ))}
               </div>
