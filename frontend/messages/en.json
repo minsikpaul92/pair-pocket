@@ -730,6 +730,11 @@
     "filterAccount": "Filter",
     "scanPhoto": "Scan photo"
   },
+  "scanQueue": {
+    "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
+    "addRecent": "Scan recent files again ({count}, kept {days} days)",
+    "openRecent": "Recent scans ({count})"
+  },
   "importPage": {
     "title": "Smart Import & files",
     "subtitle": "Import or export ledger CSV, and review past OCR / import logs.",
@@ -1115,6 +1120,10 @@
   },
   "whatsNew": {
     "items": {
+      "scanDrafts": {
+        "title": "Scans are kept if something goes wrong",
+        "description": "Photos you add for AI scanning are saved on this device, so a failed or interrupted scan can be retried. Finished ones stay for 3 days in case you want to scan them again."
+      },
       "provinceTax": {
         "title": "Tax for your province",
         "description": "Pick your province in Settings and the expense form estimates tax with its rate instead of a fixed 13%. The rate is shown next to Tax."
