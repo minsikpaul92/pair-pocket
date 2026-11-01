@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Coffee,
   Languages,
+  Receipt,
   RefreshCw,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -27,6 +28,7 @@ import ExpenseRatioHiddenSettings from "@/components/ExpenseRatioHiddenSettings"
 import {
   fetchUserSettings,
   saveGeminiApiKey,
+  setSalesTaxProvince,
   setShareGeminiApiKey,
   updateLedgerStartDate,
   resetUserData,
@@ -38,6 +40,13 @@ import {
   UserSettings,
   PartnerSummary,
 } from "@/lib/api";
+import {
+  CANADA_PROVINCES,
+  DEFAULT_SALES_TAX_PROVINCE,
+  formatTaxPercent,
+  isCanadaProvince,
+  salesTaxPercent,
+} from "@/lib/canada-tax";
 import { dayKey } from "@/lib/date";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
 import { usePathname, useRouter } from "@/i18n/navigation";
@@ -107,6 +116,7 @@ export default function SettingsView({
   const t = useTranslations("settingsPage");
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
+  const tProvinces = useTranslations("provinces");
   const locale = useLocale() as AppLocale;
   const pathname = usePathname();
   const router = useRouter();
@@ -126,6 +136,26 @@ export default function SettingsView({
   }
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [savingProvince, setSavingProvince] = useState(false);
+  const [provinceError, setProvinceError] = useState(false);
+  const salesTaxProvince = isCanadaProvince(settings?.sales_tax_province)
+    ? settings.sales_tax_province
+    : DEFAULT_SALES_TAX_PROVINCE;
+
+  async function changeSalesTaxProvince(code: string) {
+    if (savingProvince || code === salesTaxProvince) return;
+    setSavingProvince(true);
+    setProvinceError(false);
+    try {
+      setSettings(await setSalesTaxProvince(code));
+      onChanged();
+    } catch {
+      setProvinceError(true);
+    } finally {
+      setSavingProvince(false);
+    }
+  }
+
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState(false);
@@ -631,6 +661,39 @@ export default function SettingsView({
           disabled={changingLanguage}
           ariaLabel={t("languageLabel")}
         />
+      </section>
+
+      <section className="card-inset p-5 space-y-3">
+        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+          <Receipt className="h-5 w-5 text-blue-500" />
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {t("salesTaxTitle")}
+          </h2>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+          {t("salesTaxHelp")}
+        </p>
+        <select
+          value={salesTaxProvince}
+          onChange={(e) => void changeSalesTaxProvince(e.target.value)}
+          disabled={savingProvince}
+          aria-label={t("salesTaxTitle")}
+          className="input-field"
+        >
+          {CANADA_PROVINCES.map((p) => (
+            <option key={p.code} value={p.code}>
+              {tProvinces(p.code)}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+          {t("salesTaxRate", {
+            rate: formatTaxPercent(salesTaxPercent(salesTaxProvince)),
+          })}
+        </p>
+        {provinceError && (
+          <p className="text-xs text-red-500">{t("salesTaxError")}</p>
+        )}
       </section>
 
       <section className="card-inset p-5 space-y-3">

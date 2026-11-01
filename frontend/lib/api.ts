@@ -668,6 +668,7 @@ export interface UserSettings {
   dashboard_layout?: DashboardLayout;
   dashboard_layouts?: Partial<Record<"CAD" | "KRW", DashboardLayout>>;
   spending_excluded_categories?: string[];
+  sales_tax_province?: string;
 }
 
 export interface DashboardLayout {
@@ -747,6 +748,23 @@ export async function setExpenseRatioHiddenCategories(
     }
   );
   if (!res.ok) throw new ApiError("setExpenseRatioHiddenCategories");
+  const data = (await res.json()) as UserSettings;
+  return {
+    ...data,
+    category_colors: data.category_colors ?? {},
+    expense_ratio_hidden_categories: data.expense_ratio_hidden_categories ?? [],
+  };
+}
+
+export async function setSalesTaxProvince(
+  province: string
+): Promise<UserSettings> {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/sales-tax-province`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ province }),
+  });
+  if (!res.ok) throw new ApiError("setSalesTaxProvince");
   const data = (await res.json()) as UserSettings;
   return {
     ...data,

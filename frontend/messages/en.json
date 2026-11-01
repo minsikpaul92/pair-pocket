@@ -923,6 +923,10 @@
     "updateTitle": "App update",
     "updateHelp": "An app added to your Dock or home screen keeps running the version it opened with. Refresh to load the latest version.",
     "updateCta": "Refresh app",
+    "salesTaxTitle": "Sales tax",
+    "salesTaxHelp": "Choose your province. Its GST, HST and PST rate is used to estimate the tax when you add an expense. You can still edit the tax.",
+    "salesTaxRate": "Rate: {rate}%",
+    "salesTaxError": "Couldn't save. Please try again.",
     "expenseRatioHiddenTitle": "Hide categories from expense mix",
     "expenseRatioHiddenHelp": "Selected categories or sub-categories are left out of the dashboard expense mix chart. Removing a large fixed cost such as rent makes the rest of your spending easier to read. Totals and the transaction list still include them.",
     "expenseRatioHiddenError": "Couldn't save. Please try again.",
@@ -1094,8 +1098,27 @@
     "addedExpense": "{name} added an expense",
     "addedIncome": "{name} added income"
   },
+  "provinces": {
+    "AB": "Alberta",
+    "BC": "British Columbia",
+    "MB": "Manitoba",
+    "NB": "New Brunswick",
+    "NL": "Newfoundland and Labrador",
+    "NS": "Nova Scotia",
+    "NT": "Northwest Territories",
+    "NU": "Nunavut",
+    "ON": "Ontario",
+    "PE": "Prince Edward Island",
+    "QC": "Quebec",
+    "SK": "Saskatchewan",
+    "YT": "Yukon"
+  },
   "whatsNew": {
     "items": {
+      "provinceTax": {
+        "title": "Tax for your province",
+        "description": "Pick your province in Settings and the expense form estimates tax with its rate instead of a fixed 13%. The rate is shown next to Tax."
+      },
       "receiptTax": {
         "title": "Tax that matches your receipt",
         "description": "The total you type now stays put, and for groceries you can enter the tax printed on the receipt. Amounts always show two decimals, and the app offers a refresh when a new version is ready."
