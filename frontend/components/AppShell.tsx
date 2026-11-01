@@ -867,7 +867,11 @@ export default function AppShell({ user, onLogout }: Props) {
                 className="hidden min-[420px]:block md:hidden h-6 w-6 text-blue-500 shrink-0"
                 aria-hidden
               />
-              <div className="flex min-w-0 flex-auto sm:flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+              <div
+                className={`flex min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 ${
+                  visibleLedgers.length > 1 ? "flex-auto sm:flex-1" : "flex-none"
+                }`}
+              >
                 {(["personal", "shared"] as AccountType[]).map((type) => (
                   <button
                     key={type}
@@ -901,24 +905,26 @@ export default function AppShell({ user, onLogout }: Props) {
                   ))}
                 </div>
               )}
-              <NotificationBell
-                count={unreadCount}
-                active={view === "notifications"}
-                onClick={toggleNotifications}
-              />
-              <button
-                type="button"
-                onClick={toggleSettings}
-                aria-label={tNav("settings")}
-                aria-pressed={view === "settings"}
-                className={`md:hidden shrink-0 rounded-xl p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                  view === "settings"
-                    ? "bg-blue-500 text-white"
-                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-white"
-                }`}
-              >
-                <Settings className="h-5 w-5" />
-              </button>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <NotificationBell
+                  count={unreadCount}
+                  active={view === "notifications"}
+                  onClick={toggleNotifications}
+                />
+                <button
+                  type="button"
+                  onClick={toggleSettings}
+                  aria-label={tNav("settings")}
+                  aria-pressed={view === "settings"}
+                  className={`md:hidden shrink-0 rounded-xl p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                    view === "settings"
+                      ? "bg-blue-500 text-white"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-white"
+                  }`}
+                >
+                  <Settings className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             <div className="hidden md:flex items-center gap-2 shrink-0">
