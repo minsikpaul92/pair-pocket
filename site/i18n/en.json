@@ -1,8 +1,8 @@
 {
   "meta": {
-    "title": "Pair Pocket: mine, yours and ours, in two currencies",
-    "description": "A household ledger for couples who share some money and keep some apart. Personal and shared ledgers, CAD and KRW side by side, free, with no bank connection.",
-    "ogAlt": "Pair Pocket: mine, yours and ours, in two currencies"
+    "title": "Pair Pocket: mine, yours and ours, in any currency",
+    "description": "A household ledger and asset tracker for couples who share some money and keep some apart. Personal and shared ledgers, your own currencies side by side, free, with no bank connection.",
+    "ogAlt": "Pair Pocket: mine, yours and ours, in any currency"
   },
   "skip": "Skip to content",
   "brand": "Pair Pocket",
@@ -16,23 +16,23 @@
     "language": "Language"
   },
   "hero": {
-    "h1": "Mine, yours and ours, in two currencies.",
-    "sub": "A household ledger for couples who share some money and keep some apart. Canadian dollars and Korean won, side by side.",
+    "h1": "Mine, yours and ours, in any currency.",
+    "sub": "A ledger for couples who share some money and keep some apart, and for money that lives in more than one country.",
     "cta": "Get started",
     "star": "Star on GitHub"
   },
   "story": {
-    "h2": "Most money apps assume one country and one person.",
-    "p1": "I moved to Canada and still hold money in more than one country. Every app I tried was built for a single market, or treated the two of us as one person.",
-    "p2": "I wanted mine, yours and ours in one place, in two currencies, without my private entries showing up on my partner's screen. I could not find that, so I built it.",
-    "p3": "Bank statements make it harder. They show money moving under a code nobody remembers six months later. Pair Pocket lets you record the story behind the money instead."
+    "h2": "I wanted all my money in one place.",
+    "p1": "I moved from Korea to Canada, so I have money in both countries. I wanted to see all of it in one place. Anyone who has immigrated probably has money on both sides too.",
+    "p2": "As a couple, we wanted one shared ledger and one private ledger each. I wanted receipts to write themselves, subscriptions to track themselves, and my stocks counted too. I could not find an app that did all of it, so I built it.",
+    "p3": "That is why Pair Pocket goes beyond a ledger. It is where your whole financial picture lives."
   },
   "features": {
     "h2": "What it does"
   },
   "ledgers": {
     "h": "Your book, their book, and the one you share.",
-    "p1": "Each person keeps a private personal ledger. Partners link a shared ledger on top. Switch between them with one tap, and look at Canada, Korea or both with exchange rates.",
+    "p1": "Each person keeps a private personal ledger, and partners link a shared one on top. Switch with one tap, keep your own currencies side by side, and see a combined total with exchange rates.",
     "p2": "What you keep personal stays personal. If you ever unlink, the shared history never reaches a new partner."
   },
   "add": {
@@ -40,41 +40,41 @@
     "p": "Merchants and categories you used before are suggested as you type. Bring in a lot at once with a CSV file, and export one whenever you want."
   },
   "scan": {
-    "h": "Scan a receipt, review, save.",
-    "p": "A photo or a statement screenshot becomes a draft entry, and you check it before it is saved. AI is optional and runs on your own free Gemini key. Manual entry and CSV import work without one."
+    "h": "One photo, one finished entry.",
+    "p": "Take a photo of a receipt or a screenshot, and the entry fills itself in. Check it once and save. Manual entry and CSV import work too."
   },
   "settle": {
-    "h": "Settle up without a spreadsheet.",
-    "p": "Paid for a shared expense from your own account? Settle it with money from a personal account, or the other way around. Both sides are written together, so the books always agree."
+    "h": "Split a bill, record only your share.",
+    "p": "Paid for a dinner with friends? As they pay you back, settle it, and your expense drops to exactly what you spent. Settle from a personal account or the shared one. Both sides are recorded together."
   },
   "moves": {
     "h": "Moving money is not spending.",
     "p": "Card payments, transfers between your accounts and money going between the personal and shared ledgers stay in the history but are not counted as spending. Your charts show what you actually spent, not the same money twice."
   },
   "subs": {
-    "h": "Fixed expenses that remember themselves.",
-    "p": "Subscriptions, bills and installments, with promo pricing, skipped payments and reminder emails. Move one between personal and shared when life changes."
+    "h": "Fixed expenses that track themselves.",
+    "p": "Subscriptions, bills and installments are recorded on their due dates. See how much you pay each month, which account it comes from, how long a plan runs and when a promo price ends. Reminder emails and personal or shared moves included."
   },
   "stocks": {
-    "h": "Holdings in both countries.",
-    "p": "Track brokerage accounts with live quotes and currency conversion, right next to the rest of your money."
+    "h": "Your stocks count too.",
+    "p": "Holdings per brokerage account, with live quotes and currency conversion, sit next to your cash and cards. You see your total assets, not just your spending."
   },
   "invite": {
     "h": "Invite your partner by email.",
     "p": "Pick a shared ledger start date so both of you line up from day one. Once they accept, the shared ledger is ready."
   },
   "try": {
-    "h2": "Try a settlement.",
-    "p": "You paid for a shared grocery run with your own card. Slide to settle it from the shared account and watch where the money goes.",
-    "expense": "Shared expense",
-    "currency": "Currency",
-    "slider": "Settled from the shared account",
-    "spending": "Counted as spending",
-    "personal": "Personal account",
-    "shared": "Shared account",
-    "left": "Left to settle",
-    "note": "Charts count the expense once, however it is settled.",
-    "fallback": "Example: a CA$86.00 grocery bill paid on your card. Settle CA$86.00 from the shared account. Your personal account gets CA$86.00 back, the shared account drops by CA$86.00, nothing is left to settle, and your charts still count CA$86.00 once."
+    "h2": "Split the bill, keep your share.",
+    "p": "Dinner with friends came to $100.00 and you paid. Tap each friend as their e-transfer arrives and watch your spending shrink to what you really spent.",
+    "note": "Your charts count only your own share.",
+    "fallback": "Example: dinner with friends comes to $100.00. Three friends each send you $25.00 by e-transfer. After the first, your spending is $75.00. After the second, $50.00. After the third, $25.00, exactly your share.",
+    "title": "Dinner with friends",
+    "bill": "Bill you paid",
+    "received": "Received",
+    "mine": "My spending",
+    "get": "Get from {name}",
+    "got": "Got {amount} from {name}",
+    "hint": "Tap again to undo."
   },
   "free": {
     "h2": "Free, private, and clear about it.",
@@ -92,8 +92,12 @@
         "text": "passwords stored. You sign in with Google."
       },
       {
-        "fig": "2",
-        "text": "currencies side by side, Canadian dollars and Korean won."
+        "fig": "$0",
+        "text": "to use the AI features. They run on your own Gemini key, and Google's free credit covers everyday use (subject to Google's current free-tier terms)."
+      },
+      {
+        "fig": "Any",
+        "text": "currency. Keep the money you have, wherever it lives."
       },
       {
         "fig": "2",
@@ -187,5 +191,13 @@
       "alt": "The invite partner dialog with an email and a shared ledger start date."
     }
   },
-  "placeholder": "Recording placeholder"
+  "placeholder": "Recording placeholder",
+  "statement": {
+    "h": "Missed some? Scan the monthly statement.",
+    "p": "Once a month, scan your bank or card statement and fill in everything you missed in a few minutes."
+  },
+  "trip": {
+    "h": "Going home? Keep the same ledger.",
+    "p": "When you visit your home country, keep writing in the same ledger instead of starting a new one for every trip. Both countries stay in one place, at a glance."
+  }
 }

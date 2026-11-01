@@ -92,6 +92,18 @@
 {{clip:ai-scan}}
       </article>
 
+      <article class="feat" data-stage="ai-scan" data-r>
+        <h3>{{t.statement.h}}</h3>
+        <p>{{t.statement.p}}</p>
+{{clip:ai-scan}}
+      </article>
+
+      <article class="feat" data-stage="add-entry" data-r>
+        <h3>{{t.trip.h}}</h3>
+        <p>{{t.trip.p}}</p>
+{{clip:add-entry}}
+      </article>
+
       <article class="feat" data-stage="settlement" data-r>
         <h3>{{t.settle.h}}</h3>
         <p>{{t.settle.p}}</p>
@@ -136,28 +148,20 @@
       <p>{{t.try.p}}</p>
       <p class="fallback">{{t.try.fallback}}</p>
     </div>
-    <form class="calc" data-ui data-calc novalidate aria-describedby="calc-note" data-locale="{{lang}}">
-      <div class="calc-row">
-        <label for="calc-amount">{{t.try.expense}}</label>
-        <input id="calc-amount" name="amount" type="number" inputmode="decimal" min="0" step="any" value="86">
-      </div>
-      <fieldset class="seg">
-        <legend>{{t.try.currency}}</legend>
-        <label><input type="radio" name="cur" value="CAD" checked><span>CAD</span></label>
-        <label><input type="radio" name="cur" value="KRW"><span>KRW</span></label>
-      </fieldset>
-      <div class="calc-row">
-        <label for="calc-pct">{{t.try.slider}} <output id="calc-pct-out" for="calc-pct">100%</output></label>
-        <input id="calc-pct" name="pct" type="range" min="0" max="100" step="1" value="100">
-      </div>
-      <dl class="calc-out" aria-live="polite">
-        <div><dt>{{t.try.spending}}</dt><dd data-out="spending">CA$86.00</dd></div>
-        <div><dt>{{t.try.personal}}</dt><dd data-out="personal">+CA$86.00</dd></div>
-        <div><dt>{{t.try.shared}}</dt><dd data-out="shared">-CA$86.00</dd></div>
-        <div><dt>{{t.try.left}}</dt><dd data-out="left">CA$0.00</dd></div>
+    <div class="calc" data-ui data-calc data-total="100" data-got="{{t.try.got}}" data-get="{{t.try.get}}">
+      <p class="calc-title">{{t.try.title}}</p>
+      <dl class="calc-sum">
+        <div><dt>{{t.try.bill}}</dt><dd data-out="bill">$100.00</dd></div>
+        <div><dt>{{t.try.received}}</dt><dd data-out="received">$0.00</dd></div>
       </dl>
-      <p id="calc-note" class="calc-note">{{t.try.note}}</p>
-    </form>
+      <p class="calc-mine"><span>{{t.try.mine}}</span><strong data-out="mine" aria-live="polite">$100.00</strong></p>
+      <div class="friends">
+        <button type="button" class="friend" data-name="Paul" aria-pressed="false"></button>
+        <button type="button" class="friend" data-name="Lucy" aria-pressed="false"></button>
+        <button type="button" class="friend" data-name="Max" aria-pressed="false"></button>
+      </div>
+      <p class="calc-note">{{t.try.note}} {{t.try.hint}}</p>
+    </div>
   </div>
 </section>
 

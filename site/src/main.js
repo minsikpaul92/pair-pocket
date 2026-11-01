@@ -92,38 +92,30 @@
     }
   }
 
-  // Settlement calculator.
-  var form = document.querySelector("[data-calc]");
-  if (form) {
-    var amount = form.elements.amount, pct = form.elements.pct;
-    var out = function (k) { return form.querySelector('[data-out="' + k + '"]'); };
-    var pctOut = document.getElementById("calc-pct-out");
-    var defaults = { CAD: 86, KRW: 65000 };
-    var fmt = function (cur, signed) {
-      return new Intl.NumberFormat(form.getAttribute("data-locale"), {
-        style: "currency", currency: cur, currencyDisplay: "symbol",
-        maximumFractionDigits: cur === "KRW" ? 0 : 2, minimumFractionDigits: cur === "KRW" ? 0 : 2,
-        signDisplay: signed ? "exceptZero" : "auto"
+  // Settlement demo: each friend who pays back lowers your own spending.
+  var calc = document.querySelector("[data-calc]");
+  if (calc) {
+    var total = +calc.getAttribute("data-total"), tpl = calc.getAttribute("data-get"), gotTpl = calc.getAttribute("data-got");
+    var buttons = Array.prototype.slice.call(calc.querySelectorAll(".friend"));
+    var share = total / (buttons.length + 1);
+    var money = function (n) { return "$" + n.toFixed(2); };
+    var out = function (k) { return calc.querySelector('[data-out="' + k + '"]'); };
+    var draw = function () {
+      var got = 0;
+      buttons.forEach(function (b) {
+        var on = b.getAttribute("aria-pressed") === "true";
+        if (on) got += share;
+        b.textContent = (on ? gotTpl : tpl).replace("{name}", b.getAttribute("data-name")).replace("{amount}", money(share));
       });
+      out("received").textContent = money(got);
+      out("mine").textContent = money(total - got);
     };
-    var cur = function () { return form.elements.cur.value; };
-    var update = function () {
-      var a = Math.max(0, parseFloat(amount.value) || 0);
-      var c = cur();
-      var settled = Math.round(a * (pct.value / 100) * (c === "KRW" ? 1 : 100)) / (c === "KRW" ? 1 : 100);
-      var plain = fmt(c, false), signed = fmt(c, true);
-      out("spending").textContent = plain.format(a);
-      out("personal").textContent = signed.format(settled);
-      out("shared").textContent = signed.format(-settled);
-      out("left").textContent = plain.format(Math.max(0, a - settled));
-      out("personal").className = settled > 0 ? "pos" : "";
-      pctOut.textContent = pct.value + "%";
-    };
-    form.addEventListener("input", update);
-    form.addEventListener("submit", function (e) { e.preventDefault(); });
-    Array.prototype.forEach.call(form.elements.cur, function (r) {
-      r.addEventListener("change", function () { amount.value = defaults[cur()]; update(); });
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true");
+        draw();
+      });
     });
-    update();
+    draw();
   }
 })();
