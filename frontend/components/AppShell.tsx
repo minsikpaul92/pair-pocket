@@ -25,6 +25,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 
+import AppUpdateWatcher from "@/components/AppUpdateWatcher";
 import CalendarView from "@/components/CalendarView";
 import DashboardView from "@/components/DashboardView";
 import InviteModal from "@/components/InviteModal";
@@ -313,46 +314,6 @@ export default function AppShell({ user, onLogout }: Props) {
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (scanMoreInputRef.current) scanMoreInputRef.current.value = "";
   }
-
-  // Auto-check and claim Service Worker PWA updates when returning to app / window focus
-  useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-
-    let refreshing = false;
-
-    const handleControllerChange = () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    };
-
-    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
-
-    const checkUpdate = async () => {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          await reg.update();
-        }
-      } catch (err) {
-        // Ignore SW update check errors
-      }
-    };
-
-    window.addEventListener("focus", checkUpdate);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkUpdate();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
-      window.removeEventListener("focus", checkUpdate);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
 
   function clearScanQueue() {
     setScanQueue((prev) => {
@@ -1335,6 +1296,8 @@ export default function AppShell({ user, onLogout }: Props) {
           </button>
         </div>
       )}
+
+      <AppUpdateWatcher />
 
       {/* Floating Buttons Group — hidden on stocks/subscriptions (view-specific FAB) */}
       {view !== "stocks" && view !== "subscriptions" && (

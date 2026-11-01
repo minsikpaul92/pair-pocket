@@ -6,6 +6,8 @@
   "common": {
     "appName": "PairPocket",
     "close": "Close",
+    "updateAvailable": "A new version is available",
+    "updateRefresh": "Refresh",
     "add": "Add",
     "save": "Save",
     "saving": "Saving...",
@@ -918,6 +920,9 @@
     "supportTitle": "Support",
     "supportDescription": "If PairPocket helps you, you can buy me a coffee. No ads in the app.",
     "supportCta": "Buy me a coffee",
+    "updateTitle": "App update",
+    "updateHelp": "An app added to your Dock or home screen keeps running the version it opened with. Refresh to load the latest version.",
+    "updateCta": "Refresh app",
     "expenseRatioHiddenTitle": "Hide categories from expense mix",
     "expenseRatioHiddenHelp": "Selected categories or sub-categories are left out of the dashboard expense mix chart. Removing a large fixed cost such as rent makes the rest of your spending easier to read. Totals and the transaction list still include them.",
     "expenseRatioHiddenError": "Couldn't save. Please try again.",
@@ -1091,6 +1096,10 @@
   },
   "whatsNew": {
     "items": {
+      "receiptTax": {
+        "title": "Tax that matches your receipt",
+        "description": "The total you type now stays put, and for groceries you can enter the tax printed on the receipt. Amounts always show two decimals, and the app offers a refresh when a new version is ready."
+      },
       "notifications": {
         "title": "Notifications and What's New",
         "description": "A bell in the top bar tells you when your partner adds an entry to the shared ledger. Updates like this one are listed here."
