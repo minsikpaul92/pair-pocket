@@ -6,6 +6,8 @@
   "common": {
     "appName": "PairPocket",
     "close": "닫기",
+    "updateAvailable": "새 버전이 있어요",
+    "updateRefresh": "새로고침",
     "add": "추가",
     "save": "저장",
     "saving": "저장 중...",
@@ -918,6 +920,9 @@
     "supportTitle": "후원",
     "supportDescription": "PairPocket이 도움이 됐다면 커피 한 잔으로 응원할 수 있어요. 광고는 없습니다.",
     "supportCta": "Buy me a coffee",
+    "updateTitle": "앱 업데이트",
+    "updateHelp": "Dock이나 홈 화면에 추가한 앱은 처음 열린 버전을 계속 사용해요. 새로고침하면 최신 버전으로 바뀝니다.",
+    "updateCta": "앱 새로고침",
     "expenseRatioHiddenTitle": "지출 비율에서 숨길 카테고리",
     "expenseRatioHiddenHelp": "선택한 카테고리나 중분류는 대시보드 지출 비율 차트에서 빠집니다. 월세처럼 큰 고정비를 빼면 나머지 소비 흐름이 잘 보입니다. 지출 합계와 내역에는 그대로 남습니다.",
     "expenseRatioHiddenError": "저장하지 못했습니다. 다시 시도해 주세요.",
@@ -1091,6 +1096,10 @@
   },
   "whatsNew": {
     "items": {
+      "receiptTax": {
+        "title": "영수증과 딱 맞는 세금",
+        "description": "입력한 총액이 이제 그대로 유지되고, 장보기는 영수증에 찍힌 세금을 그대로 적을 수 있어요. 금액은 항상 소수점 둘째 자리까지 보이고, 새 버전이 나오면 새로고침 안내가 떠요."
+      },
       "notifications": {
         "title": "알림과 새 소식",
         "description": "상단의 종 아이콘으로 파트너가 공유 가계부에 내역을 등록하면 바로 알려드려요. 이런 업데이트 내용도 여기에서 볼 수 있어요."

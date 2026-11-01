@@ -249,6 +249,7 @@ export default function TransactionModal({
   const [dragOverModal, setDragOverModal] = useState(false);
   const dragDepthRef = useRef(0);
   const pressStartedOnBackdrop = useRef(false);
+  const totalDerivedRef = useRef(false);
   const [tipPercent, setTipPercent] = useState("");
   const [tipAmount, setTipAmount] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -563,27 +564,51 @@ export default function TransactionModal({
 
   const HST_RATE = 0.13;
 
+  // Groceries mix taxed and untaxed items, so the tax is typed from the
+  // receipt instead of being estimated at the flat rate.
+  const isMixedTaxCategory = subCategory === "식재료/장보기";
+
   function round2(val: number): number {
     return Math.round((val + Number.EPSILON) * 100) / 100;
   }
 
-  function handleSubtotalChange(raw: string) {
+  // The Total is the anchor: once the user has entered it (or it was loaded),
+  // Subtotal and Tax are only a breakdown of it and never move it. The Total
+  // is derived from Subtotal only when it was empty to begin with.
+  function handleSubtotalChange(raw: string, taxChecked = isTaxChecked) {
     const formatted = formatAmountInput(raw, transactionCurrency);
     setSubtotal(formatted);
     const sub = parseAmountInput(formatted);
-    if (sub > 0 && showTax) {
-      const tax = round2(sub * HST_RATE);
-      setTaxAmount(amountToInput(tax, transactionCurrency));
-      const preTip = sub + tax;
-      const pct = parseFloat(tipPercent) || 0;
-      let tip = parseAmountInput(tipAmount) || 0;
-      if (pct > 0) {
-        tip = round2(preTip * (pct / 100));
-        setTipAmount(amountToInput(tip, transactionCurrency));
+    if (!showTax || sub <= 0) return;
+
+    const tot = parseAmountInput(amount);
+    if (taxChecked && tot > 0 && !totalDerivedRef.current) {
+      const tax = round2(tot - sub - parseAmountInput(tipAmount));
+      if (tax >= 0) {
+        setTaxAmount(amountToInput(tax, transactionCurrency));
+        return;
       }
-      const tot = round2(preTip + tip);
-      setAmount(amountToInput(tot, transactionCurrency));
     }
+
+    let tax: number;
+    if (!taxChecked) {
+      tax = 0;
+      setTaxAmount(amountToInput(tax, transactionCurrency));
+    } else if (isMixedTaxCategory) {
+      tax = parseAmountInput(taxAmount);
+    } else {
+      tax = round2(sub * HST_RATE);
+      setTaxAmount(amountToInput(tax, transactionCurrency));
+    }
+    const preTip = sub + tax;
+    const pct = parseFloat(tipPercent) || 0;
+    let tip = parseAmountInput(tipAmount) || 0;
+    if (pct > 0) {
+      tip = round2(preTip * (pct / 100));
+      setTipAmount(amountToInput(tip, transactionCurrency));
+    }
+    totalDerivedRef.current = true;
+    setAmount(amountToInput(round2(preTip + tip), transactionCurrency));
   }
 
   function handleTaxChange(raw: string) {
@@ -592,9 +617,12 @@ export default function TransactionModal({
     const tax = parseAmountInput(formatted);
     const sub = parseAmountInput(subtotal);
     const tip = parseAmountInput(tipAmount);
-    if (sub > 0) {
-      const tot = round2(sub + tax + tip);
-      setAmount(amountToInput(tot, transactionCurrency));
+    const tot = parseAmountInput(amount);
+    if (tot > 0 && !totalDerivedRef.current) {
+      const nextSub = Math.max(0, round2(tot - tax - tip));
+      setSubtotal(amountToInput(nextSub, transactionCurrency));
+    } else if (sub > 0) {
+      setAmount(amountToInput(round2(sub + tax + tip), transactionCurrency));
     }
   }
 
@@ -629,28 +657,34 @@ export default function TransactionModal({
     }
   }
 
-  function handleTotalChange(raw: string) {
+  function handleTotalChange(raw: string, taxChecked = isTaxChecked) {
     const formatted = formatAmountInput(raw, transactionCurrency);
     setAmount(formatted);
+    totalDerivedRef.current = false;
+    if (!showTax) return;
     const tot = parseAmountInput(formatted);
-    if (tot > 0 && showTax) {
-      if (!isTaxChecked) {
-        setSubtotal(amountToInput(tot, transactionCurrency));
-        setTaxAmount(amountToInput(0, transactionCurrency));
-      } else {
-        const pct = parseFloat(tipPercent) || 0;
-        const tipRate = pct > 0 ? pct / 100 : 0;
-        const preTip = round2(tot / (1 + tipRate));
-        const sub = round2(preTip / 1.13);
-        const tax = round2(preTip - sub);
-        const tip = round2(tot - preTip);
-        setSubtotal(amountToInput(sub, transactionCurrency));
-        setTaxAmount(amountToInput(tax, transactionCurrency));
-        if (pct > 0) {
-          setTipAmount(amountToInput(tip, transactionCurrency));
-        }
-      }
+    if (tot <= 0) {
+      setSubtotal("");
+      if (!isMixedTaxCategory) setTaxAmount("");
+      return;
     }
+    const pct = parseFloat(tipPercent) || 0;
+    let preTip: number;
+    if (pct > 0) {
+      preTip = round2(tot / (1 + pct / 100));
+      setTipAmount(amountToInput(round2(tot - preTip), transactionCurrency));
+    } else {
+      preTip = Math.max(0, round2(tot - parseAmountInput(tipAmount)));
+    }
+    if (taxChecked && isMixedTaxCategory) {
+      const typedTax = parseAmountInput(taxAmount);
+      setSubtotal(amountToInput(Math.max(0, round2(preTip - typedTax)), transactionCurrency));
+      return;
+    }
+    const sub = taxChecked ? round2(preTip / (1 + HST_RATE)) : preTip;
+    const tax = round2(preTip - sub);
+    setSubtotal(amountToInput(sub, transactionCurrency));
+    setTaxAmount(amountToInput(tax, transactionCurrency));
   }
 
   // Filter owned holdings by active ledger currency scope and payment account
@@ -814,6 +848,7 @@ export default function TransactionModal({
         setTaxAmount("");
         setTipPercent("");
         setTipAmount("");
+        totalDerivedRef.current = false;
         setError(null);
         setHydratedEditId(null);
       }
@@ -2441,9 +2476,15 @@ export default function TransactionModal({
                       setIsTaxChecked(checked);
                       if (!checked) {
                         setTaxAmount(amountToInput(0, transactionCurrency));
-                        if (amount) setSubtotal(amount);
-                      } else {
-                        handleTotalChange(amount);
+                        const tot = parseAmountInput(amount);
+                        if (tot > 0) {
+                          const preTip = Math.max(0, round2(tot - parseAmountInput(tipAmount)));
+                          setSubtotal(amountToInput(preTip, transactionCurrency));
+                        }
+                      } else if (parseAmountInput(amount) > 0) {
+                        handleTotalChange(amount, true);
+                      } else if (parseAmountInput(subtotal) > 0) {
+                        handleSubtotalChange(subtotal, true);
                       }
                     }}
                     className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -2737,7 +2778,7 @@ export default function TransactionModal({
                             0
                           );
                           if (sumTotal > 0) {
-                            setAmount(
+                            handleTotalChange(
                               amountToInput(sumTotal, transactionCurrency)
                             );
                           }
@@ -2825,7 +2866,7 @@ export default function TransactionModal({
                                   0
                                 );
                                 if (sumTotal > 0) {
-                                  setAmount(
+                                  handleTotalChange(
                                     amountToInput(sumTotal, transactionCurrency)
                                   );
                                 }

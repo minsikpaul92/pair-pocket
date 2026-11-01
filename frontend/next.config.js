@@ -20,6 +20,10 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:800
 
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    // Identifies this deploy so open apps can tell a newer one is available.
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA || "dev",
+  },
   async rewrites() {
     // The API is on another site, where browsers block its cookies. Proxying
     // the session routes keeps the refresh cookie first-party to this origin.
