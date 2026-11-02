@@ -370,7 +370,7 @@ export default function BankImportPanel({
     }
   }
 
-  // Transfers have no merchant or note in the entry form; they are named after the two accounts.
+  // Transfers have no merchant in the entry form; they are named after the two accounts.
   function transferName(targetId: string, pool: FinancialAccount[]): string {
     const label = (a?: FinancialAccount | null) => a?.nickname || a?.name || "";
     return `${label(account)} → ${label(pool.find((a) => a.id === targetId))}`;
@@ -399,7 +399,6 @@ export default function BankImportPanel({
             return {
               ...base,
               merchant: transferName(r.moveId, moveTargets),
-              note: undefined,
               kind: "account_move" as const,
               counter_account_id: r.moveId,
             };
@@ -408,7 +407,6 @@ export default function BankImportPanel({
             return {
               ...base,
               merchant: transferName(r.cardId, cards),
-              note: undefined,
               kind: "card_repayment" as const,
               counter_account_id: r.cardId,
             };
@@ -613,7 +611,7 @@ export default function BankImportPanel({
             </div>
             <div
               className={`grid grid-cols-1 gap-2 ${
-                isMove(r) || isCardPayment(r) ? "sm:grid-cols-[9rem]" : "sm:grid-cols-[9rem_1fr_1fr]"
+                isMove(r) || isCardPayment(r) ? "sm:grid-cols-[9rem_1fr]" : "sm:grid-cols-[9rem_1fr_1fr]"
               }`}
             >
               <input
@@ -624,24 +622,22 @@ export default function BankImportPanel({
                 className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
               {!isMove(r) && !isCardPayment(r) && (
-                <>
-                  <input
-                    value={r.merchant}
-                    onChange={(e) => patch(r.key, { merchant: e.target.value })}
-                    placeholder={t("merchant")}
-                    aria-label={t("merchant")}
-                    className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                  />
-                  <input
-                    value={r.note}
-                    onChange={(e) => patch(r.key, { note: e.target.value })}
-                    placeholder={t("note")}
-                    aria-label={t("note")}
-                    maxLength={200}
-                    className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                  />
-                </>
+                <input
+                  value={r.merchant}
+                  onChange={(e) => patch(r.key, { merchant: e.target.value })}
+                  placeholder={t("merchant")}
+                  aria-label={t("merchant")}
+                  className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                />
               )}
+              <input
+                value={r.note}
+                onChange={(e) => patch(r.key, { note: e.target.value })}
+                placeholder={t("note")}
+                aria-label={t("note")}
+                maxLength={200}
+                className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              />
             </div>
           </div>
         )}

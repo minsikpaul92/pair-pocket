@@ -1908,7 +1908,15 @@ export default function TransactionModal({
   );
 
   const detailFields = () => {
-    if (isTransfer || isEtransfer) return transferFields;
+    if (isTransfer || isEtransfer) {
+      // Internal transfers are named after their accounts, so only the note is offered.
+      return (
+        <>
+          {transferFields}
+          {!isEtransfer && merchantField}
+        </>
+      );
+    }
     if (isStock) return stockFields;
     if (isInvestment) {
       return (
