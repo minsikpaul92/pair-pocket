@@ -134,12 +134,14 @@ async def compute_stats(
     merchant: str | None = None,
     institution: str | None = None,
     exclude_categories: list[str] | None = None,
+    exclude_savings: bool = False,
 ) -> dict:
     """Aggregate income/expense totals with adjusted metrics.
 
     - adjusted_expense: total_expense − N빵 정산/환급 (actual out-of-pocket spend)
     - pure_consumption: total_expense − 투자/저축 (spending charts, excludes transfers)
     - exclude_categories: expense categories left out of every expense figure
+    - exclude_savings: leave out expenses paid from savings accounts (budget view)
     """
     excluded = {normalize_transfer_category(c) for c in (exclude_categories or [])}
     ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
@@ -161,6 +163,30 @@ async def compute_stats(
         **base_filter,
         "kind": {"$ne": TransactionKind.TRANSFER.value},
     }
+    if exclude_savings:
+        savings_ids = [
+            str(a["_id"])
+            async for a in db["accounts"].find(
+                {
+                    "kind": "savings",
+                    "owner_id": {"$in": ids},
+                    **shared_scope(account_type.value, shared_group_id),
+                },
+                {"_id": 1},
+            )
+        ]
+        if savings_ids:
+            stats_filter = {
+                "$and": [
+                    stats_filter,
+                    {
+                        "$or": [
+                            {"type": {"$ne": TransactionType.EXPENSE.value}},
+                            {"account_id": {"$nin": savings_ids}},
+                        ]
+                    },
+                ]
+            }
     pipeline = [
         {"$match": stats_filter},
         {

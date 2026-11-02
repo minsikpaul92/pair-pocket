@@ -89,6 +89,7 @@ async def stats_summary(
     merchant: str | None = None,
     institution: str | None = None,
     exclude_categories: list[str] = Query(default_factory=list),
+    exclude_savings: bool = False,
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
@@ -108,4 +109,5 @@ async def stats_summary(
         merchant=merchant,
         institution=institution,
         exclude_categories=exclude_categories,
+        exclude_savings=exclude_savings,
     )

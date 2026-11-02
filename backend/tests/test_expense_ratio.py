@@ -176,3 +176,41 @@ def test_hidden_entries_accept_sub_categories(env):
     )
     assert res.status_code == 200
     assert res.json()["expense_ratio_hidden_categories"] == ["주거/통신 › 월세/모기지"]
+
+
+def test_exclude_savings_drops_only_savings_expenses(env):
+    savings = run(
+        env.db.accounts.insert_one(
+            {"kind": "savings", "owner_id": env.user.id, "account_type": "personal"}
+        )
+    ).inserted_id
+    checking = run(
+        env.db.accounts.insert_one(
+            {"kind": "checking", "owner_id": env.user.id, "account_type": "personal"}
+        )
+    ).inserted_id
+    for account, amount in ((savings, 100), (checking, 30)):
+        run(
+            env.db.transactions.insert_one(
+                {
+                    "date": datetime(2026, 11, 2),
+                    "amount": amount,
+                    "currency": "CAD",
+                    "type": "expense",
+                    "account_type": "personal",
+                    "shared_group_id": None,
+                    "category": "식비",
+                    "sub_category": "외식",
+                    "merchant": "Shop",
+                    "kind": "normal",
+                    "owner_id": env.user.id,
+                    "account_id": str(account),
+                }
+            )
+        )
+    params = {"currency": "CAD", "month": "2026-11"}
+    assert env.client.get("/api/stats/summary", params=params).json()["total_expense"] == 130
+    body = env.client.get(
+        "/api/stats/summary", params={**params, "exclude_savings": "true"}
+    ).json()
+    assert body["total_expense"] == 30

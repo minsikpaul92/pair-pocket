@@ -890,6 +890,8 @@ export interface StatsFilters {
   institution?: string;
   /** Expense categories left out of every expense figure. */
   excludeCategories?: string[];
+  /** Leave out expenses paid from savings accounts (budget view). */
+  excludeSavings?: boolean;
 }
 
 export async function fetchStatsSummary(
@@ -908,6 +910,7 @@ export async function fetchStatsSummary(
   for (const c of filters.excludeCategories ?? []) {
     params.append("exclude_categories", c);
   }
+  if (filters.excludeSavings) params.set("exclude_savings", "true");
 
   const res = await apiFetch(
     `${API_BASE_URL}/api/stats/summary?${params.toString()}`,

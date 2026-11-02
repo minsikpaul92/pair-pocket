@@ -200,6 +200,7 @@ export default function DashboardView({
           month: monthStr,
           accountType,
           excludeCategories: excluded,
+          excludeSavings: true,
         }).catch(() => null)
       );
       worthJobs.push(
@@ -217,6 +218,7 @@ export default function DashboardView({
           month: monthStr,
           accountType,
           excludeCategories: excluded,
+          excludeSavings: true,
         }).catch(() => null)
       );
       worthJobs.push(
@@ -281,6 +283,7 @@ export default function DashboardView({
           month: prevMonth,
           accountType,
           excludeCategories: excluded,
+          excludeSavings: true,
         }).catch(() => null)
       )
     ).then((list) => {

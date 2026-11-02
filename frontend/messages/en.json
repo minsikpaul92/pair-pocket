@@ -1205,6 +1205,10 @@
   },
   "whatsNew": {
     "items": {
+      "budgetExcludesSavings": {
+        "title": "Budget no longer counts savings spending",
+        "description": "The dashboard budget and spending now leave out money paid from savings accounts and only count checking and card spending."
+      },
       "subscriptionFromEntry": {
         "title": "Turn a subscription entry into a fixed expense",
         "description": "After you save a Culture / hobbies > Subscriptions entry, from the entry form or a bank import, you can add it to Fixed expenses in one tap. It repeats from next month, so this month is not counted twice."
