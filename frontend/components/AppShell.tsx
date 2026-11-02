@@ -1104,6 +1104,7 @@ export default function AppShell({ user, onLogout }: Props) {
           ) : view === "list" ? (
             <ListView
               scope={scope}
+              accountType={accountType}
               presets={presets}
               transactions={transactions}
               pendingOccurrences={pendingOccurrences}

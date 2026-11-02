@@ -244,6 +244,8 @@
     "hiddenCategoriesNote": "{count, plural, one {# category} other {# categories}} hidden in Settings."
   },
   "list": {
+    "allAccounts": "All accounts",
+    "account": "Account",
     "allCategories": "All categories",
     "allSubCategories": "All sub-categories",
     "searchMerchant": "Search merchant",
@@ -760,7 +762,7 @@
     "autoTitle": "Ready to save",
     "autoHint": "Matched to your past entries or confidently suggested.",
     "duplicateTitle": "Already in the app",
-    "duplicateHint": "Skipped. Check one only to save it anyway.",
+    "duplicateHint": "Skipped. Compare each with the entry shown, and check a row to save it anyway.",
     "merchant": "Merchant",
     "category": "Category",
     "subCategory": "Subcategory",
@@ -769,10 +771,20 @@
     "needsChoice": "Choose a category, or a card for a card payment.",
     "waiting": "{count} entries still need your check.",
     "save": "Save {count}",
+    "cancel": "Cancel",
+    "fileRows": "{count, plural, one {# row} other {# rows}}",
+    "changeFile": "Change",
+    "removeFile": "Remove file",
+    "cancelConfirm": "Discard this analysis? Nothing has been saved yet.",
     "cardSideNote": "Card payment. It is recorded from the bank side, so it is left out here.",
-    "transferNote": "Transfer between accounts. Save it as income or expense only if it is not your own account.",
+    "transferNote": "Transfer between accounts. If it goes to your own account, choose that account below.",
+    "transferInNote": "Transfer between accounts. If it came from your own account, it is entered from that account. Save it as income only if it is not yours.",
+    "ownMove": "Transfer to my own account",
+    "moveTarget": "Receiving account",
+    "pickMoveTarget": "Choose the account",
+    "matchedEntry": "Already entered: {merchant} on {date} ({amount})",
     "etransferNote": "e-Transfer. Choose whether it is income or an expense.",
-    "similarTo": "Looks like {merchant} on {date}"
+    "similarTo": "Looks like {merchant} on {date} ({amount})"
 },
   "scanQueue": {
     "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
@@ -1172,6 +1184,10 @@
   },
   "whatsNew": {
     "items": {
+      "importPolish": {
+        "title": "Easier statement import and a filter by account",
+        "description": "Statement import now shows which entry a skipped row matched, lets you save a transfer to your own account as a move, and has a Cancel button. The list can be filtered by account or card."
+      },
       "bankStatementImport": {
         "title": "Import your bank statement",
         "description": "Upload a CSV from your bank under Import. Entries you already added are skipped, and categories are suggested for the rest, so you only check the unsure ones."

@@ -12,7 +12,11 @@ from pydantic import BaseModel, Field
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.account import FinancialAccountKind
-from app.models.ledger import TRANSFER_CATEGORY, TRANSFER_SUB_CARD_REPAYMENT
+from app.models.ledger import (
+    TRANSFER_CATEGORY,
+    TRANSFER_SUB_ACCOUNT_TRANSFER,
+    TRANSFER_SUB_CARD_REPAYMENT,
+)
 from app.models.transaction import AccountType, Currency, TransactionCreate, TransactionType
 from app.models.user import UserOut
 from app.routers.settings import _get_or_create, _parse_custom
@@ -96,6 +100,8 @@ async def preview_bank_csv(
             },
             "$or": [
                 {"account_id": account_id},
+                # A transfer entered from the other account's side.
+                {"counter_account_id": account_id},
                 {"account_id": None},
                 {"account_id": {"$exists": False}},
             ],
@@ -166,7 +172,8 @@ class ImportItem(BaseModel):
     category: str = ""
     sub_category: str = ""
     # card_repayment: money from this bank account paying off a card account.
-    kind: Literal["normal", "card_repayment"] = "normal"
+    # account_move: money from this account into another of the user's accounts.
+    kind: Literal["normal", "card_repayment", "account_move"] = "normal"
     counter_account_id: str | None = None
     note: str | None = Field(default=None, max_length=200)
 
@@ -194,6 +201,22 @@ def _payload(account: dict, item: ImportItem) -> TransactionCreate:
             type=TransactionType.EXPENSE,
             category=TRANSFER_CATEGORY,
             sub_category=TRANSFER_SUB_CARD_REPAYMENT,
+            counter_account_id=item.counter_account_id,
+        )
+    if item.kind == "account_move":
+        if (
+            item.direction != "out"
+            or not item.counter_account_id
+            or item.counter_account_id == str(account["_id"])
+        ):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "Account move needs another account"
+            )
+        return TransactionCreate(
+            **base,
+            type=TransactionType.EXPENSE,
+            category=TRANSFER_CATEGORY,
+            sub_category=TRANSFER_SUB_ACCOUNT_TRANSFER,
             counter_account_id=item.counter_account_id,
         )
     if item.category == TRANSFER_CATEGORY:

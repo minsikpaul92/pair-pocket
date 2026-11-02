@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, FileSpreadsheet, Loader2, UploadCloud } from "lucide-react";
+import { Check, ChevronDown, FileSpreadsheet, Loader2, UploadCloud, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Dropdown from "@/components/ui/dropdown";
 import {
@@ -40,6 +40,8 @@ interface RowState {
   subCategory: string;
   cardPayment: boolean;
   cardId: string;
+  accountMove: boolean;
+  moveId: string;
 }
 
 const SAVED_KEY = "pairpocket.bankImportSaved";
@@ -59,6 +61,8 @@ function initialState(row: BankPreviewRow, cards: FinancialAccount[]): RowState 
     subCategory: s?.sub_category ?? "",
     cardPayment: isBankSideCardPayment,
     cardId: cards.length === 1 ? cards[0].id : "",
+    accountMove: row.hint === "account_transfer" && row.direction === "out",
+    moveId: "",
   };
 }
 
@@ -87,6 +91,22 @@ export default function BankImportPanel({
     }
   });
   const [dragging, setDragging] = useState(false);
+  const [fileRows, setFileRows] = useState<number | null>(null);
+
+  useEffect(() => {
+    setFileRows(null);
+    if (!file) return;
+    let cancelled = false;
+    file
+      .text()
+      .then((text) => {
+        if (!cancelled) setFileRows(text.split(/\r?\n/).filter((l) => l.trim()).length);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [file]);
   const [preview, setPreview] = useState<BankPreview | null>(null);
   const [rows, setRows] = useState<RowState[]>([]);
 
@@ -119,6 +139,9 @@ export default function BankImportPanel({
     [accounts, account?.currency]
   );
   const currency: Currency = account?.currency ?? "CAD";
+  const moveTargets = accounts.filter(
+    (a) => a.id !== accountId && a.currency === currency
+  );
 
   async function analyze() {
     if (!file || !accountId) return;
@@ -179,6 +202,7 @@ export default function BankImportPanel({
 
   function isComplete(r: RowState): boolean {
     if (r.cardPayment) return Boolean(r.cardId);
+    if (r.accountMove) return Boolean(r.moveId);
     return Boolean(r.category && r.subCategory && r.merchant.trim());
   }
 
@@ -188,6 +212,20 @@ export default function BankImportPanel({
     (r) => r.row.bucket === "review" && !r.include
   ).length;
 
+  function cancel() {
+    if (chosen.length > 0 && !window.confirm(t("cancelConfirm"))) return;
+    setPreview(null);
+    setRows([]);
+    setFile(null);
+    setError(null);
+  }
+
+  function moveName(targetId: string): string {
+    const label = (a?: FinancialAccount | null) => a?.nickname || a?.name || "";
+    const target = accounts.find((a) => a.id === targetId);
+    return `${label(account)} → ${label(target)}`;
+  }
+
   async function save() {
     if (!preview || chosen.length === 0 || incomplete > 0) return;
     setBusy(true);
@@ -196,7 +234,16 @@ export default function BankImportPanel({
       const result = await commitBankRows(
         preview.account_id,
         chosen.map((r) =>
-          r.cardPayment
+          r.accountMove
+            ? {
+                date: r.row.date,
+                amount: r.row.amount,
+                direction: r.row.direction,
+                merchant: moveName(r.moveId),
+                kind: "account_move" as const,
+                counter_account_id: r.moveId,
+              }
+            : r.cardPayment
             ? {
                 date: r.row.date,
                 amount: r.row.amount,
@@ -237,19 +284,33 @@ export default function BankImportPanel({
     const { row } = r;
     const options = categoryOptions(row.direction);
     const subs = options.find((g) => g.category === r.category)?.sub_categories ?? [];
-    const note =
+    const hintNote =
       row.hint === "card_repayment" && row.direction === "in"
         ? t("cardSideNote")
         : row.hint === "account_transfer"
-          ? t("transferNote")
+          ? row.direction === "out"
+            ? t("transferNote")
+            : t("transferInNote")
           : row.hint === "e_transfer"
             ? t("etransferNote")
-            : row.match && row.bucket !== "auto"
-              ? t("similarTo", {
-                  merchant: row.match.merchant ?? "",
-                  date: row.match.date,
-                })
-              : null;
+            : null;
+    const matchAmount =
+      row.match?.amount != null ? formatAmount(row.match.amount, currency) : "";
+    const matchNote = row.match
+      ? row.bucket === "duplicate"
+        ? t("matchedEntry", {
+            merchant: row.match.merchant ?? "",
+            date: row.match.date,
+            amount: matchAmount,
+          })
+        : row.bucket !== "auto"
+          ? t("similarTo", {
+              merchant: row.match.merchant ?? "",
+              date: row.match.date,
+              amount: matchAmount,
+            })
+          : null
+      : null;
     return (
       <li
         key={row.index}
@@ -281,10 +342,42 @@ export default function BankImportPanel({
             {formatAmount(row.amount, currency)}
           </span>
         </label>
-        {note && (
-          <p className="text-[11px] text-amber-600 dark:text-amber-400">{note}</p>
+        {hintNote && (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400">{hintNote}</p>
         )}
-        {editable && r.include && (
+        {matchNote && (
+          <p
+            className={`text-[11px] font-semibold ${
+              row.bucket === "duplicate"
+                ? "text-gray-600 dark:text-gray-300"
+                : "text-amber-600 dark:text-amber-400"
+            }`}
+          >
+            {matchNote}
+          </p>
+        )}
+        {editable && row.hint === "account_transfer" && row.direction === "out" && (
+          <label className="flex items-center gap-2 text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+            <input
+              type="checkbox"
+              checked={r.accountMove}
+              onChange={(e) => patch(row.index, { accountMove: e.target.checked })}
+              className="rounded text-indigo-600"
+            />
+            {t("ownMove")}
+          </label>
+        )}
+        {editable && r.include && r.accountMove && (
+          <Dropdown
+            value={r.moveId}
+            onChange={(v) => patch(row.index, { moveId: v })}
+            ariaLabel={t("moveTarget")}
+            placeholder={t("pickMoveTarget")}
+            size="sm"
+            options={moveTargets.map((a) => ({ value: a.id, label: accountPickerLabel(a) }))}
+          />
+        )}
+        {editable && r.include && !r.accountMove && (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <input
               value={r.merchant}
@@ -361,7 +454,7 @@ export default function BankImportPanel({
           <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
         </summary>
         <ul className="mt-3 space-y-2">
-          {list.map((r) => renderRow(r, bucket !== "duplicate"))}
+          {list.map((r) => renderRow(r, true))}
         </ul>
       </details>
     );
@@ -404,22 +497,63 @@ export default function BankImportPanel({
           className={`flex min-h-[130px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition-all ${
             dragging
               ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/20"
-              : "border-gray-300 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/10"
+              : file
+                ? "border-emerald-300 bg-emerald-50/30 dark:border-emerald-800 dark:bg-emerald-950/10"
+                : "border-gray-300 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/10"
           }`}
         >
-          <UploadCloud className="h-7 w-7 text-gray-400" />
-          <span className="max-w-full truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
-            {file ? file.name : t("dropHere")}
-          </span>
-          <label className="cursor-pointer rounded-lg bg-gray-100 px-3.5 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-white">
-            {t("choose")}
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              onChange={(e) => pickFile(e.target.files?.[0])}
-              className="hidden"
-            />
-          </label>
+          {file ? (
+            <div className="flex w-full items-center gap-3 text-left">
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+                <FileSpreadsheet className="h-6 w-6" />
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </span>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-semibold text-gray-800 dark:text-gray-100">
+                  {file.name}
+                </span>
+                <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+                  CSV · {Math.max(1, Math.round(file.size / 1024))} KB
+                  {fileRows !== null ? ` · ${t("fileRows", { count: fileRows })}` : ""}
+                </span>
+              </span>
+              <label className="shrink-0 cursor-pointer rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-white">
+                {t("changeFile")}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => pickFile(e.target.files?.[0])}
+                  className="hidden"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setFile(null)}
+                aria-label={t("removeFile")}
+                className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <UploadCloud className="h-7 w-7 text-gray-400" />
+              <span className="max-w-full truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
+                {t("dropHere")}
+              </span>
+              <label className="cursor-pointer rounded-lg bg-gray-100 px-3.5 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-white">
+                {t("choose")}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => pickFile(e.target.files?.[0])}
+                  className="hidden"
+                />
+              </label>
+            </>
+          )}
         </div>
         <button
           type="button"
@@ -462,15 +596,25 @@ export default function BankImportPanel({
                 {t("waiting", { count: waiting })}
               </p>
             )}
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={busy || chosen.length === 0 || incomplete > 0}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("save", { count: chosen.length })}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={cancel}
+                disabled={busy}
+                className="shrink-0 rounded-xl bg-gray-100 px-4 py-3 text-xs font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={busy || chosen.length === 0 || incomplete > 0}
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {t("save", { count: chosen.length })}
+              </button>
+            </div>
           </div>
         </>
       )}

@@ -306,3 +306,42 @@ def test_undo_is_blocked_once_an_entry_is_settled(env, client):
     saved = run(env.db.transactions.find_one({}))
     run(env.db.transactions.insert_one({"owner_id": saved["owner_id"], "settles_expense_id": str(saved["_id"])}))
     assert client.delete(f"/api/import/bank/batch/{batch}").status_code == 409
+
+
+def _other_account(env):
+    other = {**env.accounts.personal, "_id": ObjectId(), "name": "other"}
+    run(env.db.accounts.insert_one(other))
+    return other
+
+
+def test_commit_account_move_is_a_transfer_to_the_other_account(env, client):
+    other = _other_account(env)
+    res = _commit(client, env.accounts.personal, [
+        {"date": "2026-10-20", "amount": 140, "direction": "out", "merchant": "A to B",
+         "kind": "account_move", "counter_account_id": str(other["_id"])}])
+    assert res.status_code == 201, res.text
+    saved = run(env.db.transactions.find_one({}))
+    assert saved["kind"] == "transfer" and saved["counter_account_id"] == str(other["_id"])
+    assert saved["sub_category"] == "내 계좌 이동"
+
+
+def test_commit_account_move_needs_another_account(env, client):
+    own = str(env.accounts.personal["_id"])
+    for counter in (None, own):
+        res = _commit(client, env.accounts.personal, [
+            {"date": "2026-10-20", "amount": 140, "direction": "out", "merchant": "x",
+             "kind": "account_move", "counter_account_id": counter}])
+        assert res.status_code == 422
+
+
+def test_transfer_entered_from_the_other_account_counts_as_entered(env, client):
+    other = _other_account(env)
+    run(env.db.transactions.insert_one({
+        "owner_id": env.users["owner"].id, "account_type": "personal", "currency": "CAD",
+        "type": "expense", "kind": "transfer", "category": "자산 이동/카드",
+        "sub_category": "내 계좌 이동", "date": datetime(2026, 10, 26), "amount": 335.17,
+        "merchant": "other to this", "account_id": str(other["_id"]),
+        "counter_account_id": str(env.accounts.personal["_id"]),
+    }))
+    rows = _post(client, env.accounts.personal, "2026-10-26,WO1 TFR-FR 6186275,,335.17,100\n").json()["rows"]
+    assert rows[0]["bucket"] == "duplicate" and rows[0]["match"]["merchant"] == "other to this"
