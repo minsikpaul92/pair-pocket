@@ -2243,7 +2243,7 @@ export default function TransactionModal({
               onClick={() => handleTypeChange("income")}
               className={`${segmentBase} ${
                 type === "income"
-                  ? "bg-white dark:bg-gray-700 text-blue-500 shadow-sm"
+                  ? "bg-white dark:bg-gray-700 text-blue-500 dark:text-blue-400 shadow-sm"
                   : "text-gray-500 dark:text-gray-400"
               }`}
             >
@@ -2667,7 +2667,7 @@ export default function TransactionModal({
                       ]);
                     }
                   }}
-                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold shrink-0"
+                  className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold shrink-0"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {tTx("itemsAdd")}
@@ -2760,7 +2760,7 @@ export default function TransactionModal({
                           },
                         ]);
                       }}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-0.5 ml-1"
+                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold flex items-center gap-0.5 ml-1"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       {tCommon("add")}
@@ -2768,7 +2768,7 @@ export default function TransactionModal({
                     <button
                       type="button"
                       onClick={() => setShowItems(false)}
-                      className="text-xs text-gray-500 hover:text-gray-700 font-semibold ml-1"
+                      className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold ml-1"
                     >
                       {tTx("itemsHide")}
                     </button>
