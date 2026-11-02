@@ -27,7 +27,6 @@ import {
   SUB_CATEGORY_SETTLEMENT,
   TRANSFER_CATEGORY,
   TRANSFER_SUB_CARD_REPAYMENT,
-  TRANSFER_SUB_ETRANSFER,
   TRANSFER_SUB_INVESTMENT_FUNDING,
   SettleableExpense,
   NewTransaction,
@@ -54,7 +53,6 @@ import {
   amountToInput,
   parseAmountInput,
   hasSettlement,
-  isEtransferSub,
   isNonCashflowTransaction,
   pairedTransferLedgers,
   normalizeTransferCategory,
@@ -515,10 +513,6 @@ export default function TransactionModal({
     category === TRANSFER_CATEGORY ? pairedTransferLedgers(normalizedSub) : null;
   const isLedgerTransfer = ledgerPair !== null;
   const otherLedger: AccountType = accountType === "personal" ? "shared" : "personal";
-  const isEtransfer =
-    type === "expense" &&
-    category === TRANSFER_CATEGORY &&
-    isEtransferSub(normalizedSub);
   const isCardRepayment =
     type === "expense" &&
     category === TRANSFER_CATEGORY &&
@@ -527,9 +521,9 @@ export default function TransactionModal({
     type === "expense" &&
     category === TRANSFER_CATEGORY &&
     subCategory === TRANSFER_SUB_INVESTMENT_FUNDING;
-  // From/to account UI for internal moves + ledger transfers (not e-Transfer).
+  // From/to account UI for internal moves + ledger transfers.
   const isTransfer =
-    (type === "expense" && category === TRANSFER_CATEGORY && !isEtransfer) ||
+    (type === "expense" && category === TRANSFER_CATEGORY) ||
     (type === "income" && isLedgerTransfer);
   const isTransferCategory =
     category === TRANSFER_CATEGORY && (type === "expense" || isLedgerTransfer);
@@ -560,7 +554,6 @@ export default function TransactionModal({
         "투자 계좌 이체",
         "공용 계좌 입금",
         "개인 계좌로 인출",
-        "e-Transfer",
       ]),
     []
   );
@@ -1300,12 +1293,7 @@ export default function TransactionModal({
       setError(tErrors("settlementExpenseRequired"));
       return;
     }
-    if (isEtransfer) {
-      if (!accountId) {
-        setError(tErrors("fromAccountRequired"));
-        return;
-      }
-    } else if (isTransfer) {
+    if (isTransfer) {
       if (!accountId) {
         setError(tErrors("fromAccountRequired"));
         return;
@@ -1367,8 +1355,7 @@ export default function TransactionModal({
       finalMerchant = `${stockName || finalTicker} (${finalTicker.toUpperCase()})`;
     }
 
-    const useTransferMerchant = isTransfer && !isEtransfer;
-    const payload: NewTransaction = {
+        const payload: NewTransaction = {
       date: `${dateStr}T00:00:00`,
       amount: numericAmount,
       currency: currentCurrency,
@@ -1376,15 +1363,14 @@ export default function TransactionModal({
       account_type: accountType,
       category,
       sub_category: normalizeTransferSubCategory(subCategory),
-      merchant: useTransferMerchant
+      merchant: isTransfer
         ? transferMerchant
         : finalMerchant || tCommon("unspecified"),
       institution: (isInvestment || isStock) ? finalInstitution : null,
       settles_expense_id: isSettlement ? settlesExpenseId : null,
       account_id: accountId || null,
-      counter_account_id:
-        isTransfer && !isEtransfer ? counterAccountId || null : null,
-      kind: isTransfer && !isLedgerTransfer && !isEtransfer ? "transfer" : "normal",
+      counter_account_id: isTransfer ? counterAccountId || null : null,
+      kind: isTransfer && !isLedgerTransfer ? "transfer" : "normal",
       is_stock_trade: isStock,
       trade_type: isStock ? (isStockBuy ? "buy" : "sell") : undefined,
       ticker: isStock ? finalTicker.toUpperCase() : undefined,
@@ -1627,7 +1613,7 @@ export default function TransactionModal({
     </div>
   );
 
-  const transferFields = (isTransfer || isEtransfer) && (
+  const transferFields = isTransfer && (
     <div className="space-y-3">
       <div>
         <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -1650,59 +1636,41 @@ export default function TransactionModal({
           filterAccounts={fromAccountFilter}
         />
       </div>
-      {!isEtransfer && (
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            {isCardRepayment
-              ? tTx("repayCard")
-              : ledgerPair
-                ? tTx(ledgerPair[1] === "personal" ? "transferToPersonal" : "transferToShared")
-                : tTx("toAccount")}
-          </label>
-          <AccountSelect
-            accounts={transferToAccounts}
-            value={fromIsPrimary ? counterAccountId : accountId}
-            onChange={fromIsPrimary ? setCounterAccountId : pickAccount}
-            onRegister={() => {
-              setAccountRegisterTarget(fromIsPrimary ? "counter" : "primary");
-              setShowAccountRegister(true);
-            }}
-            disabled={accountsLoading || !subCategory}
-            allowNone={false}
-            placeholder={
-              isCardRepayment
-                ? tTx("selectCard")
-                : tTx("selectToAccount")
-            }
-            variant="field"
-            filterAccounts={toAccountFilter}
-          />
-        </div>
-      )}
-      {isEtransfer && (
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            {tTx("etransferRecipient")}
-          </label>
-          <input
-            type="text"
-            value={merchant}
-            onChange={(e) => setMerchant(e.target.value)}
-            placeholder={tTx("etransferRecipientPlaceholder")}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
-          />
-        </div>
-      )}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+          {isCardRepayment
+            ? tTx("repayCard")
+            : ledgerPair
+              ? tTx(ledgerPair[1] === "personal" ? "transferToPersonal" : "transferToShared")
+              : tTx("toAccount")}
+        </label>
+        <AccountSelect
+          accounts={transferToAccounts}
+          value={fromIsPrimary ? counterAccountId : accountId}
+          onChange={fromIsPrimary ? setCounterAccountId : pickAccount}
+          onRegister={() => {
+            setAccountRegisterTarget(fromIsPrimary ? "counter" : "primary");
+            setShowAccountRegister(true);
+          }}
+          disabled={accountsLoading || !subCategory}
+          allowNone={false}
+          placeholder={
+            isCardRepayment
+              ? tTx("selectCard")
+              : tTx("selectToAccount")
+          }
+          variant="field"
+          filterAccounts={toAccountFilter}
+        />
+      </div>
       <p className="text-xs text-gray-400">
-        {isEtransfer
-          ? tTx("transferNoteEtransfer")
-          : ledgerPair
-            ? tTx(
-                ledgerPair[0] === "personal"
-                  ? "transferNoteSharedFunding"
-                  : "transferNoteSharedWithdrawal"
-              )
-            : tTx("transferNote")}
+        {ledgerPair
+          ? tTx(
+              ledgerPair[0] === "personal"
+                ? "transferNoteSharedFunding"
+                : "transferNoteSharedWithdrawal"
+            )
+          : tTx("transferNote")}
       </p>
     </div>
   );
@@ -1929,12 +1897,12 @@ export default function TransactionModal({
   );
 
   const detailFields = () => {
-    if (isTransfer || isEtransfer) {
+    if (isTransfer) {
       // Internal transfers are named after their accounts, so only the note is offered.
       return (
         <>
           {transferFields}
-          {!isEtransfer && merchantField}
+          {merchantField}
         </>
       );
     }
@@ -2945,6 +2913,42 @@ export default function TransactionModal({
               {tTx("settlementPairNote")}
             </p>
           )}
+          {editingTransaction?.pair_kind === "settlement" &&
+            editingTransaction.origin && (
+              <div className="rounded-xl bg-blue-50 dark:bg-blue-500/10 px-3.5 py-2.5 text-xs">
+                <p className="font-semibold text-blue-600 dark:text-blue-400">
+                  {tTx("settlementOriginTitle")}
+                </p>
+                <p className="mt-1 flex items-baseline justify-between gap-3 text-gray-900 dark:text-white">
+                  <span className="min-w-0 truncate font-semibold">
+                    {editingTransaction.origin.merchant || tCommon("unspecified")}
+                  </span>
+                  <span className="shrink-0 whitespace-nowrap tabular-nums font-semibold">
+                    {formatAmount(
+                      editingTransaction.origin.amount,
+                      editingTransaction.origin.currency
+                    )}
+                  </span>
+                </p>
+                <p className="mt-0.5 text-gray-500 dark:text-gray-400">
+                  {new Intl.DateTimeFormat(locale, {
+                    year: "numeric",
+                    month: "numeric",
+                    day: "numeric",
+                  }).format(parseDate(editingTransaction.origin.date))}
+                  {" · "}
+                  {tAccountType(editingTransaction.origin.account_type)}
+                  {" · "}
+                  {translateCategory(editingTransaction.origin.category, tCategories)}
+                  {editingTransaction.origin.sub_category
+                    ? ` › ${translateSubCategory(
+                        editingTransaction.origin.sub_category,
+                        tSubCategories
+                      )}`
+                    : ""}
+                </p>
+              </div>
+            )}
           {error && <p className="text-sm text-red-500">{error}</p>}
 
           <div className="flex gap-2">

@@ -258,6 +258,8 @@
     "type": "구분",
     "noTransactions": "해당 조건의 거래가 없습니다.",
     "add": "추가하기",
+    "tabMove": "정산/이동",
+    "settlesOrigin": "원 거래: {merchant} · {date} · {amount}",
     "backToDashboard": "대시보드로 돌아가기",
     "searchMerchantOrNote": "사용처 / 노트 검색",
     "autocomplete": "자동완성",
@@ -334,6 +336,7 @@
     "settlementSelectReceiveAccount": "받는 계좌를 선택하세요",
     "settlementPaidHint": "{ledger} 가계부에 지출로 함께 기록되고, 이 지출은 정산된 만큼 줄어듭니다.",
     "settlementPairNote": "개인↔공유 정산으로 연결된 기록입니다. 금액·날짜·메모만 수정할 수 있고, 삭제하면 짝이 되는 기록도 함께 삭제됩니다.",
+    "settlementOriginTitle": "원 거래",
     "fromAccount": "출금 계좌",
     "selectFromAccount": "출금 계좌 선택",
     "toAccount": "입금 계좌",
@@ -341,12 +344,9 @@
     "repayCard": "상환할 카드",
     "selectCard": "카드 선택",
     "transferNote": "자산 이동/카드는 지출/수입 합계에 포함되지 않고, 계좌 잔액만 이동합니다.",
-    "transferNoteEtransfer": "다른 사람에게 보내는 송금입니다. 실제 지출로 집계됩니다.",
     "transferNoteSharedFunding": "개인 통장에서 공용 통장으로 옮깁니다. 개인은 지출, 공용은 수입으로 기록됩니다.",
     "sharedToAccount": "공용 입금 계좌",
     "selectSharedToAccount": "공용 계좌 선택",
-    "etransferRecipient": "받는 사람",
-    "etransferRecipientPlaceholder": "예: John, 월세 집주인",
     "addCategory": "새 대분류 추가",
     "addSubCategory": "새 중분류 추가",
     "addInstitution": "새 금융기관 추가",
@@ -512,7 +512,7 @@
     "sideBusiness": "부업",
     "resale": "중고거래",
     "tips": "팁(Tip)",
-    "splitSettlement": "N빵 정산/환급",
+    "splitSettlement": "정산/환급",
     "stockSale": "주식 판매수익",
     "dividends": "투자 배당금",
     "bankInterest": "은행 이자",
@@ -1237,6 +1237,10 @@
   },
   "whatsNew": {
     "items": {
+      "settlementMoveTab": {
+        "title": "목록에 정산/이동 탭이 생겼어요",
+        "description": "정산, 내 계좌 이동, 카드 대금 상환, 공용과 개인 사이 이체는 이제 지출과 수입이 아니라 정산/이동 탭에 모아 보여요. 공용과 개인 사이 정산은 눌러서 어떤 지출을 정산한 건지 바로 볼 수 있고, 결제가 끝난 구독 금액도 더는 빨갛게 보이지 않아요. e-Transfer 분류는 없어졌고, 일반 분류로 입력하면 돼요."
+      },
       "budgetCarryChoice": {
         "title": "달마다 지난달 초과분을 뺄지 고를 수 있어요",
         "description": "대시보드의 예산 카드를 누르면, 이번 달 예산에서 지난달 초과분을 뺄지 선택할 수 있어요. 빼지 않으면 설정한 예산 금액 그대로 한 달을 시작해요."

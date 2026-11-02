@@ -35,7 +35,6 @@ import {
   fetchUserSettings,
   formatAmount,
   formatAmountInput,
-  isEtransferSub,
   monthsBetweenDates,
   parseAmountInput,
   subCategoriesFor,
@@ -134,9 +133,7 @@ export default function SubscriptionRegisterModal({
   const [hasGeminiKey, setHasGeminiKey] = useState(false);
   const [aiHint, setAiHint] = useState<string | null>(null);
 
-  const isEtransfer =
-    category === TRANSFER_CATEGORY && isEtransferSub(subCategory);
-  const isTransfer = category === TRANSFER_CATEGORY && !isEtransfer;
+  const isTransfer = category === TRANSFER_CATEGORY;
 
   const transferFromAccounts = useMemo(() => {
     return accounts.filter((a) => !a.is_liability);

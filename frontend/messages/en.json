@@ -258,6 +258,8 @@
     "type": "Type",
     "noTransactions": "No transactions match these filters.",
     "add": "Add",
+    "tabMove": "Settle/Move",
+    "settlesOrigin": "Settles: {merchant} · {date} · {amount}",
     "backToDashboard": "Back to dashboard",
     "searchMerchantOrNote": "Search merchant / note",
     "autocomplete": "Autocomplete",
@@ -334,6 +336,7 @@
     "settlementSelectReceiveAccount": "Select an account",
     "settlementPaidHint": "Also recorded as an expense in the {ledger} ledger, and this expense shrinks by the settled amount.",
     "settlementPairNote": "This entry is linked to a personal/shared settlement. Only the amount, date and note can be changed, and deleting it also deletes its counterpart.",
+    "settlementOriginTitle": "Original expense",
     "fromAccount": "From account",
     "selectFromAccount": "Select source account",
     "toAccount": "To account",
@@ -341,12 +344,9 @@
     "repayCard": "Card to repay",
     "selectCard": "Select card",
     "transferNote": "Transfers are excluded from income/expense totals and only move account balances.",
-    "transferNoteEtransfer": "Sending money to someone else. Counts as a real expense.",
     "transferNoteSharedFunding": "Moves money from a personal account to a shared account. Recorded as an expense personally and as income on the shared ledger.",
     "sharedToAccount": "Shared destination account",
     "selectSharedToAccount": "Select shared account",
-    "etransferRecipient": "Recipient",
-    "etransferRecipientPlaceholder": "e.g. John, landlord",
     "addCategory": "Add category",
     "addSubCategory": "Add sub-category",
     "addInstitution": "Add institution",
@@ -512,7 +512,7 @@
     "sideBusiness": "Side business",
     "resale": "Resale",
     "tips": "Tips",
-    "splitSettlement": "Split settlement / refund",
+    "splitSettlement": "Settlement / refund",
     "stockSale": "Stock sale proceeds",
     "dividends": "Investment dividends",
     "bankInterest": "Bank interest",
@@ -1237,6 +1237,10 @@
   },
   "whatsNew": {
     "items": {
+      "settlementMoveTab": {
+        "title": "A Settle/Move tab in the list",
+        "description": "Settlements, moves between your accounts, card payments and transfers between shared and personal now sit in a Settle/Move tab instead of Expense and Income. Tap a settlement between ledgers to see which expense it paid, and paid subscriptions are no longer shown in red. The e-Transfer category is gone; use a regular category instead."
+      },
       "budgetCarryChoice": {
         "title": "Choose whether last month's overspend is deducted",
         "description": "Tap the budget card on the dashboard to choose whether last month's overspend is deducted from this month. If not, the month starts with your full budget."

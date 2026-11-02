@@ -108,11 +108,26 @@ class TransactionCreate(TransactionBase):
     linked_transaction_id: None = Field(default=None, exclude=True)
 
 
+class SettlementOrigin(BaseModel):
+    """The expense a settlement entry pays back, as shown on the settlement."""
+
+    id: str
+    date: datetime
+    amount: float
+    currency: Currency
+    account_type: AccountType
+    category: str
+    sub_category: str
+    merchant: str
+
+
 class TransactionOut(TransactionBase):
     id: str
     owner_id: str
     # "settlement" for the two entries of a settlement paid across ledgers.
     pair_kind: str | None = None
+    # Set on settlement entries when the user may see the settled expense.
+    origin: SettlementOrigin | None = None
 
 
 class CrossSettlementCreate(BaseModel):
