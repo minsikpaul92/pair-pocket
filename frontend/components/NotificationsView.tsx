@@ -20,6 +20,9 @@ import {
 
 type Tab = "alerts" | "whatsNew";
 
+/** How many What's New entries show before the older ones are folded. */
+const RECENT_WHATS_NEW = 7;
+
 interface Props {
   /** Called after any read change with the server's unread count. */
   onUnreadChange: (count: number) => void;
@@ -42,6 +45,9 @@ export default function NotificationsView({
   const [items, setItems] = useState<AppNotification[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [unseenNew, setUnseenNew] = useState(false);
+  // Read notifications leave the main list; History shows them again.
+  const [showHistory, setShowHistory] = useState(false);
+  const [showOlder, setShowOlder] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -89,6 +95,9 @@ export default function NotificationsView({
     day: "numeric",
   });
   const unread = items?.filter((n) => !n.is_read).length ?? 0;
+  const visible = (items ?? []).filter((n) => n.is_read === showHistory);
+  const recentNew = WHATS_NEW.slice(0, RECENT_WHATS_NEW);
+  const olderNew = WHATS_NEW.slice(RECENT_WHATS_NEW);
 
   return (
     <div className="space-y-4">
@@ -96,14 +105,30 @@ export default function NotificationsView({
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           {t("title")}
         </h2>
-        {tab === "alerts" && unread > 0 && (
-          <button
-            type="button"
-            onClick={readAll}
-            className="shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30"
-          >
-            {t("markAllRead")}
-          </button>
+        {tab === "alerts" && (
+          <div className="flex shrink-0 items-center gap-1">
+            {!showHistory && unread > 0 && (
+              <button
+                type="button"
+                onClick={readAll}
+                className="shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30"
+              >
+                {t("markAllRead")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowHistory((v) => !v)}
+              aria-pressed={showHistory}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                showHistory
+                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
+                  : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              }`}
+            >
+              {t(showHistory ? "backToNew" : "history")}
+            </button>
+          </div>
         )}
       </div>
 
@@ -140,13 +165,15 @@ export default function NotificationsView({
           <p className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
             {t("loadFailed")}
           </p>
-        ) : items && items.length === 0 ? (
+        ) : visible.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-            {t("empty")}
+            {showHistory
+              ? t("historyEmpty")
+              : t(items && items.length > 0 ? "emptyUnread" : "empty")}
           </p>
         ) : (
           <ul className="space-y-2">
-            {items?.map((n) => {
+            {visible.map((n) => {
               const actor = n.actor_name || t("partnerFallback");
               const category = translateCategory(n.category, tCategories);
               return (
@@ -194,29 +221,70 @@ export default function NotificationsView({
           </ul>
         )
       ) : (
-        <ul className="space-y-3">
-          {WHATS_NEW.map((entry) => (
-            <li
-              key={entry.id}
-              className="card-inset space-y-1.5 p-4"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="min-w-0 text-sm font-semibold text-gray-900 dark:text-white">
-                  {tNew(`items.${entry.id}.title`)}
-                </h3>
-                <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-gray-400">
-                  v{entry.version}
-                </span>
-              </div>
-              <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-                {tNew(`items.${entry.id}.description`)}
-              </p>
-              <p className="text-xs tabular-nums text-gray-400">
-                {dateFmt.format(new Date(`${entry.date}T00:00:00`))}
-              </p>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-3">
+          <ul className="space-y-3">
+            {recentNew.map((entry) => (
+              <li
+                key={entry.id}
+                className="card-inset space-y-1.5 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="min-w-0 text-sm font-semibold text-gray-900 dark:text-white">
+                    {tNew(`items.${entry.id}.title`)}
+                  </h3>
+                  <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-gray-400">
+                    v{entry.version}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+                  {tNew(`items.${entry.id}.description`)}
+                </p>
+                <p className="text-xs tabular-nums text-gray-400">
+                  {dateFmt.format(new Date(`${entry.date}T00:00:00`))}
+                </p>
+              </li>
+            ))}
+          </ul>
+          {olderNew.length > 0 && (
+            <>
+              {showOlder && (
+                <ul className="space-y-3">
+                  {olderNew.map((entry) => (
+                    <li
+                      key={entry.id}
+                      className="card-inset space-y-1.5 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="min-w-0 text-sm font-semibold text-gray-900 dark:text-white">
+                          {tNew(`items.${entry.id}.title`)}
+                        </h3>
+                        <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-gray-400">
+                          v{entry.version}
+                        </span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+                        {tNew(`items.${entry.id}.description`)}
+                      </p>
+                      <p className="text-xs tabular-nums text-gray-400">
+                        {dateFmt.format(new Date(`${entry.date}T00:00:00`))}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowOlder((v) => !v)}
+                aria-expanded={showOlder}
+                className="w-full whitespace-nowrap rounded-xl py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30"
+              >
+                {showOlder
+                  ? t("hideOlderUpdates")
+                  : t("showOlderUpdates", { count: olderNew.length })}
+              </button>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
