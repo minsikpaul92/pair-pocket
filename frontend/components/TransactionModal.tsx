@@ -15,6 +15,7 @@ import MerchantSelect from "@/components/MerchantSelect";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
+import Dropdown from "@/components/ui/dropdown";
 import SwipeableRow from "@/components/SwipeableRow";
 import {
   AccountType,
@@ -54,6 +55,7 @@ import {
   parseAmountInput,
   hasSettlement,
   isNonCashflowTransaction,
+  isSettlementTransaction,
   pairedTransferLedgers,
   normalizeTransferCategory,
   normalizeTransferSubCategory,
@@ -138,6 +140,9 @@ function convertCurrency(
   return amount;
 }
 
+/** Option value for settlements in the Settle/Move kind list; transfers use their sub-category name. */
+const MOVE_KIND_SETTLEMENT = "settlement";
+
 export default function TransactionModal({
   currency,
   taxPercent = 13,
@@ -174,6 +179,8 @@ export default function TransactionModal({
   const isEditing = Boolean(editingTransaction);
 
   const [type, setType] = useState<TransactionType>("expense");
+  /** The Settle/Move tab: settlements and transfers are picked by kind, not by category. */
+  const [moveTab, setMoveTab] = useState(false);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [subCategory, setSubCategory] = useState("");
@@ -465,39 +472,32 @@ export default function TransactionModal({
   );
   const ledgerTransfersAvailable = hasPartner || editingLedgerTransfer;
 
-  /**
-   * Personal ↔ shared transfers are entered as an expense in the sending
-   * ledger or as income in the receiving ledger; other transfer subs are
-   * expense-only.
-   */
-  const transferSubAllowed = useCallback(
-    (sub: string) => {
-      const pair = pairedTransferLedgers(sub);
-      if (!pair) return type === "expense";
-      if (!ledgerTransfersAvailable) return false;
-      const [outflow, inflow] = pair;
-      return type === "expense" ? accountType === outflow : accountType === inflow;
-    },
-    [type, accountType, ledgerTransfersAvailable]
+  const categoryOptions = useMemo(
+    () =>
+      categoriesForType(presets, type).filter(
+        (c) => c !== TRANSFER_CATEGORY && c !== INCOME_CATEGORY_SETTLEMENT
+      ),
+    [presets, type]
   );
 
-  const categoryOptions = useMemo(() => {
-    const raw = categoriesForType(presets, type);
-    if (type === "income") {
-      const hasReceivable = subCategoriesFor(presets, type, TRANSFER_CATEGORY).some(
-        transferSubAllowed
-      );
-      if (!hasReceivable) return raw.filter((c) => c !== TRANSFER_CATEGORY);
-    }
-    return raw;
-  }, [presets, type, transferSubAllowed]);
+  const subCategoryOptions = useMemo(
+    () => (category ? subCategoriesFor(presets, type, category) : []),
+    [presets, type, category]
+  );
 
-  const subCategoryOptions = useMemo(() => {
-    if (!category) return [];
-    const raw = subCategoriesFor(presets, type, category);
-    if (category === TRANSFER_CATEGORY) return raw.filter(transferSubAllowed);
-    return raw;
-  }, [presets, type, category, transferSubAllowed]);
+  /** Personal ↔ shared transfers are entered as an expense in the sending ledger, income in the receiving one. */
+  const moveKindOptions = useMemo(() => {
+    const transfers = subCategoriesFor(presets, "expense", TRANSFER_CATEGORY).filter(
+      (sub) => !pairedTransferLedgers(sub) || ledgerTransfersAvailable
+    );
+    return [MOVE_KIND_SETTLEMENT, ...transfers].map((value) => ({
+      value,
+      label: translateSubCategory(
+        value === MOVE_KIND_SETTLEMENT ? SUB_CATEGORY_SETTLEMENT : value,
+        tSubCategories
+      ),
+    }));
+  }, [presets, ledgerTransfersAvailable, tSubCategories]);
 
   const isInvestment =
     type === "expense" && category === EXPENSE_CATEGORY_INVESTMENT;
@@ -506,6 +506,13 @@ export default function TransactionModal({
     type === "income" &&
     category === INCOME_CATEGORY_SETTLEMENT &&
     subCategory === SUB_CATEGORY_SETTLEMENT;
+
+  const moveKind =
+    category === TRANSFER_CATEGORY
+      ? normalizeTransferSubCategory(subCategory)
+      : isSettlement
+        ? MOVE_KIND_SETTLEMENT
+        : "";
 
   const normalizedSub = normalizeTransferSubCategory(subCategory);
   // (sending ledger, receiving ledger) for personal ↔ shared transfers.
@@ -842,6 +849,7 @@ export default function TransactionModal({
     if (!editingTransaction) {
       if (hydratedEditId !== null) {
         setType("expense");
+        setMoveTab(false);
         setAmount("");
         setCategory("");
         setSubCategory("");
@@ -876,6 +884,10 @@ export default function TransactionModal({
 
     const tx = editingTransaction;
     setType(tx.type);
+    setMoveTab(
+      normalizeTransferCategory(tx.category) === TRANSFER_CATEGORY ||
+        isSettlementTransaction(tx)
+    );
     setAmount(amountToInput(tx.amount, tx.currency));
     setCategory(normalizeTransferCategory(tx.category));
     setSubCategory(normalizeTransferSubCategory(tx.sub_category || ""));
@@ -1193,13 +1205,33 @@ export default function TransactionModal({
     };
   }, [isSettlement, isEditing, hasPartner, currency, otherLedger]);
 
-  function handleTypeChange(next: TransactionType) {
+  function handleTypeChange(next: TransactionType, move = false) {
     setType(next);
+    setMoveTab(move);
     setCategory("");
     setSubCategory("");
     setSettlesExpenseId("");
     setMerchant("");
     setInstitution("");
+    setError(null);
+  }
+
+  function handleMoveKindChange(next: string) {
+    setSettlesExpenseId("");
+    setMerchantHints([]);
+    setInstitution("");
+    if (next === MOVE_KIND_SETTLEMENT) {
+      setType("income");
+      setCategory(INCOME_CATEGORY_SETTLEMENT);
+      setSubCategory(SUB_CATEGORY_SETTLEMENT);
+    } else {
+      const pair = pairedTransferLedgers(next);
+      setType(pair && accountType === pair[1] ? "income" : "expense");
+      setCategory(TRANSFER_CATEGORY);
+      setSubCategory(next);
+    }
+    // Keep saved transfer accounts when editing; only clear on create.
+    if (!isEditing) setCounterAccountId(ACCOUNT_NONE);
     setError(null);
   }
 
@@ -1484,7 +1516,7 @@ export default function TransactionModal({
   }
 
   const segmentBase =
-    "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors";
+    "flex-1 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors";
 
   const settlementField = isSettlement && (
     <div>
@@ -2199,7 +2231,7 @@ export default function TransactionModal({
               type="button"
               onClick={() => handleTypeChange("expense")}
               className={`${segmentBase} ${
-                type === "expense"
+                !moveTab && type === "expense"
                   ? "bg-white dark:bg-gray-700 text-red-500 shadow-sm"
                   : "text-gray-500 dark:text-gray-400"
               }`}
@@ -2210,12 +2242,23 @@ export default function TransactionModal({
               type="button"
               onClick={() => handleTypeChange("income")}
               className={`${segmentBase} ${
-                type === "income"
+                !moveTab && type === "income"
                   ? "bg-white dark:bg-gray-700 text-blue-500 dark:text-blue-400 shadow-sm"
                   : "text-gray-500 dark:text-gray-400"
               }`}
             >
               {tCommon("income")}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTypeChange("expense", true)}
+              className={`${segmentBase} ${
+                moveTab
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              {tTx("typeMove")}
             </button>
           </div>
 
@@ -2423,7 +2466,7 @@ export default function TransactionModal({
             </div>
           )}
 
-          {!isTransfer && (
+          {!isTransfer && !(moveTab && !moveKind) && (
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
                 {tTx("merchant")}
@@ -2440,33 +2483,50 @@ export default function TransactionModal({
             </div>
           )}
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {tTx("category")}
-            </label>
-            <CategorySelect
-              categories={categoryOptions}
-              value={category}
-              onChange={handleCategoryChange}
-              onAdd={handleAddCategory}
-            />
-          </div>
+          {moveTab ? (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("moveKind")}
+              </label>
+              <Dropdown
+                value={moveKind}
+                options={moveKindOptions}
+                onChange={handleMoveKindChange}
+                ariaLabel={tTx("moveKind")}
+                placeholder={tTx("moveKindPlaceholder")}
+              />
+            </div>
+          ) : (
+            <>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("category")}
+              </label>
+              <CategorySelect
+                categories={categoryOptions}
+                value={category}
+                onChange={handleCategoryChange}
+                onAdd={handleAddCategory}
+              />
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {tTx("subCategory")}
-            </label>
-            <SubCategorySelect
-              options={subCategoryOptions}
-              value={subCategory}
-              onChange={handleSubCategoryChange}
-              onAdd={handleAddSubCategory}
-              disabled={!category}
-              placeholder={
-                category ? tTx("selectSubCategory") : tTx("selectSubCategoryFirst")
-              }
-            />
-          </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("subCategory")}
+              </label>
+              <SubCategorySelect
+                options={subCategoryOptions}
+                value={subCategory}
+                onChange={handleSubCategoryChange}
+                onAdd={handleAddSubCategory}
+                disabled={!category}
+                placeholder={
+                  category ? tTx("selectSubCategory") : tTx("selectSubCategoryFirst")
+                }
+              />
+            </div>
+            </>
+          )}
 
           {detailFields()}
 
