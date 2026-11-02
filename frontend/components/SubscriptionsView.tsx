@@ -29,6 +29,7 @@ import {
   skipSubscriptionOccurrence,
   subscriptionDisplayAmount,
   subscriptionScheduleAmountClass,
+  SubscriptionDraft,
 } from "@/lib/api";
 import { monthKey } from "@/lib/date";
 import {
@@ -52,6 +53,10 @@ interface Props {
   focusSubscriptionId?: string | null;
   focusCancelAction?: boolean;
   onFocusHandled?: () => void;
+  /** The next saved entry to turn into a subscription, if any. */
+  draft?: SubscriptionDraft | null;
+  /** Called when the form for `draft` is closed or saved, so the next one can open. */
+  onDraftDone?: () => void;
   onChanged: () => void;
   onPresetsChange: (presets: CategoryPresets) => void;
 }
@@ -230,6 +235,8 @@ export default function SubscriptionsView({
   focusSubscriptionId = null,
   focusCancelAction = false,
   onFocusHandled,
+  draft = null,
+  onDraftDone,
   onChanged,
   onPresetsChange,
 }: Props) {
@@ -337,10 +344,25 @@ export default function SubscriptionsView({
     }
   }
 
+  const [activeDraft, setActiveDraft] = useState<SubscriptionDraft | null>(null);
+
+  useEffect(() => {
+    if (!draft || !presets) return;
+    setEditing(null);
+    setInitialParse(null);
+    setRegisterCurrency(draft.currency);
+    setActiveDraft(draft);
+    setShowRegister(true);
+  }, [draft, presets]);
+
   function closeModal() {
     setShowRegister(false);
     setEditing(null);
     setInitialParse(null);
+    if (activeDraft) {
+      setActiveDraft(null);
+      onDraftDone?.();
+    }
   }
 
   async function handleSubCameraFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -634,6 +656,7 @@ export default function SubscriptionsView({
           presets={presets}
           editing={editing}
           initialParse={initialParse}
+          draft={activeDraft}
           userEmail={userEmail}
           onClose={closeModal}
           onSaved={() => {

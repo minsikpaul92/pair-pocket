@@ -30,6 +30,7 @@ import {
   fetchOCRLogs,
   updateOCRLogFeedback,
   OCRLog,
+  SubscriptionDraft,
 } from "@/lib/api";
 import {
   YearMonth,
@@ -82,6 +83,8 @@ interface Props {
   /** Month shown in the app header; the export range starts there. */
   month: Date;
   onChanged: () => void;
+  /** Saved rows that repeat, offered for registration as subscriptions. */
+  onSubscriptions?: (drafts: SubscriptionDraft[]) => void;
 }
 
 interface EditableTransaction {
@@ -106,7 +109,14 @@ interface EditableTransaction {
   note: string;
 }
 
-export default function ImportView({ scope, accountType, presets, month, onChanged }: Props) {
+export default function ImportView({
+  scope,
+  accountType,
+  presets,
+  month,
+  onChanged,
+  onSubscriptions,
+}: Props) {
   const t = useTranslations("importPage");
   const tCommon = useTranslations("common");
   const tAccountType = useTranslations("accountType");
@@ -687,6 +697,7 @@ export default function ImportView({ scope, accountType, presets, month, onChang
           accountType={accountType}
           presets={presets}
           onChanged={onChanged}
+          onSubscriptions={onSubscriptions}
         />
       )}
 
