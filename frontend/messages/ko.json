@@ -788,6 +788,7 @@
     "moveSameLedgerIn": "같은 가계부 안의 이동은 보내는 계좌 쪽에서 입력해요. 이 내역은 선택을 해제하세요.",
     "workingOn": "{name} 정리 중",
     "keep": "아니요",
+    "date": "날짜",
     "cancel": "취소",
     "fileRows": "{count}행",
     "changeFile": "다른 파일",

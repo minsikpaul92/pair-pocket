@@ -788,6 +788,7 @@
     "moveSameLedgerIn": "A move inside one ledger is entered from the sending account. Uncheck this row.",
     "workingOn": "Working on {name}",
     "keep": "No",
+    "date": "Date",
     "cancel": "Cancel",
     "fileRows": "{count, plural, one {# row} other {# rows}}",
     "changeFile": "Change",

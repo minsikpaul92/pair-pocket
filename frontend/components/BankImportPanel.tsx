@@ -47,6 +47,8 @@ interface RowState {
   include: boolean;
   merchant: string;
   note: string;
+  /** Posting date from the statement; editable because a card can post later than the purchase. */
+  date: string;
   category: string;
   subCategory: string;
   cardId: string;
@@ -78,6 +80,7 @@ function initialState(row: BankPreviewRow, cards: FinancialAccount[]): RowState 
     include: row.bucket === "auto",
     merchant: s?.merchant ?? row.description,
     note: "",
+    date: row.date,
     category,
     subCategory,
     cardId: cards.length === 1 ? cards[0].id : "",
@@ -256,7 +259,7 @@ export default function BankImportPanel({
       if (r.row.direction === "in" && sameLedgerTarget(r.moveId)) return false;
       return Boolean(r.moveId && r.merchant.trim());
     }
-    return Boolean(r.category && r.subCategory && r.merchant.trim());
+    return Boolean(r.category && r.subCategory && r.merchant.trim() && r.date);
   }
 
   const chosen = rows.filter((r) => r.include && r.bucket !== "duplicate");
@@ -321,7 +324,7 @@ export default function BankImportPanel({
         preview.account_id,
         chosen.map((r) => {
           const base = {
-            date: r.row.date,
+            date: r.date || r.row.date,
             amount: r.row.amount,
             direction: r.row.direction,
             merchant: r.merchant.trim(),
@@ -500,7 +503,14 @@ export default function BankImportPanel({
                 />
               )}
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[9rem_1fr_1fr]">
+              <input
+                type="date"
+                value={r.date}
+                onChange={(e) => patch(row.index, { date: e.target.value })}
+                aria-label={t("date")}
+                className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              />
               <input
                 value={r.merchant}
                 onChange={(e) => patch(row.index, { merchant: e.target.value })}
