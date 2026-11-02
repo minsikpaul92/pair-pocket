@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, FileSpreadsheet, Loader2, UploadCloud, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { isApiError } from "@/lib/errors";
 import Dropdown from "@/components/ui/dropdown";
 import {
   AccountType,
@@ -10,6 +11,7 @@ import {
   BankPreviewRow,
   CategoryPresets,
   Currency,
+  INCOME_CATEGORY_SETTLEMENT,
   FinancialAccount,
   LedgerScope,
   TRANSFER_CATEGORY,
@@ -274,8 +276,11 @@ export default function BankImportPanel({
       ? [TRANSFER_SUB_ACCOUNT_TRANSFER, TRANSFER_SUB_CARD_REPAYMENT]
       : [TRANSFER_SUB_ACCOUNT_TRANSFER];
   }
+  // A settlement must name the expense it settles, which an import cannot do.
   function categoryOptions(direction: "out" | "in") {
-    return direction === "out" ? groups.expense : groups.income;
+    return direction === "out"
+      ? groups.expense
+      : groups.income.filter((g) => g.category !== INCOME_CATEGORY_SETTLEMENT);
   }
 
   function isComplete(r: RowState): boolean {
@@ -285,6 +290,7 @@ export default function BankImportPanel({
       if (r.row.direction === "in" && sameLedgerTarget(r.moveId)) return false;
       return Boolean(r.moveId && r.merchant.trim());
     }
+    if (r.category === INCOME_CATEGORY_SETTLEMENT) return false;
     return Boolean(r.category && r.subCategory && r.merchant.trim() && r.date);
   }
 
@@ -399,8 +405,13 @@ export default function BankImportPanel({
       setFile(null);
       setSourceName("");
       onChanged();
-    } catch {
-      setError(t("saveFailed"));
+    } catch (err) {
+      // The server says why (for example a category that needs more detail).
+      setError(
+        err instanceof Error && !isApiError(err)
+          ? `${t("saveFailed")} ${err.message}`
+          : t("saveFailed")
+      );
     } finally {
       setBusy(false);
     }

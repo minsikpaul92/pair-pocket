@@ -437,3 +437,14 @@ def test_set_aside_row_size_is_limited(env, as_user):
     res = as_user("owner").post(
         "/api/import/bank/pending", json={"account_id": str(env.accounts.personal["_id"]), "state": big})
     assert res.status_code == 413
+
+
+def test_settlement_category_is_never_suggested(env, client):
+    run(env.db.transactions.insert_one({
+        "owner_id": env.users["owner"].id, "account_type": "personal", "currency": "CAD",
+        "type": "income", "kind": "normal", "category": "정산", "sub_category": "N빵 정산/환급",
+        "date": datetime(2026, 9, 1), "amount": 5, "merchant": "Bank Rebate",
+    }))
+    rows = _post(client, env.accounts.personal, "2026-10-01,BANK REBATE,,17.95,100\n").json()["rows"]
+    suggestion = rows[0]["suggestion"]
+    assert suggestion is None or suggestion["category"] != "정산"

@@ -10,6 +10,7 @@ from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.models.category_preset import INCOME_CATEGORY_SETTLEMENT
 from app.models.ledger import TRANSFER_CATEGORY
 from app.models.transaction import TransactionType
 from app.models.user_settings import CustomCategoryMap
@@ -45,7 +46,7 @@ def _allowed_categories(custom: CustomCategoryMap) -> dict[str, dict[str, list[s
         "income": {
             g.category: g.sub_categories
             for g in merged.income
-            if g.category != TRANSFER_CATEGORY
+            if g.category not in (TRANSFER_CATEGORY, INCOME_CATEGORY_SETTLEMENT)
         },
     }
 
@@ -117,7 +118,7 @@ def read_ai_results(
         tx_type = TransactionType.EXPENSE if row["direction"] == "out" else TransactionType.INCOME
         category = str(item.get("category", "")).strip()
         sub = str(item.get("sub_category", "")).strip()
-        if category == TRANSFER_CATEGORY or not is_valid_merged_pair(
+        if category in (TRANSFER_CATEGORY, INCOME_CATEGORY_SETTLEMENT) or not is_valid_merged_pair(
             custom, tx_type, category, sub
         ):
             continue
@@ -155,6 +156,8 @@ async def classify_rows(
                 **shared_scope,
                 "kind": {"$ne": "transfer"},
                 "merchant": {"$nin": [None, "", "미지정"]},
+                # A settlement has to point at the expense it settles, which an import cannot do.
+                "category": {"$ne": INCOME_CATEGORY_SETTLEMENT},
             }
         )
         .sort("date", -1)
