@@ -550,7 +550,7 @@ export default function ImportView({ scope, accountType, presets, month, onChang
                       setCsvPreview([]);
                       setCsvFile(null);
                     }}
-                    className="rounded-lg border border-gray-250 hover:bg-gray-50 text-gray-700 text-xs font-semibold px-3.5 py-2"
+                    className="rounded-lg border border-gray-250 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold px-3.5 py-2"
                   >
                     {t("cancel")}
                   </button>
@@ -697,7 +697,7 @@ export default function ImportView({ scope, accountType, presets, month, onChang
             <h2 className="text-base font-bold text-gray-800 dark:text-white">{t("logsTitle")}</h2>
             <button
               onClick={loadLogs}
-              className="rounded-lg border border-gray-250 hover:bg-gray-50 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-semibold"
+              className="rounded-lg border border-gray-250 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-semibold"
               disabled={loadingLogs}
             >
               {t("refresh")}
@@ -706,7 +706,7 @@ export default function ImportView({ scope, accountType, presets, month, onChang
 
           {loadingLogs ? (
             <div className="flex h-48 items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
             </div>
           ) : logs.length === 0 ? (
             <div className="text-sm text-gray-400 py-12 text-center italic">
@@ -740,7 +740,7 @@ export default function ImportView({ scope, accountType, presets, month, onChang
                       </td>
                       <td className="p-3">
                         {log.status === "success" ? (
-                          <span className="text-green-600 font-semibold flex items-center gap-0.5">
+                          <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-0.5">
                             <CheckCircle2 className="h-3.5 w-3.5" /> {t("success")}
                           </span>
                         ) : (
