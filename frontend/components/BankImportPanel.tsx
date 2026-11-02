@@ -12,6 +12,9 @@ import {
   Currency,
   FinancialAccount,
   LedgerScope,
+  TRANSFER_CATEGORY,
+  TRANSFER_SUB_ACCOUNT_TRANSFER,
+  TRANSFER_SUB_CARD_REPAYMENT,
   accountPickerLabel,
   commitBankRows,
   fetchAccounts,
@@ -20,7 +23,6 @@ import {
   undoBankImport,
 } from "@/lib/api";
 import {
-  categoryI18nKey,
   translateCategory,
   translateSubCategory,
 } from "@/lib/category-i18n";
@@ -47,32 +49,38 @@ interface RowState {
   note: string;
   category: string;
   subCategory: string;
-  cardPayment: boolean;
   cardId: string;
-  accountMove: boolean;
   moveId: string;
 }
 
 const SAVED_KEY = "pairpocket.bankImportSaved";
 
-const isTransferCategory = (category: string) =>
-  ["transfer", "transferLegacy"].includes(categoryI18nKey(category) ?? "");
+const isMove = (r: Pick<RowState, "category" | "subCategory">) =>
+  r.category === TRANSFER_CATEGORY && r.subCategory === TRANSFER_SUB_ACCOUNT_TRANSFER;
+const isCardPayment = (r: Pick<RowState, "category" | "subCategory">) =>
+  r.category === TRANSFER_CATEGORY && r.subCategory === TRANSFER_SUB_CARD_REPAYMENT;
 
 function initialState(row: BankPreviewRow, cards: FinancialAccount[]): RowState {
   const s = row.suggestion;
-  const isBankSideCardPayment =
-    row.hint === "card_repayment" && row.direction === "out";
+  // Bank rows that look like transfers start under the transfer category.
+  let category = s?.category ?? "";
+  let subCategory = s?.sub_category ?? "";
+  if (row.hint === "card_repayment" && row.direction === "out") {
+    category = TRANSFER_CATEGORY;
+    subCategory = TRANSFER_SUB_CARD_REPAYMENT;
+  } else if (row.hint === "account_transfer") {
+    category = TRANSFER_CATEGORY;
+    subCategory = TRANSFER_SUB_ACCOUNT_TRANSFER;
+  }
   return {
     row,
     bucket: row.bucket,
     include: row.bucket === "auto",
     merchant: s?.merchant ?? row.description,
     note: "",
-    category: s?.category ?? "",
-    subCategory: s?.sub_category ?? "",
-    cardPayment: isBankSideCardPayment,
+    category,
+    subCategory,
     cardId: cards.length === 1 ? cards[0].id : "",
-    accountMove: row.hint === "account_transfer",
     moveId: "",
   };
 }
@@ -225,15 +233,25 @@ export default function BankImportPanel({
   }
 
   const groups = (presets ? presets : { expense: [], income: [] }) as CategoryPresets;
+  // Only moves between the user's own accounts and card payments can be imported
+  // from the transfer category; the other transfer kinds are entered by hand.
+  function subOptions(
+    direction: "out" | "in",
+    group: { category: string; sub_categories: string[] } | undefined
+  ): string[] {
+    if (!group) return [];
+    if (group.category !== TRANSFER_CATEGORY) return group.sub_categories;
+    return direction === "out"
+      ? [TRANSFER_SUB_ACCOUNT_TRANSFER, TRANSFER_SUB_CARD_REPAYMENT]
+      : [TRANSFER_SUB_ACCOUNT_TRANSFER];
+  }
   function categoryOptions(direction: "out" | "in") {
-    return (direction === "out" ? groups.expense : groups.income).filter(
-      (g) => !isTransferCategory(g.category)
-    );
+    return direction === "out" ? groups.expense : groups.income;
   }
 
   function isComplete(r: RowState): boolean {
-    if (r.cardPayment) return Boolean(r.cardId);
-    if (r.accountMove) {
+    if (isCardPayment(r)) return Boolean(r.cardId);
+    if (isMove(r)) {
       // A move inside one ledger is entered from the sending account only.
       if (r.row.direction === "in" && sameLedgerTarget(r.moveId)) return false;
       return Boolean(r.moveId && r.merchant.trim());
@@ -309,10 +327,10 @@ export default function BankImportPanel({
             merchant: r.merchant.trim(),
             note: r.note.trim() || undefined,
           };
-          if (r.accountMove) {
+          if (isMove(r)) {
             return { ...base, kind: "account_move" as const, counter_account_id: r.moveId };
           }
-          if (r.cardPayment) {
+          if (isCardPayment(r)) {
             return { ...base, kind: "card_repayment" as const, counter_account_id: r.cardId };
           }
           return { ...base, category: r.category, sub_category: r.subCategory };
@@ -338,7 +356,7 @@ export default function BankImportPanel({
     const { row } = r;
     const isDuplicate = r.bucket === "duplicate";
     const options = categoryOptions(row.direction);
-    const subs = options.find((g) => g.category === r.category)?.sub_categories ?? [];
+    const subs = subOptions(row.direction, options.find((g) => g.category === r.category));
     const hintNote =
       row.hint === "card_repayment" && row.direction === "in"
         ? t("cardSideNote")
@@ -367,7 +385,7 @@ export default function BankImportPanel({
           : null
       : null;
     const moveBlocked =
-      r.accountMove &&
+      isMove(r) &&
       row.direction === "in" &&
       r.moveId !== "" &&
       sameLedgerTarget(r.moveId);
@@ -421,19 +439,42 @@ export default function BankImportPanel({
         )}
         {!isDuplicate && (
           <div className="space-y-2">
-            {row.hint === "account_transfer" && (
-              <label className="flex items-center gap-2 text-[11px] font-semibold text-gray-700 dark:text-gray-200">
-                <input
-                  type="checkbox"
-                  checked={r.accountMove}
-                  onChange={(e) => patch(row.index, { accountMove: e.target.checked })}
-                  className="rounded text-indigo-600"
-                />
-                {t("ownMove")}
-              </label>
-            )}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {r.accountMove ? (
+              <Dropdown
+                value={r.category}
+                onChange={(v) => {
+                  const next = subOptions(
+                    row.direction,
+                    options.find((g) => g.category === v)
+                  );
+                  patch(row.index, {
+                    category: v,
+                    subCategory: v === TRANSFER_CATEGORY && next.length === 1 ? next[0] : "",
+                  });
+                }}
+                ariaLabel={t("category")}
+                placeholder={t("category")}
+                size="sm"
+                className="sm:col-span-1"
+                options={options.map((g) => ({
+                  value: g.category,
+                  label: translateCategory(g.category, tCategories),
+                }))}
+              />
+              <Dropdown
+                value={r.subCategory}
+                onChange={(v) => patch(row.index, { subCategory: v })}
+                ariaLabel={t("subCategory")}
+                placeholder={t("subCategory")}
+                disabled={!r.category}
+                size="sm"
+                className="sm:col-span-2"
+                options={subs.map((sub) => ({
+                  value: sub,
+                  label: translateSubCategory(sub, tSubCategories),
+                }))}
+              />
+              {isMove(r) && (
                 <Dropdown
                   value={r.moveId}
                   onChange={(v) => pickMoveTarget(r, v)}
@@ -446,7 +487,8 @@ export default function BankImportPanel({
                     label: `${tAccountType(a.account_type)} · ${accountPickerLabel(a)}`,
                   }))}
                 />
-              ) : r.cardPayment ? (
+              )}
+              {isCardPayment(r) && (
                 <Dropdown
                   value={r.cardId}
                   onChange={(v) => patch(row.index, { cardId: v })}
@@ -456,34 +498,6 @@ export default function BankImportPanel({
                   className="sm:col-span-3"
                   options={cards.map((c) => ({ value: c.id, label: accountPickerLabel(c) }))}
                 />
-              ) : (
-                <>
-                  <Dropdown
-                    value={r.category}
-                    onChange={(v) => patch(row.index, { category: v, subCategory: "" })}
-                    ariaLabel={t("category")}
-                    placeholder={t("category")}
-                    size="sm"
-                    className="sm:col-span-1"
-                    options={options.map((g) => ({
-                      value: g.category,
-                      label: translateCategory(g.category, tCategories),
-                    }))}
-                  />
-                  <Dropdown
-                    value={r.subCategory}
-                    onChange={(v) => patch(row.index, { subCategory: v })}
-                    ariaLabel={t("subCategory")}
-                    placeholder={t("subCategory")}
-                    disabled={!r.category}
-                    size="sm"
-                    className="sm:col-span-2"
-                    options={subs.map((sub) => ({
-                      value: sub,
-                      label: translateSubCategory(sub, tSubCategories),
-                    }))}
-                  />
-                </>
               )}
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
