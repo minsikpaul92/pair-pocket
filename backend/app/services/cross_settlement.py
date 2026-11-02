@@ -29,6 +29,7 @@ from app.models.transaction import (
 from app.models.user import UserOut
 from app.services import db_transactions
 from app.services.access import assert_can_access_doc, resolve_owner_ids
+from app.services.notifications import remove_for_transactions
 from app.services.settlement import check_settlement
 from app.services.validation import _assert_account_type, _load_owned_account
 
@@ -320,3 +321,4 @@ async def delete(db: AsyncIOMotorDatabase, user: UserOut, existing: dict) -> Non
         )
 
     await db_transactions.run_in_transaction(db, write)
+    await remove_for_transactions(db, [str(income["_id"]), str(expense["_id"])])

@@ -69,6 +69,7 @@ import {
   fetchInvitationMe,
   fetchPendingOccurrences,
   fetchSubscriptions,
+  fetchTransaction,
   fetchTransactions,
   fetchUnreadNotificationCount,
   fetchUserSettings,
@@ -603,6 +604,10 @@ export default function AppShell({ user, onLogout }: Props) {
     if (enabledScopes.includes(target)) setScope(target);
     if (item.tx_date) setMonth(parseDate(item.tx_date));
     setView("list");
+    // Open the entry itself; if it is gone, the list is all there is to show.
+    fetchTransaction(item.transaction_id)
+      .then(openEdit)
+      .catch(() => null);
   }
 
   function openView(next: View) {
