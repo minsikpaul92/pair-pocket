@@ -12,6 +12,7 @@ import {
   LogOut,
   UserPlus,
   Settings,
+  Users,
   CalendarDays,
   Coffee,
   Languages,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
+import AccountsSettings from "@/components/AccountsSettings";
 import AccountDefaultsSettings from "@/components/AccountDefaultsSettings";
 import DashboardSettings from "@/components/DashboardSettings";
 import LanguageSelect from "@/components/LanguageSelect";
@@ -64,7 +66,28 @@ interface Props {
   onTabChange: (tab: SettingsTab) => void;
 }
 
-export type SettingsTab = "general" | "dashboard";
+export type SettingsTab =
+  | "accounts"
+  | "dashboard"
+  | "entry"
+  | "partner"
+  | "app";
+
+const SETTINGS_TABS: SettingsTab[] = [
+  "accounts",
+  "dashboard",
+  "entry",
+  "partner",
+  "app",
+];
+
+const TAB_LABEL_KEYS = {
+  accounts: "tabAccounts",
+  dashboard: "tabDashboard",
+  entry: "tabEntry",
+  partner: "tabPartner",
+  app: "tabApp",
+} as const;
 
 const RESET_SCOPES: ResetScope[] = [
   "all",
@@ -366,32 +389,23 @@ export default function SettingsView({
   }
 
   const tabBar = (
-    <div className="flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
-      {(["general", "dashboard"] as SettingsTab[]).map((k) => (
+    <div className="flex gap-1 overflow-x-auto rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+      {SETTINGS_TABS.map((k) => (
         <button
           key={k}
           type="button"
           onClick={() => onTabChange(k)}
-          className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+          className={`flex-1 shrink-0 whitespace-nowrap rounded-lg px-2 py-2 text-[13px] font-semibold sm:px-3 sm:text-sm transition-colors ${
             tab === k
               ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white"
               : "text-gray-500"
           }`}
         >
-          {t(k === "general" ? "tabGeneral" : "tabDashboard")}
+          {t(TAB_LABEL_KEYS[k])}
         </button>
       ))}
     </div>
   );
-
-  if (tab === "dashboard") {
-    return (
-      <div className="space-y-6">
-        {tabBar}
-        <DashboardSettings accountType={accountType} scope={scope} />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -410,358 +424,401 @@ export default function SettingsView({
         </div>
       )}
 
-      {/* Mobile-only: controls removed from the compact top bar */}
-      <section className="card-inset p-5 space-y-1 md:hidden">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3 mb-1">
-          <Settings className="h-5 w-5 text-blue-500" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("preferencesTitle")}
-          </h2>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 py-3">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-            {t("themeLabel")}
-          </span>
-          <ThemeToggle />
-        </div>
-
-        {(onInvite || onLogout) && (
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-1 mt-1">
-            <p className="pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              {t("accountSection")}
-            </p>
-            {onInvite && (
-              <button
-                type="button"
-                onClick={onInvite}
-                className="w-full flex items-center gap-3 rounded-xl py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
-              >
-                {partner ? (
-                  partner.picture ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={partner.picture}
-                      alt={partner.name}
-                      className="h-8 w-8 rounded-full object-cover shrink-0 ring-2 ring-white dark:ring-gray-900"
-                    />
-                  ) : (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold shrink-0">
-                      {(partner.name || "?").slice(0, 1)}
-                    </span>
-                  )
-                ) : (
-                  <UserPlus className="h-5 w-5 text-blue-500 shrink-0" />
-                )}
-                <span className="truncate">
-                  {partner ? t("invitePartnerDone") : t("invitePartner")}
-                </span>
-              </button>
-            )}
-            {onLogout && (
-              <button
-                type="button"
-                onClick={onLogout}
-                className="w-full flex items-center gap-3 rounded-xl py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-              >
-                <LogOut className="h-5 w-5 shrink-0" />
-                <span className="truncate">{tNav("logout")}</span>
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      <section className="card-inset p-5 space-y-3">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <RefreshCw className="h-5 w-5 text-blue-500" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("updateTitle")}
-          </h2>
-          <span className="ml-auto text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
-            v{WHATS_NEW[0].version}
-          </span>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("updateHelp")}
-        </p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
-        >
-          <RefreshCw className="h-4 w-4 shrink-0" />
-          {t("updateCta")}
-        </button>
-      </section>
-
-      <section className="card-inset p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-blue-500" />
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-              {t("geminiTitle")}
-            </h2>
-          </div>
-          {connected ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400 border border-green-200/50 dark:border-green-800/50">
-              <CheckCircle2 className="h-3.5 w-3.5" /> {t("connected")}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 dark:bg-yellow-900/30 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 dark:text-yellow-400 border border-yellow-200/50 dark:border-yellow-800/50">
-              {t("notConnected")}
-            </span>
-          )}
-        </div>
-
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("geminiDescription")}
-        </p>
-
-        {settings?.using_partner_key && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
-            {t("usingPartnerKey")}
-          </p>
-        )}
-        {settings?.partner_using_my_key && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
-            {t("partnerUsingMyKey")}
-          </p>
-        )}
-
-        <form onSubmit={handleSaveKey} className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              {t("apiKeyLabel")}
-            </label>
-            <div className="relative">
-              <Key className="absolute left-3 top-2.5 h-4.5 w-4.5 text-gray-400" />
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={
-                  settings?.has_gemini_key
-                    ? "••••••••••••••••••••••••••••"
-                    : t("apiKeyPlaceholder")
-                }
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 pl-10 pr-3.5 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
-                required
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={savingKey || !apiKey.trim()}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 font-semibold text-white py-2.5 text-sm transition-all duration-200 shadow-sm"
-          >
-            {savingKey ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("saving")}
-              </>
-            ) : (
-              t("saveKey")
-            )}
-          </button>
-        </form>
-
-        {hasPartner && settings?.has_gemini_key && (
-          <div className="space-y-2 border-t border-gray-100 dark:border-gray-800 pt-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 space-y-0.5">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
-                  {t("shareKey")}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                  {t("shareKeyHelp")}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={Boolean(settings.share_gemini_api_key)}
-                aria-label={t("shareKey")}
-                onClick={handleToggleShare}
-                disabled={sharingKey}
-                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 ${
-                  settings.share_gemini_api_key
-                    ? "bg-blue-500"
-                    : "bg-gray-200 dark:bg-gray-700"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${
-                    settings.share_gemini_api_key
-                      ? "translate-x-5"
-                      : "translate-x-0"
-                  }`}
-                >
-                  {sharingKey && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
-                  )}
-                </span>
-              </button>
-            </div>
-            {shareBlockedMsg && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
-                {shareBlockedMsg}
-              </p>
-            )}
-          </div>
-        )}
-      </section>
-
-      <AccountDefaultsSettings accountType={accountType} scope={scope} />
-
-      <section className="card-inset p-5 space-y-3">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <CalendarDays className="h-5 w-5 text-blue-500" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {hasPartner ? t("personalStartDateTitle") : t("startDateTitle")}
-          </h2>
-          {savingStartDate && (
-            <Loader2 className="ml-auto h-4 w-4 animate-spin text-blue-500" />
-          )}
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {hasPartner ? t("personalStartDateHelp") : t("startDateHelp")}
-        </p>
-        <DayPicker
-          value={parseISODate(settings?.ledger_start_date)}
-          onChange={(next) => handleStartDateChange(next, "personal")}
-          locale={locale}
-          disabled={savingStartDate}
-        />
-      </section>
-
-      {hasPartner && (
-        <section className="card-inset p-5 space-y-3">
-          <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-            <CalendarDays className="h-5 w-5 text-blue-500" />
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-              {t("sharedStartDateTitle")}
-            </h2>
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-            {t("sharedStartDateHelp")}
-          </p>
-          <DayPicker
-            value={parseISODate(
-              settings?.shared_ledger_start_date || settings?.ledger_start_date
-            )}
-            onChange={(next) => handleStartDateChange(next, "shared")}
-            locale={locale}
-            disabled={savingStartDate}
+      {tab === "accounts" && (
+        <>
+          <AccountsSettings
+            accountType={accountType}
+            scope={scope}
+            onChanged={onChanged}
           />
-        </section>
+                <AccountDefaultsSettings accountType={accountType} scope={scope} />
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <CalendarDays className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {hasPartner ? t("personalStartDateTitle") : t("startDateTitle")}
+                    </h2>
+                    {savingStartDate && (
+                      <Loader2 className="ml-auto h-4 w-4 animate-spin text-blue-500" />
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {hasPartner ? t("personalStartDateHelp") : t("startDateHelp")}
+                  </p>
+                  <DayPicker
+                    value={parseISODate(settings?.ledger_start_date)}
+                    onChange={(next) => handleStartDateChange(next, "personal")}
+                    locale={locale}
+                    disabled={savingStartDate}
+                  />
+                </section>
+                {hasPartner && (
+                  <section className="card-inset p-5 space-y-3">
+                    <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                      <CalendarDays className="h-5 w-5 text-blue-500" />
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                        {t("sharedStartDateTitle")}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      {t("sharedStartDateHelp")}
+                    </p>
+                    <DayPicker
+                      value={parseISODate(
+                        settings?.shared_ledger_start_date || settings?.ledger_start_date
+                      )}
+                      onChange={(next) => handleStartDateChange(next, "shared")}
+                      locale={locale}
+                      disabled={savingStartDate}
+                    />
+                  </section>
+                )}
+        </>
       )}
 
-      <ExpenseRatioHiddenSettings
-        settings={settings}
-        onSaved={(next) => {
-          setSettings(next);
-          onChanged();
-        }}
-      />
+      {tab === "dashboard" && (
+        <>
+          <DashboardSettings accountType={accountType} scope={scope} />
+                <ExpenseRatioHiddenSettings
+                  settings={settings}
+                  onSaved={(next) => {
+                    setSettings(next);
+                    onChanged();
+                  }}
+                />
+        </>
+      )}
 
-      <section className="card-inset p-5 space-y-3">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <Languages className="h-5 w-5 text-blue-500" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("languageLabel")}
-          </h2>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("languageHelp")}
-        </p>
-        <LanguageSelect
-          value={locale}
-          options={LOCALE_OPTIONS.filter((item) => !item.beta).map((item) => ({
-            code: item.code,
-            native: item.native,
-          }))}
-          onChange={(code) => void changeLanguage(code as AppLocale)}
-          disabled={changingLanguage}
-          ariaLabel={t("languageLabel")}
-        />
-      </section>
+      {tab === "entry" && (
+        <>
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <Receipt className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("salesTaxTitle")}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("salesTaxHelp")}
+                  </p>
+                  <select
+                    value={salesTaxProvince}
+                    onChange={(e) => void changeSalesTaxProvince(e.target.value)}
+                    disabled={savingProvince}
+                    aria-label={t("salesTaxTitle")}
+                    className="input-field"
+                  >
+                    {CANADA_PROVINCES.map((p) => (
+                      <option key={p.code} value={p.code}>
+                        {tProvinces(p.code)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                    {t("salesTaxRate", {
+                      rate: formatTaxPercent(salesTaxPercent(salesTaxProvince)),
+                    })}
+                  </p>
+                  {provinceError && (
+                    <p className="text-xs text-red-500">{t("salesTaxError")}</p>
+                  )}
+                </section>
+                <section className="card-inset p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-blue-500" />
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                        {t("geminiTitle")}
+                      </h2>
+                    </div>
+                    {connected ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400 border border-green-200/50 dark:border-green-800/50">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> {t("connected")}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 dark:bg-yellow-900/30 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 dark:text-yellow-400 border border-yellow-200/50 dark:border-yellow-800/50">
+                        {t("notConnected")}
+                      </span>
+                    )}
+                  </div>
 
-      <section className="card-inset p-5 space-y-3">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <Receipt className="h-5 w-5 text-blue-500" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("salesTaxTitle")}
-          </h2>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("salesTaxHelp")}
-        </p>
-        <select
-          value={salesTaxProvince}
-          onChange={(e) => void changeSalesTaxProvince(e.target.value)}
-          disabled={savingProvince}
-          aria-label={t("salesTaxTitle")}
-          className="input-field"
-        >
-          {CANADA_PROVINCES.map((p) => (
-            <option key={p.code} value={p.code}>
-              {tProvinces(p.code)}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
-          {t("salesTaxRate", {
-            rate: formatTaxPercent(salesTaxPercent(salesTaxProvince)),
-          })}
-        </p>
-        {provinceError && (
-          <p className="text-xs text-red-500">{t("salesTaxError")}</p>
-        )}
-      </section>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("geminiDescription")}
+                  </p>
 
-      <section className="card-inset p-5 space-y-3">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <Coffee className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("supportTitle")}
-          </h2>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("supportDescription")}
-        </p>
-        <a
-          href={BUY_ME_A_COFFEE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-semibold py-2.5 text-sm transition-colors border border-amber-200/80 dark:border-amber-800/50"
-        >
-          <Coffee className="h-4 w-4 shrink-0" />
-          <span className="truncate">{t("supportCta")}</span>
-        </a>
-      </section>
+                  {settings?.using_partner_key && (
+                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                      {t("usingPartnerKey")}
+                    </p>
+                  )}
+                  {settings?.partner_using_my_key && (
+                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                      {t("partnerUsingMyKey")}
+                    </p>
+                  )}
 
-      <section className="card-inset p-5 space-y-4 border border-red-200/50 dark:border-red-950/30">
-        <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-          <RotateCcw className="h-5 w-5 text-red-500" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t("resetTitle")}
-          </h2>
-        </div>
+                  <form onSubmit={handleSaveKey} className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        {t("apiKeyLabel")}
+                      </label>
+                      <div className="relative">
+                        <Key className="absolute left-3 top-2.5 h-4.5 w-4.5 text-gray-400" />
+                        <input
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder={
+                            settings?.has_gemini_key
+                              ? "••••••••••••••••••••••••••••"
+                              : t("apiKeyPlaceholder")
+                          }
+                          className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 pl-10 pr-3.5 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={savingKey || !apiKey.trim()}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 font-semibold text-white py-2.5 text-sm transition-all duration-200 shadow-sm"
+                    >
+                      {savingKey ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {t("saving")}
+                        </>
+                      ) : (
+                        t("saveKey")
+                      )}
+                    </button>
+                  </form>
 
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          {t("resetDescription")}
-        </p>
+                  {hasPartner && settings?.has_gemini_key && (
+                    <div className="space-y-2 border-t border-gray-100 dark:border-gray-800 pt-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                            {t("shareKey")}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                            {t("shareKeyHelp")}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={Boolean(settings.share_gemini_api_key)}
+                          aria-label={t("shareKey")}
+                          onClick={handleToggleShare}
+                          disabled={sharingKey}
+                          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 ${
+                            settings.share_gemini_api_key
+                              ? "bg-blue-500"
+                              : "bg-gray-200 dark:bg-gray-700"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${
+                              settings.share_gemini_api_key
+                                ? "translate-x-5"
+                                : "translate-x-0"
+                            }`}
+                          >
+                            {sharingKey && (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                            )}
+                          </span>
+                        </button>
+                      </div>
+                      {shareBlockedMsg && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+                          {shareBlockedMsg}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </section>
+        </>
+      )}
 
-        <button
-          type="button"
-          onClick={openResetModal}
-          disabled={resetting}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 dark:bg-red-950/20 dark:hover:bg-red-900/30 dark:active:bg-red-900/40 text-red-600 dark:text-red-400 font-semibold py-2.5 text-sm transition-all duration-200 border border-red-200 dark:border-red-900/30"
-        >
-          {t("resetButton")}
-        </button>
-      </section>
+      {tab === "partner" && (
+        <>
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <Users className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("partnerTitle")}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {partner
+                      ? t("partnerConnected", { name: partner.name })
+                      : t("partnerHelp")}
+                  </p>
+                  {onInvite && (
+                    <button
+                      type="button"
+                      onClick={onInvite}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
+                    >
+                      <UserPlus className="h-4 w-4 shrink-0" />
+                      {partner ? t("invitePartnerDone") : t("invitePartner")}
+                    </button>
+                  )}
+                </section>
+        </>
+      )}
+
+      {tab === "app" && (
+        <>
+                {/* Mobile-only: controls removed from the compact top bar */}
+                <section className="card-inset p-5 space-y-1 md:hidden">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3 mb-1">
+                    <Settings className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("preferencesTitle")}
+                    </h2>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 py-3">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                      {t("themeLabel")}
+                    </span>
+                    <ThemeToggle />
+                  </div>
+
+                  {(onInvite || onLogout) && (
+                    <div className="border-t border-gray-100 dark:border-gray-800 pt-1 mt-1">
+                      <p className="pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        {t("accountSection")}
+                      </p>
+                      {onInvite && (
+                        <button
+                          type="button"
+                          onClick={onInvite}
+                          className="w-full flex items-center gap-3 rounded-xl py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+                        >
+                          {partner ? (
+                            partner.picture ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={partner.picture}
+                                alt={partner.name}
+                                className="h-8 w-8 rounded-full object-cover shrink-0 ring-2 ring-white dark:ring-gray-900"
+                              />
+                            ) : (
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold shrink-0">
+                                {(partner.name || "?").slice(0, 1)}
+                              </span>
+                            )
+                          ) : (
+                            <UserPlus className="h-5 w-5 text-blue-500 shrink-0" />
+                          )}
+                          <span className="truncate">
+                            {partner ? t("invitePartnerDone") : t("invitePartner")}
+                          </span>
+                        </button>
+                      )}
+                      {onLogout && (
+                        <button
+                          type="button"
+                          onClick={onLogout}
+                          className="w-full flex items-center gap-3 rounded-xl py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        >
+                          <LogOut className="h-5 w-5 shrink-0" />
+                          <span className="truncate">{tNav("logout")}</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </section>
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <Languages className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("languageLabel")}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("languageHelp")}
+                  </p>
+                  <LanguageSelect
+                    value={locale}
+                    options={LOCALE_OPTIONS.filter((item) => !item.beta).map((item) => ({
+                      code: item.code,
+                      native: item.native,
+                    }))}
+                    onChange={(code) => void changeLanguage(code as AppLocale)}
+                    disabled={changingLanguage}
+                    ariaLabel={t("languageLabel")}
+                  />
+                </section>
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <RefreshCw className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("updateTitle")}
+                    </h2>
+                    <span className="ml-auto text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
+                      v{WHATS_NEW[0].version}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("updateHelp")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
+                  >
+                    <RefreshCw className="h-4 w-4 shrink-0" />
+                    {t("updateCta")}
+                  </button>
+                </section>
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <Coffee className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("supportTitle")}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("supportDescription")}
+                  </p>
+                  <a
+                    href={BUY_ME_A_COFFEE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-semibold py-2.5 text-sm transition-colors border border-amber-200/80 dark:border-amber-800/50"
+                  >
+                    <Coffee className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{t("supportCta")}</span>
+                  </a>
+                </section>
+                <section className="card-inset p-5 space-y-4 border border-red-200/50 dark:border-red-950/30">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <RotateCcw className="h-5 w-5 text-red-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("resetTitle")}
+                    </h2>
+                  </div>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("resetDescription")}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={openResetModal}
+                    disabled={resetting}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 dark:bg-red-950/20 dark:hover:bg-red-900/30 dark:active:bg-red-900/40 text-red-600 dark:text-red-400 font-semibold py-2.5 text-sm transition-all duration-200 border border-red-200 dark:border-red-900/30"
+                  >
+                    {t("resetButton")}
+                  </button>
+                </section>
+        </>
+      )}
 
       {showResetModal && (
         <div

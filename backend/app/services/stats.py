@@ -119,6 +119,32 @@ def _is_transfer_category(category: str) -> bool:
     return normalize_transfer_category(category) == TRANSFER_CATEGORY
 
 
+async def budget_excluded_account_ids(
+    db: AsyncIOMotorDatabase,
+    *,
+    user_id: str,
+    owner_ids: list[str],
+    account_type: AccountType,
+    shared_group_id: str | None,
+) -> list[str]:
+    """Accounts left out of the budget: the user's choice, else savings accounts."""
+    settings = await db["user_settings"].find_one({"owner_id": user_id})
+    chosen = (settings or {}).get("spending_excluded_accounts")
+    if chosen is not None:
+        return list(chosen)
+    return [
+        str(a["_id"])
+        async for a in db["accounts"].find(
+            {
+                "kind": "savings",
+                "owner_id": {"$in": owner_ids},
+                **shared_scope(account_type.value, shared_group_id),
+            },
+            {"_id": 1},
+        )
+    ]
+
+
 async def compute_stats(
     db: AsyncIOMotorDatabase,
     *,
@@ -134,12 +160,14 @@ async def compute_stats(
     merchant: str | None = None,
     institution: str | None = None,
     exclude_categories: list[str] | None = None,
+    exclude_account_ids: list[str] | None = None,
 ) -> dict:
     """Aggregate income/expense totals with adjusted metrics.
 
     - adjusted_expense: total_expense − N빵 정산/환급 (actual out-of-pocket spend)
     - pure_consumption: total_expense − 투자/저축 (spending charts, excludes transfers)
     - exclude_categories: expense categories left out of every expense figure
+    - exclude_account_ids: leave out expenses paid from these accounts (budget view)
     """
     excluded = {normalize_transfer_category(c) for c in (exclude_categories or [])}
     ids = owner_ids if owner_ids is not None else ([owner_id] if owner_id else [])
@@ -161,6 +189,18 @@ async def compute_stats(
         **base_filter,
         "kind": {"$ne": TransactionKind.TRANSFER.value},
     }
+    if exclude_account_ids:
+        stats_filter = {
+            "$and": [
+                stats_filter,
+                {
+                    "$or": [
+                        {"type": {"$ne": TransactionType.EXPENSE.value}},
+                        {"account_id": {"$nin": exclude_account_ids}},
+                    ]
+                },
+            ]
+        }
     pipeline = [
         {"$match": stats_filter},
         {

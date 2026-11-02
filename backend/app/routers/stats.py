@@ -9,7 +9,11 @@ from app.database import get_database
 from app.models.transaction import AccountType, Currency
 from app.models.user import UserOut
 from app.services.access import resolve_owner_ids
-from app.services.stats import compute_stats, resolve_date_range
+from app.services.stats import (
+    budget_excluded_account_ids,
+    compute_stats,
+    resolve_date_range,
+)
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -89,12 +93,24 @@ async def stats_summary(
     merchant: str | None = None,
     institution: str | None = None,
     exclude_categories: list[str] = Query(default_factory=list),
+    apply_account_exclusions: bool = False,
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
     """Dashboard stats with investment exclusion and N빵 settlement netting."""
     date_range = resolve_date_range(start, end, month=month)
     owner_ids = await resolve_owner_ids(db, current_user, account_type)
+    excluded_accounts = (
+        await budget_excluded_account_ids(
+            db,
+            user_id=current_user.id,
+            owner_ids=owner_ids,
+            account_type=account_type,
+            shared_group_id=current_user.shared_group_id,
+        )
+        if apply_account_exclusions
+        else None
+    )
     return await compute_stats(
         db,
         owner_ids=owner_ids,
@@ -108,4 +124,5 @@ async def stats_summary(
         merchant=merchant,
         institution=institution,
         exclude_categories=exclude_categories,
+        exclude_account_ids=excluded_accounts,
     )

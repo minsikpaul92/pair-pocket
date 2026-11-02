@@ -110,6 +110,7 @@ async def compute_account_balance(
     Liability accounts (credit card):
       + card purchases (expense on this card)
       - card repayments (TRANSFER › 카드 대금 상환 with counter_account_id)
+      - refunds and rebates (income on this card)
     """
     account_id = str(account_doc["_id"])
     is_liability = account_doc.get("is_liability", False)
@@ -176,6 +177,9 @@ async def compute_account_balance(
                 balance -= amount
             elif tx_type == TransactionType.EXPENSE.value and primary:
                 balance += amount
+            elif tx_type == TransactionType.INCOME.value and primary:
+                # Refunds and rebates credited to the card lower what is owed.
+                balance -= amount
             continue
 
         # Asset account — internal transfers move between accounts;

@@ -806,7 +806,7 @@
     "matchedEntry": "이미 입력됨: {date} {merchant} ({amount})",
     "etransferNote": "e-Transfer예요. 수입인지 지출인지 골라 주세요.",
     "similarTo": "{date}의 {merchant} ({amount})와 비슷해요"
-},
+  },
   "scanQueue": {
     "restored": "지난 스캔에서 못 끝낸 파일 {count}개를 다시 불러왔어요.",
     "addRecent": "최근 스캔한 파일 다시 넣기 ({count}개, {days}일 보관)",
@@ -924,8 +924,11 @@
     "exportCapped": "거래가 500건이 넘는 달이 있어 파일에 일부가 빠졌을 수 있습니다."
   },
   "settingsPage": {
-    "tabGeneral": "일반",
+    "tabAccounts": "계좌",
     "tabDashboard": "대시보드",
+    "tabEntry": "입력",
+    "tabPartner": "파트너",
+    "tabApp": "앱",
     "budgetTitle": "월 예산",
     "budgetHelp": "이번 달 예산은 설정한 금액에서 지난달 초과 지출을 뺀 금액이에요. 덜 쓴 금액은 이월되지 않아요.",
     "budgetPersonal": "개인",
@@ -934,6 +937,8 @@
     "budgetKorea": "한국 (KRW)",
     "budgetSaved": "저장됨",
     "budgetError": "예산을 저장하지 못했어요.",
+    "budgetAccountsTitle": "예산에 포함할 계좌",
+    "budgetAccountsHelp": "체크한 계좌에서 쓴 지출만 월 예산과 대시보드 지출에 잡혀요. 처음에는 저축 계좌만 빠져 있어요.",
     "excludeTitle": "지출에서 제외할 항목",
     "excludeHelp": "체크한 카테고리는 대시보드의 지출, 예산 계산, 지출 비율 차트, 지출 내역에서 빠져요. 카드값 결제 같은 자산 이동은 기본으로 제외돼요.",
     "layoutTitle": "대시보드 카드",
@@ -1032,7 +1037,31 @@
       "subscription": "비워 두면 기본 카드 → 은행 계좌 순서",
       "brokerage": "주식 매수·매도에 사용"
     },
-    "languageHelp": "앱에 표시되는 언어를 바꿉니다."
+    "languageHelp": "앱에 표시되는 언어를 바꿉니다.",
+    "accountsTitle": "계좌 목록",
+    "accountsAdd": "추가",
+    "accountsHelp": "계좌를 눌러 이름, 은행, 기초 잔액을 고칠 수 있어요. 통장 잔액이 앱과 다르면 \"잔액 맞추기\"를 누르세요.",
+    "accountsEmpty": "등록된 계좌가 없어요.",
+    "accountInactive": "숨김",
+    "accountEdit": "수정",
+    "accountDelete": "삭제",
+    "accountDeleteCancel": "취소",
+    "accountDeleteConfirm": "\"{name}\" 계좌를 삭제할까요? 거래 내역은 남지만 이 계좌와의 연결이 끊어져요.",
+    "accountDeleteError": "삭제하지 못했어요. 다시 시도해 주세요.",
+    "matchBalance": "잔액 맞추기",
+    "matchTitle": "{name} 잔액 맞추기",
+    "matchHelp": "통장에 지금 보이는 잔액을 넣으면, 앱 잔액이 그 금액이 되도록 기초 잔액을 계산해요.",
+    "matchHelpCard": "카드 앱에 보이는 남은 카드 빚을 넣으면, 앱 금액이 그 금액이 되도록 기초 잔액을 계산해요.",
+    "matchActual": "통장 잔액",
+    "matchActualCard": "남은 카드 빚",
+    "matchAppBalance": "앱 잔액",
+    "matchDiff": "차이",
+    "matchOpening": "기초 잔액",
+    "matchNote": "거래 내역은 바뀌지 않고, 기초 잔액만 바뀌어요.",
+    "matchError": "저장하지 못했어요. 다시 시도해 주세요.",
+    "partnerTitle": "파트너",
+    "partnerHelp": "파트너를 초대하면 공유 가계부를 함께 쓰고 정산할 수 있어요.",
+    "partnerConnected": "{name}님과 연결되어 있어요. 공유 가계부와 정산을 함께 쓰고 있어요."
   },
   "onboarding": {
     "title": "시작하기",
@@ -1205,6 +1234,18 @@
   },
   "whatsNew": {
     "items": {
+      "cardRefundBalance": {
+        "title": "카드 환급이 카드 빚에 반영돼요",
+        "description": "카드로 들어온 환급이나 리베이트가 이제 카드의 남은 빚을 줄여요. 잔액 맞추기에서는 갚은 것보다 많이 낸 카드의 마이너스 금액도 입력할 수 있어요."
+      },
+      "settingsTabs": {
+        "title": "설정이 탭으로 나뉘고 잔액 맞추기가 생겼어요",
+        "description": "설정을 계좌, 대시보드, 입력, 파트너, 앱 탭으로 나눴어요. 계좌 탭에서 계좌를 고치고, 통장 잔액을 넣어 앱 잔액을 한 번에 맞출 수 있어요."
+      },
+      "budgetExcludesSavings": {
+        "title": "예산에 포함할 계좌를 고를 수 있어요",
+        "description": "설정의 대시보드 탭에서 월 예산과 지출에 포함할 계좌를 고를 수 있어요. 처음에는 저축 계좌만 빠져 있어요."
+      },
       "subscriptionFromEntry": {
         "title": "구독 내역을 고정지출로 바로 등록",
         "description": "문화/취미 > 정기 구독 내역을 입력하거나 은행 명세서로 가져와 저장하면, 한 번에 고정지출로 등록할 수 있어요. 다음 달부터 이어지니 이번 달이 두 번 잡히지 않아요."
@@ -1216,7 +1257,7 @@
       "bankStatementImport": {
         "title": "은행 명세서 가져오기",
         "description": "가져오기 메뉴에서 은행 CSV를 올리면 이미 입력한 내역은 건너뛰고, 나머지는 분류를 추천해 줘요. 애매한 것만 확인하면 돼요."
-    },
+      },
       "scanDrafts": {
         "title": "스캔 파일이 임시 보관돼요",
         "description": "AI 스캔에 넣은 사진이 이 기기에 저장돼서, 실패하거나 중간에 끊겨도 다시 시도할 수 있어요. 끝난 파일은 3일 동안 보관해서 다시 스캔할 수도 있어요."

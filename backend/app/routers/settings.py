@@ -23,6 +23,7 @@ from app.models.user_settings import (
     AddInstitutionBody,
     BudgetBody,
     DashboardLayoutBody,
+    SpendingAccountExclusionsBody,
     SpendingExclusionsBody,
     CustomCategoryMap,
     ExpenseRatioHiddenCategoriesBody,
@@ -166,6 +167,7 @@ async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
             if doc.get("spending_excluded_categories") is not None
             else [TRANSFER_CATEGORY]
         ),
+        "spending_excluded_accounts": doc.get("spending_excluded_accounts"),
         "dashboard_layouts": {
             str(country): {
                 "order": list((layout or {}).get("order", [])),
@@ -538,6 +540,22 @@ async def update_spending_exclusions(
     await db[COLLECTION].update_one(
         {"owner_id": current_user.id},
         {"$set": {"spending_excluded_categories": categories}},
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/spending-account-exclusions", response_model=UserSettingsOut)
+async def update_spending_account_exclusions(
+    payload: SpendingAccountExclusionsBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    await _get_or_create(db, current_user.id)
+    accounts = list(dict.fromkeys(a.strip() for a in payload.accounts if a.strip()))
+    await db[COLLECTION].update_one(
+        {"owner_id": current_user.id},
+        {"$set": {"spending_excluded_accounts": accounts}},
     )
     doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
     return await _settings_out(db, doc)

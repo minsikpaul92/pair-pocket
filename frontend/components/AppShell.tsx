@@ -205,7 +205,7 @@ export default function AppShell({ user, onLogout }: Props) {
   const [previousView, setPreviousView] = useState<View>("calendar");
   const [unreadCount, setUnreadCount] = useState(0);
   const [whatsNewUnseen, setWhatsNewUnseen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("accounts");
   const [scope, setScope] = useState<LedgerScope>("CAD");
   // The dashboard shows one country at a time; under "All" it falls back to
   // the Canada/Korea tab picked most recently.
@@ -228,8 +228,10 @@ export default function AppShell({ user, onLogout }: Props) {
       : enabledScopes.includes(lastCountry)
         ? lastCountry
         : (enabledScopes.find((s) => s === "CAD" || s === "KRW") ?? "CAD");
-  // Dashboard settings are per country, so "All" is not offered there.
-  const countryOnly = view === "settings" && settingsTab === "dashboard";
+  // Account and dashboard settings are per country, so "All" is not offered there.
+  const countryOnly =
+    view === "settings" &&
+    (settingsTab === "dashboard" || settingsTab === "accounts");
   const visibleLedgers = useMemo(
     () =>
       LEDGERS.filter(
@@ -638,7 +640,7 @@ export default function AppShell({ user, onLogout }: Props) {
   }, [scope]);
 
   useEffect(() => {
-    if (view !== "settings") setSettingsTab("general");
+    if (view !== "settings") setSettingsTab("accounts");
   }, [view]);
 
   // Materialize due subscriptions when ledger type changes (not on every data bump).
