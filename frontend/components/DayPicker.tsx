@@ -36,6 +36,8 @@ type Props = {
   disabled?: boolean;
   /** Earliest day that can be chosen; earlier days are shown but disabled. */
   min?: Date;
+  /** A custom button that opens the calendar, in place of the default date field. */
+  trigger?: React.ReactElement;
 };
 
 /**
@@ -51,6 +53,7 @@ export default function DayPicker({
   showIcon = true,
   disabled = false,
   min,
+  trigger,
 }: Props) {
   const t = useTranslations("common");
   const tCal = useTranslations("calendar");
@@ -87,6 +90,7 @@ export default function DayPicker({
       }}
     >
       <PopoverTrigger asChild>
+        {trigger ?? (
         <button
           type="button"
           disabled={disabled}
@@ -110,6 +114,7 @@ export default function DayPicker({
             {value ? formatDayLabel(value, locale) : t("selectDate")}
           </p>
         </button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="z-[110] w-[300px] p-3" align="start">
         <div className="mb-3 flex items-center justify-between gap-2">
