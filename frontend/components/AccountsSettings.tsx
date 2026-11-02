@@ -1,6 +1,6 @@
 "use client";
 
-import { Landmark, Loader2, Plus, Scale } from "lucide-react";
+import { Landmark, Loader2, Pencil, Plus, Scale, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
@@ -12,6 +12,7 @@ import {
   FinancialAccount,
   LedgerScope,
   accountLabel,
+  deleteAccount,
   fetchAccounts,
   fetchNetWorth,
   formatAmount,
@@ -190,6 +191,9 @@ export default function AccountsSettings({
   const [editing, setEditing] = useState<FinancialAccount | null>(null);
   const [adding, setAdding] = useState(false);
   const [matching, setMatching] = useState<FinancialAccount | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteFailed, setDeleteFailed] = useState(false);
 
   const load = useCallback(async () => {
     const [list, worth] = await Promise.all([
@@ -208,6 +212,20 @@ export default function AccountsSettings({
     setAccounts(null);
     load().catch(() => setAccounts([]));
   }, [load]);
+
+  async function removeAccount(account: FinancialAccount) {
+    setDeletingId(account.id);
+    setDeleteFailed(false);
+    try {
+      await deleteAccount(account.id);
+      setConfirmingId(null);
+      refreshed();
+    } catch {
+      setDeleteFailed(true);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function refreshed() {
     setEditing(null);
@@ -256,48 +274,106 @@ export default function AccountsSettings({
             return (
               <li
                 key={a.id}
-                className={`flex items-center gap-2 rounded-xl bg-gray-50 p-1.5 dark:bg-gray-900/50 ${
+                className={`rounded-xl bg-gray-50 p-1.5 dark:bg-gray-900/50 ${
                   a.is_active ? "" : "opacity-60"
                 }`}
               >
-                <button
-                  type="button"
-                  onClick={() => setEditing(a)}
-                  className="min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-gray-100 dark:hover:bg-gray-800/70"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                      {accountLabel(a)}
-                    </span>
-                    {!a.is_active && (
-                      <span className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                        {t("accountInactive")}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditing(a)}
+                    className="min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-gray-100 dark:hover:bg-gray-800/70"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        {accountLabel(a)}
                       </span>
+                      {!a.is_active && (
+                        <span className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                          {t("accountInactive")}
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                      {[a.institution, number, tKinds(ACCOUNT_KIND_KEYS[a.kind])]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </button>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-white">
+                      {balance === undefined
+                        ? "\u2014"
+                        : formatAmount(balance, a.currency)}
+                    </span>
+                    {canMatch && (
+                      <button
+                        type="button"
+                        onClick={() => setMatching(a)}
+                        className="flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-300"
+                      >
+                        <Scale className="h-3 w-3" />
+                        {t("matchBalance")}
+                      </button>
                     )}
                   </div>
-                  <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-                    {[a.institution, number, tKinds(ACCOUNT_KIND_KEYS[a.kind])]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </button>
-                <div className="flex shrink-0 flex-col items-end gap-1 pr-1.5">
-                  <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-white">
-                    {balance === undefined
-                      ? "—"
-                      : formatAmount(balance, a.currency)}
-                  </span>
-                  {canMatch && (
+                  <div className="flex shrink-0 items-center">
                     <button
                       type="button"
-                      onClick={() => setMatching(a)}
-                      className="flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-300"
+                      onClick={() => setEditing(a)}
+                      aria-label={t("accountEdit")}
+                      title={t("accountEdit")}
+                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                     >
-                      <Scale className="h-3 w-3" />
-                      {t("matchBalance")}
+                      <Pencil className="h-4 w-4" />
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteFailed(false);
+                        setConfirmingId(confirmingId === a.id ? null : a.id);
+                      }}
+                      aria-label={t("accountDelete")}
+                      title={t("accountDelete")}
+                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
+                {confirmingId === a.id && (
+                  <div className="mx-1 mb-1 mt-1.5 space-y-2 rounded-lg border border-red-200/70 bg-red-50 p-3 dark:border-red-900/40 dark:bg-red-950/20">
+                    <p className="text-xs leading-relaxed text-red-700 dark:text-red-300">
+                      {t("accountDeleteConfirm", { name: accountLabel(a) })}
+                    </p>
+                    {deleteFailed && (
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        {t("accountDeleteError")}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingId(null)}
+                        disabled={deletingId === a.id}
+                        className="rounded-lg bg-white py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                      >
+                        {t("accountDeleteCancel")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeAccount(a)}
+                        disabled={deletingId === a.id}
+                        className="flex items-center justify-center gap-1.5 rounded-lg bg-red-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {deletingId === a.id && (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        )}
+                        {t("accountDelete")}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </li>
             );
           })}
