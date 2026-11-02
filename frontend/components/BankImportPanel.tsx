@@ -17,21 +17,19 @@ import {
   TRANSFER_SUB_CARD_REPAYMENT,
   accountPickerLabel,
   commitBankRows,
+  createPendingImport,
+  deletePendingImport,
   fetchAccounts,
   formatAmount,
+  listPendingImports,
   previewBankCsv,
   undoBankImport,
+  updatePendingImport,
 } from "@/lib/api";
 import {
   translateCategory,
   translateSubCategory,
 } from "@/lib/category-i18n";
-import {
-  ImportDraft,
-  listImportDrafts,
-  removeImportDraft,
-  saveImportDraft,
-} from "@/lib/import-drafts";
 
 interface Props {
   scope: LedgerScope;
@@ -40,10 +38,17 @@ interface Props {
   onChanged: () => void;
 }
 
+type Bucket = BankPreviewRow["bucket"] | "later";
+
 interface RowState {
+  /** Stable id for the row: its statement line, or the saved set-aside entry. */
+  key: string;
+  /** Set when the row was set aside to finish later (shared with the partner in a shared ledger). */
+  pendingId?: string;
+  mine?: boolean;
   row: BankPreviewRow;
-  /** Where the row sits now; the user can move it between "review" and "duplicate". */
-  bucket: BankPreviewRow["bucket"];
+  /** Where the row sits now; the user can move it between "review" and "duplicate", or set it aside. */
+  bucket: Bucket;
   include: boolean;
   merchant: string;
   note: string;
@@ -56,6 +61,9 @@ interface RowState {
 }
 
 const SAVED_KEY = "pairpocket.bankImportSaved";
+
+const rowButton =
+  "rounded-lg bg-gray-100 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700";
 
 const isMove = (r: Pick<RowState, "category" | "subCategory">) =>
   r.category === TRANSFER_CATEGORY && r.subCategory === TRANSFER_SUB_ACCOUNT_TRANSFER;
@@ -75,6 +83,7 @@ function initialState(row: BankPreviewRow, cards: FinancialAccount[]): RowState 
     subCategory = TRANSFER_SUB_ACCOUNT_TRANSFER;
   }
   return {
+    key: `r:${row.index}`,
     row,
     bucket: row.bucket,
     include: row.bucket === "auto",
@@ -133,13 +142,29 @@ export default function BankImportPanel({
   const [rows, setRows] = useState<RowState[]>([]);
   const [sourceName, setSourceName] = useState("");
   const [otherLedgerAccounts, setOtherLedgerAccounts] = useState<FinancialAccount[]>([]);
-  const [drafts, setDrafts] = useState<ImportDraft<RowState>[]>([]);
   const [confirmUndo, setConfirmUndo] = useState(false);
   const tAccountType = useTranslations("accountType");
 
+  async function loadPending(forAccount: string) {
+    try {
+      const list = await listPendingImports<RowState>(forAccount);
+      const loaded: RowState[] = list.map((item) => ({
+        ...item.state,
+        key: `p:${item.id}`,
+        pendingId: item.id,
+        mine: item.mine,
+        bucket: "later",
+        include: false,
+      }));
+      setRows((prev) => [...prev.filter((r) => !r.pendingId), ...loaded]);
+    } catch {
+      setRows((prev) => prev.filter((r) => !r.pendingId));
+    }
+  }
+
   useEffect(() => {
-    setDrafts(listImportDrafts<RowState>());
-  }, []);
+    if (accountId) void loadPending(accountId);
+  }, [accountId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,10 +217,13 @@ export default function BankImportPanel({
       const result = await previewBankCsv(accountId, file);
       setPreview(result);
       setSourceName(file.name);
-      setRows(result.rows.map((r) => initialState(r, cards)));
+      setRows((prev) => [
+        ...result.rows.map((r) => initialState(r, cards)),
+        ...prev.filter((r) => r.pendingId),
+      ]);
     } catch {
       setPreview(null);
-      setRows([]);
+      setRows((prev) => prev.filter((r) => r.pendingId));
       setError(t("previewFailed"));
     } finally {
       setBusy(false);
@@ -229,10 +257,8 @@ export default function BankImportPanel({
     }
   }
 
-  function patch(index: number, change: Partial<RowState>) {
-    setRows((prev) =>
-      prev.map((r) => (r.row.index === index ? { ...r, ...change } : r))
-    );
+  function patch(key: string, change: Partial<RowState>) {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...change } : r)));
   }
 
   const groups = (presets ? presets : { expense: [], income: [] }) as CategoryPresets;
@@ -268,37 +294,58 @@ export default function BankImportPanel({
 
   function reset() {
     setPreview(null);
-    setRows([]);
+    setRows((prev) => prev.filter((r) => r.pendingId));
     setFile(null);
     setSourceName("");
     setError(null);
   }
 
-  function saveForLater() {
-    if (!preview) return;
-    setDrafts(
-      saveImportDraft<RowState>({
-        accountId: preview.account_id,
-        accountName: account ? accountPickerLabel(account) : "",
-        fileName: sourceName,
-        rows,
-      })
-    );
+  function changeAccount(id: string) {
+    setAccountId(id);
     reset();
   }
 
-  function resume(draft: ImportDraft<RowState>) {
-    setDrafts(removeImportDraft<RowState>(draft.id));
-    setAccountId(draft.accountId);
-    setSaved(null);
-    setFile(null);
-    setSourceName(draft.fileName);
-    setPreview({
-      account_id: draft.accountId,
-      rows: draft.rows.map((r) => r.row),
-      summary: { auto: 0, review: 0, duplicate: 0 },
-    });
-    setRows(draft.rows);
+  /** The row as stored for later: edits included, nothing tied to this screen. */
+  function stateOf(r: RowState) {
+    const { key: _key, pendingId: _pendingId, mine: _mine, ...rest } = r;
+    return rest;
+  }
+
+  async function setAside(r: RowState) {
+    setError(null);
+    try {
+      const made = await createPendingImport(accountId, stateOf(r), sourceName);
+      patch(r.key, {
+        key: `p:${made.id}`,
+        pendingId: made.id,
+        mine: true,
+        bucket: "later",
+        include: false,
+      });
+    } catch {
+      setError(t("saveFailed"));
+    }
+  }
+
+  async function saveSetAside(r: RowState) {
+    if (!r.pendingId) return;
+    setError(null);
+    try {
+      await updatePendingImport(r.pendingId, stateOf(r));
+    } catch {
+      setError(t("saveFailed"));
+    }
+  }
+
+  async function dropSetAside(r: RowState) {
+    if (!r.pendingId) return;
+    setError(null);
+    try {
+      await deletePendingImport(r.pendingId);
+      setRows((prev) => prev.filter((x) => x.key !== r.key));
+    } catch {
+      setError(t("saveFailed"));
+    }
   }
 
   function moveName(targetId: string): string {
@@ -309,19 +356,19 @@ export default function BankImportPanel({
 
   function pickMoveTarget(r: RowState, targetId: string) {
     const generated = !r.merchant.trim() || r.merchant === r.row.description || r.merchant.includes(" → ");
-    patch(r.row.index, {
+    patch(r.key, {
       moveId: targetId,
       ...(generated ? { merchant: moveName(targetId) } : {}),
     });
   }
 
   async function save() {
-    if (!preview || chosen.length === 0 || incomplete > 0) return;
+    if (!accountId || chosen.length === 0 || incomplete > 0) return;
     setBusy(true);
     setError(null);
     try {
       const result = await commitBankRows(
-        preview.account_id,
+        accountId,
         chosen.map((r) => {
           const base = {
             date: r.date || r.row.date,
@@ -337,7 +384,8 @@ export default function BankImportPanel({
             return { ...base, kind: "card_repayment" as const, counter_account_id: r.cardId };
           }
           return { ...base, category: r.category, sub_category: r.subCategory };
-        })
+        }),
+        chosen.flatMap((r) => (r.pendingId ? [r.pendingId] : []))
       );
       const done = { count: result.created, batchId: result.batch_id };
       setSaved(done);
@@ -346,7 +394,10 @@ export default function BankImportPanel({
       } catch {
         /* storage unavailable; the message only shows until the refresh */
       }
-      reset();
+      setPreview(null);
+      setRows((prev) => prev.filter((r) => r.pendingId && !r.include));
+      setFile(null);
+      setSourceName("");
       onChanged();
     } catch {
       setError(t("saveFailed"));
@@ -394,7 +445,7 @@ export default function BankImportPanel({
       sameLedgerTarget(r.moveId);
     return (
       <li
-        key={row.index}
+        key={r.key}
         className="space-y-2 rounded-xl border border-gray-150 p-3 dark:border-gray-800"
       >
         <div className="flex items-start gap-2">
@@ -402,7 +453,7 @@ export default function BankImportPanel({
             <input
               type="checkbox"
               checked={r.include}
-              onChange={(e) => patch(row.index, { include: e.target.checked })}
+              onChange={(e) => patch(r.key, { include: e.target.checked })}
               aria-label={t("includeRow")}
               className="mt-0.5 rounded text-indigo-600"
             />
@@ -450,7 +501,7 @@ export default function BankImportPanel({
                     row.direction,
                     options.find((g) => g.category === v)
                   );
-                  patch(row.index, {
+                  patch(r.key, {
                     category: v,
                     subCategory: v === TRANSFER_CATEGORY && next.length === 1 ? next[0] : "",
                   });
@@ -466,7 +517,7 @@ export default function BankImportPanel({
               />
               <Dropdown
                 value={r.subCategory}
-                onChange={(v) => patch(row.index, { subCategory: v })}
+                onChange={(v) => patch(r.key, { subCategory: v })}
                 ariaLabel={t("subCategory")}
                 placeholder={t("subCategory")}
                 disabled={!r.category}
@@ -494,7 +545,7 @@ export default function BankImportPanel({
               {isCardPayment(r) && (
                 <Dropdown
                   value={r.cardId}
-                  onChange={(v) => patch(row.index, { cardId: v })}
+                  onChange={(v) => patch(r.key, { cardId: v })}
                   ariaLabel={t("card")}
                   placeholder={t("pickCard")}
                   size="sm"
@@ -507,20 +558,20 @@ export default function BankImportPanel({
               <input
                 type="date"
                 value={r.date}
-                onChange={(e) => patch(row.index, { date: e.target.value })}
+                onChange={(e) => patch(r.key, { date: e.target.value })}
                 aria-label={t("date")}
                 className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
               <input
                 value={r.merchant}
-                onChange={(e) => patch(row.index, { merchant: e.target.value })}
+                onChange={(e) => patch(r.key, { merchant: e.target.value })}
                 placeholder={t("merchant")}
                 aria-label={t("merchant")}
                 className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
               <input
                 value={r.note}
-                onChange={(e) => patch(row.index, { note: e.target.value })}
+                onChange={(e) => patch(r.key, { note: e.target.value })}
                 placeholder={t("note")}
                 aria-label={t("note")}
                 maxLength={200}
@@ -535,25 +586,48 @@ export default function BankImportPanel({
         {r.include && !isDuplicate && !isComplete(r) && !moveBlocked && (
           <p className="text-[11px] text-red-500">{t("needsChoice")}</p>
         )}
-        {r.bucket !== "auto" && (
-          <button
-            type="button"
-            onClick={() =>
-              isDuplicate
-                ? patch(row.index, { bucket: "review", include: false })
-                : patch(row.index, { bucket: "duplicate", include: false })
-            }
-            className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-          >
-            {isDuplicate ? t("notDuplicate") : t("isDuplicate")}
-          </button>
+        {r.mine === false && (
+          <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
+            {t("fromPartner")}
+          </p>
         )}
+        <div className="flex flex-wrap gap-2">
+          {(r.bucket === "review" || r.bucket === "duplicate") && (
+            <button
+              type="button"
+              onClick={() =>
+                patch(r.key, {
+                  bucket: isDuplicate ? "review" : "duplicate",
+                  include: false,
+                })
+              }
+              className={rowButton}
+            >
+              {isDuplicate ? t("notDuplicate") : t("isDuplicate")}
+            </button>
+          )}
+          {r.bucket === "review" && (
+            <button type="button" onClick={() => void setAside(r)} className={rowButton}>
+              {t("later")}
+            </button>
+          )}
+          {r.bucket === "later" && (
+            <>
+              <button type="button" onClick={() => void saveSetAside(r)} className={rowButton}>
+                {t("saveEdits")}
+              </button>
+              <button type="button" onClick={() => void dropSetAside(r)} className={rowButton}>
+                {t("deleteRow")}
+              </button>
+            </>
+          )}
+        </div>
       </li>
     );
   }
 
   function section(
-    bucket: BankPreviewRow["bucket"],
+    bucket: Bucket,
     title: string,
     hint: string,
     open: boolean
@@ -609,7 +683,7 @@ export default function BankImportPanel({
             </span>
             <Dropdown
               value={accountId}
-              onChange={setAccountId}
+              onChange={changeAccount}
               ariaLabel={t("account")}
               options={accounts.map((a) => ({ value: a.id, label: accountPickerLabel(a) }))}
             />
@@ -737,55 +811,20 @@ export default function BankImportPanel({
         </div>
       )}
 
-      {!preview && drafts.some((d) => accounts.some((a) => a.id === d.accountId)) && (
-        <div className="space-y-2 rounded-2xl border border-gray-150 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-          <p className="text-sm font-bold text-gray-900 dark:text-white">{t("draftsTitle")}</p>
-          <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("draftsHint")}</p>
-          <ul className="space-y-2">
-            {drafts
-              .filter((d) => accounts.some((a) => a.id === d.accountId))
-              .map((d) => (
-                <li
-                  key={d.id}
-                  className="flex items-center gap-2 rounded-xl border border-gray-150 p-3 dark:border-gray-800"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold text-gray-800 dark:text-gray-100">
-                      {d.fileName || d.accountName}
-                    </span>
-                    <span className="block truncate text-[11px] text-gray-500 dark:text-gray-400">
-                      {d.accountName} · {d.savedAt.slice(0, 10)} ·{" "}
-                      {t("draftLeft", { count: d.rows.filter((r) => r.bucket !== "duplicate").length })}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => resume(d)}
-                    className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-                  >
-                    {t("draftResume")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDrafts(removeImportDraft<RowState>(d.id))}
-                    className="shrink-0 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                  >
-                    {t("draftDelete")}
-                  </button>
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
-
-      {preview && (
+      {rows.length > 0 && (
         <>
-          {sourceName && (
+          {preview && sourceName && (
             <p className="truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
               {t("workingOn", { name: sourceName })}
             </p>
           )}
           {section("review", t("reviewTitle"), t("reviewHint"), true)}
+          {section(
+            "later",
+            t("laterTitle"),
+            accountType === "shared" ? t("laterHintShared") : t("laterHintPersonal"),
+            true
+          )}
           {section("auto", t("autoTitle"), t("autoHint"), false)}
           {section("duplicate", t("duplicateTitle"), t("duplicateHint"), false)}
 
@@ -796,22 +835,16 @@ export default function BankImportPanel({
               </p>
             )}
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={reset}
-                disabled={busy}
-                className="shrink-0 rounded-xl bg-gray-100 px-3.5 py-3 text-xs font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-              >
-                {t("cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={saveForLater}
-                disabled={busy}
-                className="shrink-0 rounded-xl bg-gray-100 px-3.5 py-3 text-xs font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-              >
-                {t("later")}
-              </button>
+              {preview && (
+                <button
+                  type="button"
+                  onClick={reset}
+                  disabled={busy}
+                  className="shrink-0 rounded-xl bg-gray-100 px-3.5 py-3 text-xs font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  {t("cancel")}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void save()}

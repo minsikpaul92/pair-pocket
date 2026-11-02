@@ -2715,12 +2715,13 @@ export async function previewBankCsv(
 
 export async function commitBankRows(
   accountId: string,
-  items: BankImportItem[]
+  items: BankImportItem[],
+  pendingIds: string[] = []
 ): Promise<{ created: number; batch_id: string }> {
   const res = await apiFetch(`${API_BASE_URL}/api/import/bank/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ account_id: accountId, items }),
+    body: JSON.stringify({ account_id: accountId, items, pending_ids: pendingIds }),
   });
   if (!res.ok) throw await readApiError(res, "saveBank");
   return (await res.json()) as { created: number; batch_id: string };
@@ -2729,6 +2730,59 @@ export async function commitBankRows(
 export async function undoBankImport(batchId: string): Promise<void> {
   const res = await apiFetch(
     `${API_BASE_URL}/api/import/bank/batch/${encodeURIComponent(batchId)}`,
+    { method: "DELETE", headers: authHeaders() }
+  );
+  if (!res.ok) throw await readApiError(res, "undoBank");
+}
+
+/** A statement row set aside to finish later; the partner sees it in a shared ledger. */
+export interface PendingImportRow<T = unknown> {
+  id: string;
+  account_id: string;
+  source_name: string;
+  state: T;
+  created_at: string;
+  mine: boolean;
+}
+
+export async function listPendingImports<T>(accountId: string): Promise<PendingImportRow<T>[]> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/import/bank/pending?account_id=${encodeURIComponent(accountId)}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw await readApiError(res, "saveBank");
+  return (await res.json()) as PendingImportRow<T>[];
+}
+
+export async function createPendingImport<T>(
+  accountId: string,
+  state: T,
+  sourceName: string
+): Promise<PendingImportRow<T>> {
+  const res = await apiFetch(`${API_BASE_URL}/api/import/bank/pending`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ account_id: accountId, state, source_name: sourceName }),
+  });
+  if (!res.ok) throw await readApiError(res, "saveBank");
+  return (await res.json()) as PendingImportRow<T>;
+}
+
+export async function updatePendingImport<T>(id: string, state: T): Promise<void> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/import/bank/pending/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ state }),
+    }
+  );
+  if (!res.ok) throw await readApiError(res, "saveBank");
+}
+
+export async function deletePendingImport(id: string): Promise<void> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/import/bank/pending/${encodeURIComponent(id)}`,
     { method: "DELETE", headers: authHeaders() }
   );
   if (!res.ok) throw await readApiError(res, "undoBank");

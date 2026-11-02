@@ -1,7 +1,8 @@
 """Bank statement import: preview what is new, already entered, or needs a look."""
 
 from datetime import date as date_type, datetime, time
-from typing import Literal
+import json
+from typing import Any, Literal
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -185,6 +186,8 @@ class ImportItem(BaseModel):
 class CommitBody(BaseModel):
     account_id: str
     items: list[ImportItem] = Field(min_length=1, max_length=MAX_ROWS)
+    # Set-aside rows these items came from; they are cleared once saved.
+    pending_ids: list[str] = Field(default_factory=list, max_length=MAX_ROWS)
 
 
 def _payload(account: dict, item: ImportItem, counter: dict | None = None) -> TransactionCreate:
@@ -293,6 +296,7 @@ async def commit_bank_rows(
     for document in documents:
         document["import_batch_id"] = batch_id
     await db["transactions"].insert_many(documents)
+    await _delete_pending(db, current_user, account, body.pending_ids)
     return {"created": len(body.items), "batch_id": batch_id}
 
 
@@ -313,3 +317,141 @@ async def undo_bank_import(
         )
     result = await db["transactions"].delete_many(query)
     return {"deleted": result.deleted_count}
+
+
+# --- Rows set aside to finish later -------------------------------------
+# In a shared ledger the partner sees and can finish them too.
+
+MAX_STATE_BYTES = 20_000
+
+
+class PendingBody(BaseModel):
+    account_id: str
+    # The row as the review screen holds it, edits included. Opaque to the server.
+    state: dict[str, Any]
+    source_name: str = Field(default="", max_length=200)
+
+
+class PendingUpdate(BaseModel):
+    state: dict[str, Any]
+
+
+def _check_state(state: dict[str, Any]) -> None:
+    if len(json.dumps(state)) > MAX_STATE_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Row is too large")
+
+
+async def _account_for(db, current_user: UserOut, account_id: str) -> dict:
+    try:
+        account = await db["accounts"].find_one({"_id": ObjectId(account_id)})
+    except InvalidId:
+        account = None
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    await assert_can_access_doc(db, current_user, account)
+    return account
+
+
+async def _pending_scope(db, current_user: UserOut, account: dict) -> dict:
+    ledger = AccountType(account["account_type"])
+    owner_ids = await resolve_owner_ids(db, current_user, ledger)
+    return {
+        **owner_match(owner_ids),
+        "account_type": ledger.value,
+        **shared_scope(ledger.value, current_user.shared_group_id),
+        "account_id": str(account["_id"]),
+    }
+
+
+async def _delete_pending(db, current_user: UserOut, account: dict, ids: list[str]) -> None:
+    valid = [ObjectId(i) for i in ids if ObjectId.is_valid(i)]
+    if not valid:
+        return
+    scope = await _pending_scope(db, current_user, account)
+    await db["import_pending"].delete_many({**scope, "_id": {"$in": valid}})
+
+
+def _pending_out(doc: dict, user_id: str) -> dict:
+    return {
+        "id": str(doc["_id"]),
+        "account_id": doc["account_id"],
+        "source_name": doc.get("source_name", ""),
+        "state": doc["state"],
+        "created_at": doc["created_at"].isoformat(),
+        "mine": doc.get("created_by") == user_id,
+    }
+
+
+@router.get("/pending")
+async def list_pending(
+    account_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> list[dict]:
+    account = await _account_for(db, current_user, account_id)
+    scope = await _pending_scope(db, current_user, account)
+    docs = await db["import_pending"].find(scope).sort("created_at", 1).to_list(length=MAX_ROWS)
+    return [_pending_out(d, current_user.id) for d in docs]
+
+
+@router.post("/pending", status_code=status.HTTP_201_CREATED)
+async def create_pending(
+    body: PendingBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    account = await _account_for(db, current_user, body.account_id)
+    ledger = AccountType(account["account_type"])
+    require_shared_group_for_write(current_user, ledger)
+    _check_state(body.state)
+    document = {
+        "owner_id": current_user.id,
+        "created_by": current_user.id,
+        "account_type": ledger.value,
+        "shared_group_id": current_user.shared_group_id if ledger == AccountType.SHARED else None,
+        "account_id": str(account["_id"]),
+        "source_name": body.source_name,
+        "state": body.state,
+        "created_at": datetime.utcnow(),
+    }
+    result = await db["import_pending"].insert_one(document)
+    return _pending_out({**document, "_id": result.inserted_id}, current_user.id)
+
+
+async def _pending_doc(db, current_user: UserOut, pending_id: str) -> dict:
+    found = (
+        await db["import_pending"].find_one({"_id": ObjectId(pending_id)})
+        if ObjectId.is_valid(pending_id)
+        else None
+    )
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+    account = await _account_for(db, current_user, found["account_id"])
+    scope = await _pending_scope(db, current_user, account)
+    if not await db["import_pending"].find_one({**scope, "_id": found["_id"]}, {"_id": 1}):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+    return found
+
+
+@router.put("/pending/{pending_id}")
+async def update_pending(
+    pending_id: str,
+    body: PendingUpdate,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    found = await _pending_doc(db, current_user, pending_id)
+    _check_state(body.state)
+    await db["import_pending"].update_one({"_id": found["_id"]}, {"$set": {"state": body.state}})
+    return _pending_out({**found, "state": body.state}, current_user.id)
+
+
+@router.delete("/pending/{pending_id}")
+async def delete_pending(
+    pending_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    found = await _pending_doc(db, current_user, pending_id)
+    await db["import_pending"].delete_one({"_id": found["_id"]})
+    return {"deleted": 1}

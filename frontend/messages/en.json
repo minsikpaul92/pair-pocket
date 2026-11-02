@@ -772,11 +772,6 @@
     "waiting": "{count} entries still need your check.",
     "save": "Save {count}",
     "later": "Later",
-    "draftsTitle": "Imports to finish later",
-    "draftsHint": "Kept in this browser only. Continue or delete them any time.",
-    "draftLeft": "{count, plural, one {# entry left} other {# entries left}}",
-    "draftResume": "Continue",
-    "draftDelete": "Delete",
     "notDuplicate": "Not a duplicate",
     "isDuplicate": "It is a duplicate",
     "note": "Note",
@@ -789,6 +784,12 @@
     "workingOn": "Working on {name}",
     "keep": "No",
     "date": "Date",
+    "laterTitle": "To finish later",
+    "laterHintShared": "Your partner can see and finish these too.",
+    "laterHintPersonal": "Come back to edit or delete them any time.",
+    "saveEdits": "Save changes",
+    "deleteRow": "Delete",
+    "fromPartner": "Left by your partner",
     "cancel": "Cancel",
     "fileRows": "{count, plural, one {# row} other {# rows}}",
     "changeFile": "Change",
@@ -1202,7 +1203,7 @@
     "items": {
       "importPolish": {
         "title": "Easier statement import and a filter by account",
-        "description": "Statement import now fills in suggestions for every row, shows which entry a skipped row matched, lets you move a row between Needs a look and Already entered, and saves moves between your own accounts, including joint to personal. You can set a statement aside to finish later. The list can be filtered by account or card."
+        "description": "Statement import now fills in suggestions for every row, shows which entry a skipped row matched, lets you move a row between Needs a look and Already entered, and saves moves between your own accounts, including joint to personal. You can set single rows aside to finish later, and your partner can finish them in a shared ledger. The list can be filtered by account or card."
       },
       "bankStatementImport": {
         "title": "Import your bank statement",
