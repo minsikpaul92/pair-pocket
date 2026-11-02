@@ -1234,6 +1234,10 @@
   },
   "whatsNew": {
     "items": {
+      "cardRefundBalance": {
+        "title": "Card refunds now lower what you owe",
+        "description": "Refunds and rebates credited to a card now reduce its balance. In Match balance you can also enter a negative amount for a card you overpaid."
+      },
       "settingsTabs": {
         "title": "Settings are split into tabs, with balance matching",
         "description": "Settings now have Accounts, Dashboard, Entry, Partner and App tabs. In Accounts you can edit an account and enter your bank balance to match the app in one step."
