@@ -791,6 +791,8 @@
     "deleteRow": "Delete",
     "fromPartner": "Left by your partner",
     "settlesWhich": "Which expense does this settle? If it is not entered yet, set the row aside for later.",
+    "savedTo": "{count, plural, one {# entry saved to {account}} other {# entries saved to {account}}}",
+    "dismiss": "Dismiss",
     "cancel": "Cancel",
     "fileRows": "{count, plural, one {# row} other {# rows}}",
     "changeFile": "Change",

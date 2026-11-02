@@ -122,10 +122,10 @@ export default function BankImportPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Saving refreshes the app, which remounts this panel, so the result survives via sessionStorage.
-  const [saved, setSaved] = useState<{ count: number; batchId: string } | null>(() => {
+  const [saved, setSaved] = useState<{ count: number; batchId: string; account?: string } | null>(() => {
     try {
       const stored = window.sessionStorage.getItem(SAVED_KEY);
-      return stored ? (JSON.parse(stored) as { count: number; batchId: string }) : null;
+      return stored ? (JSON.parse(stored) as { count: number; batchId: string; account?: string }) : null;
     } catch {
       return null;
     }
@@ -414,7 +414,11 @@ export default function BankImportPanel({
         }),
         chosen.flatMap((r) => (r.pendingId ? [r.pendingId] : []))
       );
-      const done = { count: result.created, batchId: result.batch_id };
+      const done = {
+        count: result.created,
+        batchId: result.batch_id,
+        account: account ? accountPickerLabel(account) : undefined,
+      };
       setSaved(done);
       try {
         window.sessionStorage.setItem(SAVED_KEY, JSON.stringify(done));
@@ -823,7 +827,11 @@ export default function BankImportPanel({
       {error && <p className="text-xs text-red-500">{error}</p>}
       {saved !== null && (
         <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-          <span>{t("saved", { count: saved.count })}</span>
+          <span className="min-w-0 flex-1">
+            {saved.account
+              ? t("savedTo", { count: saved.count, account: saved.account })
+              : t("saved", { count: saved.count })}
+          </span>
           {confirmUndo ? (
             <span className="flex shrink-0 items-center gap-1.5">
               <span className="font-normal">{t("undoConfirm", { count: saved.count })}</span>
@@ -853,6 +861,22 @@ export default function BankImportPanel({
               {t("undo")}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                window.sessionStorage.removeItem(SAVED_KEY);
+              } catch {
+                /* nothing stored */
+              }
+              setSaved(null);
+              setConfirmUndo(false);
+            }}
+            aria-label={t("dismiss")}
+            className="shrink-0 rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-950"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 

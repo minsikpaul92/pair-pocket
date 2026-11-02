@@ -791,6 +791,8 @@
     "deleteRow": "삭제",
     "fromPartner": "파트너가 남긴 내역",
     "settlesWhich": "어느 지출을 정산하나요? 아직 지출이 없으면 나중에 처리로 두세요.",
+    "savedTo": "{account}에 {count}건을 저장했어요",
+    "dismiss": "닫기",
     "cancel": "취소",
     "fileRows": "{count}행",
     "changeFile": "다른 파일",
