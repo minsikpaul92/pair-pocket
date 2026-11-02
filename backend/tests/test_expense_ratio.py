@@ -17,7 +17,7 @@ from app.core.security import get_current_user
 from app.database import get_database
 from app.models.ledger import (
     TRANSFER_CATEGORY,
-    TRANSFER_SUB_ETRANSFER,
+    TRANSFER_SUB_ETRANSFER_LEGACY,
     TRANSFER_SUB_SHARED_FUNDING,
 )
 from app.models.user import UserOut
@@ -66,7 +66,7 @@ def env():
     add(datetime(2026, 10, 3, 23, 59), 25, "식비", "카페")
     add(datetime(2026, 10, 4), 500, "식비", "외식")  # next Sunday
     add(datetime(2026, 10, 1), 300, TRANSFER_CATEGORY, TRANSFER_SUB_SHARED_FUNDING)
-    add(datetime(2026, 10, 2), 70, TRANSFER_CATEGORY, TRANSFER_SUB_ETRANSFER)
+    add(datetime(2026, 10, 2), 70, TRANSFER_CATEGORY, TRANSFER_SUB_ETRANSFER_LEGACY)
 
     app = FastAPI()
     for router in (stats_router, transactions_router, settings_router):

@@ -281,3 +281,39 @@ def test_failed_second_write_rolls_back_the_pair(env, monkeypatch):
         settle(env, expense_id, shared, personal)
     monkeypatch.undo()
     assert len(docs(env)) == 1
+
+
+def listed(env, ledger):
+    res = env.client.get(f"/api/transactions?account_type={ledger}&month=2026-09")
+    assert res.status_code == 200, res.text
+    return {row["id"]: row for row in res.json()}
+
+
+def test_both_entries_point_at_the_settled_expense(env):
+    shared, personal = env.accounts.shared, env.accounts.personal
+    expense_id = add_expense(env, "shared", shared)
+    assert settle(env, expense_id, shared, personal, amount=40).status_code == 201
+    income, payment = pair(env)
+
+    shared_rows = listed(env, "shared")
+    personal_rows = listed(env, "personal")
+    for row in (shared_rows[str(income["_id"])], personal_rows[str(payment["_id"])]):
+        assert row["origin"]["id"] == expense_id
+        assert row["origin"]["amount"] == 100
+        assert row["origin"]["merchant"] == "Shop"
+        assert row["origin"]["account_type"] == "shared"
+    # The settled expense itself carries no origin.
+    assert shared_rows[expense_id]["origin"] is None
+
+
+def test_partner_does_not_see_a_personal_expense_behind_a_settlement(env):
+    shared, personal = env.accounts.shared, env.accounts.personal
+    expense_id = add_expense(env, "personal", personal)
+    assert settle(env, expense_id, receive=personal, pay=shared).status_code == 201
+    income, payment = pair(env)
+
+    assert listed(env, "personal")[str(income["_id"])]["origin"]["id"] == expense_id
+    assert listed(env, "shared")[str(payment["_id"])]["origin"]["id"] == expense_id
+
+    env.act_as("partner")
+    assert listed(env, "shared")[str(payment["_id"])]["origin"] is None

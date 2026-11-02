@@ -193,7 +193,7 @@ const SUB_CATEGORY_VALUE_BY_ENGLISH: Record<string, string> = {
   "Side business": "부업",
   Resale: "중고거래",
   Tips: "팁(Tip)",
-  "Split settlement / refund": "N빵 정산/환급",
+  "Settlement / refund": "N빵 정산/환급",
   "Stock sale proceeds": "주식 판매수익",
   "Investment dividends": "투자 배당금",
   "Bank interest": "은행 이자",

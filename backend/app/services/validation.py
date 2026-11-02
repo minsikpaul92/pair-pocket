@@ -13,7 +13,6 @@ from app.models.ledger import (
     TRANSFER_SUB_INVESTMENT_FUNDING,
     TransactionKind,
     is_cashflow_transfer_sub,
-    is_etransfer_sub,
     normalize_transfer_category,
     normalize_transfer_sub_category,
     paired_transfer_ledgers,
@@ -122,7 +121,6 @@ async def validate_transaction_payload(
 
     is_transfer = is_transfer_expense(payload.category)
     pair = paired_transfer_ledgers(payload.sub_category) if is_transfer else None
-    is_etransfer = is_transfer and is_etransfer_sub(payload.sub_category)
     is_cashflow = is_transfer and is_cashflow_transfer_sub(payload.sub_category)
 
     # Personal↔shared transfers may be entered from the receiving side as
@@ -175,7 +173,7 @@ async def validate_transaction_payload(
         if not payload.settles_expense_id:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="[N빵 정산/환급]은 정산 대상 지출(settles_expense_id) 선택이 필요합니다.",
+                detail="[정산/환급]은 정산 대상 지출(settles_expense_id) 선택이 필요합니다.",
             )
         await check_settlement(
             db,
@@ -190,34 +188,8 @@ async def validate_transaction_payload(
     elif payload.settles_expense_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="settles_expense_id는 [N빵 정산/환급] 수입에서만 사용할 수 있습니다.",
+            detail="settles_expense_id는 [정산/환급] 수입에서만 사용할 수 있습니다.",
         )
-
-    if is_etransfer:
-        if not payload.account_id:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="e-Transfer는 출금 계좌가 필요합니다.",
-            )
-        if payload.counter_account_id:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="e-Transfer는 입금 계좌를 사용하지 않습니다.",
-            )
-        from_account = await _load_owned_account(
-            db,
-            account_id=payload.account_id,
-            owner_ids=account_owner_ids,
-            shared_group_id=current_user.shared_group_id if current_user else None,
-            label="출금 계좌",
-        )
-        _assert_account_matches_payload(from_account, payload, "출금 계좌")
-        if from_account.get("is_liability"):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="e-Transfer의 출금 계좌는 자산 계좌여야 합니다.",
-            )
-        return
 
     if pair:
         if not payload.account_id or not payload.counter_account_id:

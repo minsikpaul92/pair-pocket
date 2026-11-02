@@ -24,9 +24,9 @@ import {
   FinancialAccount,
   formatAmount,
   hasSettlement,
+  isMoveTransaction,
   isNonCashflowTransaction,
   isSubscriptionDueOrPast,
-  isSubscriptionTransaction,
   subCategoriesFor,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
@@ -95,7 +95,8 @@ export type UnifiedListItem =
       occ: SubscriptionOccurrence;
     };
 
-type TypeFilter = "all" | TransactionType;
+type TypeFilter = "all" | TransactionType | "move";
+const TYPE_TABS: TypeFilter[] = ["all", "expense", "income", "move"];
 type SortKey =
   | "date"
   | "currency"
@@ -111,6 +112,14 @@ function formatDay(iso: string): string {
   return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(
     d.getDate()
   ).padStart(2, "0")}`;
+}
+
+/** The Settle/Move tab holds what is neither spending nor income; All holds everything. */
+function matchesTab(item: UnifiedListItem, tab: TypeFilter): boolean {
+  if (tab === "all") return true;
+  const isMove = item.kind === "transaction" && isMoveTransaction(item.tx);
+  if (tab === "move") return isMove;
+  return !isMove && item.type === tab;
 }
 
 function displayAmount(tx: Transaction): number {
@@ -239,20 +248,26 @@ export default function ListView({
     return items;
   }, [visibleTxs, pendingOccurrences, tSub]);
 
+  /** Items that belong to the open tab; the category lists follow it. */
+  const tabItems = useMemo(
+    () => combinedItems.filter((item) => matchesTab(item, typeFilter)),
+    [combinedItems, typeFilter]
+  );
+
   const allCategories = useMemo(() => {
     if (!presets) return [];
     const set = new Set<string>();
-    for (const item of combinedItems) set.add(item.category);
+    for (const item of tabItems) set.add(item.category);
     const expense = categoriesForType(presets, "expense");
     const income = categoriesForType(presets, "income");
     // Some categories (e.g. transfers) exist for both types; keep each once.
     return Array.from(new Set([...expense, ...income])).filter((c) => set.has(c));
-  }, [presets, combinedItems]);
+  }, [presets, tabItems]);
 
   const subCategoryOptions = useMemo(() => {
     if (categoryFilter === "all") {
       const set = new Set<string>(
-        combinedItems
+        tabItems
           .map((t) => t.sub_category)
           .filter((s): s is string => Boolean(s))
       );
@@ -264,7 +279,7 @@ export default function ListView({
       );
     }
     const set = new Set<string>(
-      combinedItems
+      tabItems
         .filter((t) => t.category === categoryFilter)
         .map((t) => t.sub_category)
         .filter((s): s is string => Boolean(s))
@@ -282,7 +297,7 @@ export default function ListView({
         locale
       )
     );
-  }, [combinedItems, categoryFilter, presets, locale, tSubCategories]);
+  }, [tabItems, categoryFilter, presets, locale, tSubCategories]);
 
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -323,7 +338,7 @@ export default function ListView({
   const filtered = useMemo(() => {
     const q = merchantQuery.trim().toLowerCase();
     return combinedItems.filter((item) => {
-      if (typeFilter !== "all" && item.type !== typeFilter) return false;
+      if (!matchesTab(item, typeFilter)) return false;
       if (accountFilter !== "all") {
         // Subscriptions not yet charged have no account, so they only show under All.
         if (item.kind !== "transaction") return false;
@@ -421,16 +436,26 @@ export default function ListView({
   const totals = useMemo(() => {
     const byCurrency: Record<
       Currency,
-      { income: number; expense: number; count: number }
+      {
+        income: number;
+        expense: number;
+        moveOut: number;
+        moveIn: number;
+        count: number;
+      }
     > = {
-      CAD: { income: 0, expense: 0, count: 0 },
-      KRW: { income: 0, expense: 0, count: 0 },
-      USD: { income: 0, expense: 0, count: 0 },
+      CAD: { income: 0, expense: 0, moveOut: 0, moveIn: 0, count: 0 },
+      KRW: { income: 0, expense: 0, moveOut: 0, moveIn: 0, count: 0 },
+      USD: { income: 0, expense: 0, moveOut: 0, moveIn: 0, count: 0 },
     };
     for (const item of sorted) {
       const bucket = byCurrency[item.currency];
       bucket.count += 1;
       if (item.kind === "transaction") {
+        if (isMoveTransaction(item.tx)) {
+          if (item.tx.type === "income") bucket.moveIn += item.tx.amount;
+          else bucket.moveOut += item.tx.amount;
+        }
         if (isNonCashflowTransaction(item.tx)) continue;
         if (item.tx.type === "income") bucket.income += item.tx.amount;
         else bucket.expense += effectiveExpenseAmount(item.tx);
@@ -491,19 +516,23 @@ export default function ListView({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
-          {(["all", "expense", "income"] as TypeFilter[]).map((t) => (
+        <div className="flex shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+          {TYPE_TABS.map((t) => (
             <button
               key={t}
               type="button"
-              onClick={() => setTypeFilter(t)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              onClick={() => {
+                setTypeFilter(t);
+                setCategoryFilter("all");
+                setSubCategoryFilter("all");
+              }}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
                 typeFilter === t
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                   : "text-gray-500 dark:text-gray-400"
               }`}
             >
-              {tCommon(t)}
+              {t === "move" ? tList("tabMove") : tCommon(t)}
             </button>
           ))}
         </div>
@@ -651,7 +680,6 @@ export default function ListView({
               const transfer = isNonCashflowTransaction(tx);
               const title = rowTitle(tx, tCommon("unspecified"));
               const note = rowNote(tx, title);
-              const subscription = isSubscriptionTransaction(tx);
               const effective = item.effectiveAmount;
               return (
                 <li key={tx.id}>
@@ -677,6 +705,19 @@ export default function ListView({
                             : ""}
                           {note ? ` - ${note}` : ""}
                         </p>
+                        {tx.origin && (
+                          <p className="text-[11px] text-blue-500 truncate">
+                            {tList("settlesOrigin", {
+                              merchant:
+                                tx.origin.merchant || tCommon("unspecified"),
+                              date: formatDay(tx.origin.date),
+                              amount: formatAmount(
+                                tx.origin.amount,
+                                tx.origin.currency
+                              ),
+                            })}
+                          </p>
+                        )}
                       </div>
                       <p
                         className={`shrink-0 text-sm font-semibold tabular-nums ${
@@ -684,9 +725,7 @@ export default function ListView({
                             ? "text-gray-500"
                             : tx.type === "income"
                               ? "text-blue-500"
-                              : subscription
-                                ? "text-red-500"
-                                : "text-gray-900 dark:text-white"
+                              : "text-gray-900 dark:text-white"
                         }`}
                       >
                         {settled
@@ -711,7 +750,7 @@ export default function ListView({
               {tList("count", { count: sorted.length })}
             </span>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
             {activeCurrencies.map((c) => {
               const tot = totals[c];
               const displayVal =
@@ -729,9 +768,18 @@ export default function ListView({
                       {c === "CAD" ? "🇨🇦" : c === "KRW" ? "🇰🇷" : "🇺🇸"}
                     </span>
                   )}
-                  <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
-                    {formatAmount(displayVal, c)}
-                  </span>
+                  {typeFilter === "move" ? (
+                    <span className="text-sm font-bold tabular-nums whitespace-nowrap text-gray-900 dark:text-white">
+                      −{formatAmount(tot.moveOut, c)}{" "}
+                      <span className="text-blue-500">
+                        +{formatAmount(tot.moveIn, c)}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-sm font-bold tabular-nums whitespace-nowrap text-gray-900 dark:text-white">
+                      {formatAmount(displayVal, c)}
+                    </span>
+                  )}
                 </div>
               );
             })}

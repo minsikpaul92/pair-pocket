@@ -29,6 +29,7 @@ from app.services.settlement import (
     SETTLEMENT_EPSILON,
     check_settlement,
     get_settled_amounts,
+    load_settlement_origins,
     settled_total,
 )
 from app.services import cross_settlement
@@ -159,9 +160,11 @@ async def list_transactions(
         shared_group_id=current_user.shared_group_id,
     )
 
+    origins = await load_settlement_origins(db, current_user, documents)
     results: list[dict] = []
     for doc in documents:
         row = _serialize(doc)
+        row["origin"] = origins.get(str(doc["_id"]))
         if doc.get("type") == TransactionType.EXPENSE.value:
             exp_id = str(doc["_id"])
             settled = settled_map.get(exp_id, 0.0)
@@ -485,7 +488,7 @@ async def _guard_settled_expense(db, session, existing: dict, document: dict) ->
     ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="N빵 정산이 연결된 지출은 장부, 통화, 지출/수입 구분을 바꿀 수 없습니다.",
+            detail="정산이 연결된 지출은 장부, 통화, 지출/수입 구분을 바꿀 수 없습니다.",
         )
     if float(document["amount"]) + SETTLEMENT_EPSILON < settled:
         raise HTTPException(
@@ -711,7 +714,7 @@ async def delete_transaction(
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=(
-                        "이 지출에 연결된 N빵 정산이 있어 삭제할 수 없습니다. "
+                        "이 지출에 연결된 정산이 있어 삭제할 수 없습니다. "
                         "정산을 먼저 삭제해 주세요."
                     ),
                 )

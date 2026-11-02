@@ -15,14 +15,16 @@ export const TRANSFER_SUB_ACCOUNT_TRANSFER_LEGACY = "계좌 이체";
 export const TRANSFER_SUB_INVESTMENT_FUNDING = "투자 계좌 입금";
 export const TRANSFER_SUB_SHARED_FUNDING = "공용 계좌 입금";
 export const TRANSFER_SUB_SHARED_WITHDRAWAL = "개인 계좌로 인출";
-export const TRANSFER_SUB_ETRANSFER = "e-Transfer/계좌이체";
+/** No longer offered; kept so rows saved with it still count as cashflow. */
+const TRANSFER_SUB_ETRANSFER_LEGACY = "e-Transfer/계좌이체";
 export const INCOME_CATEGORY_SETTLEMENT = "정산";
+/** Stored value. Shown to users as 정산/환급 through the message files. */
 export const SUB_CATEGORY_SETTLEMENT = "N빵 정산/환급";
 
 const CASHFLOW_TRANSFER_SUBS = new Set([
   TRANSFER_SUB_SHARED_FUNDING,
   TRANSFER_SUB_SHARED_WITHDRAWAL,
-  TRANSFER_SUB_ETRANSFER,
+  TRANSFER_SUB_ETRANSFER_LEGACY,
 ]);
 
 /** (sending ledger, receiving ledger) of personal ↔ shared transfers. */
@@ -57,10 +59,6 @@ export function isSharedFundingSub(subCategory: string): boolean {
   );
 }
 
-export function isEtransferSub(subCategory: string): boolean {
-  return normalizeTransferSubCategory(subCategory) === TRANSFER_SUB_ETRANSFER;
-}
-
 /** Internal balance-only moves (grey / excluded from cashflow totals). */
 export function isTransferTransaction(tx: {
   kind?: TransactionKind | null;
@@ -88,13 +86,41 @@ export function isSettlementTransaction(tx: {
   );
 }
 
-/** Internal transfers and N빵 settlements — grey, excluded from income/expense totals. */
+/** Internal transfers and settlements: grey, excluded from income/expense totals. */
 export function isNonCashflowTransaction(tx: {
   kind?: TransactionKind | null;
   category: string;
   sub_category?: string | null;
 }): boolean {
   return isTransferTransaction(tx) || isSettlementTransaction(tx);
+}
+
+/** Personal ↔ shared transfers (공용 계좌 입금, 개인 계좌로 인출). */
+export function isLedgerTransferTransaction(tx: {
+  category: string;
+  sub_category?: string | null;
+}): boolean {
+  return (
+    normalizeTransferCategory(tx.category) === TRANSFER_CATEGORY &&
+    pairedTransferLedgers(tx.sub_category ?? "") !== null
+  );
+}
+
+/**
+ * Entries the list shows under the Settle/Move tab instead of Expense or
+ * Income. Only the list uses this; dashboard and stats numbers are unchanged.
+ */
+export function isMoveTransaction(tx: {
+  kind?: TransactionKind | null;
+  category: string;
+  sub_category?: string | null;
+  pair_kind?: string | null;
+}): boolean {
+  return (
+    isNonCashflowTransaction(tx) ||
+    isLedgerTransferTransaction(tx) ||
+    tx.pair_kind === "settlement"
+  );
 }
 
 export function getToken(): string | null {
@@ -403,10 +429,24 @@ export const ACCOUNT_KIND_LABEL: Record<FinancialAccountKind, string> = {
   cash: "현금",
 };
 
+/** The expense a settlement entry pays back. */
+export interface SettlementOrigin {
+  id: string;
+  date: string;
+  amount: number;
+  currency: Currency;
+  account_type: AccountType;
+  category: string;
+  sub_category: string;
+  merchant: string;
+}
+
 export interface Transaction {
   id: string;
   /** "settlement" for the two entries of a settlement paid across ledgers. */
   pair_kind?: string | null;
+  /** On settlement entries: the expense being settled, when the user may see it. */
+  origin?: SettlementOrigin | null;
   date: string;
   amount: number;
   currency: Currency;
@@ -569,7 +609,7 @@ export async function fetchAllTransactions(
   );
 }
 
-/** Expense amount after N빵 settlements (for calendar/list display). */
+/** Expense amount after settlements (for calendar/list display). */
 export function effectiveExpenseAmount(tx: Transaction): number {
   if (tx.type !== "expense") return tx.amount;
   return tx.effective_amount ?? tx.amount;
@@ -859,6 +899,8 @@ export interface SettleableExpense {
   remaining_amount: number;
   category: string;
   sub_category: string;
+  /** Ledger the expense is in; set by the entry form when it lists both ledgers. */
+  account_type?: AccountType;
 }
 
 export async function fetchSettleableExpenses(

@@ -17,7 +17,6 @@ from app.models.ledger import (
     TRANSFER_CATEGORY_LEGACY,
     TRANSFER_SUB_ACCOUNT_TRANSFER,
     TRANSFER_SUB_CARD_REPAYMENT,
-    TRANSFER_SUB_ETRANSFER,
     TRANSFER_SUB_INVESTMENT_FUNDING,
     TRANSFER_SUB_SHARED_FUNDING,
     TRANSFER_SUB_SHARED_WITHDRAWAL,
@@ -58,7 +57,6 @@ EXPENSE_PRESETS: dict[str, list[str]] = {
         TRANSFER_SUB_INVESTMENT_FUNDING,
         TRANSFER_SUB_SHARED_FUNDING,
         TRANSFER_SUB_SHARED_WITHDRAWAL,
-        TRANSFER_SUB_ETRANSFER,
     ],
 }
 
@@ -158,7 +156,7 @@ def is_internal_asset_move(category: str, sub_category: str) -> bool:
 
 
 def is_non_cashflow_transfer(category: str, sub_category: str = "") -> bool:
-    """True for internal asset moves; false for e-Transfer / shared funding."""
+    """True for internal asset moves; false for shared funding."""
     if not is_transfer_expense(category):
         return False
     if not sub_category:

@@ -19,14 +19,15 @@ TRANSFER_SUB_ACCOUNT_TRANSFER_LEGACY = "계좌 이체"
 TRANSFER_SUB_INVESTMENT_FUNDING = "투자 계좌 입금"
 TRANSFER_SUB_SHARED_FUNDING = "공용 계좌 입금"
 TRANSFER_SUB_SHARED_WITHDRAWAL = "개인 계좌로 인출"
-TRANSFER_SUB_ETRANSFER = "e-Transfer/계좌이체"
+# No longer offered. Rows saved with it keep counting as real cashflow.
+TRANSFER_SUB_ETRANSFER_LEGACY = "e-Transfer/계좌이체"
 
 # Subs that stay under 자산 이동/카드 but count as real cashflow (kind=normal).
 CASHFLOW_TRANSFER_SUBS = frozenset(
     {
         TRANSFER_SUB_SHARED_FUNDING,
         TRANSFER_SUB_SHARED_WITHDRAWAL,
-        TRANSFER_SUB_ETRANSFER,
+        TRANSFER_SUB_ETRANSFER_LEGACY,
     }
 )
 
@@ -83,7 +84,3 @@ def is_shared_funding_sub(sub_category: str) -> bool:
 def paired_transfer_ledgers(sub_category: str) -> tuple[str, str] | None:
     """(outflow ledger, inflow ledger) for personal↔shared transfer subs."""
     return PAIRED_TRANSFER_LEDGERS.get(normalize_transfer_sub_category(sub_category))
-
-
-def is_etransfer_sub(sub_category: str) -> bool:
-    return normalize_transfer_sub_category(sub_category) == TRANSFER_SUB_ETRANSFER

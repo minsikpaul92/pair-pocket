@@ -11,7 +11,8 @@ from app.models.category_preset import (
 )
 
 from app.models.transaction import AccountType
-from app.services.access import shared_scope
+from app.models.user import UserOut
+from app.services.access import assert_can_access_doc, shared_scope
 
 COLLECTION = "transactions"
 
@@ -203,3 +204,65 @@ async def check_settlement(
             detail=f"정산 금액이 남은 지출({remaining:.2f})을 초과합니다.",
         )
     return remaining
+
+
+def _object_ids(values) -> list[ObjectId]:
+    return [ObjectId(v) for v in values if isinstance(v, str) and ObjectId.is_valid(v)]
+
+
+async def load_settlement_origins(
+    db: AsyncIOMotorDatabase, user: UserOut, docs: list[dict]
+) -> dict[str, dict]:
+    """Map entry id -> the expense it settles, for settlement entries in `docs`.
+
+    A settlement income points at its expense directly. The expense paid from
+    the other ledger reaches it through its linked income. An expense the user
+    may not open (a partner's personal one) is left out.
+    """
+    expense_of: dict[str, str] = {}
+    via_twin: dict[str, str] = {}
+    for doc in docs:
+        entry_id = str(doc["_id"])
+        if doc.get("settles_expense_id"):
+            expense_of[entry_id] = doc["settles_expense_id"]
+        elif doc.get("pair_kind") == "settlement" and doc.get("linked_transaction_id"):
+            via_twin[entry_id] = doc["linked_transaction_id"]
+
+    if via_twin:
+        twins = await db[COLLECTION].find(
+            {"_id": {"$in": _object_ids(via_twin.values())}},
+            {"settles_expense_id": 1},
+        ).to_list(length=len(via_twin))
+        settled_by_twin = {str(t["_id"]): t.get("settles_expense_id") for t in twins}
+        for entry_id, twin_id in via_twin.items():
+            if settled_by_twin.get(twin_id):
+                expense_of[entry_id] = settled_by_twin[twin_id]
+
+    if not expense_of:
+        return {}
+    expenses = {
+        str(e["_id"]): e
+        for e in await db[COLLECTION]
+        .find({"_id": {"$in": _object_ids(expense_of.values())}})
+        .to_list(length=len(expense_of))
+    }
+    origins: dict[str, dict] = {}
+    for entry_id, expense_id in expense_of.items():
+        expense = expenses.get(expense_id)
+        if expense is None:
+            continue
+        try:
+            await assert_can_access_doc(db, user, expense)
+        except HTTPException:
+            continue
+        origins[entry_id] = {
+            "id": expense_id,
+            "date": expense["date"],
+            "amount": expense["amount"],
+            "currency": expense["currency"],
+            "account_type": expense["account_type"],
+            "category": expense.get("category", ""),
+            "sub_category": expense.get("sub_category", ""),
+            "merchant": expense.get("merchant", "미지정"),
+        }
+    return origins
