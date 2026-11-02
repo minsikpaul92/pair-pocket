@@ -94,3 +94,34 @@ def test_read_endpoints(env):
 
     # The poster's own rows were already read, and the partner's calls left them alone.
     assert all(r["is_read"] for r in rows(env, env.users["owner"]))
+
+
+def test_deleting_an_entry_removes_its_notifications(env):
+    tx_id = add(env, "shared", env.accounts.shared)
+    assert env.client.delete(f"/api/transactions/{tx_id}").status_code == 204
+    assert run(env.db.notifications.count_documents({})) == 0
+
+
+def test_deleting_a_cross_ledger_settlement_removes_its_notifications(env):
+    expense = add_expense(env, "shared", env.accounts.shared)
+    income_id = settle(env, expense, env.accounts.shared, env.accounts.personal).json()["id"]
+    assert env.client.delete(f"/api/transactions/{income_id}").status_code == 204
+    left = run(env.db.notifications.find({}).to_list(length=None))
+    assert {r["transaction_id"] for r in left} == {expense}
+
+
+def test_listing_skips_entries_that_no_longer_exist(env):
+    from app.services.notifications import list_for
+
+    add(env, "shared", env.accounts.shared, merchant="Kept")
+    ghost = add(env, "shared", env.accounts.shared, merchant="Gone")
+    run(env.db.transactions.delete_one({"_id": ObjectId(ghost)}))
+    listing = run(list_for(env.db, env.users["partner"].id))
+    assert [n["merchant"] for n in listing] == ["Kept"]
+
+
+def test_one_entry_can_be_fetched_by_id(env):
+    tx_id = add(env, "shared", env.accounts.shared, merchant="Costco")
+    got = env.client.get(f"/api/transactions/{tx_id}")
+    assert got.status_code == 200 and got.json()["merchant"] == "Costco"
+    assert env.client.get(f"/api/transactions/{ObjectId()}").status_code == 404
