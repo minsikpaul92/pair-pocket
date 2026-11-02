@@ -485,11 +485,18 @@ export default function TransactionModal({
     [presets, type, category]
   );
 
-  /** Personal ↔ shared transfers are entered as an expense in the sending ledger, income in the receiving one. */
+  /**
+   * Each side of a personal ↔ shared transfer is made together, so a ledger
+   * offers only the one that leaves it (공용 계좌 입금 from personal, 개인 계좌로
+   * 인출 from shared). An entry being edited keeps its own kind.
+   */
   const moveKindOptions = useMemo(() => {
-    const transfers = subCategoriesFor(presets, "expense", TRANSFER_CATEGORY).filter(
-      (sub) => !pairedTransferLedgers(sub) || ledgerTransfersAvailable
-    );
+    const editingSub = normalizeTransferSubCategory(editingTransaction?.sub_category ?? "");
+    const transfers = subCategoriesFor(presets, "expense", TRANSFER_CATEGORY).filter((sub) => {
+      const pair = pairedTransferLedgers(sub);
+      if (!pair) return true;
+      return ledgerTransfersAvailable && (pair[0] === accountType || sub === editingSub);
+    });
     return [MOVE_KIND_SETTLEMENT, ...transfers].map((value) => ({
       value,
       label: translateSubCategory(
@@ -497,7 +504,7 @@ export default function TransactionModal({
         tSubCategories
       ),
     }));
-  }, [presets, ledgerTransfersAvailable, tSubCategories]);
+  }, [presets, ledgerTransfersAvailable, accountType, editingTransaction, tSubCategories]);
 
   const isInvestment =
     type === "expense" && category === EXPENSE_CATEGORY_INVESTMENT;
