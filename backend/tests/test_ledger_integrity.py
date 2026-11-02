@@ -361,3 +361,57 @@ def test_expense_with_settlement_cannot_be_deleted(env):
     exp = expense(env, 100)
     settle(env, exp["id"], 10)
     assert env.client.delete(f"/api/transactions/{exp['id']}").status_code == 422
+
+
+def test_card_balance_counts_purchases_repayments_and_refunds(env):
+    card = {
+        "_id": ObjectId(),
+        "name": "card",
+        "kind": "credit_card",
+        "owner_id": env.users["owner"].id,
+        "account_type": "personal",
+        "shared_group_id": None,
+        "currency": "CAD",
+        "is_active": True,
+        "is_liability": True,
+        "opening_balance": 50.0,
+    }
+    run(env.db.accounts.insert_one(card))
+    card_id = str(card["_id"])
+    base = {
+        "date": "2026-09-15",
+        "currency": "CAD",
+        "account_type": "personal",
+        "owner_id": env.users["owner"].id,
+        "shared_group_id": None,
+        "category": "식비",
+        "sub_category": "외식/배달",
+        "merchant": "Shop",
+        "kind": "normal",
+    }
+    run(
+        env.db.transactions.insert_many(
+            [
+                {**base, "type": "expense", "amount": 200, "account_id": card_id},
+                {
+                    **base,
+                    "type": "expense",
+                    "kind": "transfer",
+                    "category": TRANSFER_CATEGORY,
+                    "sub_category": "카드 대금 상환",
+                    "amount": 120,
+                    "account_id": str(env.accounts.personal["_id"]),
+                    "counter_account_id": card_id,
+                },
+                {
+                    **base,
+                    "type": "income",
+                    "category": "정산",
+                    "sub_category": "N빵 정산/환급",
+                    "amount": 30,
+                    "account_id": card_id,
+                },
+            ]
+        )
+    )
+    assert balance(env, card) == 50 + 200 - 120 - 30
