@@ -810,7 +810,7 @@ export default function DashboardView({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="mt-1 text-xs font-medium text-blue-600 hover:underline"
+            className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
           >
             {tDashboard("balanceNoDefault")}
           </button>
@@ -829,7 +829,7 @@ export default function DashboardView({
           <button
             type="button"
             onClick={() => setShowBudgetModal(true)}
-            className="mt-1 text-[11px] font-medium text-blue-600 hover:underline"
+            className="mt-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
           >
             {tDashboard("budgetSet")}
           </button>
@@ -1094,7 +1094,7 @@ export default function DashboardView({
           <button
             type="button"
             onClick={() => setCreatingKind("credit_card")}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
           >
             <Plus className="h-3.5 w-3.5" />
             {tDashboard("addGeneric")}
@@ -1183,7 +1183,7 @@ export default function DashboardView({
             <button
               type="button"
               onClick={() => setCreatingKind("investment")}
-              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 whitespace-nowrap"
+              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 whitespace-nowrap"
             >
               <Plus className="h-3.5 w-3.5" />
               {tDashboard("addGeneric")}
@@ -1481,7 +1481,7 @@ function AccountGroup({
           <button
             type="button"
             onClick={onAdd}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
           >
             <Plus className="h-3.5 w-3.5" />
             {addLabel}

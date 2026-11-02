@@ -902,7 +902,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           {selectedAccountIdFilter !== "ALL" && (
             <button
               onClick={() => setSelectedAccountIdFilter("ALL")}
-              className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline transition-all bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md"
+              className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline transition-all bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md"
             >
               {t("showAll")}
             </button>
@@ -1028,7 +1028,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       }}
                       className={`p-0.5 rounded-md shrink-0 ${
                         isSelected
-                          ? "text-blue-600"
+                          ? "text-blue-600 dark:text-blue-400"
                           : "text-gray-300 hover:text-blue-500"
                       }`}
                       title={t("filterAccount")}
@@ -1314,7 +1314,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           <p className="text-sm text-gray-500 dark:text-gray-400">{t("noHoldings")}</p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="mt-3 text-xs font-bold text-blue-600 hover:underline"
+            className="mt-3 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
           >
             {t("addFirstHolding")}
           </button>
@@ -1693,7 +1693,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       resetAddForm();
                       setShowAddModal(true);
                     }}
-                    className="shrink-0 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 text-blue-600 p-2.5 rounded-xl transition-all"
+                    className="shrink-0 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 text-blue-600 dark:text-blue-400 p-2.5 rounded-xl transition-all"
                     title={t("addHolding")}
                   >
                     <Plus className="h-5 w-5" />
