@@ -43,6 +43,7 @@ import ListView from "@/components/ListView";
 import NotificationBell from "@/components/NotificationBell";
 import NotificationsView from "@/components/NotificationsView";
 import ThemeToggle from "@/components/ThemeToggle";
+import SubscriptionOffer from "@/components/SubscriptionOffer";
 import SubscriptionsView from "@/components/SubscriptionsView";
 import TransactionModal from "@/components/TransactionModal";
 import StocksView from "@/components/StocksView";
@@ -67,6 +68,7 @@ import {
   fetchCurrentUser,
   fetchInvitationMe,
   fetchPendingOccurrences,
+  fetchSubscriptions,
   fetchTransactions,
   fetchUnreadNotificationCount,
   fetchUserSettings,
@@ -75,6 +77,8 @@ import {
   skipSubscriptionOccurrence,
   syncSubscriptions,
   parseReceiptsOrStatements,
+  Subscription,
+  SubscriptionDraft,
 } from "@/lib/api";
 import { addMonths, dayKey, isoDayKey, monthKey, monthLabel, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
@@ -710,6 +714,39 @@ export default function AppShell({ user, onLogout }: Props) {
     bumpVersion();
   }
 
+  /** Entries that repeat can also be registered as subscriptions; skip ones that already are. */
+  async function offerSubscriptions(drafts: SubscriptionDraft[]) {
+    const known: Record<string, Subscription[]> = {};
+    const fresh: SubscriptionDraft[] = [];
+    for (const draft of drafts) {
+      const key = `${draft.accountType}|${draft.currency}`;
+      if (!known[key]) {
+        known[key] = await fetchSubscriptions({
+          accountType: draft.accountType,
+          currency: draft.currency,
+        }).catch(() => []);
+      }
+      const name = draft.name.trim().toLowerCase();
+      const exists = known[key].some(
+        (s) =>
+          s.name.trim().toLowerCase() === name ||
+          (s.merchant ?? "").trim().toLowerCase() === name
+      );
+      if (!exists) fresh.push(draft);
+    }
+    if (fresh.length > 0) setSubscriptionOffer((prev) => [...prev, ...fresh]);
+  }
+
+  function startSubscriptionDrafts() {
+    const drafts = subscriptionOffer;
+    setSubscriptionOffer([]);
+    setModalDate(null);
+    setEditingTransaction(null);
+    setSubscriptionQueue(drafts);
+    if (scope !== "ALL" && drafts[0]) setScope(drafts[0].currency);
+    setView("subscriptions");
+  }
+
   function handleSaved() {
     setModalDate(null);
     setEditingTransaction(null);
@@ -722,6 +759,9 @@ export default function AppShell({ user, onLogout }: Props) {
     setEditingTransaction(null);
     setParsedData(null);
   }
+
+  const [subscriptionOffer, setSubscriptionOffer] = useState<SubscriptionDraft[]>([]);
+  const [subscriptionQueue, setSubscriptionQueue] = useState<SubscriptionDraft[]>([]);
 
   function openModal(date: Date) {
     setEditingTransaction(null);
@@ -1131,6 +1171,8 @@ export default function AppShell({ user, onLogout }: Props) {
               userEmail={currentUser.email}
               focusSubscriptionId={subscriptionFocusId}
               focusCancelAction={subscriptionCancelAction}
+              draft={subscriptionQueue[0] ?? null}
+              onDraftDone={() => setSubscriptionQueue((q) => q.slice(1))}
               onFocusHandled={() => {
                 setSubscriptionFocusId(null);
                 setSubscriptionCancelAction(false);
@@ -1152,6 +1194,7 @@ export default function AppShell({ user, onLogout }: Props) {
               presets={presets}
               month={month}
               onChanged={bumpVersion}
+              onSubscriptions={(drafts) => void offerSubscriptions(drafts)}
             />
           ) : view === "settings" ? (
             <SettingsView
@@ -1450,6 +1493,14 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
       </nav>
 
+      {subscriptionOffer.length > 0 && (
+        <SubscriptionOffer
+          count={subscriptionOffer.length}
+          onStart={startSubscriptionDrafts}
+          onDismiss={() => setSubscriptionOffer([])}
+        />
+      )}
+
       {modalDate && presets && (
         <TransactionModal
           currency={modalCurrency}
@@ -1468,6 +1519,7 @@ export default function AppShell({ user, onLogout }: Props) {
           editingTransaction={editingTransaction}
           onClose={closeModal}
           onSaved={handleSaved}
+          onSubscriptionEntry={(draft) => void offerSubscriptions([draft])}
           onSelectTransaction={openEdit}
           onSelectPendingOccurrence={openSubscriptionFromPending}
           onSkipPendingOccurrence={handleSkipPendingOccurrence}

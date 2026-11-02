@@ -94,6 +94,11 @@ export function subCategoryI18nKey(value: string): string | null {
   return SUB_CATEGORY_KEY_BY_VALUE[value] ?? null;
 }
 
+/** Culture/hobbies > Subscriptions: spending that repeats every period and belongs in Fixed expenses. */
+export function isSubscriptionEntry(category: string, subCategory: string): boolean {
+  return categoryI18nKey(category) === "culture" && subCategoryI18nKey(subCategory) === "subscriptions";
+}
+
 export function translateCategory(
   value: string,
   t: (key: string) => string

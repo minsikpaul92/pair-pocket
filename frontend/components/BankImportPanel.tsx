@@ -18,6 +18,7 @@ import {
   FinancialAccount,
   LedgerScope,
   SettleableExpense,
+  SubscriptionDraft,
   TRANSFER_CATEGORY,
   TRANSFER_SUB_ACCOUNT_TRANSFER,
   TRANSFER_SUB_CARD_REPAYMENT,
@@ -34,6 +35,7 @@ import {
   updatePendingImport,
 } from "@/lib/api";
 import {
+  isSubscriptionEntry,
   translateCategory,
   translateSubCategory,
 } from "@/lib/category-i18n";
@@ -43,6 +45,8 @@ interface Props {
   accountType: AccountType;
   presets: CategoryPresets | null;
   onChanged: () => void;
+  /** Saved rows that repeat, offered for registration as subscriptions. */
+  onSubscriptions?: (drafts: SubscriptionDraft[]) => void;
 }
 
 type Bucket = BankPreviewRow["bucket"] | "later";
@@ -113,6 +117,7 @@ export default function BankImportPanel({
   accountType,
   presets,
   onChanged,
+  onSubscriptions,
 }: Props) {
   const t = useTranslations("bankImport");
   const locale = useLocale();
@@ -434,11 +439,30 @@ export default function BankImportPanel({
       } catch {
         /* storage unavailable; the message only shows until the refresh */
       }
+      const repeating: SubscriptionDraft[] = chosen
+        .filter(
+          (r) =>
+            r.row.direction === "out" &&
+            !isMove(r) &&
+            !isCardPayment(r) &&
+            isSubscriptionEntry(r.category, r.subCategory)
+        )
+        .map((r) => ({
+          name: r.merchant.trim(),
+          amount: r.row.amount,
+          currency,
+          accountType,
+          accountId,
+          category: r.category,
+          subCategory: r.subCategory,
+          date: r.date || r.row.date,
+        }));
       setPreview(null);
       setRows((prev) => prev.filter((r) => r.pendingId && !r.include));
       setFile(null);
       setSourceName("");
       onChanged();
+      if (repeating.length > 0) onSubscriptions?.(repeating);
     } catch (err) {
       // The server says why (for example a category that needs more detail).
       setError(

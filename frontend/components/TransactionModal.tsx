@@ -73,8 +73,9 @@ import {
   parseReceiptItems,
   fetchAllMerchants,
   lookupMerchant,
+  SubscriptionDraft,
 } from "@/lib/api";
-import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import { isSubscriptionEntry, translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
@@ -104,6 +105,8 @@ interface Props {
   editingTransaction?: Transaction | null;
   onClose: () => void;
   onSaved: () => void;
+  /** A new entry that repeats (culture > subscription), so it can also become a subscription. */
+  onSubscriptionEntry?: (draft: SubscriptionDraft) => void;
   onSelectTransaction?: (tx: Transaction) => void;
   onSelectPendingOccurrence?: (occ: SubscriptionOccurrence) => void;
   onSkipPendingOccurrence?: (occ: SubscriptionOccurrence) => void;
@@ -154,6 +157,7 @@ export default function TransactionModal({
   editingTransaction = null,
   onClose,
   onSaved,
+  onSubscriptionEntry,
   onSelectTransaction,
   onSelectPendingOccurrence,
   onSkipPendingOccurrence,
@@ -1420,6 +1424,23 @@ export default function TransactionModal({
         });
       } else {
         await createTransaction(payload);
+        if (
+          type === "expense" &&
+          !isStock &&
+          isSubscriptionEntry(category, subCategory) &&
+          (finalMerchant || note.trim())
+        ) {
+          onSubscriptionEntry?.({
+            name: finalMerchant || note.trim(),
+            amount: numericAmount,
+            currency: currentCurrency,
+            accountType,
+            accountId: accountId || null,
+            category,
+            subCategory,
+            date: dateStr,
+          });
+        }
       }
 
       const savedDate = parseDate(dateStr);
