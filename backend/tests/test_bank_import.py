@@ -345,3 +345,35 @@ def test_transfer_entered_from_the_other_account_counts_as_entered(env, client):
     }))
     rows = _post(client, env.accounts.personal, "2026-10-26,WO1 TFR-FR 6186275,,335.17,100\n").json()["rows"]
     assert rows[0]["bucket"] == "duplicate" and rows[0]["match"]["merchant"] == "other to this"
+
+
+def test_commit_move_to_other_ledger_saves_a_linked_pair(env, client):
+    personal, shared = env.accounts.personal, env.accounts.shared
+    res = _commit(client, personal, [
+        {"date": "2026-10-20", "amount": 100, "direction": "out", "merchant": "Fund joint",
+         "note": "rent share", "kind": "account_move", "counter_account_id": str(shared["_id"])}])
+    assert res.status_code == 201, res.text
+    saved = run(env.db.transactions.find({}).to_list(length=None))
+    assert len(saved) == 2 and res.json()["created"] == 1
+    by_ledger = {d["account_type"]: d for d in saved}
+    assert by_ledger["personal"]["type"] == "expense" and by_ledger["shared"]["type"] == "income"
+    assert by_ledger["personal"]["linked_transaction_id"] == str(by_ledger["shared"]["_id"])
+    assert by_ledger["personal"]["note"] == "rent share"
+    assert {d["import_batch_id"] for d in saved} == {res.json()["batch_id"]}
+    undo = client.delete(f"/api/import/bank/batch/{res.json()['batch_id']}")
+    assert undo.json() == {"deleted": 2}
+
+
+def test_shared_withdrawal_to_personal_account(env, client):
+    res = _commit(client, env.accounts.shared, [
+        {"date": "2026-10-20", "amount": 140, "direction": "out", "merchant": "To me",
+         "kind": "account_move", "counter_account_id": str(env.accounts.personal["_id"])}])
+    assert res.status_code == 201, res.text
+    saved = {d["account_type"]: d for d in run(env.db.transactions.find({}).to_list(length=None))}
+    assert saved["shared"]["type"] == "expense" and saved["shared"]["sub_category"] == "개인 계좌로 인출"
+    assert saved["personal"]["type"] == "income"
+
+
+def test_preview_labels_e_transfer_and_duplicate_rows(env, client):
+    rows = _post(client, env.accounts.personal, "2026-10-05,E-TRANSFER ***WKV,,2700,1\n").json()["rows"]
+    assert rows[0]["hint"] == "e_transfer" and "suggestion" in rows[0]
