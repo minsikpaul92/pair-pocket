@@ -40,6 +40,8 @@ import {
   parseAmountInput,
   subCategoriesFor,
   updateSubscription,
+  SubscriptionDraft,
+  sameDayNextMonth,
 } from "@/lib/api";
 import { dayKey, parseDate } from "@/lib/date";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
@@ -56,6 +58,8 @@ interface Props {
   presets: CategoryPresets;
   editing?: Subscription | null;
   initialParse?: OnboardingParseResult | null;
+  /** An entry that was just saved and repeats; fills the form and starts from its next period. */
+  draft?: SubscriptionDraft | null;
   userEmail?: string | null;
   onClose: () => void;
   onSaved: () => void;
@@ -76,6 +80,7 @@ export default function SubscriptionRegisterModal({
   presets,
   editing = null,
   initialParse = null,
+  draft = null,
   userEmail = null,
   onClose,
   onSaved,
@@ -306,6 +311,28 @@ export default function SubscriptionRegisterModal({
       .then((s) => setHasGeminiKey(Boolean(s.has_effective_gemini_key ?? s.has_gemini_key)))
       .catch(() => setHasGeminiKey(false));
   }, [editing]);
+
+  useEffect(() => {
+    if (!draft || editing) return;
+    setName(draft.name);
+    setMerchant(draft.name);
+    setAmount(formatAmountInput(String(draft.amount), draft.currency));
+    setCategory(draft.category);
+    setSubCategory(draft.subCategory);
+    setCycle("monthly");
+    setSubType("subscription");
+    setRecurrenceRule("monthly");
+    setStartDate(draft.date);
+    // This period is already entered, so the schedule begins with the next one.
+    setNextDueDate(sameDayNextMonth(draft.date));
+    setDayOfMonth(parseDate(draft.date).getDate());
+    if (draft.accountId) {
+      manualAccountPickRef.current = accountContextKey;
+      setAccountId(draft.accountId);
+    }
+    setAiHint(t("draftHint"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, editing]);
 
   useEffect(() => {
     if (initialParse && !editing) {

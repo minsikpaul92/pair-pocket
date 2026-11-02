@@ -517,6 +517,7 @@
     "sharedWithdrawal": "Shared to personal transfer"
   },
   "subscriptions": {
+    "draftHint": "The entry you just saved covers this period. The first charge is set to next month.",
     "title": "Fixed expenses",
     "subtitle": "Charges are recorded automatically on due dates · Tap to edit or delete",
     "monthlySubscriptionTotal": "Monthly subscriptions",
@@ -1204,6 +1205,10 @@
   },
   "whatsNew": {
     "items": {
+      "subscriptionFromEntry": {
+        "title": "Turn a subscription entry into a fixed expense",
+        "description": "After you save a Culture / hobbies > Subscriptions entry, from the entry form or a bank import, you can add it to Fixed expenses in one tap. It repeats from next month, so this month is not counted twice."
+      },
       "importPolish": {
         "title": "Easier statement import and a filter by account",
         "description": "Statement import now fills in suggestions for every row, shows which entry a skipped row matched, lets you move a row between Needs a look and Already entered, and saves moves between your own accounts, including joint to personal. You can set single rows aside to finish later, and your partner can finish them in a shared ledger. The list can be filtered by account or card."
@@ -1249,5 +1254,11 @@
         "description": "A simpler dashboard with a monthly budget, a card for each country and default accounts."
       }
     }
+  },
+  "subscriptionOffer": {
+    "title": "{count, plural, one {Add # subscription to Fixed expenses?} other {Add # subscriptions to Fixed expenses?}}",
+    "hint": "It will repeat from next month. This month's entry stays as it is.",
+    "register": "Add",
+    "notNow": "Not now"
   }
 }

@@ -1708,6 +1708,29 @@ export function monthsBetweenDates(start: Date, end: Date): number {
   );
 }
 
+/** What the subscription form is filled with when an entry looks like a subscription. */
+export interface SubscriptionDraft {
+  name: string;
+  amount: number;
+  currency: Currency;
+  accountType: AccountType;
+  accountId: string | null;
+  category: string;
+  subCategory: string;
+  /** Day the entry was made; the subscription continues from the next period. */
+  date: string;
+}
+
+/** The same day next month, clamped to the end of a shorter month. */
+export function sameDayNextMonth(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const last = new Date(y, m + 1, 0).getDate();
+  const next = new Date(y, m, Math.min(d, last));
+  const nm = String(next.getMonth() + 1).padStart(2, "0");
+  const nd = String(next.getDate()).padStart(2, "0");
+  return `${next.getFullYear()}-${nm}-${nd}`;
+}
+
 export function addMonthsToDateKey(dateKey: string, months: number): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   const date = new Date(y, m - 1 + months, d);
