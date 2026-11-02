@@ -899,6 +899,8 @@ export interface SettleableExpense {
   remaining_amount: number;
   category: string;
   sub_category: string;
+  /** Ledger the expense is in; set by the entry form when it lists both ledgers. */
+  account_type?: AccountType;
 }
 
 export async function fetchSettleableExpenses(

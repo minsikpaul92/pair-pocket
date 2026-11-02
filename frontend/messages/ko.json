@@ -339,6 +339,8 @@
     "typeMove": "정산/이동",
     "moveKind": "종류",
     "moveKindPlaceholder": "종류 선택",
+    "settlementReceiveIn": "받는 계좌 ({ledger})",
+    "settlementOtherLedgerHint": "{ledger} 가계부의 지출이에요. 맨 위에서 고른 계좌에서 돈을 보내 정산해요.",
     "settlementOriginTitle": "원 거래",
     "fromAccount": "출금 계좌",
     "selectFromAccount": "출금 계좌 선택",
@@ -365,6 +367,8 @@
   },
   "settlement": {
     "noExpenses": "정산 가능한 지출이 없습니다.",
+    "searchPlaceholder": "사용처, 분류, 금액 검색",
+    "noExpensesMatch": "검색 결과가 없습니다.",
     "noExpensesOnDate": "선택한 날짜에 정산 가능한 지출이 없습니다."
   },
   "account": {

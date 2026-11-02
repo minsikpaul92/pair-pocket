@@ -1,11 +1,11 @@
 "use client";
 
-import { CalendarDays, Check, ChevronDown, Receipt, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Receipt, Search, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import DayPicker from "@/components/DayPicker";
-import { Currency, SettleableExpense, formatAmount } from "@/lib/api";
+import { AccountType, Currency, SettleableExpense, formatAmount } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { dayKey, formatDayLabel, isoDayKey, parseDate } from "@/lib/date";
 
@@ -15,6 +15,9 @@ interface Props {
   onChange: (expenseId: string) => void;
   currency: Currency;
   disabled?: boolean;
+  /** Ledger tabs; each option's `account_type` says which tab it is under. */
+  ledgers?: AccountType[];
+  defaultLedger?: AccountType;
 }
 
 function formatOptionLabel(
@@ -38,6 +41,8 @@ export default function SettlementExpenseSelect({
   onChange,
   currency,
   disabled = false,
+  ledgers,
+  defaultLedger,
 }: Props) {
   const locale = useLocale();
   const tCommon = useTranslations("common");
@@ -45,12 +50,16 @@ export default function SettlementExpenseSelect({
   const tTx = useTranslations("transaction");
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
+  const tAccountType = useTranslations("accountType");
 
   const [open, setOpen] = useState(false);
   const [filterDate, setFilterDate] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
   const selected = options.find((o) => o.id === value);
+  const [pickedLedger, setPickedLedger] = useState<AccountType | null>(null);
+  const ledger = pickedLedger ?? selected?.account_type ?? defaultLedger ?? ledgers?.[0];
 
   const sortedOptions = useMemo(() => {
     return [...options].sort(
@@ -59,9 +68,20 @@ export default function SettlementExpenseSelect({
   }, [options]);
 
   const filteredOptions = useMemo(() => {
-    if (!filterDate) return sortedOptions;
-    return sortedOptions.filter((exp) => isoDayKey(exp.date) === filterDate);
-  }, [sortedOptions, filterDate]);
+    const q = query.trim().toLowerCase();
+    return sortedOptions.filter((exp) => {
+      if (ledgers && exp.account_type && exp.account_type !== ledger) return false;
+      if (filterDate && isoDayKey(exp.date) !== filterDate) return false;
+      if (!q) return true;
+      return [
+        exp.merchant,
+        translateCategory(exp.category, tCategories),
+        translateSubCategory(exp.sub_category, tSubCategories),
+        String(exp.amount),
+        String(exp.remaining_amount),
+      ].some((text) => text.toLowerCase().includes(q));
+    });
+  }, [sortedOptions, ledgers, ledger, filterDate, query, tCategories, tSubCategories]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -110,8 +130,26 @@ export default function SettlementExpenseSelect({
 
       {open && (
         <div className="absolute z-20 mt-2 w-full rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10 overflow-hidden">
-          {/* Toolbar: calendar filter */}
-          <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-700 px-3 py-2">
+          {/* Toolbar: ledger tabs, calendar filter, search */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-700 px-3 py-2">
+            {ledgers && ledgers.length > 1 && (
+              <div className="flex shrink-0 rounded-lg bg-gray-100 dark:bg-gray-900 p-0.5">
+                {ledgers.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setPickedLedger(l)}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
+                      ledger === l
+                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    {tAccountType(l)}
+                  </button>
+                ))}
+              </div>
+            )}
             <DayPicker
               value={filterDate ? parseDate(filterDate) : new Date()}
               onChange={handleDateChange}
@@ -143,6 +181,15 @@ export default function SettlementExpenseSelect({
             <span className="ml-auto text-[11px] text-gray-400">
               {tCommon("latestFirst")} · {tCommon("count", { count: filteredOptions.length })}
             </span>
+            <div className="relative basis-full">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={tSettlement("searchPlaceholder")}
+                className="w-full rounded-lg bg-gray-100 dark:bg-gray-900 py-1.5 pl-8 pr-2.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none"
+              />
+            </div>
           </div>
 
           <div className="max-h-52 overflow-auto">
@@ -150,7 +197,9 @@ export default function SettlementExpenseSelect({
               <p className="px-4 py-3 text-sm text-gray-400">
                 {filterDate
                   ? tSettlement("noExpensesOnDate")
-                  : tSettlement("noExpenses")}
+                  : query.trim()
+                    ? tSettlement("noExpensesMatch")
+                    : tSettlement("noExpenses")}
               </p>
             ) : (
               <ul className="py-1">

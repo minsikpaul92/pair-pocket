@@ -768,6 +768,11 @@ export default function TransactionModal({
   const selectedSettleable = settleableExpenses.find(
     (e) => e.id === settlesExpenseId
   );
+  // The expense is in the other ledger: the money goes there from an account here.
+  const settlesOtherLedger =
+    !isEditing &&
+    selectedSettleable?.account_type !== undefined &&
+    selectedSettleable.account_type !== accountType;
 
   const fromAccountFilter = (acc: FinancialAccount) => !acc.is_liability;
   const toAccountFilter = (acc: FinancialAccount) => {
@@ -1177,17 +1182,30 @@ export default function TransactionModal({
       return;
     }
     let active = true;
-    fetchSettleableExpenses(
-      currency,
-      editingTransaction?.id,
-      accountType
-    ).then((list) => {
-      if (active) setSettleableExpenses(list);
+    // A new settlement may pick an expense from either ledger; an existing one keeps its own.
+    const ledgers: AccountType[] =
+      isEditing || !hasPartner ? [accountType] : [accountType, otherLedger];
+    Promise.all(
+      ledgers.map((ledger) =>
+        fetchSettleableExpenses(currency, editingTransaction?.id, ledger).then(
+          (list) => list.map((exp) => ({ ...exp, account_type: ledger }))
+        )
+      )
+    ).then((lists) => {
+      if (active) setSettleableExpenses(lists.flat());
     });
     return () => {
       active = false;
     };
-  }, [isSettlement, currency, accountType, isEditing, editingTransaction?.id]);
+  }, [
+    isSettlement,
+    currency,
+    accountType,
+    otherLedger,
+    hasPartner,
+    isEditing,
+    editingTransaction?.id,
+  ]);
 
   useEffect(() => {
     if (!isSettlement || isEditing || !hasPartner) {
@@ -1221,6 +1239,12 @@ export default function TransactionModal({
     setMerchant("");
     setInstitution("");
     setError(null);
+  }
+
+  function handleSettleableChange(id: string) {
+    const picked = settleableExpenses.find((e) => e.id === id);
+    if (picked?.account_type !== selectedSettleable?.account_type) setPayFromId("");
+    setSettlesExpenseId(id);
   }
 
   function handleMoveKindChange(next: string) {
@@ -1359,7 +1383,16 @@ export default function TransactionModal({
       return;
     }
 
-    if (isSettlement && payFromId && !accountId) {
+    if (isSettlement && settlesOtherLedger) {
+      if (!accountId) {
+        setError(tErrors("fromAccountRequired"));
+        return;
+      }
+      if (!payFromId) {
+        setError(tErrors("toAccountRequired"));
+        return;
+      }
+    } else if (isSettlement && payFromId && !accountId) {
       setError(tErrors("settlementReceiveAccountRequired"));
       return;
     }
@@ -1443,8 +1476,9 @@ export default function TransactionModal({
           expense_id: settlesExpenseId,
           amount: numericAmount,
           date: payload.date,
-          receive_account_id: accountId,
-          pay_account_id: payFromId,
+          // In the other ledger's expense case the account here pays and the other one receives.
+          receive_account_id: settlesOtherLedger ? payFromId : accountId,
+          pay_account_id: settlesOtherLedger ? accountId : payFromId,
           note: payload.note ?? undefined,
         });
       } else {
@@ -1533,8 +1567,10 @@ export default function TransactionModal({
       <SettlementExpenseSelect
         options={settleableExpenses}
         value={settlesExpenseId}
-        onChange={setSettlesExpenseId}
+        onChange={handleSettleableChange}
         currency={currency}
+        ledgers={isEditing || !hasPartner ? undefined : [accountType, otherLedger]}
+        defaultLedger={accountType}
       />
       {selectedSettleable && (
         <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
@@ -1552,7 +1588,24 @@ export default function TransactionModal({
           </span>
         </p>
       )}
-      {!isEditing && hasPartner && payAccounts.length > 0 && (
+      {settlesOtherLedger && (
+        <div className="mt-3">
+          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            {tTx("settlementReceiveIn", { ledger: tAccountType(otherLedger) })}
+          </label>
+          <Dropdown
+            value={payFromId}
+            onChange={setPayFromId}
+            ariaLabel={tTx("settlementReceiveIn", { ledger: tAccountType(otherLedger) })}
+            placeholder={tTx("settlementSelectReceiveAccount")}
+            options={payAccounts.map((a) => ({ value: a.id, label: accountLabel(a) }))}
+          />
+          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {tTx("settlementOtherLedgerHint", { ledger: tAccountType(otherLedger) })}
+          </p>
+        </div>
+      )}
+      {!isEditing && hasPartner && payAccounts.length > 0 && !settlesOtherLedger && (
         <div className="mt-3">
           <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {tTx("settlementPaidFrom")}

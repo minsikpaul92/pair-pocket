@@ -339,6 +339,8 @@
     "typeMove": "Settle/Move",
     "moveKind": "Kind",
     "moveKindPlaceholder": "Select a kind",
+    "settlementReceiveIn": "Receiving account ({ledger})",
+    "settlementOtherLedgerHint": "This expense is in the {ledger} ledger. The account at the top pays for it.",
     "settlementOriginTitle": "Original expense",
     "fromAccount": "From account",
     "selectFromAccount": "Select source account",
@@ -365,6 +367,8 @@
   },
   "settlement": {
     "noExpenses": "No expenses available for settlement.",
+    "searchPlaceholder": "Search merchant, category, amount",
+    "noExpensesMatch": "No expenses match your search.",
     "noExpensesOnDate": "No settleable expenses on the selected date."
   },
   "account": {
