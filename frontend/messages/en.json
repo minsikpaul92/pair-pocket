@@ -937,6 +937,8 @@
     "budgetKorea": "Korea (KRW)",
     "budgetSaved": "Saved",
     "budgetError": "Could not save the budget.",
+    "budgetAccountsTitle": "Accounts in the budget",
+    "budgetAccountsHelp": "Only spending from checked accounts counts toward the monthly budget and dashboard spending. At first, savings accounts are left out.",
     "excludeTitle": "Excluded from spending",
     "excludeHelp": "Checked categories are left out of dashboard spending, the budget, the spending chart and the spending list. Transfers such as card payments are excluded by default.",
     "layoutTitle": "Dashboard cards",
@@ -1237,8 +1239,8 @@
         "description": "Settings now have Accounts, Dashboard, Entry, Partner and App tabs. In Accounts you can edit an account and enter your bank balance to match the app in one step."
       },
       "budgetExcludesSavings": {
-        "title": "Budget no longer counts savings spending",
-        "description": "The dashboard budget and spending now leave out money paid from savings accounts and only count checking and card spending."
+        "title": "Choose which accounts count toward your budget",
+        "description": "In the Dashboard tab of Settings you can choose which accounts count toward the monthly budget and spending. At first, savings accounts are left out."
       },
       "subscriptionFromEntry": {
         "title": "Turn a subscription entry into a fixed expense",

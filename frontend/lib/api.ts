@@ -668,6 +668,8 @@ export interface UserSettings {
   dashboard_layout?: DashboardLayout;
   dashboard_layouts?: Partial<Record<"CAD" | "KRW", DashboardLayout>>;
   spending_excluded_categories?: string[];
+  /** Account ids left out of the budget; null/absent = savings accounts. */
+  spending_excluded_accounts?: string[] | null;
   sales_tax_province?: string;
 }
 
@@ -890,8 +892,8 @@ export interface StatsFilters {
   institution?: string;
   /** Expense categories left out of every expense figure. */
   excludeCategories?: string[];
-  /** Leave out expenses paid from savings accounts (budget view). */
-  excludeSavings?: boolean;
+  /** Leave out spending from the accounts the user excluded (budget view). */
+  applyAccountExclusions?: boolean;
 }
 
 export async function fetchStatsSummary(
@@ -910,7 +912,9 @@ export async function fetchStatsSummary(
   for (const c of filters.excludeCategories ?? []) {
     params.append("exclude_categories", c);
   }
-  if (filters.excludeSavings) params.set("exclude_savings", "true");
+  if (filters.applyAccountExclusions) {
+    params.set("apply_account_exclusions", "true");
+  }
 
   const res = await apiFetch(
     `${API_BASE_URL}/api/stats/summary?${params.toString()}`,
@@ -2277,6 +2281,21 @@ export async function saveSpendingExclusions(
     body: JSON.stringify({ categories }),
   });
   if (!res.ok) throw new ApiError("saveSpendingExclusions");
+  return (await res.json()) as UserSettings;
+}
+
+export async function saveSpendingAccountExclusions(
+  accounts: string[]
+): Promise<UserSettings> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/settings/spending-account-exclusions`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ accounts }),
+    }
+  );
+  if (!res.ok) throw new ApiError("saveSpendingAccountExclusions");
   return (await res.json()) as UserSettings;
 }
 

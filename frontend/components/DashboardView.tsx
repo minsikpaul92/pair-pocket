@@ -180,7 +180,10 @@ export default function DashboardView({
     () => userSettings?.spending_excluded_categories ?? [TRANSFER_CATEGORY],
     [userSettings]
   );
-  const excludeKey = excluded.join("|");
+  const excludeKey =
+    excluded.join("|") +
+    "#" +
+    (userSettings?.spending_excluded_accounts ?? ["default"]).join("|");
   const suppressCardClick = useRef(false);
   const suppressBrokerClick = useRef(false);
 
@@ -200,7 +203,7 @@ export default function DashboardView({
           month: monthStr,
           accountType,
           excludeCategories: excluded,
-          excludeSavings: true,
+          applyAccountExclusions: true,
         }).catch(() => null)
       );
       worthJobs.push(
@@ -218,7 +221,7 @@ export default function DashboardView({
           month: monthStr,
           accountType,
           excludeCategories: excluded,
-          excludeSavings: true,
+          applyAccountExclusions: true,
         }).catch(() => null)
       );
       worthJobs.push(
@@ -283,7 +286,7 @@ export default function DashboardView({
           month: prevMonth,
           accountType,
           excludeCategories: excluded,
-          excludeSavings: true,
+          applyAccountExclusions: true,
         }).catch(() => null)
       )
     ).then((list) => {

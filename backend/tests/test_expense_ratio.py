@@ -178,18 +178,15 @@ def test_hidden_entries_accept_sub_categories(env):
     assert res.json()["expense_ratio_hidden_categories"] == ["주거/통신 › 월세/모기지"]
 
 
-def test_exclude_savings_drops_only_savings_expenses(env):
-    savings = run(
-        env.db.accounts.insert_one(
-            {"kind": "savings", "owner_id": env.user.id, "account_type": "personal"}
-        )
-    ).inserted_id
-    checking = run(
-        env.db.accounts.insert_one(
-            {"kind": "checking", "owner_id": env.user.id, "account_type": "personal"}
-        )
-    ).inserted_id
-    for account, amount in ((savings, 100), (checking, 30)):
+def _add_account_expenses(env):
+    ids = {}
+    for kind, amount in (("savings", 100), ("checking", 30)):
+        account = run(
+            env.db.accounts.insert_one(
+                {"kind": kind, "owner_id": env.user.id, "account_type": "personal"}
+            )
+        ).inserted_id
+        ids[kind] = str(account)
         run(
             env.db.transactions.insert_one(
                 {
@@ -208,9 +205,31 @@ def test_exclude_savings_drops_only_savings_expenses(env):
                 }
             )
         )
-    params = {"currency": "CAD", "month": "2026-11"}
-    assert env.client.get("/api/stats/summary", params=params).json()["total_expense"] == 130
+    return ids
+
+
+def _spent(env, **extra):
     body = env.client.get(
-        "/api/stats/summary", params={**params, "exclude_savings": "true"}
+        "/api/stats/summary",
+        params={"currency": "CAD", "month": "2026-11", **extra},
     ).json()
-    assert body["total_expense"] == 30
+    return body["total_expense"]
+
+
+def test_budget_leaves_savings_out_by_default(env):
+    _add_account_expenses(env)
+    assert _spent(env) == 130
+    assert _spent(env, apply_account_exclusions="true") == 30
+
+
+def test_budget_uses_the_accounts_the_user_left_out(env):
+    ids = _add_account_expenses(env)
+    res = env.client.put(
+        "/api/settings/spending-account-exclusions",
+        json={"accounts": [ids["checking"]]},
+    )
+    assert res.status_code == 200
+    assert res.json()["spending_excluded_accounts"] == [ids["checking"]]
+    assert _spent(env, apply_account_exclusions="true") == 100
+    env.client.put("/api/settings/spending-account-exclusions", json={"accounts": []})
+    assert _spent(env, apply_account_exclusions="true") == 130

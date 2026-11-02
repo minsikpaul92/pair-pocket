@@ -9,11 +9,15 @@ import {
   LedgerScope,
   UserSettings,
   CategoryGroup,
+  FinancialAccount,
   TRANSFER_CATEGORY,
+  accountLabel,
+  fetchAccounts,
   fetchCategoryPresets,
   fetchUserSettings,
   normalizeTransferCategory,
   saveDashboardLayout,
+  saveSpendingAccountExclusions,
   saveSpendingExclusions,
   updateBudget,
 } from "@/lib/api";
@@ -48,6 +52,7 @@ export default function DashboardSettings({ accountType, scope }: Props) {
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryGroup[]>([]);
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
 
   useEffect(() => {
     fetchUserSettings()
@@ -75,6 +80,16 @@ export default function DashboardSettings({ accountType, scope }: Props) {
       .catch(() => setError(t("budgetError")));
   }, [t]);
 
+  useEffect(() => {
+    fetchAccounts({ accountType })
+      .then(setAccounts)
+      .catch(() => setError(t("budgetError")));
+  }, [accountType, t]);
+
+  const budgetAccounts = accounts.filter(
+    (a) => a.kind !== "investment" && (scope === "ALL" || a.currency === scope)
+  );
+
   const excluded = settings?.spending_excluded_categories ?? [TRANSFER_CATEGORY];
 
   async function toggleExcluded(category: string) {
@@ -83,6 +98,23 @@ export default function DashboardSettings({ accountType, scope }: Props) {
       : [...excluded, category];
     try {
       setSettings(await saveSpendingExclusions(next));
+      setError(null);
+    } catch {
+      setError(t("budgetError"));
+    }
+  }
+
+  // Until the user chooses, savings accounts are the ones left out.
+  const excludedAccounts =
+    settings?.spending_excluded_accounts ??
+    accounts.filter((a) => a.kind === "savings").map((a) => a.id);
+
+  async function toggleAccount(accountId: string) {
+    const next = excludedAccounts.includes(accountId)
+      ? excludedAccounts.filter((id) => id !== accountId)
+      : [...excludedAccounts, accountId];
+    try {
+      setSettings(await saveSpendingAccountExclusions(next));
       setError(null);
     } catch {
       setError(t("budgetError"));
@@ -180,6 +212,35 @@ export default function DashboardSettings({ accountType, scope }: Props) {
             );
           })}
         </div>
+      </section>
+
+      <section className="card-inset space-y-3 p-5">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {t("budgetAccountsTitle")}
+          </h2>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t("budgetAccountsHelp")}
+          </p>
+        </div>
+        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          {budgetAccounts.map((a) => (
+            <li key={a.id}>
+              <label className="flex cursor-pointer items-center justify-between gap-3 py-2.5">
+                <span className="min-w-0 truncate text-sm text-gray-800 dark:text-gray-100">
+                  {accountLabel(a)}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={!excludedAccounts.includes(a.id)}
+                  disabled={!settings}
+                  onChange={() => toggleAccount(a.id)}
+                  className="h-4 w-4 shrink-0 accent-blue-600"
+                />
+              </label>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="card-inset space-y-3 p-5">

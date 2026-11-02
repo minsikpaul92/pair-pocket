@@ -47,6 +47,9 @@ class UserSettingsBase(BaseModel):
     dashboard_layouts: dict[str, DashboardLayout] = Field(default_factory=dict)
     # Expense categories left out of dashboard spending; None = default (transfers).
     spending_excluded_categories: list[str] | None = None
+    # Account ids whose spending is left out of the budget and dashboard spending;
+    # None = default (savings accounts).
+    spending_excluded_accounts: list[str] | None = None
     # Province whose sales tax rate is used to estimate tax on CAD expenses.
     sales_tax_province: CanadaProvince = DEFAULT_SALES_TAX_PROVINCE
 
@@ -137,3 +140,7 @@ class DashboardLayoutBody(BaseModel):
 
 class SpendingExclusionsBody(BaseModel):
     categories: list[str] = Field(default_factory=list, max_length=100)
+
+
+class SpendingAccountExclusionsBody(BaseModel):
+    accounts: list[str] = Field(default_factory=list, max_length=200)
