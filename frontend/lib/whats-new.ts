@@ -9,7 +9,8 @@ export interface WhatsNewEntry {
 }
 
 export const WHATS_NEW: WhatsNewEntry[] = [
-  { id: "settlementMoveTab", version: "0.18.0", date: "2026-11-02" },
+  { id: "settlementMoveTab", version: "0.19.0", date: "2026-11-02" },
+  { id: "notificationHistory", version: "0.18.0", date: "2026-11-02" },
   { id: "budgetCarryChoice", version: "0.17.0", date: "2026-11-02" },
   { id: "cardRefundBalance", version: "0.16.1", date: "2026-11-02" },
   { id: "settingsTabs", version: "0.16.0", date: "2026-11-02" },

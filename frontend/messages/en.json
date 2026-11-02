@@ -1221,6 +1221,12 @@
     "tabAlerts": "Alerts",
     "tabWhatsNew": "What's New",
     "markAllRead": "Read all",
+    "history": "History",
+    "backToNew": "New",
+    "emptyUnread": "No unread notifications.",
+    "historyEmpty": "No read notifications yet.",
+    "showOlderUpdates": "Show {count} older updates",
+    "hideOlderUpdates": "Show less",
     "empty": "No notifications yet. New entries in your shared ledger show up here.",
     "loadFailed": "Couldn't load notifications. Please try again.",
     "partnerFallback": "Your partner",
@@ -1245,8 +1251,12 @@
   "whatsNew": {
     "items": {
       "settlementMoveTab": {
-        "title": "A Settle/Move tab in the list",
-        "description": "Settlements, moves between your accounts, card payments and transfers between shared and personal now sit in a Settle/Move tab instead of Expense and Income. Tap a settlement between ledgers to see which expense it paid, and paid subscriptions are no longer shown in red. The e-Transfer category is gone; use a regular category instead."
+        "title": "A Settle/Move tab",
+        "description": "Settlements, moves between your accounts, card payments and transfers between shared and personal now sit in a Settle/Move tab instead of Expense and Income. You can also pick it when adding an entry, and the settlement picker lets you switch between personal and shared expenses and search. Tap a settlement between ledgers to see which expense it paid. Paid subscriptions are no longer shown in red. The e-Transfer category is gone; use a regular category instead."
+      },
+      "notificationHistory": {
+        "title": "Read notifications are tucked away, with a History",
+        "description": "Notifications leave the list once you read them, and the History button brings the read ones back. What's New shows the latest 7 updates and folds the older ones."
       },
       "budgetCarryChoice": {
         "title": "Choose whether last month's overspend is deducted",
@@ -1258,7 +1268,7 @@
       },
       "settingsTabs": {
         "title": "Settings are split into tabs, with balance matching",
-        "description": "Settings now have Accounts, Dashboard, Entry, Partner and App tabs. In Accounts you can edit an account and enter your bank balance to match the app in one step."
+        "description": "Settings now have Accounts, Dashboard, Entry, Partner and App tabs. In Accounts you can edit and delete an account, and enter your bank balance to match the app in one step."
       },
       "budgetExcludesSavings": {
         "title": "Choose which accounts count toward your budget",
