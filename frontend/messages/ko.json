@@ -1214,6 +1214,12 @@
     "tabAlerts": "알림",
     "tabWhatsNew": "새 소식",
     "markAllRead": "모두 읽음",
+    "history": "히스토리",
+    "backToNew": "새 알림",
+    "emptyUnread": "읽지 않은 알림이 없어요.",
+    "historyEmpty": "읽은 알림이 아직 없어요.",
+    "showOlderUpdates": "이전 업데이트 {count}개 보기",
+    "hideOlderUpdates": "접기",
     "empty": "아직 알림이 없어요. 공유 가계부에 새 내역이 생기면 여기에 표시돼요.",
     "loadFailed": "알림을 불러오지 못했어요. 다시 시도해 주세요.",
     "partnerFallback": "파트너",
@@ -1237,6 +1243,10 @@
   },
   "whatsNew": {
     "items": {
+      "notificationHistory": {
+        "title": "읽은 알림은 숨겨지고, 히스토리에서 다시 볼 수 있어요",
+        "description": "알림은 읽으면 목록에서 사라지고, 알림 화면의 히스토리에서 읽은 알림을 다시 볼 수 있어요. 새로운 소식은 최근 7개만 보이고, 이전 업데이트는 접어 두었어요."
+      },
       "budgetCarryChoice": {
         "title": "달마다 지난달 초과분을 뺄지 고를 수 있어요",
         "description": "대시보드의 예산 카드를 누르면, 이번 달 예산에서 지난달 초과분을 뺄지 선택할 수 있어요. 빼지 않으면 설정한 예산 금액 그대로 한 달을 시작해요."
@@ -1247,7 +1257,7 @@
       },
       "settingsTabs": {
         "title": "설정이 탭으로 나뉘고 잔액 맞추기가 생겼어요",
-        "description": "설정을 계좌, 대시보드, 입력, 파트너, 앱 탭으로 나눴어요. 계좌 탭에서 계좌를 고치고, 통장 잔액을 넣어 앱 잔액을 한 번에 맞출 수 있어요."
+        "description": "설정을 계좌, 대시보드, 입력, 파트너, 앱 탭으로 나눴어요. 계좌 탭에서 계좌를 고치고 삭제할 수 있고, 통장 잔액을 넣어 앱 잔액을 한 번에 맞출 수도 있어요."
       },
       "budgetExcludesSavings": {
         "title": "예산에 포함할 계좌를 고를 수 있어요",
