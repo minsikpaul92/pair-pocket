@@ -439,12 +439,44 @@ def test_set_aside_row_size_is_limited(env, as_user):
     assert res.status_code == 413
 
 
-def test_settlement_category_is_never_suggested(env, client):
+def _expense(env, amount=40.0):
+    doc = {"owner_id": env.users["owner"].id, "account_type": "personal", "currency": "CAD",
+           "type": "expense", "kind": "normal", "category": "금융/기타", "sub_category": "수수료/연회비",
+           "date": datetime(2026, 10, 1), "amount": amount, "merchant": "Bank fee",
+           "account_id": str(env.accounts.personal["_id"])}
+    return str(run(env.db.transactions.insert_one(doc)).inserted_id)
+
+
+def _rebate(expense_id, amount):
+    return {"date": "2026-10-30", "amount": amount, "direction": "in", "merchant": "Bank",
+            "category": "정산", "sub_category": "N빵 정산/환급", "settles_expense_id": expense_id}
+
+
+def test_settlement_import_needs_the_expense(env, client):
+    res = _commit(client, env.accounts.personal, [_rebate(None, 17.95)])
+    assert res.status_code == 422
+
+
+def test_settlement_import_links_the_expense(env, client):
+    expense = _expense(env)
+    res = _commit(client, env.accounts.personal, [_rebate(expense, 17.95)])
+    assert res.status_code == 201, res.text
+    saved = run(env.db.transactions.find_one({"settles_expense_id": expense}))
+    assert saved["category"] == "정산" and saved["amount"] == 17.95
+
+
+def test_settlements_in_one_import_must_fit_the_expense_together(env, client):
+    expense = _expense(env, 30.0)
+    res = _commit(client, env.accounts.personal, [_rebate(expense, 20), _rebate(expense, 20)])
+    assert res.status_code == 422
+    assert run(env.db.transactions.count_documents({"settles_expense_id": expense})) == 0
+
+
+def test_a_settlement_suggestion_is_never_auto(env, client):
     run(env.db.transactions.insert_one({
         "owner_id": env.users["owner"].id, "account_type": "personal", "currency": "CAD",
         "type": "income", "kind": "normal", "category": "정산", "sub_category": "N빵 정산/환급",
         "date": datetime(2026, 9, 1), "amount": 5, "merchant": "Bank Rebate",
     }))
     rows = _post(client, env.accounts.personal, "2026-10-01,BANK REBATE,,17.95,100\n").json()["rows"]
-    suggestion = rows[0]["suggestion"]
-    assert suggestion is None or suggestion["category"] != "정산"
+    assert rows[0]["suggestion"]["category"] == "정산" and rows[0]["bucket"] == "review"

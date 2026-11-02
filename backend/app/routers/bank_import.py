@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.account import FinancialAccountKind
+from app.models.category_preset import INCOME_CATEGORY_SETTLEMENT
 from app.models.ledger import (
     TRANSFER_CATEGORY,
     TRANSFER_SUB_ACCOUNT_TRANSFER,
@@ -31,6 +32,7 @@ from app.services.access import (
     resolve_owner_ids,
     shared_scope,
 )
+from app.services.settlement import check_settlement
 from app.services.transaction_links import is_paired_transfer, twin_document
 from app.services.validation import validate_transaction_payload
 
@@ -58,6 +60,9 @@ def _bucket(row: dict, is_card: bool) -> str:
     if row["status"] == bank_import.STATUS_REVIEW or row["hint"] != bank_import.HINT_NORMAL:
         return "review"
     suggestion = row["suggestion"]
+    # A settlement needs the user to pick the expense it settles, so it is never auto.
+    if suggestion and suggestion["category"] == INCOME_CATEGORY_SETTLEMENT:
+        return "review"
     if suggestion and suggestion["confidence"] >= bank_classify.AUTO_CONFIDENCE:
         return "auto"
     return "review"
@@ -181,6 +186,8 @@ class ImportItem(BaseModel):
     kind: Literal["normal", "card_repayment", "account_move"] = "normal"
     counter_account_id: str | None = None
     note: str | None = Field(default=None, max_length=200)
+    # For a settlement income: the expense it pays back (an earlier or saved entry).
+    settles_expense_id: str | None = None
 
 
 class CommitBody(BaseModel):
@@ -199,6 +206,7 @@ def _payload(account: dict, item: ImportItem, counter: dict | None = None) -> Tr
         "account_id": str(account["_id"]),
         "merchant": item.merchant,
         "note": item.note,
+        "settles_expense_id": item.settles_expense_id,
     }
     if item.kind == "card_repayment":
         if item.direction != "out" or not item.counter_account_id:
@@ -292,6 +300,22 @@ async def commit_bank_rows(
             document["linked_transaction_id"] = str(twin["_id"])
             twin["linked_transaction_id"] = str(document["_id"])
             documents.append(twin)
+    # Each item was checked alone; several settlements of one expense must also fit together.
+    totals: dict[str, float] = {}
+    for document in documents:
+        if document.get("settles_expense_id"):
+            key = document["settles_expense_id"]
+            totals[key] = totals.get(key, 0.0) + float(document["amount"])
+    for expense_id, total in totals.items():
+        await check_settlement(
+            db,
+            expense_id=expense_id,
+            amount=total,
+            currency=account["currency"],
+            owner_ids=owner_ids,
+            account_type=ledger,
+            shared_group_id=current_user.shared_group_id,
+        )
     batch_id = str(ObjectId())
     for document in documents:
         document["import_batch_id"] = batch_id

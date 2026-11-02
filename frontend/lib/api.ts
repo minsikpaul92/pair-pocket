@@ -2695,6 +2695,8 @@ export interface BankImportItem {
   sub_category?: string;
   kind?: "normal" | "card_repayment" | "account_move";
   counter_account_id?: string;
+  note?: string;
+  settles_expense_id?: string;
 }
 
 export async function previewBankCsv(

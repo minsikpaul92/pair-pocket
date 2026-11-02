@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, FileSpreadsheet, Loader2, UploadCloud, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { isApiError } from "@/lib/errors";
+import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import Dropdown from "@/components/ui/dropdown";
 import {
   AccountType,
@@ -14,6 +15,7 @@ import {
   INCOME_CATEGORY_SETTLEMENT,
   FinancialAccount,
   LedgerScope,
+  SettleableExpense,
   TRANSFER_CATEGORY,
   TRANSFER_SUB_ACCOUNT_TRANSFER,
   TRANSFER_SUB_CARD_REPAYMENT,
@@ -22,6 +24,7 @@ import {
   createPendingImport,
   deletePendingImport,
   fetchAccounts,
+  fetchSettleableExpenses,
   formatAmount,
   listPendingImports,
   previewBankCsv,
@@ -60,6 +63,8 @@ interface RowState {
   subCategory: string;
   cardId: string;
   moveId: string;
+  /** For a settlement: the expense it pays back. */
+  settlesId: string;
 }
 
 const SAVED_KEY = "pairpocket.bankImportSaved";
@@ -67,6 +72,7 @@ const SAVED_KEY = "pairpocket.bankImportSaved";
 const rowButton =
   "rounded-lg bg-gray-100 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700";
 
+const isSettlement = (r: Pick<RowState, "category">) => r.category === INCOME_CATEGORY_SETTLEMENT;
 const isMove = (r: Pick<RowState, "category" | "subCategory">) =>
   r.category === TRANSFER_CATEGORY && r.subCategory === TRANSFER_SUB_ACCOUNT_TRANSFER;
 const isCardPayment = (r: Pick<RowState, "category" | "subCategory">) =>
@@ -96,6 +102,7 @@ function initialState(row: BankPreviewRow, cards: FinancialAccount[]): RowState 
     subCategory,
     cardId: cards.length === 1 ? cards[0].id : "",
     moveId: "",
+    settlesId: "",
   };
 }
 
@@ -208,6 +215,18 @@ export default function BankImportPanel({
   const moveTargets = [...accounts, ...otherLedgerAccounts].filter(
     (a) => a.id !== accountId && a.currency === currency && a.kind !== "credit_card"
   );
+  const needsSettleable = rows.some((r) => isSettlement(r));
+  const [settleable, setSettleable] = useState<SettleableExpense[]>([]);
+  useEffect(() => {
+    if (!needsSettleable) return;
+    let cancelled = false;
+    fetchSettleableExpenses(currency, undefined, accountType).then((list) => {
+      if (!cancelled) setSettleable(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsSettleable, currency, accountType, saved]);
   const sameLedgerTarget = (id: string) => accounts.some((a) => a.id === id);
 
   async function analyze() {
@@ -276,11 +295,8 @@ export default function BankImportPanel({
       ? [TRANSFER_SUB_ACCOUNT_TRANSFER, TRANSFER_SUB_CARD_REPAYMENT]
       : [TRANSFER_SUB_ACCOUNT_TRANSFER];
   }
-  // A settlement must name the expense it settles, which an import cannot do.
   function categoryOptions(direction: "out" | "in") {
-    return direction === "out"
-      ? groups.expense
-      : groups.income.filter((g) => g.category !== INCOME_CATEGORY_SETTLEMENT);
+    return direction === "out" ? groups.expense : groups.income;
   }
 
   function isComplete(r: RowState): boolean {
@@ -290,7 +306,7 @@ export default function BankImportPanel({
       if (r.row.direction === "in" && sameLedgerTarget(r.moveId)) return false;
       return Boolean(r.moveId && r.merchant.trim());
     }
-    if (r.category === INCOME_CATEGORY_SETTLEMENT) return false;
+    if (isSettlement(r) && !r.settlesId) return false;
     return Boolean(r.category && r.subCategory && r.merchant.trim() && r.date);
   }
 
@@ -389,7 +405,12 @@ export default function BankImportPanel({
           if (isCardPayment(r)) {
             return { ...base, kind: "card_repayment" as const, counter_account_id: r.cardId };
           }
-          return { ...base, category: r.category, sub_category: r.subCategory };
+          return {
+            ...base,
+            category: r.category,
+            sub_category: r.subCategory,
+            ...(isSettlement(r) ? { settles_expense_id: r.settlesId } : {}),
+          };
         }),
         chosen.flatMap((r) => (r.pendingId ? [r.pendingId] : []))
       );
@@ -553,6 +574,19 @@ export default function BankImportPanel({
                   }))}
                 />
               )}
+              {isSettlement(r) && (
+                <div className="space-y-1 sm:col-span-3">
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {t("settlesWhich")}
+                  </p>
+                  <SettlementExpenseSelect
+                    options={settleable}
+                    value={r.settlesId}
+                    onChange={(id) => patch(r.key, { settlesId: id })}
+                    currency={currency}
+                  />
+                </div>
+              )}
               {isCardPayment(r) && (
                 <Dropdown
                   value={r.cardId}
@@ -617,7 +651,7 @@ export default function BankImportPanel({
               {isDuplicate ? t("notDuplicate") : t("isDuplicate")}
             </button>
           )}
-          {r.bucket === "review" && (
+          {(r.bucket === "review" || r.bucket === "auto") && (
             <button type="button" onClick={() => void setAside(r)} className={rowButton}>
               {t("later")}
             </button>

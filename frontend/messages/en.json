@@ -790,6 +790,7 @@
     "saveEdits": "Save changes",
     "deleteRow": "Delete",
     "fromPartner": "Left by your partner",
+    "settlesWhich": "Which expense does this settle? If it is not entered yet, set the row aside for later.",
     "cancel": "Cancel",
     "fileRows": "{count, plural, one {# row} other {# rows}}",
     "changeFile": "Change",
