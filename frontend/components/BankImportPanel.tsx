@@ -900,13 +900,13 @@ export default function BankImportPanel({
             </p>
           )}
           {section("review", t("reviewTitle"), t("reviewHint"), true)}
+          {section("auto", t("autoTitle"), t("autoHint"), false)}
           {section(
             "later",
             t("laterTitle"),
             accountType === "shared" ? t("laterHintShared") : t("laterHintPersonal"),
             true
           )}
-          {section("auto", t("autoTitle"), t("autoHint"), false)}
           {section("duplicate", t("duplicateTitle"), t("duplicateHint"), false)}
 
           <div className="space-y-2 rounded-2xl border border-gray-150 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
