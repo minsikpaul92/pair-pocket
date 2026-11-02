@@ -5,7 +5,9 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import SwipeableRow from "@/components/SwipeableRow";
+import Dropdown from "@/components/ui/dropdown";
 import {
+  AccountType,
   CategoryPresets,
   Currency,
   EXPENSE_CATEGORY_INVESTMENT,
@@ -16,7 +18,10 @@ import {
   TransactionType,
   categoriesForType,
   deleteTransaction,
+  accountPickerLabel,
   effectiveExpenseAmount,
+  fetchAccounts,
+  FinancialAccount,
   formatAmount,
   hasSettlement,
   isNonCashflowTransaction,
@@ -47,6 +52,7 @@ function rowNote(tx: Transaction, title: string): string {
 
 interface Props {
   scope: LedgerScope;
+  accountType?: AccountType;
   presets: CategoryPresets | null;
   transactions: Transaction[];
   pendingOccurrences?: SubscriptionOccurrence[];
@@ -113,6 +119,7 @@ function displayAmount(tx: Transaction): number {
 
 export default function ListView({
   scope,
+  accountType = "personal",
   presets,
   transactions,
   pendingOccurrences = [],
@@ -150,6 +157,24 @@ export default function ListView({
       setSubCategoryFilter(initialSubCategoryFilter);
     }
   }, [initialCategoryFilter, initialSubCategoryFilter]);
+  const [accountFilter, setAccountFilter] = useState<string>("all");
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAccountFilter("all");
+    fetchAccounts({ accountType, activeOnly: false })
+      .then((list) => {
+        if (!cancelled) setAccounts(list);
+      })
+      .catch(() => {
+        if (!cancelled) setAccounts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountType]);
+
   const [merchantQuery, setMerchantQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -299,6 +324,15 @@ export default function ListView({
     const q = merchantQuery.trim().toLowerCase();
     return combinedItems.filter((item) => {
       if (typeFilter !== "all" && item.type !== typeFilter) return false;
+      if (accountFilter !== "all") {
+        // Subscriptions not yet charged have no account, so they only show under All.
+        if (item.kind !== "transaction") return false;
+        if (
+          item.tx.account_id !== accountFilter &&
+          item.tx.counter_account_id !== accountFilter
+        )
+          return false;
+      }
       if (categoryFilter !== "all" && item.category !== categoryFilter)
         return false;
       if (
@@ -327,6 +361,7 @@ export default function ListView({
   }, [
     combinedItems,
     typeFilter,
+    accountFilter,
     categoryFilter,
     subCategoryFilter,
     merchantQuery,
@@ -473,35 +508,51 @@ export default function ListView({
           ))}
         </div>
 
-        <select
+        <Dropdown
+          value={accountFilter}
+          onChange={setAccountFilter}
+          ariaLabel={tList("account")}
+          size="sm"
+          className="w-auto min-w-[8rem] max-w-[14rem]"
+          options={[
+            { value: "all", label: tList("allAccounts") },
+            ...accounts.map((a) => ({ value: a.id, label: accountPickerLabel(a) })),
+          ]}
+        />
+
+        <Dropdown
           value={categoryFilter}
-          onChange={(e) => {
-            setCategoryFilter(e.target.value);
+          onChange={(v) => {
+            setCategoryFilter(v);
             setSubCategoryFilter("all");
           }}
-          className="input-field w-auto py-2 text-sm"
-        >
-          <option value="all">{tList("allCategories")}</option>
-          {allCategories.map((c) => (
-            <option key={c} value={c}>
-              {translateCategory(c, tCategories)}
-            </option>
-          ))}
-        </select>
+          ariaLabel={tList("category")}
+          size="sm"
+          className="w-auto min-w-[8rem]"
+          options={[
+            { value: "all", label: tList("allCategories") },
+            ...allCategories.map((c) => ({
+              value: c,
+              label: translateCategory(c, tCategories),
+            })),
+          ]}
+        />
 
-        <select
+        <Dropdown
           value={subCategoryFilter}
-          onChange={(e) => setSubCategoryFilter(e.target.value)}
-          className="input-field w-auto py-2 text-sm"
+          onChange={setSubCategoryFilter}
+          ariaLabel={tList("subCategory")}
+          size="sm"
+          className="w-auto min-w-[8rem]"
           disabled={categoryFilter === "all" && subCategoryOptions.length === 0}
-        >
-          <option value="all">{tList("allSubCategories")}</option>
-          {subCategoryOptions.map((s) => (
-            <option key={s} value={s}>
-              {translateSubCategory(s, tSubCategories)}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "all", label: tList("allSubCategories") },
+            ...subCategoryOptions.map((s) => ({
+              value: s,
+              label: translateSubCategory(s, tSubCategories),
+            })),
+          ]}
+        />
 
         <div ref={searchContainerRef} className="relative flex-1 min-w-[10rem]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />

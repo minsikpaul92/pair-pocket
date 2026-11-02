@@ -2693,7 +2693,7 @@ export interface BankImportItem {
   merchant: string;
   category?: string;
   sub_category?: string;
-  kind?: "normal" | "card_repayment";
+  kind?: "normal" | "card_repayment" | "account_move";
   counter_account_id?: string;
 }
 

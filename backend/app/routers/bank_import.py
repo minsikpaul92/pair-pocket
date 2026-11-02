@@ -12,7 +12,13 @@ from pydantic import BaseModel, Field
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.account import FinancialAccountKind
-from app.models.ledger import TRANSFER_CATEGORY, TRANSFER_SUB_CARD_REPAYMENT
+from app.models.ledger import (
+    TRANSFER_CATEGORY,
+    TRANSFER_SUB_ACCOUNT_TRANSFER,
+    TRANSFER_SUB_CARD_REPAYMENT,
+    TRANSFER_SUB_SHARED_FUNDING,
+    TRANSFER_SUB_SHARED_WITHDRAWAL,
+)
 from app.models.transaction import AccountType, Currency, TransactionCreate, TransactionType
 from app.models.user import UserOut
 from app.routers.settings import _get_or_create, _parse_custom
@@ -24,6 +30,7 @@ from app.services.access import (
     resolve_owner_ids,
     shared_scope,
 )
+from app.services.transaction_links import is_paired_transfer, twin_document
 from app.services.validation import validate_transaction_payload
 
 from app.routers.transactions import _document_from_payload  # noqa: E402
@@ -96,6 +103,8 @@ async def preview_bank_csv(
             },
             "$or": [
                 {"account_id": account_id},
+                # A transfer entered from the other account's side.
+                {"counter_account_id": account_id},
                 {"account_id": None},
                 {"account_id": {"$exists": False}},
             ],
@@ -132,11 +141,12 @@ async def preview_bank_csv(
             }
         )
 
-    # Only rows that could be saved as an ordinary entry need a category.
+    # Rows that could be saved as an ordinary entry get a suggested category,
+    # including ones marked as already entered, in case the user says they are new.
     to_label = [
         r
         for r in out
-        if r["hint"] == bank_import.HINT_NORMAL and r["status"] != bank_import.STATUS_DUPLICATE
+        if r["hint"] in (bank_import.HINT_NORMAL, bank_import.HINT_E_TRANSFER)
     ]
     custom = _parse_custom(await _get_or_create(db, current_user.id))
     suggestions = await bank_classify.classify_rows(
@@ -166,7 +176,8 @@ class ImportItem(BaseModel):
     category: str = ""
     sub_category: str = ""
     # card_repayment: money from this bank account paying off a card account.
-    kind: Literal["normal", "card_repayment"] = "normal"
+    # account_move: money from this account into another of the user's accounts.
+    kind: Literal["normal", "card_repayment", "account_move"] = "normal"
     counter_account_id: str | None = None
     note: str | None = Field(default=None, max_length=200)
 
@@ -176,7 +187,7 @@ class CommitBody(BaseModel):
     items: list[ImportItem] = Field(min_length=1, max_length=MAX_ROWS)
 
 
-def _payload(account: dict, item: ImportItem) -> TransactionCreate:
+def _payload(account: dict, item: ImportItem, counter: dict | None = None) -> TransactionCreate:
     base = {
         "date": datetime.combine(item.date, time.min),
         "amount": item.amount,
@@ -195,6 +206,31 @@ def _payload(account: dict, item: ImportItem) -> TransactionCreate:
             category=TRANSFER_CATEGORY,
             sub_category=TRANSFER_SUB_CARD_REPAYMENT,
             counter_account_id=item.counter_account_id,
+        )
+    if item.kind == "account_move":
+        if counter is None or str(counter["_id"]) == str(account["_id"]):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "Account move needs another account"
+            )
+        own, other = account["account_type"], counter["account_type"]
+        if own == other:
+            # Between two accounts of one ledger, only the sending side is entered here.
+            if item.direction != "out":
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    "Enter this move from the sending account",
+                )
+            sub = TRANSFER_SUB_ACCOUNT_TRANSFER
+        elif (own == "personal") == (item.direction == "out"):
+            sub = TRANSFER_SUB_SHARED_FUNDING
+        else:
+            sub = TRANSFER_SUB_SHARED_WITHDRAWAL
+        return TransactionCreate(
+            **base,
+            type=TransactionType.EXPENSE if item.direction == "out" else TransactionType.INCOME,
+            category=TRANSFER_CATEGORY,
+            sub_category=sub,
+            counter_account_id=str(counter["_id"]),
         )
     if item.category == TRANSFER_CATEGORY:
         raise HTTPException(
@@ -229,20 +265,35 @@ async def commit_bank_rows(
 
     documents = []
     for item in body.items:
-        payload = _payload(account, item)
+        counter = None
+        if item.kind == "account_move" and item.counter_account_id:
+            try:
+                counter = await db["accounts"].find_one({"_id": ObjectId(item.counter_account_id)})
+            except InvalidId:
+                counter = None
+            if counter is not None:
+                await assert_can_access_doc(db, current_user, counter)
+        payload = _payload(account, item, counter)
         await validate_transaction_payload(
             payload, db, current_user.id, owner_ids=owner_ids, current_user=current_user
         )
-        documents.append(
-            _document_from_payload(
-                payload, owner_id=current_user.id, shared_group_id=current_user.shared_group_id
-            )
+        document = _document_from_payload(
+            payload, owner_id=current_user.id, shared_group_id=current_user.shared_group_id
         )
+        documents.append(document)
+        if is_paired_transfer(document):
+            # A move between the personal and shared ledgers is stored as a linked pair.
+            document["_id"] = ObjectId()
+            twin = twin_document(document, shared_group_id=current_user.shared_group_id)
+            twin["_id"] = ObjectId()
+            document["linked_transaction_id"] = str(twin["_id"])
+            twin["linked_transaction_id"] = str(document["_id"])
+            documents.append(twin)
     batch_id = str(ObjectId())
     for document in documents:
         document["import_batch_id"] = batch_id
     await db["transactions"].insert_many(documents)
-    return {"created": len(documents), "batch_id": batch_id}
+    return {"created": len(body.items), "batch_id": batch_id}
 
 
 @router.delete("/batch/{batch_id}")

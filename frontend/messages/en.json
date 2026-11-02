@@ -244,6 +244,8 @@
     "hiddenCategoriesNote": "{count, plural, one {# category} other {# categories}} hidden in Settings."
   },
   "list": {
+    "allAccounts": "All accounts",
+    "account": "Account",
     "allCategories": "All categories",
     "allSubCategories": "All sub-categories",
     "searchMerchant": "Search merchant",
@@ -760,7 +762,7 @@
     "autoTitle": "Ready to save",
     "autoHint": "Matched to your past entries or confidently suggested.",
     "duplicateTitle": "Already in the app",
-    "duplicateHint": "Skipped. Check one only to save it anyway.",
+    "duplicateHint": "Skipped. Compare each with the entry shown, and check a row to save it anyway.",
     "merchant": "Merchant",
     "category": "Category",
     "subCategory": "Subcategory",
@@ -769,10 +771,36 @@
     "needsChoice": "Choose a category, or a card for a card payment.",
     "waiting": "{count} entries still need your check.",
     "save": "Save {count}",
+    "later": "Later",
+    "draftsTitle": "Imports to finish later",
+    "draftsHint": "Kept in this browser only. Continue or delete them any time.",
+    "draftLeft": "{count, plural, one {# entry left} other {# entries left}}",
+    "draftResume": "Continue",
+    "draftDelete": "Delete",
+    "notDuplicate": "Not a duplicate",
+    "isDuplicate": "It is a duplicate",
+    "note": "Note",
+    "selectAll": "Select all",
+    "clearAll": "Clear all",
+    "includeRow": "Select to save",
+    "moveSource": "Sending account",
+    "pickMoveSource": "Choose the sending account",
+    "moveSameLedgerIn": "A move inside one ledger is entered from the sending account. Uncheck this row.",
+    "workingOn": "Working on {name}",
+    "keep": "No",
+    "cancel": "Cancel",
+    "fileRows": "{count, plural, one {# row} other {# rows}}",
+    "changeFile": "Change",
+    "removeFile": "Remove file",
     "cardSideNote": "Card payment. It is recorded from the bank side, so it is left out here.",
-    "transferNote": "Transfer between accounts. Save it as income or expense only if it is not your own account.",
+    "transferNote": "Transfer between accounts. If it goes to your own account, choose that account below.",
+    "transferInNote": "Transfer between accounts. If it came from your own account, choose the sending account below.",
+    "ownMove": "Transfer to my own account",
+    "moveTarget": "Receiving account",
+    "pickMoveTarget": "Choose the account",
+    "matchedEntry": "Already entered: {merchant} on {date} ({amount})",
     "etransferNote": "e-Transfer. Choose whether it is income or an expense.",
-    "similarTo": "Looks like {merchant} on {date}"
+    "similarTo": "Looks like {merchant} on {date} ({amount})"
 },
   "scanQueue": {
     "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
@@ -1172,6 +1200,10 @@
   },
   "whatsNew": {
     "items": {
+      "importPolish": {
+        "title": "Easier statement import and a filter by account",
+        "description": "Statement import now fills in suggestions for every row, shows which entry a skipped row matched, lets you move a row between Needs a look and Already entered, and saves moves between your own accounts, including joint to personal. You can set a statement aside to finish later. The list can be filtered by account or card."
+      },
       "bankStatementImport": {
         "title": "Import your bank statement",
         "description": "Upload a CSV from your bank under Import. Entries you already added are skipped, and categories are suggested for the rest, so you only check the unsure ones."
