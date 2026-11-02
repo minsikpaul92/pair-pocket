@@ -9,6 +9,7 @@ export interface WhatsNewEntry {
 }
 
 export const WHATS_NEW: WhatsNewEntry[] = [
+  { id: "settingsTabs", version: "0.16.0", date: "2026-11-02" },
   { id: "budgetExcludesSavings", version: "0.15.1", date: "2026-11-02" },
   { id: "subscriptionFromEntry", version: "0.15.0", date: "2026-11-02" },
   { id: "importPolish", version: "0.14.0", date: "2026-11-01" },

@@ -806,7 +806,7 @@
     "matchedEntry": "Already entered: {merchant} on {date} ({amount})",
     "etransferNote": "e-Transfer. Choose whether it is income or an expense.",
     "similarTo": "Looks like {merchant} on {date} ({amount})"
-},
+  },
   "scanQueue": {
     "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
     "addRecent": "Scan recent files again ({count}, kept {days} days)",
@@ -924,8 +924,11 @@
     "exportCapped": "Some months have more than 500 transactions, so the file may be incomplete."
   },
   "settingsPage": {
-    "tabGeneral": "General",
+    "tabAccounts": "Accounts",
     "tabDashboard": "Dashboard",
+    "tabEntry": "Entry",
+    "tabPartner": "Partner",
+    "tabApp": "App",
     "budgetTitle": "Monthly budget",
     "budgetHelp": "This month's budget is the amount you set minus last month's overspending. Underspending is not carried over.",
     "budgetPersonal": "Personal",
@@ -1032,7 +1035,26 @@
       "subscription": "When empty: default card, then bank account",
       "brokerage": "Used for stock buys and sells"
     },
-    "languageHelp": "Changes the language of the app."
+    "languageHelp": "Changes the language of the app.",
+    "accountsTitle": "Accounts",
+    "accountsAdd": "Add",
+    "accountsHelp": "Tap an account to edit its name, bank or opening balance. If a balance differs from your bank, tap \"Match balance\".",
+    "accountsEmpty": "No accounts yet.",
+    "accountInactive": "Hidden",
+    "matchBalance": "Match balance",
+    "matchTitle": "Match balance for {name}",
+    "matchHelp": "Enter the balance your bank shows today. The app works out the opening balance that makes its balance equal it.",
+    "matchHelpCard": "Enter the amount still owed that your card app shows. The app works out the opening balance that makes its amount equal it.",
+    "matchActual": "Bank balance",
+    "matchActualCard": "Amount owed",
+    "matchAppBalance": "App balance",
+    "matchDiff": "Difference",
+    "matchOpening": "Opening balance",
+    "matchNote": "Your entries stay as they are. Only the opening balance changes.",
+    "matchError": "Could not save. Please try again.",
+    "partnerTitle": "Partner",
+    "partnerHelp": "Invite a partner to share a ledger and settle up together.",
+    "partnerConnected": "You are connected with {name}. You share a ledger and settle up together."
   },
   "onboarding": {
     "title": "Get started",
@@ -1205,6 +1227,10 @@
   },
   "whatsNew": {
     "items": {
+      "settingsTabs": {
+        "title": "Settings are split into tabs, with balance matching",
+        "description": "Settings now have Accounts, Dashboard, Entry, Partner and App tabs. In Accounts you can edit an account and enter your bank balance to match the app in one step."
+      },
       "budgetExcludesSavings": {
         "title": "Budget no longer counts savings spending",
         "description": "The dashboard budget and spending now leave out money paid from savings accounts and only count checking and card spending."
@@ -1220,7 +1246,7 @@
       "bankStatementImport": {
         "title": "Import your bank statement",
         "description": "Upload a CSV from your bank under Import. Entries you already added are skipped, and categories are suggested for the rest, so you only check the unsure ones."
-    },
+      },
       "scanDrafts": {
         "title": "Scans are kept if something goes wrong",
         "description": "Photos you add for AI scanning are saved on this device, so a failed or interrupted scan can be retried. Finished ones stay for 3 days in case you want to scan them again."
