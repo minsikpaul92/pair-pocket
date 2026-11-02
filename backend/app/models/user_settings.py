@@ -42,6 +42,9 @@ class UserSettingsBase(BaseModel):
     onboarding_personal_step: int = 0
     # { "personal" | "shared": { "CAD" | "KRW": monthly budget } }
     budgets: dict[str, dict[str, float]] = Field(default_factory=dict)
+    # { "personal" | "shared": ["YYYY-MM", ...] } months that start without last
+    # month's overspend deducted from the budget.
+    budget_carry_skipped: dict[str, list[str]] = Field(default_factory=dict)
     # Legacy single layout (read-only fallback) and the per-country layouts.
     dashboard_layout: DashboardLayout = Field(default_factory=DashboardLayout)
     dashboard_layouts: dict[str, DashboardLayout] = Field(default_factory=dict)
@@ -129,6 +132,12 @@ class BudgetBody(BaseModel):
     kind: str = Field(default="personal", pattern="^(personal|shared)$")
     currency: str = Field(pattern="^(CAD|KRW)$")
     amount: float = Field(ge=0)
+
+
+class BudgetCarryBody(BaseModel):
+    kind: str = Field(default="personal", pattern="^(personal|shared)$")
+    month: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    carry: bool
 
 
 class DashboardLayoutBody(BaseModel):

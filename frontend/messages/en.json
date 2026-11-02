@@ -197,6 +197,9 @@
     "budgetOk": "OK",
     "budgetCancel": "Cancel",
     "budgetCarry": "Base {base} · last month over −{over}",
+    "budgetCarryOption": "Deduct last month's overspend from this month",
+    "budgetCarryAmount": "Last month over by {over}",
+    "budgetCarrySkipped": "Overspend is not deducted this month",
     "remaining": "{amount} left",
     "overBudget": "{amount} over",
     "fixedExpenses": "Fixed expenses",
@@ -1234,6 +1237,10 @@
   },
   "whatsNew": {
     "items": {
+      "budgetCarryChoice": {
+        "title": "Choose whether last month's overspend is deducted",
+        "description": "Tap the budget card on the dashboard to choose whether last month's overspend is deducted from this month. If not, the month starts with your full budget."
+      },
       "cardRefundBalance": {
         "title": "Card refunds now lower what you owe",
         "description": "Refunds and rebates credited to a card now reduce its balance. In Match balance you can also enter a negative amount for a card you overpaid."
