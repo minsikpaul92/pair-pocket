@@ -213,7 +213,6 @@ export default function BankImportPanel({
   ).length;
 
   function cancel() {
-    if (chosen.length > 0 && !window.confirm(t("cancelConfirm"))) return;
     setPreview(null);
     setRows([]);
     setFile(null);

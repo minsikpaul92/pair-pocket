@@ -775,7 +775,6 @@
     "fileRows": "{count, plural, one {# row} other {# rows}}",
     "changeFile": "Change",
     "removeFile": "Remove file",
-    "cancelConfirm": "Discard this analysis? Nothing has been saved yet.",
     "cardSideNote": "Card payment. It is recorded from the bank side, so it is left out here.",
     "transferNote": "Transfer between accounts. If it goes to your own account, choose that account below.",
     "transferInNote": "Transfer between accounts. If it came from your own account, it is entered from that account. Save it as income only if it is not yours.",
