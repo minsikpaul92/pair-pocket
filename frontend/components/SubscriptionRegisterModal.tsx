@@ -1148,16 +1148,15 @@ export default function SubscriptionRegisterModal({
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
                   {t("promoEndDate")}
                 </label>
-                <input
-                  type="date"
-                  value={promoEndDate}
-                  min={startDate}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setPromoEndDate(next);
-                    if (!next) setPromoReminderEnabled(false);
+                <DayPicker
+                  value={promoEndDate ? parseDate(promoEndDate) : null}
+                  min={parseDate(startDate)}
+                  onChange={(d) => setPromoEndDate(dayKey(d))}
+                  onClear={() => {
+                    setPromoEndDate("");
+                    setPromoReminderEnabled(false);
                   }}
-                  className="input-field"
+                  locale={locale}
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
                   {t("promoEndHint")}

@@ -34,6 +34,8 @@ type Props = {
   showIcon?: boolean;
   /** Disable opening the calendar (locked / read-only). */
   disabled?: boolean;
+  /** Earliest day that can be chosen; earlier days are shown but disabled. */
+  min?: Date;
 };
 
 /**
@@ -48,6 +50,7 @@ export default function DayPicker({
   triggerClassName,
   showIcon = true,
   disabled = false,
+  min,
 }: Props) {
   const t = useTranslations("common");
   const tCal = useTranslations("calendar");
@@ -156,14 +159,19 @@ export default function DayPicker({
             const inMonth = isSameMonth(cell, viewMonth);
             const selected = value ? isSameDay(cell, value) : false;
             const isToday = isSameDay(cell, today);
+            const tooEarly = min
+              ? cell < new Date(min.getFullYear(), min.getMonth(), min.getDate())
+              : false;
             return (
               <button
                 key={cell.toISOString()}
                 type="button"
+                disabled={tooEarly}
                 onClick={() => selectDay(cell)}
                 className={cn(
                   "h-9 w-full rounded-lg text-sm font-medium tabular-nums transition-colors",
                   !inMonth && "opacity-35",
+                  tooEarly && "pointer-events-none opacity-25",
                   selected
                     ? "bg-blue-500 text-white shadow-sm"
                     : isToday

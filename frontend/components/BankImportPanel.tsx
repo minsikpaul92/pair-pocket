@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, FileSpreadsheet, Loader2, UploadCloud, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { dayKey, parseDate } from "@/lib/date";
 import { isApiError } from "@/lib/errors";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
+import DayPicker from "@/components/DayPicker";
 import Dropdown from "@/components/ui/dropdown";
 import {
   AccountType,
@@ -113,6 +115,7 @@ export default function BankImportPanel({
   onChanged,
 }: Props) {
   const t = useTranslations("bankImport");
+  const locale = useLocale();
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
 
@@ -611,15 +614,15 @@ export default function BankImportPanel({
             </div>
             <div
               className={`grid grid-cols-1 gap-2 ${
-                isMove(r) || isCardPayment(r) ? "sm:grid-cols-[9rem_1fr]" : "sm:grid-cols-[9rem_1fr_1fr]"
+                isMove(r) || isCardPayment(r) ? "sm:grid-cols-[12rem_1fr]" : "sm:grid-cols-[12rem_1fr_1fr]"
               }`}
             >
-              <input
-                type="date"
-                value={r.date}
-                onChange={(e) => patch(r.key, { date: e.target.value })}
-                aria-label={t("date")}
-                className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              <DayPicker
+                value={parseDate(r.date || r.row.date)}
+                onChange={(d) => patch(r.key, { date: dayKey(d) })}
+                locale={locale}
+                showIcon={false}
+                triggerClassName="rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800 [&>p]:text-xs"
               />
               {!isMove(r) && !isCardPayment(r) && (
                 <input
