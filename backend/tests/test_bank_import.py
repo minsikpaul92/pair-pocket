@@ -306,3 +306,177 @@ def test_undo_is_blocked_once_an_entry_is_settled(env, client):
     saved = run(env.db.transactions.find_one({}))
     run(env.db.transactions.insert_one({"owner_id": saved["owner_id"], "settles_expense_id": str(saved["_id"])}))
     assert client.delete(f"/api/import/bank/batch/{batch}").status_code == 409
+
+
+def _other_account(env):
+    other = {**env.accounts.personal, "_id": ObjectId(), "name": "other"}
+    run(env.db.accounts.insert_one(other))
+    return other
+
+
+def test_commit_account_move_is_a_transfer_to_the_other_account(env, client):
+    other = _other_account(env)
+    res = _commit(client, env.accounts.personal, [
+        {"date": "2026-10-20", "amount": 140, "direction": "out", "merchant": "A to B",
+         "kind": "account_move", "counter_account_id": str(other["_id"])}])
+    assert res.status_code == 201, res.text
+    saved = run(env.db.transactions.find_one({}))
+    assert saved["kind"] == "transfer" and saved["counter_account_id"] == str(other["_id"])
+    assert saved["sub_category"] == "내 계좌 이동"
+
+
+def test_commit_account_move_needs_another_account(env, client):
+    own = str(env.accounts.personal["_id"])
+    for counter in (None, own):
+        res = _commit(client, env.accounts.personal, [
+            {"date": "2026-10-20", "amount": 140, "direction": "out", "merchant": "x",
+             "kind": "account_move", "counter_account_id": counter}])
+        assert res.status_code == 422
+
+
+def test_transfer_entered_from_the_other_account_counts_as_entered(env, client):
+    other = _other_account(env)
+    run(env.db.transactions.insert_one({
+        "owner_id": env.users["owner"].id, "account_type": "personal", "currency": "CAD",
+        "type": "expense", "kind": "transfer", "category": "자산 이동/카드",
+        "sub_category": "내 계좌 이동", "date": datetime(2026, 10, 26), "amount": 335.17,
+        "merchant": "other to this", "account_id": str(other["_id"]),
+        "counter_account_id": str(env.accounts.personal["_id"]),
+    }))
+    rows = _post(client, env.accounts.personal, "2026-10-26,WO1 TFR-FR 6186275,,335.17,100\n").json()["rows"]
+    assert rows[0]["bucket"] == "duplicate" and rows[0]["match"]["merchant"] == "other to this"
+
+
+def test_commit_move_to_other_ledger_saves_a_linked_pair(env, client):
+    personal, shared = env.accounts.personal, env.accounts.shared
+    res = _commit(client, personal, [
+        {"date": "2026-10-20", "amount": 100, "direction": "out", "merchant": "Fund joint",
+         "note": "rent share", "kind": "account_move", "counter_account_id": str(shared["_id"])}])
+    assert res.status_code == 201, res.text
+    saved = run(env.db.transactions.find({}).to_list(length=None))
+    assert len(saved) == 2 and res.json()["created"] == 1
+    by_ledger = {d["account_type"]: d for d in saved}
+    assert by_ledger["personal"]["type"] == "expense" and by_ledger["shared"]["type"] == "income"
+    assert by_ledger["personal"]["linked_transaction_id"] == str(by_ledger["shared"]["_id"])
+    assert by_ledger["personal"]["note"] == "rent share"
+    assert {d["import_batch_id"] for d in saved} == {res.json()["batch_id"]}
+    undo = client.delete(f"/api/import/bank/batch/{res.json()['batch_id']}")
+    assert undo.json() == {"deleted": 2}
+
+
+def test_shared_withdrawal_to_personal_account(env, client):
+    res = _commit(client, env.accounts.shared, [
+        {"date": "2026-10-20", "amount": 140, "direction": "out", "merchant": "To me",
+         "kind": "account_move", "counter_account_id": str(env.accounts.personal["_id"])}])
+    assert res.status_code == 201, res.text
+    saved = {d["account_type"]: d for d in run(env.db.transactions.find({}).to_list(length=None))}
+    assert saved["shared"]["type"] == "expense" and saved["shared"]["sub_category"] == "개인 계좌로 인출"
+    assert saved["personal"]["type"] == "income"
+
+
+def test_preview_labels_e_transfer_and_duplicate_rows(env, client):
+    rows = _post(client, env.accounts.personal, "2026-10-05,E-TRANSFER ***WKV,,2700,1\n").json()["rows"]
+    assert rows[0]["hint"] == "e_transfer" and "suggestion" in rows[0]
+
+
+@pytest.fixture
+def as_user(env):
+    app = FastAPI()
+    app.include_router(bank_import_router.router)
+    current = {"user": env.users["owner"]}
+    app.dependency_overrides[get_database] = lambda: env.db
+    app.dependency_overrides[get_current_user] = lambda: current["user"]
+    with TestClient(app) as c:
+        def use(name):
+            current["user"] = env.users[name]
+            return c
+        yield use
+
+
+def test_set_aside_rows_are_shared_with_the_partner(env, as_user):
+    shared = str(env.accounts.shared["_id"])
+    owner = as_user("owner")
+    made = owner.post("/api/import/bank/pending", json={"account_id": shared, "state": {"row": {"index": 3}}})
+    assert made.status_code == 201, made.text
+    pid = made.json()["id"]
+    assert made.json()["mine"] is True
+
+    partner = as_user("partner")
+    listed = partner.get("/api/import/bank/pending", params={"account_id": shared}).json()
+    assert [p["id"] for p in listed] == [pid] and listed[0]["mine"] is False
+    edited = partner.put(f"/api/import/bank/pending/{pid}", json={"state": {"row": {"index": 3}, "note": "mine"}})
+    assert edited.json()["state"]["note"] == "mine"
+    assert partner.delete(f"/api/import/bank/pending/{pid}").status_code == 200
+    assert partner.get("/api/import/bank/pending", params={"account_id": shared}).json() == []
+
+
+def test_set_aside_rows_on_a_personal_account_stay_private(env, as_user):
+    personal = str(env.accounts.personal["_id"])
+    pid = as_user("owner").post(
+        "/api/import/bank/pending", json={"account_id": personal, "state": {"x": 1}}
+    ).json()["id"]
+    partner = as_user("partner")
+    assert partner.get("/api/import/bank/pending", params={"account_id": personal}).status_code == 404
+    assert partner.delete(f"/api/import/bank/pending/{pid}").status_code == 404
+
+
+def test_commit_clears_the_set_aside_rows_it_saved(env, as_user):
+    personal = env.accounts.personal
+    owner = as_user("owner")
+    pid = owner.post(
+        "/api/import/bank/pending", json={"account_id": str(personal["_id"]), "state": {"x": 1}}
+    ).json()["id"]
+    res = owner.post("/api/import/bank/commit", json={
+        "account_id": str(personal["_id"]), "items": [_item()], "pending_ids": [pid]})
+    assert res.status_code == 201, res.text
+    assert owner.get("/api/import/bank/pending", params={"account_id": str(personal["_id"])}).json() == []
+
+
+def test_set_aside_row_size_is_limited(env, as_user):
+    big = {"blob": "x" * 25_000}
+    res = as_user("owner").post(
+        "/api/import/bank/pending", json={"account_id": str(env.accounts.personal["_id"]), "state": big})
+    assert res.status_code == 413
+
+
+def _expense(env, amount=40.0):
+    doc = {"owner_id": env.users["owner"].id, "account_type": "personal", "currency": "CAD",
+           "type": "expense", "kind": "normal", "category": "금융/기타", "sub_category": "수수료/연회비",
+           "date": datetime(2026, 10, 1), "amount": amount, "merchant": "Bank fee",
+           "account_id": str(env.accounts.personal["_id"])}
+    return str(run(env.db.transactions.insert_one(doc)).inserted_id)
+
+
+def _rebate(expense_id, amount):
+    return {"date": "2026-10-30", "amount": amount, "direction": "in", "merchant": "Bank",
+            "category": "정산", "sub_category": "N빵 정산/환급", "settles_expense_id": expense_id}
+
+
+def test_settlement_import_needs_the_expense(env, client):
+    res = _commit(client, env.accounts.personal, [_rebate(None, 17.95)])
+    assert res.status_code == 422
+
+
+def test_settlement_import_links_the_expense(env, client):
+    expense = _expense(env)
+    res = _commit(client, env.accounts.personal, [_rebate(expense, 17.95)])
+    assert res.status_code == 201, res.text
+    saved = run(env.db.transactions.find_one({"settles_expense_id": expense}))
+    assert saved["category"] == "정산" and saved["amount"] == 17.95
+
+
+def test_settlements_in_one_import_must_fit_the_expense_together(env, client):
+    expense = _expense(env, 30.0)
+    res = _commit(client, env.accounts.personal, [_rebate(expense, 20), _rebate(expense, 20)])
+    assert res.status_code == 422
+    assert run(env.db.transactions.count_documents({"settles_expense_id": expense})) == 0
+
+
+def test_a_settlement_suggestion_is_never_auto(env, client):
+    run(env.db.transactions.insert_one({
+        "owner_id": env.users["owner"].id, "account_type": "personal", "currency": "CAD",
+        "type": "income", "kind": "normal", "category": "정산", "sub_category": "N빵 정산/환급",
+        "date": datetime(2026, 9, 1), "amount": 5, "merchant": "Bank Rebate",
+    }))
+    rows = _post(client, env.accounts.personal, "2026-10-01,BANK REBATE,,17.95,100\n").json()["rows"]
+    assert rows[0]["suggestion"]["category"] == "정산" and rows[0]["bucket"] == "review"

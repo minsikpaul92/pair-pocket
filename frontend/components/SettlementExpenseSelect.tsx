@@ -4,9 +4,10 @@ import { CalendarDays, Check, ChevronDown, Receipt, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import DayPicker from "@/components/DayPicker";
 import { Currency, SettleableExpense, formatAmount } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
-import { dayKey, formatDayLabel, isoDayKey } from "@/lib/date";
+import { dayKey, formatDayLabel, isoDayKey, parseDate } from "@/lib/date";
 
 interface Props {
   options: SettleableExpense[];
@@ -46,10 +47,8 @@ export default function SettlementExpenseSelect({
   const tSubCategories = useTranslations("subCategories");
 
   const [open, setOpen] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [filterDate, setFilterDate] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find((o) => o.id === value);
 
@@ -66,33 +65,24 @@ export default function SettlementExpenseSelect({
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Element;
+      // The calendar opens in a popover outside this box; clicking in it is not "outside".
+      if (target.closest?.("[data-radix-popper-content-wrapper]")) return;
+      if (ref.current && !ref.current.contains(target)) {
         setOpen(false);
-        setShowDatePicker(false);
       }
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  function handleCalendarClick(e: React.MouseEvent) {
-    e.stopPropagation();
-    setShowDatePicker((v) => !v);
-    if (!showDatePicker) {
-      setTimeout(() => dateInputRef.current?.showPicker?.(), 0);
-    }
-  }
-
-  function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const next = e.target.value || null;
-    setFilterDate(next);
-    setShowDatePicker(false);
+  function handleDateChange(day: Date) {
+    setFilterDate(dayKey(day));
   }
 
   function clearDateFilter(e: React.MouseEvent) {
     e.stopPropagation();
     setFilterDate(null);
-    setShowDatePicker(false);
   }
 
   return (
@@ -122,18 +112,24 @@ export default function SettlementExpenseSelect({
         <div className="absolute z-20 mt-2 w-full rounded-xl bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10 overflow-hidden">
           {/* Toolbar: calendar filter */}
           <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-700 px-3 py-2">
-            <button
-              type="button"
-              onClick={handleCalendarClick}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                filterDate || showDatePicker
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              <CalendarDays className="h-4 w-4" />
-              {tCommon("date")}
-            </button>
+            <DayPicker
+              value={filterDate ? parseDate(filterDate) : new Date()}
+              onChange={handleDateChange}
+              locale={locale}
+              trigger={
+                <button
+                  type="button"
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    filterDate
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  {tCommon("date")}
+                </button>
+              }
+            />
             {filterDate && (
               <button
                 type="button"
@@ -148,19 +144,6 @@ export default function SettlementExpenseSelect({
               {tCommon("latestFirst")} · {tCommon("count", { count: filteredOptions.length })}
             </span>
           </div>
-
-          {/* Hidden date input triggered by calendar button */}
-          {showDatePicker && (
-            <div className="border-b border-gray-100 dark:border-gray-700 px-3 py-2">
-              <input
-                ref={dateInputRef}
-                type="date"
-                value={filterDate ?? dayKey(new Date())}
-                onChange={handleDateChange}
-                className="w-full rounded-lg bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-          )}
 
           <div className="max-h-52 overflow-auto">
             {filteredOptions.length === 0 ? (
@@ -178,7 +161,6 @@ export default function SettlementExpenseSelect({
                       onClick={() => {
                         onChange(exp.id);
                         setOpen(false);
-                        setShowDatePicker(false);
                       }}
                       className="w-full flex items-start gap-2 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >

@@ -96,7 +96,7 @@ export default function Dropdown({
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="z-[130] w-[var(--radix-popover-trigger-width)] min-w-[10rem] p-1.5"
+        className="z-[130] w-max min-w-[max(10rem,var(--radix-popover-trigger-width))] max-w-[min(22rem,calc(100vw-2rem))] p-1.5"
       >
         <div
           ref={listRef}

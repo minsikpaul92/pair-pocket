@@ -21,6 +21,10 @@ The UI language only changes text. Read `docs/i18n-and-layout.md` before touchin
 
 Choose a single value from a list with `frontend/components/ui/dropdown.tsx` (`Dropdown`), not a raw `<select>`. It keeps every list looking and behaving the same, in both themes and at phone width. Use `size="sm"` in dense rows. Existing raw selects are being replaced over time; `npm run check:ui` fails if a file gains one.
 
+## Calendars
+
+Pick a date with `frontend/components/DayPicker.tsx`, not a native date input. It keeps every calendar looking and behaving the same, in both themes and at phone width. `npm run check:ui` fails if a file uses `type="date"`.
+
 ## What's New
 
 What's New is for users, not developers. Add an entry only when a user would notice the change: something they can now do, or a problem they ran into that is now fixed. Leave out anything only developers care about.

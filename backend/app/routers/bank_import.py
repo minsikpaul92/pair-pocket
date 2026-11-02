@@ -1,7 +1,8 @@
 """Bank statement import: preview what is new, already entered, or needs a look."""
 
 from datetime import date as date_type, datetime, time
-from typing import Literal
+import json
+from typing import Any, Literal
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -12,7 +13,14 @@ from pydantic import BaseModel, Field
 from app.core.security import get_current_user
 from app.database import get_database
 from app.models.account import FinancialAccountKind
-from app.models.ledger import TRANSFER_CATEGORY, TRANSFER_SUB_CARD_REPAYMENT
+from app.models.category_preset import INCOME_CATEGORY_SETTLEMENT
+from app.models.ledger import (
+    TRANSFER_CATEGORY,
+    TRANSFER_SUB_ACCOUNT_TRANSFER,
+    TRANSFER_SUB_CARD_REPAYMENT,
+    TRANSFER_SUB_SHARED_FUNDING,
+    TRANSFER_SUB_SHARED_WITHDRAWAL,
+)
 from app.models.transaction import AccountType, Currency, TransactionCreate, TransactionType
 from app.models.user import UserOut
 from app.routers.settings import _get_or_create, _parse_custom
@@ -24,6 +32,8 @@ from app.services.access import (
     resolve_owner_ids,
     shared_scope,
 )
+from app.services.settlement import check_settlement
+from app.services.transaction_links import is_paired_transfer, twin_document
 from app.services.validation import validate_transaction_payload
 
 from app.routers.transactions import _document_from_payload  # noqa: E402
@@ -50,6 +60,9 @@ def _bucket(row: dict, is_card: bool) -> str:
     if row["status"] == bank_import.STATUS_REVIEW or row["hint"] != bank_import.HINT_NORMAL:
         return "review"
     suggestion = row["suggestion"]
+    # A settlement needs the user to pick the expense it settles, so it is never auto.
+    if suggestion and suggestion["category"] == INCOME_CATEGORY_SETTLEMENT:
+        return "review"
     if suggestion and suggestion["confidence"] >= bank_classify.AUTO_CONFIDENCE:
         return "auto"
     return "review"
@@ -96,6 +109,8 @@ async def preview_bank_csv(
             },
             "$or": [
                 {"account_id": account_id},
+                # A transfer entered from the other account's side.
+                {"counter_account_id": account_id},
                 {"account_id": None},
                 {"account_id": {"$exists": False}},
             ],
@@ -132,11 +147,12 @@ async def preview_bank_csv(
             }
         )
 
-    # Only rows that could be saved as an ordinary entry need a category.
+    # Rows that could be saved as an ordinary entry get a suggested category,
+    # including ones marked as already entered, in case the user says they are new.
     to_label = [
         r
         for r in out
-        if r["hint"] == bank_import.HINT_NORMAL and r["status"] != bank_import.STATUS_DUPLICATE
+        if r["hint"] in (bank_import.HINT_NORMAL, bank_import.HINT_E_TRANSFER)
     ]
     custom = _parse_custom(await _get_or_create(db, current_user.id))
     suggestions = await bank_classify.classify_rows(
@@ -166,17 +182,22 @@ class ImportItem(BaseModel):
     category: str = ""
     sub_category: str = ""
     # card_repayment: money from this bank account paying off a card account.
-    kind: Literal["normal", "card_repayment"] = "normal"
+    # account_move: money from this account into another of the user's accounts.
+    kind: Literal["normal", "card_repayment", "account_move"] = "normal"
     counter_account_id: str | None = None
     note: str | None = Field(default=None, max_length=200)
+    # For a settlement income: the expense it pays back (an earlier or saved entry).
+    settles_expense_id: str | None = None
 
 
 class CommitBody(BaseModel):
     account_id: str
     items: list[ImportItem] = Field(min_length=1, max_length=MAX_ROWS)
+    # Set-aside rows these items came from; they are cleared once saved.
+    pending_ids: list[str] = Field(default_factory=list, max_length=MAX_ROWS)
 
 
-def _payload(account: dict, item: ImportItem) -> TransactionCreate:
+def _payload(account: dict, item: ImportItem, counter: dict | None = None) -> TransactionCreate:
     base = {
         "date": datetime.combine(item.date, time.min),
         "amount": item.amount,
@@ -185,6 +206,7 @@ def _payload(account: dict, item: ImportItem) -> TransactionCreate:
         "account_id": str(account["_id"]),
         "merchant": item.merchant,
         "note": item.note,
+        "settles_expense_id": item.settles_expense_id,
     }
     if item.kind == "card_repayment":
         if item.direction != "out" or not item.counter_account_id:
@@ -195,6 +217,31 @@ def _payload(account: dict, item: ImportItem) -> TransactionCreate:
             category=TRANSFER_CATEGORY,
             sub_category=TRANSFER_SUB_CARD_REPAYMENT,
             counter_account_id=item.counter_account_id,
+        )
+    if item.kind == "account_move":
+        if counter is None or str(counter["_id"]) == str(account["_id"]):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "Account move needs another account"
+            )
+        own, other = account["account_type"], counter["account_type"]
+        if own == other:
+            # Between two accounts of one ledger, only the sending side is entered here.
+            if item.direction != "out":
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    "Enter this move from the sending account",
+                )
+            sub = TRANSFER_SUB_ACCOUNT_TRANSFER
+        elif (own == "personal") == (item.direction == "out"):
+            sub = TRANSFER_SUB_SHARED_FUNDING
+        else:
+            sub = TRANSFER_SUB_SHARED_WITHDRAWAL
+        return TransactionCreate(
+            **base,
+            type=TransactionType.EXPENSE if item.direction == "out" else TransactionType.INCOME,
+            category=TRANSFER_CATEGORY,
+            sub_category=sub,
+            counter_account_id=str(counter["_id"]),
         )
     if item.category == TRANSFER_CATEGORY:
         raise HTTPException(
@@ -229,20 +276,52 @@ async def commit_bank_rows(
 
     documents = []
     for item in body.items:
-        payload = _payload(account, item)
+        counter = None
+        if item.kind == "account_move" and item.counter_account_id:
+            try:
+                counter = await db["accounts"].find_one({"_id": ObjectId(item.counter_account_id)})
+            except InvalidId:
+                counter = None
+            if counter is not None:
+                await assert_can_access_doc(db, current_user, counter)
+        payload = _payload(account, item, counter)
         await validate_transaction_payload(
             payload, db, current_user.id, owner_ids=owner_ids, current_user=current_user
         )
-        documents.append(
-            _document_from_payload(
-                payload, owner_id=current_user.id, shared_group_id=current_user.shared_group_id
-            )
+        document = _document_from_payload(
+            payload, owner_id=current_user.id, shared_group_id=current_user.shared_group_id
+        )
+        documents.append(document)
+        if is_paired_transfer(document):
+            # A move between the personal and shared ledgers is stored as a linked pair.
+            document["_id"] = ObjectId()
+            twin = twin_document(document, shared_group_id=current_user.shared_group_id)
+            twin["_id"] = ObjectId()
+            document["linked_transaction_id"] = str(twin["_id"])
+            twin["linked_transaction_id"] = str(document["_id"])
+            documents.append(twin)
+    # Each item was checked alone; several settlements of one expense must also fit together.
+    totals: dict[str, float] = {}
+    for document in documents:
+        if document.get("settles_expense_id"):
+            key = document["settles_expense_id"]
+            totals[key] = totals.get(key, 0.0) + float(document["amount"])
+    for expense_id, total in totals.items():
+        await check_settlement(
+            db,
+            expense_id=expense_id,
+            amount=total,
+            currency=account["currency"],
+            owner_ids=owner_ids,
+            account_type=ledger,
+            shared_group_id=current_user.shared_group_id,
         )
     batch_id = str(ObjectId())
     for document in documents:
         document["import_batch_id"] = batch_id
     await db["transactions"].insert_many(documents)
-    return {"created": len(documents), "batch_id": batch_id}
+    await _delete_pending(db, current_user, account, body.pending_ids)
+    return {"created": len(body.items), "batch_id": batch_id}
 
 
 @router.delete("/batch/{batch_id}")
@@ -262,3 +341,141 @@ async def undo_bank_import(
         )
     result = await db["transactions"].delete_many(query)
     return {"deleted": result.deleted_count}
+
+
+# --- Rows set aside to finish later -------------------------------------
+# In a shared ledger the partner sees and can finish them too.
+
+MAX_STATE_BYTES = 20_000
+
+
+class PendingBody(BaseModel):
+    account_id: str
+    # The row as the review screen holds it, edits included. Opaque to the server.
+    state: dict[str, Any]
+    source_name: str = Field(default="", max_length=200)
+
+
+class PendingUpdate(BaseModel):
+    state: dict[str, Any]
+
+
+def _check_state(state: dict[str, Any]) -> None:
+    if len(json.dumps(state)) > MAX_STATE_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Row is too large")
+
+
+async def _account_for(db, current_user: UserOut, account_id: str) -> dict:
+    try:
+        account = await db["accounts"].find_one({"_id": ObjectId(account_id)})
+    except InvalidId:
+        account = None
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    await assert_can_access_doc(db, current_user, account)
+    return account
+
+
+async def _pending_scope(db, current_user: UserOut, account: dict) -> dict:
+    ledger = AccountType(account["account_type"])
+    owner_ids = await resolve_owner_ids(db, current_user, ledger)
+    return {
+        **owner_match(owner_ids),
+        "account_type": ledger.value,
+        **shared_scope(ledger.value, current_user.shared_group_id),
+        "account_id": str(account["_id"]),
+    }
+
+
+async def _delete_pending(db, current_user: UserOut, account: dict, ids: list[str]) -> None:
+    valid = [ObjectId(i) for i in ids if ObjectId.is_valid(i)]
+    if not valid:
+        return
+    scope = await _pending_scope(db, current_user, account)
+    await db["import_pending"].delete_many({**scope, "_id": {"$in": valid}})
+
+
+def _pending_out(doc: dict, user_id: str) -> dict:
+    return {
+        "id": str(doc["_id"]),
+        "account_id": doc["account_id"],
+        "source_name": doc.get("source_name", ""),
+        "state": doc["state"],
+        "created_at": doc["created_at"].isoformat(),
+        "mine": doc.get("created_by") == user_id,
+    }
+
+
+@router.get("/pending")
+async def list_pending(
+    account_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> list[dict]:
+    account = await _account_for(db, current_user, account_id)
+    scope = await _pending_scope(db, current_user, account)
+    docs = await db["import_pending"].find(scope).sort("created_at", 1).to_list(length=MAX_ROWS)
+    return [_pending_out(d, current_user.id) for d in docs]
+
+
+@router.post("/pending", status_code=status.HTTP_201_CREATED)
+async def create_pending(
+    body: PendingBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    account = await _account_for(db, current_user, body.account_id)
+    ledger = AccountType(account["account_type"])
+    require_shared_group_for_write(current_user, ledger)
+    _check_state(body.state)
+    document = {
+        "owner_id": current_user.id,
+        "created_by": current_user.id,
+        "account_type": ledger.value,
+        "shared_group_id": current_user.shared_group_id if ledger == AccountType.SHARED else None,
+        "account_id": str(account["_id"]),
+        "source_name": body.source_name,
+        "state": body.state,
+        "created_at": datetime.utcnow(),
+    }
+    result = await db["import_pending"].insert_one(document)
+    return _pending_out({**document, "_id": result.inserted_id}, current_user.id)
+
+
+async def _pending_doc(db, current_user: UserOut, pending_id: str) -> dict:
+    found = (
+        await db["import_pending"].find_one({"_id": ObjectId(pending_id)})
+        if ObjectId.is_valid(pending_id)
+        else None
+    )
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+    account = await _account_for(db, current_user, found["account_id"])
+    scope = await _pending_scope(db, current_user, account)
+    if not await db["import_pending"].find_one({**scope, "_id": found["_id"]}, {"_id": 1}):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+    return found
+
+
+@router.put("/pending/{pending_id}")
+async def update_pending(
+    pending_id: str,
+    body: PendingUpdate,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    found = await _pending_doc(db, current_user, pending_id)
+    _check_state(body.state)
+    await db["import_pending"].update_one({"_id": found["_id"]}, {"$set": {"state": body.state}})
+    return _pending_out({**found, "state": body.state}, current_user.id)
+
+
+@router.delete("/pending/{pending_id}")
+async def delete_pending(
+    pending_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    found = await _pending_doc(db, current_user, pending_id)
+    await db["import_pending"].delete_one({"_id": found["_id"]})
+    return {"deleted": 1}

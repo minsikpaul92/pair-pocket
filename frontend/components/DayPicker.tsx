@@ -34,6 +34,10 @@ type Props = {
   showIcon?: boolean;
   /** Disable opening the calendar (locked / read-only). */
   disabled?: boolean;
+  /** Earliest day that can be chosen; earlier days are shown but disabled. */
+  min?: Date;
+  /** A custom button that opens the calendar, in place of the default date field. */
+  trigger?: React.ReactElement;
 };
 
 /**
@@ -48,6 +52,8 @@ export default function DayPicker({
   triggerClassName,
   showIcon = true,
   disabled = false,
+  min,
+  trigger,
 }: Props) {
   const t = useTranslations("common");
   const tCal = useTranslations("calendar");
@@ -84,6 +90,7 @@ export default function DayPicker({
       }}
     >
       <PopoverTrigger asChild>
+        {trigger ?? (
         <button
           type="button"
           disabled={disabled}
@@ -107,6 +114,7 @@ export default function DayPicker({
             {value ? formatDayLabel(value, locale) : t("selectDate")}
           </p>
         </button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="z-[110] w-[300px] p-3" align="start">
         <div className="mb-3 flex items-center justify-between gap-2">
@@ -156,14 +164,19 @@ export default function DayPicker({
             const inMonth = isSameMonth(cell, viewMonth);
             const selected = value ? isSameDay(cell, value) : false;
             const isToday = isSameDay(cell, today);
+            const tooEarly = min
+              ? cell < new Date(min.getFullYear(), min.getMonth(), min.getDate())
+              : false;
             return (
               <button
                 key={cell.toISOString()}
                 type="button"
+                disabled={tooEarly}
                 onClick={() => selectDay(cell)}
                 className={cn(
                   "h-9 w-full rounded-lg text-sm font-medium tabular-nums transition-colors",
                   !inMonth && "opacity-35",
+                  tooEarly && "pointer-events-none opacity-25",
                   selected
                     ? "bg-blue-500 text-white shadow-sm"
                     : isToday

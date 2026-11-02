@@ -4,6 +4,9 @@
  * not a raw <select>. Existing raw <select> elements are counted per file in
  * scripts/ui-baseline.json and may only go down.
  *
+ * Keeps calendars consistent: dates are picked with components/DayPicker.tsx,
+ * never a native date input.
+ *
  * Usage: node scripts/check-ui.mjs [--update]
  */
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
@@ -25,10 +28,13 @@ function walk(dir, out = []) {
 }
 
 const counts = {};
+const nativeDates = [];
 for (const dir of ["components", "app"]) {
   for (const file of walk(join(root, dir))) {
-    const n = (readFileSync(file, "utf8").match(/<select[\s>]/g) ?? []).length;
+    const text = readFileSync(file, "utf8");
+    const n = (text.match(/<select[\s>]/g) ?? []).length;
     if (n) counts[relative(root, file)] = n;
+    if (/type=["']date["']/.test(text)) nativeDates.push(relative(root, file));
   }
 }
 
@@ -45,6 +51,10 @@ const errors = Object.entries(counts)
     ([file, n]) =>
       `${file}: ${n} raw <select> (allowed ${baseline[file] ?? 0}). Use components/ui/dropdown.tsx instead.`
   );
+
+for (const file of nativeDates) {
+  errors.push(`${file}: native date input. Use components/DayPicker.tsx instead.`);
+}
 
 if (errors.length) {
   console.error("ui check failed:\n  - " + errors.join("\n  - "));
