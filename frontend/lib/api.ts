@@ -1407,6 +1407,14 @@ export async function updateTransaction(
   return (await res.json()) as Transaction;
 }
 
+export async function fetchTransaction(id: string): Promise<Transaction> {
+  const res = await apiFetch(`${API_BASE_URL}/api/transactions/${id}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw await readApiError(res, "serverUnavailable");
+  return (await res.json()) as Transaction;
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   const res = await apiFetch(`${API_BASE_URL}/api/transactions/${id}`, {
     method: "DELETE",

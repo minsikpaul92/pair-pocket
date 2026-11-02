@@ -33,7 +33,7 @@ from app.services.settlement import (
     settled_total,
 )
 from app.services import cross_settlement
-from app.services.notifications import notify_transaction
+from app.services.notifications import notify_transaction, remove_for_transactions
 from app.services.stats import resolve_date_range
 from app.services.transaction_links import (
     authorized_funding_twin,
@@ -574,6 +574,30 @@ async def create_cross_settlement(
     return _serialize(created)
 
 
+@router.get("/{transaction_id}", response_model=TransactionOut)
+async def get_transaction(
+    transaction_id: str,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """One entry the caller can see, shaped like a row of the list."""
+    if not ObjectId.is_valid(transaction_id):
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(transaction_id)})
+    await assert_can_access_doc(
+        db, current_user, doc, not_found_detail="Transaction not found."
+    )
+    row = _serialize(doc)
+    row["origin"] = (await load_settlement_origins(db, current_user, [doc])).get(
+        transaction_id
+    )
+    if doc.get("type") == TransactionType.EXPENSE.value:
+        settled = await settled_total(db, transaction_id)
+        row["settled_amount"] = settled
+        row["effective_amount"] = max(float(doc["amount"]) - settled, 0.0)
+    return row
+
+
 @router.put("/{transaction_id}", response_model=TransactionOut)
 async def update_transaction(
     transaction_id: str,
@@ -729,4 +753,7 @@ async def delete_transaction(
     else:
         await write(None)
 
+    await remove_for_transactions(
+        db, [transaction_id, *([str(twin["_id"])] if twin else [])]
+    )
     await _sync_stock_holding(db, existing)

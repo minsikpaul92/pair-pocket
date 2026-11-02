@@ -1250,6 +1250,10 @@
   },
   "whatsNew": {
     "items": {
+      "notificationOpensEntry": {
+        "title": "Notifications open the entry",
+        "description": "Tapping a notification now opens that entry instead of just the list. Notifications for deleted entries are removed, so the same entry no longer shows up twice."
+      },
       "settlementMoveTab": {
         "title": "A Settle/Move tab",
         "description": "Settlements, moves between your accounts, card payments and transfers between shared and personal now sit in a Settle/Move tab instead of Expense and Income. You can also pick it when adding an entry, and the settlement picker lets you switch between personal and shared expenses and search. Tap a settlement between ledgers to see which expense it paid. Paid subscriptions are no longer shown in red. The e-Transfer category is gone; use a regular category instead."

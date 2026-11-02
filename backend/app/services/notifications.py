@@ -91,6 +91,16 @@ async def unread_count(db: AsyncIOMotorDatabase, user_id: str) -> int:
     )
 
 
+async def remove_for_transactions(
+    db: AsyncIOMotorDatabase, transaction_ids: list[str]
+) -> None:
+    """Drop the notifications of deleted entries. Never raises."""
+    try:
+        await db[COLLECTION].delete_many({"transaction_id": {"$in": transaction_ids}})
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not remove notifications")
+
+
 async def list_for(db: AsyncIOMotorDatabase, user_id: str, limit: int = 50) -> list[dict]:
     docs = (
         await db[COLLECTION]
@@ -98,7 +108,13 @@ async def list_for(db: AsyncIOMotorDatabase, user_id: str, limit: int = 50) -> l
         .sort("created_at", -1)
         .to_list(length=limit)
     )
-    return [serialize(d) for d in docs]
+    # Entries deleted before notifications were cleaned up have nothing to open.
+    ids = [ObjectId(d["transaction_id"]) for d in docs if ObjectId.is_valid(d["transaction_id"])]
+    alive = {
+        str(d["_id"])
+        async for d in db["transactions"].find({"_id": {"$in": ids}}, {"_id": 1})
+    }
+    return [serialize(d) for d in docs if d["transaction_id"] in alive]
 
 
 async def mark_read(db: AsyncIOMotorDatabase, user_id: str, notification_id: str) -> bool:
