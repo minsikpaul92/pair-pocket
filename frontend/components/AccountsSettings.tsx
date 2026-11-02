@@ -107,9 +107,12 @@ function BalanceMatchModal({
             inputMode="decimal"
             autoFocus
             value={actual}
-            onChange={(e) =>
-              setActual(formatAmountInput(e.target.value, account.currency))
-            }
+            onChange={(e) => {
+              // A card that was overpaid shows a negative amount.
+              const negative = e.target.value.trim().startsWith("-");
+              const digits = formatAmountInput(e.target.value, account.currency);
+              setActual(negative ? `-${digits}` : digits);
+            }}
             className="input-field"
           />
         </div>
