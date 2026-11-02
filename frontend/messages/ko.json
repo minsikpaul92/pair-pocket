@@ -197,6 +197,9 @@
     "budgetOk": "확인",
     "budgetCancel": "취소",
     "budgetCarry": "기본 {base} · 지난달 초과 −{over}",
+    "budgetCarryOption": "지난달 초과분을 이번 달 예산에서 뺄게요",
+    "budgetCarryAmount": "지난달 초과 {over}",
+    "budgetCarrySkipped": "이번 달은 초과분을 빼지 않아요",
     "remaining": "{amount} 남음",
     "overBudget": "{amount} 초과",
     "fixedExpenses": "고정지출",
@@ -1234,6 +1237,10 @@
   },
   "whatsNew": {
     "items": {
+      "budgetCarryChoice": {
+        "title": "달마다 지난달 초과분을 뺄지 고를 수 있어요",
+        "description": "대시보드의 예산 카드를 누르면, 이번 달 예산에서 지난달 초과분을 뺄지 선택할 수 있어요. 빼지 않으면 설정한 예산 금액 그대로 한 달을 시작해요."
+      },
       "cardRefundBalance": {
         "title": "카드 환급이 카드 빚에 반영돼요",
         "description": "카드로 들어온 환급이나 리베이트가 이제 카드의 남은 빚을 줄여요. 잔액 맞추기에서는 갚은 것보다 많이 낸 카드의 마이너스 금액도 입력할 수 있어요."

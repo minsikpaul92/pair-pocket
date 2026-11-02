@@ -22,6 +22,7 @@ from app.models.user_settings import (
     ActiveLocaleBody,
     AddInstitutionBody,
     BudgetBody,
+    BudgetCarryBody,
     DashboardLayoutBody,
     SpendingAccountExclusionsBody,
     SpendingExclusionsBody,
@@ -155,6 +156,7 @@ async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
         "onboarding_personal_completed": onboarded,
         "onboarding_personal_step": int(doc.get("onboarding_personal_step") or 0),
         "budgets": doc.get("budgets") or {},
+        "budget_carry_skipped": doc.get("budget_carry_skipped") or {},
         "sales_tax_province": doc.get("sales_tax_province")
         or DEFAULT_SALES_TAX_PROVINCE,
         "dashboard_layout": {
@@ -525,6 +527,35 @@ async def update_budget(
         entity=f"budget:{payload.kind}",
         detail={"currency": payload.currency, "amount": payload.amount},
     )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/budget-carry", response_model=UserSettingsOut)
+async def update_budget_carry(
+    payload: BudgetCarryBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Choose whether a month's budget deducts the previous month's overspend."""
+    await _get_or_create(db, current_user.id)
+    owner_ids = [current_user.id]
+    if payload.kind == "shared":
+        if not current_user.shared_group_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="공유 예산을 설정하려면 파트너 연결이 필요합니다.",
+            )
+        partner_id = await get_partner_owner_id(db, current_user.id)
+        if partner_id:
+            owner_ids.append(partner_id)
+            await _get_or_create(db, partner_id)
+
+    field = f"budget_carry_skipped.{payload.kind}"
+    change = {"$pull": {field: payload.month}} if payload.carry else {
+        "$addToSet": {field: payload.month}
+    }
+    await db[COLLECTION].update_many({"owner_id": {"$in": owner_ids}}, change)
     doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
     return await _settings_out(db, doc)
 

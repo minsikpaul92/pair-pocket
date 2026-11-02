@@ -629,8 +629,12 @@ export default function DashboardView({
   const budget = useMemo(() => {
     const target: Currency = scope === "ALL" ? display : budgetCurrencies[0];
     const saved = userSettings?.budgets?.[accountType] ?? {};
+    // The user can start a month without last month's overspend deducted.
+    const skipped = (
+      userSettings?.budget_carry_skipped?.[accountType] ?? []
+    ).includes(monthStr);
     let base = 0;
-    let carry = 0;
+    let overspend = 0;
     let configured = false;
     for (const c of budgetCurrencies) {
       const amount = saved[c] ?? 0;
@@ -638,16 +642,19 @@ export default function DashboardView({
       configured = true;
       const over = Math.max(0, (prevStats[c]?.adjusted_expense ?? 0) - amount);
       base += convertNative(amount, c, target);
-      carry += convertNative(over, c, target);
+      overspend += convertNative(over, c, target);
     }
+    const carry = skipped ? 0 : overspend;
     return {
       configured,
       base,
       carry,
+      overspend,
+      skipped,
       effective: Math.max(0, base - carry),
       currency: target,
     };
-  }, [userSettings, prevStats, accountType, scope, display, convertNative]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userSettings, prevStats, accountType, scope, display, convertNative, monthStr]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const expenseItems = useMemo(
     () =>
@@ -818,7 +825,12 @@ export default function DashboardView({
       </section>
     ),
     budget: (
-      <section className="card-inset h-full p-4">
+      <section
+        className={`card-inset h-full p-4 ${
+          budget.configured ? "cursor-pointer" : ""
+        }`}
+        onClick={budget.configured ? () => setShowBudgetModal(true) : undefined}
+      >
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
           {tDashboard("budget")}
         </p>
@@ -834,14 +846,21 @@ export default function DashboardView({
             {tDashboard("budgetSet")}
           </button>
         ) : (
-          budget.carry > 0 && (
-            <p className="mt-1 text-[11px] leading-snug text-red-500">
-              {tDashboard("budgetCarry", {
-                base: fmt(budget.base, budgetCurrency),
-                over: fmt(budget.carry, budgetCurrency),
-              })}
-            </p>
-          )
+          <>
+            {budget.carry > 0 && (
+              <p className="mt-1 text-[11px] leading-snug text-red-500">
+                {tDashboard("budgetCarry", {
+                  base: fmt(budget.base, budgetCurrency),
+                  over: fmt(budget.carry, budgetCurrency),
+                })}
+              </p>
+            )}
+            {budget.skipped && budget.overspend > 0 && (
+              <p className="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+                {tDashboard("budgetCarrySkipped")}
+              </p>
+            )}
+          </>
         )}
       </section>
     ),
@@ -1385,6 +1404,9 @@ export default function DashboardView({
           accountType={accountType}
           currencies={budgetCurrencies}
           settings={userSettings}
+          month={monthStr}
+          overspend={budget.overspend}
+          currency={budgetCurrency}
           onSaved={setUserSettings}
           onClose={() => setShowBudgetModal(false)}
         />

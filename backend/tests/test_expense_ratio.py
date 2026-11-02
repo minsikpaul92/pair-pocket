@@ -233,3 +233,21 @@ def test_budget_uses_the_accounts_the_user_left_out(env):
     assert _spent(env, apply_account_exclusions="true") == 100
     env.client.put("/api/settings/spending-account-exclusions", json={"accounts": []})
     assert _spent(env, apply_account_exclusions="true") == 130
+
+
+def test_budget_carry_choice_is_stored_per_month(env):
+    put = lambda month, carry: env.client.put(
+        "/api/settings/budget-carry",
+        json={"kind": "personal", "month": month, "carry": carry},
+    )
+    res = put("2026-11", False)
+    assert res.status_code == 200
+    assert res.json()["budget_carry_skipped"] == {"personal": ["2026-11"]}
+    put("2026-11", False)
+    assert put("2026-12", False).json()["budget_carry_skipped"] == {
+        "personal": ["2026-11", "2026-12"]
+    }
+    assert put("2026-11", True).json()["budget_carry_skipped"] == {
+        "personal": ["2026-12"]
+    }
+    assert put("2026-13", True).status_code == 422

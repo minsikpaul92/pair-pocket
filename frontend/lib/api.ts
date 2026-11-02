@@ -665,6 +665,8 @@ export interface UserSettings {
   onboarding_personal_completed?: boolean;
   onboarding_personal_step?: number;
   budgets?: Partial<Record<AccountType, Partial<Record<"CAD" | "KRW", number>>>>;
+  /** Months (YYYY-MM) that start without last month's overspend deducted. */
+  budget_carry_skipped?: Partial<Record<AccountType, string[]>>;
   dashboard_layout?: DashboardLayout;
   dashboard_layouts?: Partial<Record<"CAD" | "KRW", DashboardLayout>>;
   spending_excluded_categories?: string[];
@@ -2269,6 +2271,20 @@ export async function updateBudget(payload: {
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || "Failed to update budget");
   }
+  return (await res.json()) as UserSettings;
+}
+
+export async function updateBudgetCarry(payload: {
+  kind: AccountType;
+  month: string;
+  carry: boolean;
+}): Promise<UserSettings> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/budget-carry`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new ApiError("updateBudgetCarry");
   return (await res.json()) as UserSettings;
 }
 

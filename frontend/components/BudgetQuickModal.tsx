@@ -3,7 +3,13 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { type UserSettings, updateBudget } from "@/lib/api";
+import {
+  type Currency,
+  type UserSettings,
+  formatAmount,
+  updateBudget,
+  updateBudgetCarry,
+} from "@/lib/api";
 import type { AccountType } from "@/lib/api";
 import type { BudgetCurrency } from "@/lib/dashboard-layout";
 
@@ -12,6 +18,11 @@ interface Props {
   /** One input per currency: just the ledger's own, or CAD and KRW on All. */
   currencies: BudgetCurrency[];
   settings: UserSettings | null;
+  /** The month being viewed (YYYY-MM); the carry choice applies to it. */
+  month: string;
+  /** Last month's overspend that would be deducted, in `currency`. */
+  overspend: number;
+  currency: Currency;
   onSaved: (settings: UserSettings) => void;
   onClose: () => void;
 }
@@ -20,6 +31,9 @@ export default function BudgetQuickModal({
   accountType,
   currencies,
   settings,
+  month,
+  overspend,
+  currency,
   onSaved,
   onClose,
 }: Props) {
@@ -32,6 +46,10 @@ export default function BudgetQuickModal({
       })
     )
   );
+  const wasSkipped = (
+    settings?.budget_carry_skipped?.[accountType] ?? []
+  ).includes(month);
+  const [carry, setCarry] = useState(!wasSkipped);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
 
@@ -47,6 +65,9 @@ export default function BudgetQuickModal({
         const current = settings?.budgets?.[accountType]?.[currency] ?? 0;
         if (!Number.isFinite(amount) || amount < 0 || amount === current) continue;
         next = await updateBudget({ kind: accountType, currency, amount });
+      }
+      if (carry === wasSkipped) {
+        next = await updateBudgetCarry({ kind: accountType, month, carry });
       }
       if (next) onSaved(next);
       onClose();
@@ -89,6 +110,26 @@ export default function BudgetQuickModal({
             </label>
           ))}
         </div>
+        {(overspend > 0 || wasSkipped) && (
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="checkbox"
+              checked={carry}
+              onChange={(e) => setCarry(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+            />
+            <span className="text-xs leading-snug text-gray-600 dark:text-gray-300">
+              {t("budgetCarryOption")}
+              {overspend > 0 && (
+                <span className="block text-gray-400 dark:text-gray-500">
+                  {t("budgetCarryAmount", {
+                    over: formatAmount(overspend, currency),
+                  })}
+                </span>
+              )}
+            </span>
+          </label>
+        )}
         {error && (
           <p className="text-xs text-red-500">{t("budgetSaveError")}</p>
         )}
