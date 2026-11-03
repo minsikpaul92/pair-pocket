@@ -176,7 +176,7 @@ export default function OnboardingScreenshotScan({
           const resumeAt = formatResumeAtEastern(ev.resume_at);
           setStatus(
             tImport("statusQuotaFallback", {
-              model: ev.model || "gemini-3.6-flash",
+              model: ev.model || "gemini-3.8-flash",
               fallback: ev.fallback_model || "gemini-3.5-flash-lite",
               resumeAt,
             })
