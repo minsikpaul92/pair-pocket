@@ -1091,7 +1091,7 @@
     "sharedStartDateTitle": "공유 가계부 시작일",
     "sharedStartDateReadOnly": "초대 시 정해진 공유 시작일입니다. 설정에서 나중에 수정할 수 있습니다.",
     "apiKeyTitle": "Gemini API Key",
-    "apiKeyPlaceholder": "API Key (선택, 스크린샷 분석용)",
+    "apiKeyPlaceholder": "Gemini API Key 붙여넣기",
     "apiKeySaved": "이미 저장된 키가 있습니다.",
     "continue": "계속",
     "back": "이전",
@@ -1213,8 +1213,7 @@
     "apiKeyOptionalTitle": "선택: 스크린샷으로 자동 입력"
   },
   "geminiGuide": {
-    "dataTitle": "Google로 전송되는 정보",
-    "dataSent": "영수증이나 명세서를 스캔하면 이미지나 PDF가 내 키로 Google Gemini 서비스에 전송됩니다.",
+    "noticeSummary": "스캔한 내용은 내 키로 Google에 전송됩니다",
     "dataTiers": "무료 키를 쓰면 Google이 보낸 내용을 제품 개선에 사용하고 사람이 검토할 수 있어서, Google은 개인 정보를 보내지 말라고 안내합니다. 유료 키는 제품 개선에 쓰이지 않고, 오용 감지를 위해 일정 기간만 기록됩니다.",
     "termsLink": "Google 약관 보기",
     "optional": "키는 선택 사항입니다. 키가 없어도 직접 입력과 CSV 가져오기는 그대로 쓸 수 있고, 나중에 설정에서 키를 추가할 수 있습니다. 연결된 파트너가 키를 저장했다면 내 키가 없을 때 파트너 키를 사용합니다.",

@@ -1091,7 +1091,7 @@
     "sharedStartDateTitle": "Shared ledger start date",
     "sharedStartDateReadOnly": "This shared start date was set when you were invited. You can change it later in Settings.",
     "apiKeyTitle": "Gemini API key",
-    "apiKeyPlaceholder": "API key (optional, for screenshot AI)",
+    "apiKeyPlaceholder": "Paste your Gemini API key",
     "apiKeySaved": "A key is already saved.",
     "continue": "Continue",
     "back": "Back",
@@ -1213,8 +1213,7 @@
     "apiKeyOptionalTitle": "Optional: fill in from screenshots"
   },
   "geminiGuide": {
-    "dataTitle": "What goes to Google",
-    "dataSent": "When you scan a receipt or statement, the image or PDF is sent to Google's Gemini service with your own key.",
+    "noticeSummary": "Scans are sent to Google with your key",
     "dataTiers": "With a free key, Google may use what you send to improve its products and people may review it, so Google advises not to send personal information. With a paid key, it is not used to improve products and is logged only for a limited time to detect misuse.",
     "termsLink": "Google's terms",
     "optional": "The key is optional. Manual entry and CSV import work without it, and you can add a key later in Settings. If your linked partner saved a key, theirs is used when you have none.",
