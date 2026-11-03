@@ -80,14 +80,6 @@ web_modules/
 .next
 out
 
-# next-pwa generated service worker files
-frontend/public/sw.js
-frontend/public/sw.js.map
-frontend/public/workbox-*.js
-frontend/public/workbox-*.js.map
-frontend/public/swe-worker-*.js
-frontend/public/fallback-*.js
-
 # Nuxt.js build / generate output
 .nuxt
 dist
