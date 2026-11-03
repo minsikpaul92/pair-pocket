@@ -21,6 +21,7 @@ import { useLocale, useTranslations } from "next-intl";
 import LanguagePicker from "@/components/LanguagePicker";
 import CountryToggle from "@/components/CountryToggle";
 import OnboardingField from "@/components/OnboardingField";
+import GeminiKeyGuide from "@/components/GeminiKeyGuide";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import DayPicker from "@/components/DayPicker";
 import AccountSelect from "@/components/AccountSelect";
@@ -1542,20 +1543,7 @@ export default function OnboardingWizard() {
                   {t("apiKeyOptionalTitle")}
                 </h2>
               </summary>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                <li>{t("apiKeyStep1")}</li>
-                <li>{t("apiKeyStep2")}</li>
-                <li>{t("apiKeyStep3")}</li>
-              </ol>
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm font-medium text-blue-500 hover:underline"
-              >
-                aistudio.google.com/apikey
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+              <GeminiKeyGuide stepsOpen />
               {settings?.has_gemini_key ? (
                 <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4" />

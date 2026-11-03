@@ -957,7 +957,7 @@
     "geminiTitle": "Gemini AI 설정",
     "connected": "연동됨",
     "notConnected": "미연동",
-    "geminiDescription": "개인 Google Gemini API Key를 연동하면 영수증 OCR과 PDF 명세서 분석을 사용할 수 있습니다. 파트너와 연결되면 키가 없을 때 파트너 키를 사용할 수 있습니다.",
+    "geminiDescription": "개인 Google Gemini API Key를 연동하면 영수증 OCR과 PDF 명세서 분석을 사용할 수 있습니다.",
     "apiKeyLabel": "Gemini API Key",
     "apiKeyPlaceholder": "AI API Key 입력",
     "saving": "저장 중...",
@@ -1091,9 +1091,6 @@
     "sharedStartDateTitle": "공유 가계부 시작일",
     "sharedStartDateReadOnly": "초대 시 정해진 공유 시작일입니다. 설정에서 나중에 수정할 수 있습니다.",
     "apiKeyTitle": "Gemini API Key",
-    "apiKeyStep1": "Google AI Studio에 로그인합니다.",
-    "apiKeyStep2": "Create API key로 키를 만듭니다.",
-    "apiKeyStep3": "아래에서 키를 붙여넣습니다. (나중에 설정에서도 변경 가능)",
     "apiKeyPlaceholder": "API Key (선택, 스크린샷 분석용)",
     "apiKeySaved": "이미 저장된 키가 있습니다.",
     "continue": "계속",
@@ -1215,6 +1212,21 @@
     "startDateLater": "설정에서 나중에 바꿀 수 있어요.",
     "apiKeyOptionalTitle": "선택: 스크린샷으로 자동 입력"
   },
+  "geminiGuide": {
+    "dataTitle": "Google로 전송되는 정보",
+    "dataSent": "영수증이나 명세서를 스캔하면 이미지나 PDF가 내 키로 Google Gemini 서비스에 전송됩니다.",
+    "dataTiers": "무료 키를 쓰면 Google이 보낸 내용을 제품 개선에 사용하고 사람이 검토할 수 있어서, Google은 개인 정보를 보내지 말라고 안내합니다. 유료 키는 제품 개선에 쓰이지 않고, 오용 감지를 위해 일정 기간만 기록됩니다.",
+    "termsLink": "Google 약관 보기",
+    "optional": "키는 선택 사항입니다. 키가 없어도 직접 입력과 CSV 가져오기는 그대로 쓸 수 있고, 나중에 설정에서 키를 추가할 수 있습니다. 연결된 파트너가 키를 저장했다면 내 키가 없을 때 파트너 키를 사용합니다.",
+    "stepsTitle": "키 발급 방법",
+    "step1": "아래 AI Studio 열기를 누르면 새 탭에서 Google AI Studio의 API 키 화면이 열립니다.",
+    "step2": "Google 계정으로 로그인합니다. 처음이면 약관 동의 화면이 나오고, 기본 프로젝트가 자동으로 만들어질 수 있습니다.",
+    "step3": "Create API key를 누릅니다. 프로젝트를 고르라고 하면 Google이 만들어 준 프로젝트를 선택합니다.",
+    "step4": "새 키를 복사합니다. 영문과 숫자로 된 긴 문자열입니다.",
+    "step5": "이 화면으로 돌아와 아래 입력란에 키를 붙여넣습니다.",
+    "openStudio": "AI Studio 열기",
+    "freeTier": "새 키는 사용량 제한이 있는 Google 무료 등급으로 시작합니다. AI Studio에서 결제를 설정해야 유료로 바뀝니다."
+  },
   "notifications": {
     "title": "알림",
     "open": "알림",
@@ -1250,6 +1262,10 @@
   },
   "whatsNew": {
     "items": {
+      "geminiKeyGuide": {
+        "title": "Gemini 키 안내가 자세해졌어요",
+        "description": "온보딩과 설정에서 무료 Gemini 키를 받는 방법을 단계별로 안내하고, 스캔할 때 Google로 무엇이 전송되는지 알려 드려요. 키는 여전히 선택 사항이에요."
+      },
       "notificationOpensEntry": {
         "title": "알림을 누르면 그 거래가 바로 열려요",
         "description": "알림 카드를 누르면 목록만 보이는 대신 해당 거래가 바로 열려요. 지운 거래의 알림은 더는 남지 않아서, 같은 거래가 두 번 알려지는 일도 없어요."
