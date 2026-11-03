@@ -123,6 +123,19 @@ cd frontend && npm run lint && npm run check:i18n && npm run build
 cd backend && PYTHONPATH=. pytest -q
 ```
 
+CI also runs `npm audit --audit-level=high` (reported but not blocking yet) and `pip-audit` (blocking).
+
+### Dependency updates
+
+Dependabot opens weekly PRs for `frontend` (npm), `backend` (pip) and GitHub Actions. Minor and patch bumps come grouped in one PR per ecosystem; major bumps come one per package.
+
+To review one:
+
+1. Wait for CI. A green run means lint, i18n and UI checks, the production build, the audits and the backend tests all pass on the new versions.
+2. For grouped minor and patch PRs with green CI, skim the changed packages and merge.
+3. For major bumps (for example `next`, `eslint`, `@ducanh2912/next-pwa`), read the release notes, check the PR locally (`npm ci && npm run build && npm run start`, or `pytest` for the backend), and click through sign-in, adding a transaction and the PWA install before merging. Close it with a comment if it needs code changes that should land in their own PR.
+4. Dependency bumps get no What's New entry unless they fix something users saw.
+
 ### Environment variables
 
 | Location | Variable | Description |
