@@ -1273,6 +1273,10 @@
   },
   "whatsNew": {
     "items": {
+      "geminiKeyCards": {
+        "title": "Picture guide for the Gemini key",
+        "description": "Getting a Gemini key now shows each Google AI Studio screen with the button to press, including the project step that new accounts need."
+      },
       "geminiKeyGuide": {
         "title": "Clearer Gemini key setup",
         "description": "Onboarding and Settings now walk you through getting a free Gemini key step by step and explain what is sent to Google when you scan. The key is still optional."

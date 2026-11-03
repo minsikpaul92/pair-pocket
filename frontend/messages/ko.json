@@ -1273,6 +1273,10 @@
   },
   "whatsNew": {
     "items": {
+      "geminiKeyCards": {
+        "title": "Gemini 키 발급을 그림으로 안내해요",
+        "description": "Gemini 키를 받을 때 Google AI Studio 화면을 한 장씩 보여 주고 눌러야 할 버튼을 표시해요. 새 계정에 필요한 프로젝트 만들기 단계도 들어 있어요."
+      },
       "geminiKeyGuide": {
         "title": "Gemini 키 안내가 자세해졌어요",
         "description": "온보딩과 설정에서 무료 Gemini 키를 받는 방법을 단계별로 안내하고, 스캔할 때 Google로 무엇이 전송되는지 알려 드려요. 키는 여전히 선택 사항이에요."
