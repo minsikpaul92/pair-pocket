@@ -231,6 +231,7 @@
     "income": "Income",
     "investmentSavings": "Invest / save",
     "expenseRatio": "Expense mix",
+    "expenseMixTotal": "Total spent",
     "categoryBreakdown": "Spending by category",
     "trendTitle": "Income & expense trend",
     "trendRange": "{months} mo",

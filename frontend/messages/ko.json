@@ -231,6 +231,7 @@
     "income": "소득",
     "investmentSavings": "투자/저축",
     "expenseRatio": "지출 비율",
+    "expenseMixTotal": "총 지출",
     "categoryBreakdown": "카테고리별 지출",
     "trendTitle": "수입·지출 추이",
     "trendRange": "{months}개월",

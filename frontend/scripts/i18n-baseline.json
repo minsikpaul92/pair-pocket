@@ -2,7 +2,7 @@
   "hangul": {
     "components/AppShell.tsx": 10,
     "components/CategoryIcon.tsx": 18,
-    "components/DashboardAnalytics.tsx": 20,
+    "components/DashboardAnalytics.tsx": 19,
     "components/ImportView.tsx": 5,
     "components/ListView.tsx": 1,
     "components/MerchantSelect.tsx": 6,
