@@ -35,8 +35,10 @@ class StagingLoginIn(BaseModel):
 class StagingResetIn(BaseModel):
     password: str
     # "empty": brand-new users. "couples": Tester 1+2 and 3+4 linked, set up,
-    # with default accounts (staging_login.seed_couples).
-    preset: Literal["empty", "couples"] = "empty"
+    # with default accounts (staging_login.seed_couples). "demo": linked like
+    # "couples", with named accounts and a month of demo data
+    # (staging_login.seed_demo).
+    preset: Literal["empty", "couples", "demo"] = "empty"
     # With "empty": reset only this account, leaving the others as they are.
     account: str | None = None
 
@@ -83,4 +85,6 @@ async def reset_test_accounts(
     deleted = await staging_login.reset(db)
     if body.preset == "couples":
         await staging_login.seed_couples(db)
+    elif body.preset == "demo":
+        await staging_login.seed_demo(db)
     return {"deleted": deleted, "preset": body.preset}
