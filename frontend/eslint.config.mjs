@@ -1,25 +1,22 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
 
-const compat = new FlatCompat({
-  baseDirectory: dirname(fileURLToPath(import.meta.url)),
-});
-
-const eslintConfig = [
+export default defineConfig([
+  ...nextVitals,
   {
-    // Build output and the service worker files next-pwa writes into public/.
-    ignores: [
-      ".next/**",
-      "out/**",
-      "next-env.d.ts",
-      "public/sw.js",
-      "public/workbox-*.js",
-      "public/swe-worker-*.js",
-      "public/fallback-*.js",
-    ],
+    // React Compiler rules added by eslint-plugin-react-hooks 7. Existing code
+    // predates them, so report as warnings until it is cleaned up.
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/static-components": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
+    },
   },
-  ...compat.extends("next/core-web-vitals"),
-];
-
-export default eslintConfig;
+  // Build output.
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "next-env.d.ts",
+  ]),
+]);
