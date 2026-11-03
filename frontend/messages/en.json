@@ -1230,13 +1230,13 @@
     "card4": "If it says No Cloud Projects Available, open that list and press Create project.",
     "card5": "Keep the name and press Create project.",
     "card6": "Press Create key.",
-    "card7": "Press Copy key, then come back here and paste it into the field below.",
+    "card7": "Press Copy key, then come back here and paste it into the Gemini API key field below.",
     "cardAlt": "Google AI Studio screen for step {current}",
     "counter": "{current} / {total}",
     "prev": "Back",
     "next": "Next",
     "openStudio": "Open AI Studio",
-    "freeTier": "New keys start on Google's free tier, which has usage limits. Paid use starts only if you set up billing in AI Studio."
+    "freeTier": "Nothing is charged unless you add a payment method in AI Studio. Enjoy AI features within the free limit, and if you use it up, you can keep going once it resets."
   },
   "notifications": {
     "title": "Notifications",
