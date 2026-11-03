@@ -123,6 +123,17 @@ cd frontend && npm run lint && npm run check:i18n && npm run build
 cd backend && PYTHONPATH=. pytest -q
 ```
 
+CI also runs `npm audit --audit-level=high` (reported but not blocking yet) and `pip-audit` (blocking).
+
+### Dependency updates
+
+There are no scheduled version-update PRs. Dependencies are watched in two ways:
+
+- **Dependabot security updates** (repository setting) open a PR only when a dependency has a known vulnerability. Wait for CI, read the advisory, and merge if it is green. If the fix needs a major upgrade that breaks the build, close it with a comment and plan the upgrade in its own PR.
+- **CI audits** run `npm audit --audit-level=high` (non-blocking for now) and `pip-audit` on every PR, so new advisories show up in the CI log without any extra PRs.
+
+Upgrade versions on purpose when needed (for example the planned Next 16 upgrade), not on a weekly schedule. Dependency bumps get no What's New entry unless they fix something users saw.
+
 ### Environment variables
 
 | Location | Variable | Description |

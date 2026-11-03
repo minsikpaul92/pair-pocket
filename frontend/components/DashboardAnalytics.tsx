@@ -808,7 +808,7 @@ export default function DashboardAnalytics({
               {/* Centered Total Summary (z-0 so tooltip floats on top) */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                  총 지출
+                  {t("expenseMixTotal")}
                 </span>
                 <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums mt-0.5">
                   {formatAmount(pieTotalExpense, displayCurrency)}

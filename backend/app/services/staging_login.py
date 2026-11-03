@@ -20,6 +20,7 @@ from app.config import Settings
 from app.models.account import FinancialAccountKind
 from app.models.transaction import AccountType, Currency
 from app.models.user import UserOut
+from app.services import staging_demo
 from app.services.partnerships import archive_partnership
 from app.services.sessions import create_login_code
 
@@ -155,8 +156,40 @@ async def seed_couples(
     from app.models.account import AccountCreate
     from app.routers.accounts import create_account
 
+    for users in await link_couples(db, couples):
+        for user in users:
+            for name, kind in PRESET_PERSONAL_ACCOUNTS:
+                await create_account(
+                    AccountCreate(name=name, kind=kind, currency=Currency.CAD), user, db
+                )
+        for name, kind in PRESET_SHARED_ACCOUNTS:
+            await create_account(
+                AccountCreate(
+                    name=name,
+                    kind=kind,
+                    currency=Currency.CAD,
+                    account_type=AccountType.SHARED,
+                ),
+                users[0],
+                db,
+            )
+
+
+async def seed_demo(db: AsyncIOMotorDatabase) -> None:
+    """Both couples linked and filled with a believable month of demo data in
+    their own language (app/services/staging_demo.py)."""
+    for ids, users in zip(COUPLES, await link_couples(db)):
+        await staging_demo.seed_couple(db, users, _ACCOUNTS_BY_ID[ids[0]]["locale"])
+
+
+async def link_couples(
+    db: AsyncIOMotorDatabase, couples: tuple[tuple[str, str], ...] | list = COUPLES
+) -> list[list[UserOut]]:
+    """Link each couple in an active shared group, with onboarding done and both
+    ledgers starting this month; return each couple's members."""
     start = date.today().replace(day=1).isoformat()
     user_ids = {i: await _ensure_user(db, i) for ids in couples for i in ids}
+    linked = []
     for ids in couples:
         members = [user_ids[i] for i in ids]
         group_id = secrets.token_urlsafe(16)
@@ -183,25 +216,10 @@ async def seed_couples(
                     }
                 },
             )
-        users = [
-            _user_out(await db["users"].find_one({"_id": ObjectId(m)})) for m in members
-        ]
-        for user in users:
-            for name, kind in PRESET_PERSONAL_ACCOUNTS:
-                await create_account(
-                    AccountCreate(name=name, kind=kind, currency=Currency.CAD), user, db
-                )
-        for name, kind in PRESET_SHARED_ACCOUNTS:
-            await create_account(
-                AccountCreate(
-                    name=name,
-                    kind=kind,
-                    currency=Currency.CAD,
-                    account_type=AccountType.SHARED,
-                ),
-                users[0],
-                db,
-            )
+        linked.append(
+            [_user_out(await db["users"].find_one({"_id": ObjectId(m)})) for m in members]
+        )
+    return linked
 
 
 async def reset(
@@ -265,6 +283,7 @@ async def reset(
         },
     )
     await delete("shared_groups", {"_id": {"$in": test_only_groups}})
+    await delete("notifications", {"recipient_id": {"$in": user_ids}})
     await delete("auth_sessions", {"user_id": {"$in": user_ids}})
     await delete("auth_login_codes", {"user_id": {"$in": user_ids}})
     await delete("users", {"_id": {"$in": [ObjectId(uid) for uid in user_ids]}})
