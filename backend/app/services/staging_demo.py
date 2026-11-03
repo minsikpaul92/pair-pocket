@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import date, datetime
+from math import ceil
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -66,29 +67,32 @@ DEMO_ACCOUNTS = (
 )
 
 # Holdings: (account key, ticker, shares, average price, name in English,
-# name in Korean). Prices are in the brokerage's currency.
+# name in Korean). Prices are in the brokerage's currency. Average costs sit
+# about 15% under November 2026 prices (NAVER a little above), so returns look
+# like a real portfolio's; revisit them if prices move far.
 DEMO_HOLDINGS = (
-    ("a_wealthsimple", "SHOP.TO", 15, 110.0, "Shopify", "쇼피파이"),
-    ("a_wealthsimple", "RY.TO", 20, 150.0, "Royal Bank of Canada", "캐나다 왕립은행"),
+    ("a_wealthsimple", "SHOP.TO", 15, 172.0, "Shopify", "쇼피파이"),
+    ("a_wealthsimple", "RY.TO", 20, 248.0, "Royal Bank of Canada", "캐나다 왕립은행"),
     (
         "a_wealthsimple",
         "XEQT.TO",
         100,
-        30.5,
+        39.8,
         "iShares Core Equity ETF Portfolio",
         "iShares 코어 주식 ETF",
     ),
-    ("a_kiwoom", "005930.KS", 20, 68000.0, "Samsung Electronics", "삼성전자"),
-    ("a_kiwoom", "000660.KS", 5, 180000.0, "SK hynix", "SK하이닉스"),
-    ("a_kiwoom", "035420.KS", 4, 195000.0, "NAVER", "네이버"),
+    ("a_kiwoom", "005930.KS", 20, 182000.0, "Samsung Electronics", "삼성전자"),
+    ("a_kiwoom", "000660.KS", 5, 1180000.0, "SK hynix", "SK하이닉스"),
+    ("a_kiwoom", "035420.KS", 4, 185000.0, "NAVER", "네이버"),
 )
 
 # The expense the settlement demo settles: paid in full from a personal card.
 DINNER_MERCHANT = {"en": "Dinner with friends", "ko": "친구들과 저녁 식사"}
 
-# Entries: (entered by, account key, day of month, type, category, sub-category,
-# amount in CAD, merchant in English, merchant in Korean). Entries on the
-# shared account are in the shared ledger.
+# Entries: (entered by, account key, day, type, category, sub-category,
+# amount in CAD, merchant in English, merchant in Korean). Days are laid out
+# over a 28-day month and squeezed into the days passed so far (_passed).
+# Entries on the shared account are in the shared ledger.
 DEMO_ENTRIES = (
     ("a", "a_chequing", 1, INCOME, "급여", "급여", 3400.0, "Northwind Payroll", "노스윈드 급여"),
     ("b", "b_chequing", 1, INCOME, "급여", "급여", 2900.0, "Lakeside Clinic Payroll", "레이크사이드 클리닉 급여"),
@@ -137,6 +141,13 @@ def _on(day: int) -> datetime:
     today = date.today()
     last = monthrange(today.year, today.month)[1]
     return datetime(today.year, today.month, min(day, last), 12)
+
+
+def _passed(day: int) -> datetime:
+    """A day from the 28-day layout, moved so it is never later than today:
+    early in the month the entries share the days from the 1st to today."""
+    today = date.today().day
+    return _on(day if today >= 28 else max(1, ceil(day * today / 28)))
 
 
 async def seed_couple(db: AsyncIOMotorDatabase, users: list[UserOut], locale: str) -> None:
@@ -192,7 +203,7 @@ async def seed_couple(db: AsyncIOMotorDatabase, users: list[UserOut], locale: st
     for who, key, day, tx_type, category, sub, amount, en, ko in DEMO_ENTRIES:
         await create_transaction(
             TransactionCreate(
-                date=_on(day),
+                date=_passed(day),
                 amount=amount,
                 currency=Currency.CAD,
                 type=tx_type,
@@ -209,7 +220,7 @@ async def seed_couple(db: AsyncIOMotorDatabase, users: list[UserOut], locale: st
     for who, source, target, day, sub, amount, en, ko in DEMO_TRANSFERS:
         await create_transaction(
             TransactionCreate(
-                date=_on(day),
+                date=_passed(day),
                 amount=amount,
                 currency=Currency.CAD,
                 type=EXPENSE,

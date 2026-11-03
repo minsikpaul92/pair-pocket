@@ -1,6 +1,7 @@
 """Staging test accounts: off outside test databases, sign-in, and reset."""
 
 import asyncio
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -12,7 +13,7 @@ from mongomock_motor import AsyncMongoMockClient
 from app.database import get_database
 from app.routers import auth
 from app.routers import staging_login as staging_router
-from app.services import partnerships
+from app.services import partnerships, staging_demo
 
 PASSWORD = "staging-password"
 
@@ -339,6 +340,7 @@ def test_demo_preset_fills_both_couples_in_their_language(env):
     assert len([s for s in subscriptions if s["is_fixed_bill"]]) == 4
     assert "Netflix" in {s["name"] for s in subscriptions}
     assert run(env.db.notifications.count_documents({})) == 0
+    assert_nothing_after_today(env)
 
     # An empty reset clears all of it and leaves other users alone.
     env.client.post("/api/auth/test-login/reset", json={"password": PASSWORD})
@@ -346,3 +348,35 @@ def test_demo_preset_fills_both_couples_in_their_language(env):
         assert run(env.db[collection].count_documents({})) == 0, collection
     remaining = run(env.db.transactions.find({}).to_list(None))
     assert [doc["_id"] for doc in remaining] == [real.inserted_id]
+
+
+def assert_nothing_after_today(env, today: date | None = None):
+    """No seeded entry is dated after `today`. With a pretend `today`, bills are
+    left out: they are recorded on their due date by the real clock."""
+    query: dict = {"date": {"$exists": True}}
+    if today:
+        query["subscription_id"] = None
+    today = today or date.today()
+    entries = run(env.db.transactions.find(query).to_list(None))
+    assert entries
+    late = [(e["merchant"], e["date"]) for e in entries if e["date"].date() > today]
+    assert not late
+
+
+def test_demo_preset_on_the_first_of_the_month_dates_nothing_later(env, monkeypatch):
+    first = date.today().replace(day=1)
+
+    class FirstOfMonth(date):
+        @classmethod
+        def today(cls):
+            return first
+
+    monkeypatch.setattr(staging_demo, "date", FirstOfMonth)
+    res = env.client.post(
+        "/api/auth/test-login/reset", json={"password": PASSWORD, "preset": "demo"}
+    )
+    assert res.status_code == 200
+    assert_nothing_after_today(env, first)
+    # Later bills are still scheduled for their own day this month.
+    netflix = run(env.db.subscriptions.find_one({"name": "Netflix"}))
+    assert netflix["next_due_date"].day == 18
