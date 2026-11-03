@@ -27,6 +27,7 @@ import DashboardSettings from "@/components/DashboardSettings";
 import LanguageSelect from "@/components/LanguageSelect";
 import ThemeToggle from "@/components/ThemeToggle";
 import DayPicker from "@/components/DayPicker";
+import GeminiKeyGuide from "@/components/GeminiKeyGuide";
 import ExpenseRatioHiddenSettings from "@/components/ExpenseRatioHiddenSettings";
 import {
   fetchUserSettings,
@@ -556,6 +557,8 @@ export default function SettingsView({
                       {t("partnerUsingMyKey")}
                     </p>
                   )}
+
+                  <GeminiKeyGuide />
 
                   <form onSubmit={handleSaveKey} className="space-y-3">
                     <div>
