@@ -127,14 +127,12 @@ CI also runs `npm audit --audit-level=high` (reported but not blocking yet) and 
 
 ### Dependency updates
 
-Dependabot opens weekly PRs for `frontend` (npm), `backend` (pip) and GitHub Actions. Minor and patch bumps come grouped in one PR per ecosystem; major bumps come one per package.
+There are no scheduled version-update PRs. Dependencies are watched in two ways:
 
-To review one:
+- **Dependabot security updates** (repository setting) open a PR only when a dependency has a known vulnerability. Wait for CI, read the advisory, and merge if it is green. If the fix needs a major upgrade that breaks the build, close it with a comment and plan the upgrade in its own PR.
+- **CI audits** run `npm audit --audit-level=high` (non-blocking for now) and `pip-audit` on every PR, so new advisories show up in the CI log without any extra PRs.
 
-1. Wait for CI. A green run means lint, i18n and UI checks, the production build, the audits and the backend tests all pass on the new versions.
-2. For grouped minor and patch PRs with green CI, skim the changed packages and merge.
-3. For major bumps (for example `next`, `eslint`, `@ducanh2912/next-pwa`), read the release notes, check the PR locally (`npm ci && npm run build && npm run start`, or `pytest` for the backend), and click through sign-in, adding a transaction and the PWA install before merging. Close it with a comment if it needs code changes that should land in their own PR.
-4. Dependency bumps get no What's New entry unless they fix something users saw.
+Upgrade versions on purpose when needed (for example the planned Next 16 upgrade), not on a weekly schedule. Dependency bumps get no What's New entry unless they fix something users saw.
 
 ### Environment variables
 
