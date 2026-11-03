@@ -30,7 +30,7 @@ jobs:
           node-version: "22"
       - run: node site/scripts/check.mjs
       - run: node site/scripts/build.mjs --strict
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'
         with:
           path: site/dist
