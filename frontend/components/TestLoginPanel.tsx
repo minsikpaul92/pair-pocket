@@ -23,7 +23,14 @@ function languageName(code: string): string {
 }
 
 type Notice = { kind: "error" | "info"; text: string };
-type ResetChoice = "couples" | "empty" | "selected";
+type ResetChoice = "couples" | "demo" | "empty" | "selected";
+
+const RESET_DONE = {
+  couples: "resetCouplesDone",
+  demo: "resetDemoDone",
+  empty: "resetDone",
+  selected: "resetDone",
+} as const;
 
 function readFresh(): string[] {
   try {
@@ -143,7 +150,7 @@ export default function TestLoginPanel() {
       }
       setNotice({
         kind: "info",
-        text: t(choice === "couples" ? "resetCouplesDone" : "resetDone"),
+        text: t(RESET_DONE[choice]),
       });
     } catch (err) {
       setNotice({ kind: "error", text: translateError(err, tErrors) });
@@ -162,6 +169,7 @@ export default function TestLoginPanel() {
     disabled?: boolean;
   }[] = [
     { choice: "couples", title: t("resetCouples"), hint: t("tipResetCouples") },
+    { choice: "demo", title: t("resetDemo"), hint: t("tipResetDemo") },
     { choice: "empty", title: t("reset"), hint: t("tipReset") },
     account
       ? {

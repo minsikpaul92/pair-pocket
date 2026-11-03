@@ -254,3 +254,95 @@ def test_reset_can_target_one_account(env):
         json={"password": PASSWORD, "account": "someone"},
     )
     assert bad.status_code == 422
+
+
+def test_demo_preset_fills_both_couples_in_their_language(env):
+    sign_in(env, "tester3")  # existing data is replaced, not merged
+    real = run(env.db.transactions.insert_one({"owner_id": "real-user", "amount": 5}))
+    res = env.client.post(
+        "/api/auth/test-login/reset", json={"password": PASSWORD, "preset": "demo"}
+    )
+    assert res.status_code == 200
+
+    users = {
+        u["google_id"].split(":")[1]: u for u in run(env.db.users.find({}).to_list(None))
+    }
+    assert sorted(users) == ["tester1", "tester2", "tester3", "tester4"]
+    assert users["tester3"]["shared_group_id"] == users["tester4"]["shared_group_id"]
+    for ids in (("tester1", "tester2"), ("tester3", "tester4")):
+        for account in ids:
+            settings = run(
+                env.db.user_settings.find_one({"owner_id": str(users[account]["_id"])})
+            )
+            assert settings["onboarding_personal_completed"] is True
+
+    def account_names(account: str) -> dict[str, dict]:
+        docs = run(
+            env.db.accounts.find({"owner_id": str(users[account]["_id"])}).to_list(None)
+        )
+        return {doc["name"]: doc for doc in docs}
+
+    tester3 = account_names("tester3")
+    assert {"TD Chequing", "TD Visa", "TD Savings", "Tangerine Joint Chequing"} <= set(
+        tester3
+    )
+    assert tester3["Wealthsimple TFSA"]["currency"] == "CAD"
+    assert tester3["Kiwoom Securities"]["currency"] == "KRW"
+    assert tester3["Kiwoom Securities"]["country"] == "KR"
+    assert {"RBC Chequing", "RBC Visa", "RBC Savings"} == set(account_names("tester4"))
+    tester1 = account_names("tester1")
+    assert {"TD 입출금", "TD 비자카드", "키움증권"} <= set(tester1)
+    assert not any("Test" in name for name in tester1)
+
+    holdings = run(env.db.holdings.find({}).to_list(None))
+    assert len(holdings) == 12
+    assert {h["currency"] for h in holdings} == {"CAD", "KRW"}
+
+    from app.models.category_preset import is_valid_pair
+    from app.models.transaction import TransactionType
+
+    for group_id in {u["shared_group_id"] for u in users.values()}:
+        members = [str(u["_id"]) for u in users.values() if u["shared_group_id"] == group_id]
+        entries = run(
+            env.db.transactions.find({"owner_id": {"$in": members}}).to_list(None)
+        )
+        for entry in entries:
+            assert is_valid_pair(
+                TransactionType(entry["type"]), entry["category"], entry["sub_category"]
+            ), entry
+        shared = [e for e in entries if e["account_type"] == "shared"]
+        assert all(e["shared_group_id"] == group_id for e in shared)
+        # Both partners fund the joint account; the shared income comes with it.
+        assert len([e for e in shared if e["type"] == "income"]) == 2
+        expense_categories = {
+            e["category"]
+            for e in entries
+            if e["type"] == "expense" and e["category"] != "자산 이동/카드"
+        }
+        assert len(expense_categories) >= 5
+        assert any(e["type"] == "income" and e["account_type"] == "personal" for e in entries)
+        # Rent is due on the 1st, so it is already recorded.
+        assert any(e.get("subscription_id") and e["amount"] == 2100 for e in entries)
+
+    dinners = run(env.db.transactions.find({"amount": 100.0}).to_list(None))
+    assert {d["merchant"] for d in dinners} == {"Dinner with friends", "친구들과 저녁 식사"}
+    for dinner in dinners:
+        assert dinner["account_type"] == "personal"
+        card = run(env.db.accounts.find_one({"_id": ObjectId(dinner["account_id"])}))
+        assert card["kind"] == "credit_card"
+        assert not run(
+            env.db.transactions.count_documents({"settles_expense_id": str(dinner["_id"])})
+        )
+
+    subscriptions = run(env.db.subscriptions.find({}).to_list(None))
+    assert len(subscriptions) == 6
+    assert len([s for s in subscriptions if s["is_fixed_bill"]]) == 4
+    assert "Netflix" in {s["name"] for s in subscriptions}
+    assert run(env.db.notifications.count_documents({})) == 0
+
+    # An empty reset clears all of it and leaves other users alone.
+    env.client.post("/api/auth/test-login/reset", json={"password": PASSWORD})
+    for collection in ("users", "accounts", "holdings", "subscriptions", "subscription_occurrences", "account_defaults"):
+        assert run(env.db[collection].count_documents({})) == 0, collection
+    remaining = run(env.db.transactions.find({}).to_list(None))
+    assert [doc["_id"] for doc in remaining] == [real.inserted_id]

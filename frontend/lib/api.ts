@@ -346,7 +346,7 @@ export async function signInTestAccount(
 }
 
 /** How test accounts start after a reset. */
-export type TestResetPreset = "empty" | "couples";
+export type TestResetPreset = "empty" | "couples" | "demo";
 
 /**
  * Delete every test account and its data. "couples" then recreates Tester 1+2
