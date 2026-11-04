@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ClipboardPaste,
   ExternalLink,
+  Loader2,
   ShieldCheck,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -24,14 +25,18 @@ const GEMINI_KEY_PATTERN = /^AIza[0-9A-Za-z_-]{35}$/;
 type KeyInputProps = {
   apiKey?: string;
   onApiKeyChange?: (value: string) => void;
+  /** Saves the key; the parent clears `apiKey` once it is stored. */
+  onSaveKey?: (key: string) => Promise<void>;
 };
 
 /** Swipeable screenshot cards that walk through creating a key in AI Studio. */
-function StepCards({ apiKey = "", onApiKeyChange }: KeyInputProps) {
+function StepCards({ apiKey = "", onApiKeyChange, onSaveKey }: KeyInputProps) {
   const t = useTranslations("geminiGuide");
   const [index, setIndex] = useState(0);
   const touchX = useRef<number | null>(null);
   const keyInput = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<"saved" | "error" | null>(null);
   const total = CARD_KEYS.length;
   const go = (step: number) => setIndex((i) => Math.min(total - 1, Math.max(0, i + step)));
   const onKeyCard = index === total - 1 && Boolean(onApiKeyChange);
@@ -46,6 +51,7 @@ function StepCards({ apiKey = "", onApiKeyChange }: KeyInputProps) {
       const text = e.clipboardData?.getData("text").trim() ?? "";
       if (!GEMINI_KEY_PATTERN.test(text)) return;
       e.preventDefault();
+      setSaveState(null);
       onApiKeyChange(text);
     };
     document.addEventListener("paste", onPaste);
@@ -56,6 +62,7 @@ function StepCards({ apiKey = "", onApiKeyChange }: KeyInputProps) {
     try {
       const text = (await navigator.clipboard.readText()).trim();
       if (text) {
+        setSaveState(null);
         onApiKeyChange?.(text);
         return;
       }
@@ -63,6 +70,21 @@ function StepCards({ apiKey = "", onApiKeyChange }: KeyInputProps) {
       // Clipboard reading is blocked or unsupported; let the user paste by hand.
     }
     keyInput.current?.focus();
+  }
+
+  async function saveKey() {
+    const key = apiKey.trim();
+    if (!key || !onSaveKey) return;
+    setSaving(true);
+    setSaveState(null);
+    try {
+      await onSaveKey(key);
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -137,7 +159,17 @@ function StepCards({ apiKey = "", onApiKeyChange }: KeyInputProps) {
                 ref={keyInput}
                 type="password"
                 value={apiKey}
-                onChange={(e) => onApiKeyChange?.(e.target.value.trim())}
+                onChange={(e) => {
+                  setSaveState(null);
+                  onApiKeyChange?.(e.target.value.trim());
+                }}
+                onKeyDown={(e) => {
+                  // The guide can sit inside a form; Enter here saves the key only.
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void saveKey();
+                  }
+                }}
                 placeholder={t("keyPlaceholder")}
                 aria-label={t("keyPlaceholder")}
                 autoComplete="off"
@@ -146,17 +178,31 @@ function StepCards({ apiKey = "", onApiKeyChange }: KeyInputProps) {
               <button
                 type="button"
                 onClick={pasteFromClipboard}
-                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl bg-blue-500 hover:bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 <ClipboardPaste className="h-4 w-4" />
                 {t("paste")}
               </button>
             </div>
-            {apiKey && (
+            {onSaveKey && (
+              <button
+                type="button"
+                onClick={saveKey}
+                disabled={saving || !apiKey.trim()}
+                className="flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 py-2 text-sm font-semibold text-white"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {saving ? t("savingKey") : t("saveKey")}
+              </button>
+            )}
+            {saveState === "saved" && (
               <p className="flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                {t("keyFilled")}
+                {t("keySaved")}
               </p>
+            )}
+            {saveState === "error" && (
+              <p className="text-xs font-medium text-red-600 dark:text-red-400">{t("keySaveError")}</p>
             )}
           </div>
         )}
@@ -174,6 +220,7 @@ export default function GeminiKeyGuide({
   stepsOpen = false,
   apiKey,
   onApiKeyChange,
+  onSaveKey,
 }: { stepsOpen?: boolean } & KeyInputProps) {
   const t = useTranslations("geminiGuide");
 
@@ -212,7 +259,7 @@ export default function GeminiKeyGuide({
           <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
         </summary>
         <div className="space-y-3 px-4 pb-4">
-          <StepCards apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
+          <StepCards apiKey={apiKey} onApiKeyChange={onApiKeyChange} onSaveKey={onSaveKey} />
           <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
             {t("freeTier")}
           </p>
