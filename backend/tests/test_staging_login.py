@@ -276,6 +276,13 @@ def test_demo_preset_fills_both_couples_in_their_language(env):
                 env.db.user_settings.find_one({"owner_id": str(users[account]["_id"])})
             )
             assert settings["onboarding_personal_completed"] is True
+            # Both countries on, so the country toggle shows; budgets are set.
+            assert set(settings["preferred_locales"]) == {"en", "ko"}
+            assert settings["budgets"]["shared"]["CAD"] > 0
+    assert users["tester3"]["name"] == "Alex Morgan"
+    assert users["tester1"]["name"] == "김민준"
+    sign_in(env, "tester3")  # signing in keeps the demo name
+    assert run(env.db.users.find_one({"_id": users["tester3"]["_id"]}))["name"] == "Alex Morgan"
 
     def account_names(account: str) -> dict[str, dict]:
         docs = run(

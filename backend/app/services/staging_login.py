@@ -103,12 +103,13 @@ async def _ensure_user(db: AsyncIOMotorDatabase, account_id: str) -> str:
     await db["users"].update_one(
         {"google_id": google_id},
         {
-            "$set": {
-                "email": _email(account_id),
+            "$set": {"email": _email(account_id), "picture": None},
+            # The demo preset renames the testers; signing in keeps that name.
+            "$setOnInsert": {
+                "google_id": google_id,
                 "name": account["name"],
-                "picture": None,
+                "shared_group_id": None,
             },
-            "$setOnInsert": {"google_id": google_id, "shared_group_id": None},
         },
         upsert=True,
     )
