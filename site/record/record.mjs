@@ -6,9 +6,9 @@
 // first frame, not recorded) and `play(page, ui)` (the recorded part). The
 // output goes to site/media/<clip>.mp4, .webm and -poster.webp.
 //
-// Frames are captured straight from Chrome (CDP screencast) at 2x pixel
-// density as high quality JPEGs, then scaled down to 1280x800 and encoded
-// once. Playwright's own recorder encodes at about 1 Mbps first, which blurs
+// Frames are captured straight from Chrome (CDP screencast) at high pixel
+// density as high quality JPEGs, then scaled down (phone: 780x1688, desktop:
+// 1280x800) and encoded once. Playwright's own recorder encodes at about 1 Mbps first, which blurs
 // text whenever the screen moves. `--keep-raw` keeps the frames in
 // site/media/raw/<clip>-frames/.
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -20,21 +20,30 @@ import sharp from 'sharp';
 import { APP, resetDemo, signInUrl } from './session.mjs';
 import { installOverlay, ui } from './cursor.mjs';
 
-const W = 1280;
-const H = 800;
-const SCALE = 2; // capture density; the output is scaled back to W x H
+// Clips are recorded on a phone by default: they fit the tall stage on the
+// landing page and the text reads larger. `layout = 'desktop'` opts out.
+// `scale` is the capture density; the output is scaled down to `out`.
+// `poster` is the webp quality that keeps the poster under its 40 KB budget.
+const LAYOUTS = {
+  phone: { width: 390, height: 844, scale: 3, out: [780, 1688], touch: true, poster: 70 },
+  desktop: { width: 1280, height: 800, scale: 2, out: [1280, 800], touch: false, poster: 80 },
+};
 const media = (name) => fileURLToPath(new URL(`../media/${name}`, import.meta.url));
 
 const [clipId, ...flags] = process.argv.slice(2);
 if (!clipId) throw new Error('usage: node record.mjs <clip> [--no-reset] [--keep-raw]');
 const clip = await import(`./clips/${clipId}.mjs`);
+const layout = LAYOUTS[clip.layout ?? 'phone'];
+const [W, H] = layout.out;
 
 if (!flags.includes('--no-reset')) await resetDemo();
 
 const browser = await chromium.launch();
 const contextOptions = {
-  viewport: { width: W, height: H },
-  deviceScaleFactor: SCALE,
+  viewport: { width: layout.width, height: layout.height },
+  deviceScaleFactor: layout.scale,
+  isMobile: layout.touch,
+  hasTouch: layout.touch,
   colorScheme: 'light',
   locale: 'en-CA',
   timezoneId: 'America/Toronto',
@@ -55,7 +64,7 @@ const frameDir = `${rawDir}/${clipId}-frames`;
 rmSync(frameDir, { recursive: true, force: true });
 mkdirSync(frameDir, { recursive: true });
 const context = await browser.newContext({ ...contextOptions, storageState });
-await installOverlay(context);
+await installOverlay(context, { touch: layout.touch });
 const page = await context.newPage();
 await page.goto(`${APP}/en`);
 await clip.setup(page);
@@ -71,11 +80,12 @@ cdp.on('Page.screencastFrame', ({ data, metadata, sessionId }) => {
   frames.push({ file, t: metadata.timestamp });
 });
 await cdp.send('Page.startScreencast', {
-  format: 'jpeg', quality: 95, maxWidth: W * SCALE, maxHeight: H * SCALE, everyNthFrame: 1,
+  format: 'jpeg', quality: 95, everyNthFrame: 1,
+  maxWidth: layout.width * layout.scale, maxHeight: layout.height * layout.scale,
 });
 
-const pointer = ui(page);
-await pointer.place(...(clip.pointer ?? [1000, 560]));
+const pointer = ui(page, { touch: layout.touch });
+await pointer.place(...(clip.pointer ?? [layout.width - 10, layout.height / 2]));
 await page.waitForTimeout(600);
 const start = Date.now() / 1000;
 await clip.play(page, pointer);
@@ -109,7 +119,7 @@ run(...input, '-vf', `fps=30,${scale},format=yuv420p`, '-c:v', 'libx264', '-crf'
 run(...input, '-vf', `fps=30,${scale}`, '-c:v', 'libvpx-vp9', '-crf', clip.webmCrf ?? '34', '-b:v', '0',
   '-row-mt', '1', media(`${clipId}.webm`));
 // Pass a buffer: sharp keeps a file it opened by path locked on Windows.
-await sharp(readFileSync(used[0].file)).resize(W, H, { kernel: 'lanczos3' }).webp({ quality: 80 })
+await sharp(readFileSync(used[0].file)).resize(W, H, { kernel: 'lanczos3' }).webp({ quality: layout.poster })
   .toFile(media(`${clipId}-poster.webp`));
 if (!flags.includes('--keep-raw')) rmSync(frameDir, { recursive: true, force: true });
 

@@ -1,13 +1,14 @@
 // Fixed expenses: add Spotify with a promo price ($4.99 for three months,
 // then $11.99) and a promo end reminder, then see it in Due this month.
+// Recorded on a phone.
 export const account = 'tester3';
-export const crf = '22';
+export const crf = '26';
 // A whole form is a lot of steps; play it faster so the clip stays short.
-export const speed = 1.5;
-// Rest the pointer in the empty right margin so no row shows a hover state.
-export const pointer = [1190, 300];
+export const speed = 1.25;
 
 const button = (page, name) => page.getByRole('button', { name, exact: true });
+// Bottom tab bar on a phone (the sidebar buttons with the same names are hidden).
+const tab = (page, name) => page.getByText(name, { exact: true }).filter({ visible: true }).last();
 const dialog = (page) => page.getByRole('dialog');
 
 // Scroll the dialog's scrolling area smoothly to the bottom.
@@ -27,7 +28,7 @@ async function type(page, ui, locator, text) {
 }
 
 export async function setup(page) {
-  await button(page, 'Fixed expenses').click();
+  await tab(page, 'Fixed expenses').click();
   await button(page, 'Personal').click();
   await button(page, 'All').first().click();
   await page.getByText('Fido phone plan', { exact: true }).first().waitFor();
@@ -69,6 +70,5 @@ export async function play(page, ui) {
   // Then the new row, with its account, next payment and promo end date.
   await page.getByText('Spotify', { exact: true }).last()
     .evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-  await ui.moveTo(...pointer);
   await ui.pause(1600);
 }

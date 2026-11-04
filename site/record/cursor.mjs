@@ -1,6 +1,11 @@
 // Recorded videos have no mouse pointer, so draw one in the page and move it
 // slowly with eased steps. Also hides the Next.js dev badge and scrollbars.
-const OVERLAY = () => {
+// In touch mode (phone clips) there is no pointer at all, only a tap ripple.
+const OVERLAY = (opts = {}) => {
+  const touch = opts.touch ? `
+    #rec-cursor { display: none !important; }
+    .rec-ripple { width: 46px; height: 46px; margin: -23px 0 0 -23px;
+      background: rgba(37,99,235,.28); box-shadow: 0 0 0 2px rgba(37,99,235,.35); }` : '';
   const css = `
     nextjs-portal { display: none !important; }
     html { scrollbar-width: none; }
@@ -10,7 +15,7 @@ const OVERLAY = () => {
     .rec-ripple { position: fixed; width: 34px; height: 34px; margin: -17px 0 0 -17px;
       border-radius: 50%; background: rgba(59,130,246,.35); z-index: 2147483646;
       pointer-events: none; animation: rec-ripple .45s ease-out forwards; }
-    @keyframes rec-ripple { from { transform: scale(.3); opacity: 1 } to { transform: scale(1.4); opacity: 0 } }`;
+    @keyframes rec-ripple { from { transform: scale(.3); opacity: 1 } to { transform: scale(1.4); opacity: 0 } }` + touch;
   const mount = () => {
     if (document.getElementById('rec-cursor')) return;
     const style = document.createElement('style');
@@ -39,16 +44,23 @@ const OVERLAY = () => {
   else document.addEventListener('DOMContentLoaded', mount);
 };
 
-export const installOverlay = (context) => context.addInitScript(OVERLAY);
+export const installOverlay = (context, opts = {}) => context.addInitScript(OVERLAY, opts);
 
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
-export function ui(page) {
+export function ui(page, { touch = false } = {}) {
   const pos = { x: 1000, y: 560 };
   const api = {
     pause: (ms = 500) => page.waitForTimeout(ms),
-    // Glide to a point at a calm, distance-based speed.
+    // Glide to a point at a calm, distance-based speed. A finger does not
+    // glide: it jumps there, after about the time it takes to reach.
     async moveTo(x, y) {
+      if (touch) {
+        await page.waitForTimeout(250);
+        await page.mouse.move(x, y);
+        Object.assign(pos, { x, y });
+        return;
+      }
       const dist = Math.hypot(x - pos.x, y - pos.y);
       const steps = Math.max(12, Math.round(dist / 14));
       const from = { ...pos };

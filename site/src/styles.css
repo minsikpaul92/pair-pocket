@@ -104,14 +104,22 @@ a { color: inherit; text-decoration-thickness: 0.08em; text-underline-offset: 0.
 }
 .stage figure {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 16px; padding: clamp(24px, 3vw, 48px);
+  gap: 12px; padding: clamp(16px, 2vw, 32px);
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity 0.9s var(--ease), visibility 0s linear 0.9s;
 }
 .stage figure.on { opacity: 1; visibility: visible; transition-delay: 0s; }
+/* The clip sits above the floating coins and bubbles, which peek out around it
+   (the figure itself is transparent). */
+.stage figure { z-index: 3; }
 .stage figcaption { font-size: var(--step-small); color: var(--accent-ink); font-weight: 600; }
 .stage .ph { background: var(--paper); }
-.stage .shot, .stage .ph { background: var(--paper); width: 100%; max-height: calc(100svh - 190px); height: auto; border-radius: 20px; object-fit: contain; }
+/* As large as the stage allows: tall (phone) clips fill the height, wide ones the width. */
+.stage .ph { width: 100%; max-height: calc(100% - 40px); border-radius: 20px; }
+.stage .shot { background: var(--paper); width: auto; height: auto; max-width: 100%; max-height: calc(100% - 40px); border-radius: 20px; object-fit: contain; }
+/* Clips are pictures, not players: nothing to click, no controls or menus. */
+video.shot { pointer-events: none; user-select: none; -webkit-user-select: none; }
+video.shot::-webkit-media-controls { display: none !important; }
 .inline-clip { display: none; }
 
 .bar a, .bar span { white-space: nowrap; }
@@ -159,7 +167,12 @@ details.langs div { position: absolute; right: 0; top: 100%; background: var(--p
 .feat p { max-width: 46ch; margin-top: 18px; }
 .feat p + p { margin-top: 14px; }
 .inline-clip { margin-top: 28px; }
-.inline-clip .shot, .inline-clip .ph { width: 100%; height: auto; border-radius: var(--r); }
+.inline-clip .ph { width: 100%; border-radius: var(--r); }
+.inline-clip .shot {
+  display: block; margin-inline: auto; width: auto; height: auto; max-width: 100%; max-height: 82svh; border-radius: var(--r);
+  /* An edge, so the clip does not blend into the page around it. */
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.1), 0 8px 24px rgba(15, 23, 42, 0.08);
+}
 .hero .inline-clip { padding-inline: var(--pad); }
 
 /* Recording placeholders */
@@ -308,9 +321,10 @@ details.langs div { position: absolute; right: 0; top: 100%; background: var(--p
   background: var(--paper); color: var(--accent-hover);
   animation: bob 6s ease-in-out infinite;
 }
-.b1 { left: 22%; top: 5%; transform: rotate(-5deg); }
-.b2 { right: 20%; top: 6%; border-radius: 999px 999px 8px 999px; background: var(--field); color: var(--ink); animation-delay: -2s; }
-.b3 { left: 36%; bottom: 5%; background: var(--ink); color: var(--paper); animation-delay: -4s; }
+/* Bubbles sit in the space beside the phone-sized clips. */
+.b1 { left: 5%; top: 24%; transform: rotate(-5deg); }
+.b2 { right: 5%; top: 40%; border-radius: 999px 999px 8px 999px; background: var(--field); color: var(--ink); animation-delay: -2s; }
+.b3 { left: 6%; bottom: 28%; background: var(--ink); color: var(--paper); animation-delay: -4s; }
 @keyframes bob { 0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); } 50% { transform: translateY(-10px) rotate(var(--tilt, 0deg)); } }
 .b1 { --tilt: -5deg; } .b2 { --tilt: 4deg; } .b3 { --tilt: -2deg; }
 @media (prefers-reduced-motion: reduce) { .coin, .bubble { animation: none; } }

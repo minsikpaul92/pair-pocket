@@ -28,14 +28,15 @@ TEST_LOGIN_PASSWORD=<any long random value>
 2. Start the backend (`uvicorn app.main:app --port 8000` in `backend`) and the frontend (`npm run dev` in `frontend`).
 3. `node record.mjs <clip>`, for example `node record.mjs toggle`.
 
-Each run resets the test accounts to the demo data (`--no-reset` skips it), signs in as Tester 3, gets to the first frame without recording, then records only the clip itself. It writes `../media/<clip>.mp4`, `.webm` and `-poster.webp` and prints the length and sizes. Frames are captured straight from Chrome at 2x pixel density, then scaled to 1280x800 and encoded once, so text stays sharp while the screen moves. `--keep-raw` keeps the captured frames in `../media/raw/<clip>-frames/`.
+Each run resets the test accounts to the demo data (`--no-reset` skips it), signs in as Tester 3, gets to the first frame without recording, then records only the clip itself. It writes `../media/<clip>.mp4`, `.webm` and `-poster.webp` and prints the length and sizes. Clips are recorded on a phone (390x844 with touch, so there is no pointer, only a tap ripple). Frames are captured straight from Chrome at 3x pixel density, then scaled to 780x1688 and encoded once, so text stays sharp while the screen moves. `--keep-raw` keeps the captured frames in `../media/raw/<clip>-frames/`.
 
 ## Adding a clip
 
 Create `clips/<id>.mjs` exporting:
 
 - `setup(page)`: get to the first frame and wait until everything has loaded. Not recorded.
-- `play(page, ui)`: the recorded part. `ui.click(locator)`, `ui.hover(locator)`, `ui.moveTo(x, y)` and `ui.pause(ms)` move a drawn pointer slowly (recorded videos have no mouse pointer).
-- Optional: `account` (default `tester3`), `pointer` (where the pointer rests at the start, `[x, y]`), `crf` (mp4 quality, default `24`), `speed` (play faster than recorded, for example `1.5` for a long form).
+- `play(page, ui)`: the recorded part. `ui.click(locator)` taps with a ripple, `ui.pause(ms)` waits. On a desktop layout `ui.click`, `ui.hover` and `ui.moveTo(x, y)` also move a drawn pointer slowly (recorded videos have no mouse pointer).
+- On a phone the sidebar is hidden: reach the bottom tabs by their visible text, as `clips/toggle.mjs` does.
+- Optional: `account` (default `tester3`), `layout` (`desktop` records at 1280x800 with a drawn pointer instead of a phone), `pointer` (desktop only: where the pointer rests at the start, `[x, y]`), `crf` (mp4 quality, default `24`), `speed` (play faster than recorded, for example `1.5` for a long form).
 
 Find labels and layout with a browser first (reading the page as text is enough), then write the steps. Afterwards set the clip to `"status": "done"` in `../media/clips.json` and run `node ../scripts/check.mjs`.

@@ -46,7 +46,8 @@
     revealables.forEach(function (el) { rio.observe(el); });
   }
 
-  // Videos: play only what is on screen, never when reduced motion is requested.
+  // Videos: play only what is on screen, never when reduced motion is requested
+  // (then the poster stays). They are pictures, not players: no controls.
   var videos = Array.prototype.slice.call(document.querySelectorAll("video.shot"));
   function visible(v) { return v.offsetParent !== null; }
   function play(v) {
@@ -55,7 +56,6 @@
     var p = v.play();
     if (p && p.catch) p.catch(function () {});
   }
-  if (reduced) videos.forEach(function (v) { v.controls = true; });
 
   // Stage: the right half follows whichever section is in the middle of the screen.
   var figs = Array.prototype.slice.call(document.querySelectorAll(".stage figure[data-clip]"));
