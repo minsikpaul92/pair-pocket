@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import {
   type Currency,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import type { AccountType } from "@/lib/api";
 import type { BudgetCurrency } from "@/lib/dashboard-layout";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 interface Props {
   accountType: AccountType;
@@ -38,6 +39,8 @@ export default function BudgetQuickModal({
   onClose,
 }: Props) {
   const t = useTranslations("dashboard");
+  const titleId = useId();
+  useEscapeKey(onClose);
   const [drafts, setDrafts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       currencies.map((c) => {
@@ -79,6 +82,9 @@ export default function BudgetQuickModal({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
       className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -88,7 +94,7 @@ export default function BudgetQuickModal({
         onSubmit={submit}
         className="w-full max-w-xs space-y-4 rounded-2xl bg-white p-5 shadow-xl dark:bg-gray-900"
       >
-        <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">
+        <h3 id={titleId} className="text-base font-bold tracking-tight text-gray-900 dark:text-white">
           {t("budgetModalTitle")}
         </h3>
         <div className="space-y-2">
@@ -131,7 +137,7 @@ export default function BudgetQuickModal({
           </label>
         )}
         {error && (
-          <p className="text-xs text-red-500">{t("budgetSaveError")}</p>
+          <p className="text-xs text-red-500" role="alert">{t("budgetSaveError")}</p>
         )}
         <div className="flex justify-end gap-2">
           <button

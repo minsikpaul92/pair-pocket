@@ -2,7 +2,7 @@
 
 import { Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
@@ -44,6 +44,7 @@ import {
 } from "@/lib/api";
 import { dayKey, parseDate } from "@/lib/date";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 import { translateError } from "@/lib/errors";
 import {
   formatSubscriptionDate,
@@ -90,6 +91,7 @@ export default function SubscriptionRegisterModal({
   const tTx = useTranslations("transaction");
   const tErrors = useTranslations("errors");
   const tAccountType = useTranslations("accountType");
+  const titleId = useId();
   const locale = useLocale();
 
   const isEditing = Boolean(editing);
@@ -187,13 +189,7 @@ export default function SubscriptionRegisterModal({
     setNextDueDate(dayKey(candidate));
   }, []);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   useEffect(() => {
     if (!editing) return;
@@ -537,12 +533,15 @@ export default function SubscriptionRegisterModal({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">
+            <h2 id={titleId} className="text-xl font-bold tracking-tight">
               {isEditing ? t("editTitle") : t("registerTitle")}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -1225,7 +1224,7 @@ export default function SubscriptionRegisterModal({
             </>
           )}
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-red-500" role="alert">{error}</p>}
 
           <div className="flex gap-2">
             {isEditing && (

@@ -126,7 +126,7 @@ export default function AccountDefaultsSettings({ accountType, scope }: Props) {
       )}
 
       {error ? (
-        <p className="text-xs text-red-600 dark:text-red-400">
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
           {t("accountDefaultsLoadError")}
         </p>
       ) : (

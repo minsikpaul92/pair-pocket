@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { 
   Briefcase, 
@@ -21,6 +21,7 @@ import AccountRegisterModal from "@/components/AccountRegisterModal";
 import FloatingActionStack from "@/components/FloatingActionStack";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 import {
   AccountType,
@@ -63,6 +64,9 @@ type ViewMode = "price" | "valuation";
 export default function StocksView({ accountType, ledgerScope, version, onChanged }: Props) {
   const { defaults: accountDefaults } = useAccountDefaults(accountType, version);
   const t = useTranslations("stocks");
+  const tCommon = useTranslations("common");
+  const addTitleId = useId();
+  const editTitleId = useId();
 
   // State controls
   const [displayCurrency, setDisplayCurrency] = useState<Currency>("CAD");
@@ -853,6 +857,9 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
     convertBetween,
   ]);
 
+  useEscapeKey(() => setShowAddModal(false), showAddModal);
+  useEscapeKey(() => setShowEditModal(false), showEditModal && Boolean(selectedHolding));
+
   return (
     <div className="space-y-4">
       {/* 1. Market Index Header (rotates indices + FX) */}
@@ -1293,8 +1300,9 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   onClick={() => setSelectedAccountIdFilter("ALL")}
                   className="hover:text-gray-900 dark:hover:text-white font-black ml-1.5"
                   title={t("clearFilter")}
+                  aria-label={t("clearFilter")}
                 >
-                  ✕
+                  <X className="h-3 w-3" />
                 </button>
               </div>
           </div>
@@ -1397,20 +1405,21 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             }
           }}
         >
-          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-2xl relative border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-150 max-h-[92dvh] overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-labelledby={addTitleId} className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-2xl relative border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-150 max-h-[92dvh] overflow-y-auto">
             <button
               onClick={() => setShowAddModal(false)}
+              aria-label={tCommon("close")}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
               <X className="h-5 w-5" />
             </button>
-            <h3 className="text-lg font-black tracking-tight text-gray-900 dark:text-white mb-4">
+            <h3 id={addTitleId} className="text-lg font-black tracking-tight text-gray-900 dark:text-white mb-4">
               {t("addHolding")}
             </h3>
 
             <form onSubmit={handleAddHolding} className="space-y-4">
               {formError && (
-                <div className="bg-red-50 dark:bg-red-950/30 text-red-500 text-xs px-3 py-2 rounded-xl">
+                <div role="alert" className="bg-red-50 dark:bg-red-950/30 text-red-500 text-xs px-3 py-2 rounded-xl">
                   {formError}
                 </div>
               )}
@@ -1587,14 +1596,15 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             }
           }}
         >
-          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-2xl relative border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-150">
+          <div role="dialog" aria-modal="true" aria-labelledby={editTitleId} className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-2xl relative border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => setShowEditModal(false)}
+              aria-label={tCommon("close")}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
               <X className="h-5 w-5" />
             </button>
-            <h3 className="text-lg font-black tracking-tight text-gray-900 dark:text-white mb-2">
+            <h3 id={editTitleId} className="text-lg font-black tracking-tight text-gray-900 dark:text-white mb-2">
               {t("editHolding")}
             </h3>
             <p className="text-xs text-gray-400 mb-4">{selectedHolding.name} ({selectedHolding.ticker})</p>

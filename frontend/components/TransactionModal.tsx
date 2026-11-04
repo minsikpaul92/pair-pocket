@@ -2,7 +2,7 @@
 
 import { Camera, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatTaxPercent } from "@/lib/canada-tax";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
@@ -13,6 +13,7 @@ import DayPicker from "@/components/DayPicker";
 import InstitutionSelect from "@/components/InstitutionSelect";
 import MerchantSelect from "@/components/MerchantSelect";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import Dropdown from "@/components/ui/dropdown";
@@ -175,6 +176,7 @@ export default function TransactionModal({
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
   const tSub = useTranslations("subscriptions");
+  const titleId = useId();
 
   const isEditing = Boolean(editingTransaction);
 
@@ -799,13 +801,7 @@ export default function TransactionModal({
       .catch((err) => console.error("Failed to fetch holdings in modal", err));
   }, [accountType]);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   useEffect(() => {
     let active = true;
@@ -2081,6 +2077,9 @@ export default function TransactionModal({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto select-none"
         style={{
           transform: modalDragY > 0 ? `translateY(${modalDragY}px)` : undefined,
@@ -2102,7 +2101,7 @@ export default function TransactionModal({
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-bold tracking-tight whitespace-nowrap">
+              <h2 id={titleId} className="text-lg sm:text-xl font-bold tracking-tight whitespace-nowrap">
                 {isEditing ? tTx("edit") : tTx("new")}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
@@ -3014,6 +3013,7 @@ export default function TransactionModal({
                                   );
                                 }
                               }}
+                              aria-label={tTx("itemRemove")}
                               className="text-red-500 hover:text-red-600 p-1"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -3069,7 +3069,7 @@ export default function TransactionModal({
                 </p>
               </div>
             )}
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-red-500" role="alert">{error}</p>}
 
           <div className="flex gap-2">
             {isEditing && (

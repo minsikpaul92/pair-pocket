@@ -2,7 +2,7 @@
 
 import { Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import BankPicker from "@/components/BankPicker";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
@@ -30,6 +30,7 @@ import {
 } from "@/lib/api";
 import type { BankCountry } from "@/lib/banks";
 import { translateError } from "@/lib/errors";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 interface Props {
   currency: Currency;
@@ -71,6 +72,8 @@ export default function AccountRegisterModal({
   const tKinds = useTranslations("accountKinds");
   const tCommon = useTranslations("common");
   const tErrors = useTranslations("errors");
+  const titleId = useId();
+  useEscapeKey(onClose);
 
   const [name, setName] = useState(account?.name ?? "");
   const [nickname, setNickname] = useState(account?.nickname ?? "");
@@ -251,12 +254,15 @@ export default function AccountRegisterModal({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[90dvh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold tracking-tight">
+            <h3 id={titleId} className="text-lg font-bold tracking-tight">
               {isEdit ? t("editTitle") : t("registerTitle")}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">

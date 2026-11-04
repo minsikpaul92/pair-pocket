@@ -31,3 +31,20 @@ body {
     @apply bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-xl px-4 py-3 transition-colors;
   }
 }
+
+/* Respect the system "reduce motion" setting: no slides, fades or zooms.
+   Loading spinners (animate-spin) and skeleton pulses keep running. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
+
+  [class*="animate-in"],
+  [class*="animate-out"] {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
+}

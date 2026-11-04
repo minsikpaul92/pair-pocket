@@ -160,7 +160,7 @@ export default function ExpenseRatioHiddenSettings({ settings, onSaved }: Props)
         })}
       </ul>
       {error && (
-        <p className="text-xs text-red-600 dark:text-red-400">
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
           {t("expenseRatioHiddenError")}
         </p>
       )}

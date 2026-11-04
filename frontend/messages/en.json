@@ -248,7 +248,12 @@
     "thisWeek": "This week",
     "previousWeek": "Previous week",
     "nextWeek": "Next week",
-    "hiddenCategoriesNote": "{count, plural, one {# category} other {# categories}} hidden in Settings."
+    "hiddenCategoriesNote": "{count, plural, one {# category} other {# categories}} hidden in Settings.",
+    "topSpending": "Top spending",
+    "otherSpending": "Other",
+    "subCategoryBreakdown": "Spending by subcategory",
+    "uncategorized": "Uncategorized",
+    "moreTransactions": "{count, plural, one {View # more transaction} other {View # more transactions}}"
   },
   "list": {
     "allAccounts": "All accounts",
@@ -307,6 +312,7 @@
     "itemNamePlaceholder": "e.g. watermelon",
     "itemStandardPlaceholder": "Standard name",
     "itemsScanAi": "Extract sub-items from receipt with AI",
+    "itemRemove": "Remove item",
     "subtotalLabel": "Subtotal",
     "taxLabel": "Tax (HST 13%)",
     "totalLabel": "Total",
@@ -824,7 +830,8 @@
   "scanQueue": {
     "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
     "addRecent": "Scan recent files again ({count}, kept {days} days)",
-    "openRecent": "Recent scans ({count})"
+    "openRecent": "Recent scans ({count})",
+    "remove": "Remove file"
   },
   "importPage": {
     "title": "Import & export",
@@ -1279,6 +1286,10 @@
   },
   "whatsNew": {
     "items": {
+      "dashboardEnglishText": {
+        "title": "Dashboard text in English",
+        "description": "The spending breakdown on the dashboard no longer shows Korean labels when the app is in English. Windows now also close with the Esc key, and screen readers name the icon buttons."
+      },
       "geminiKeyCards": {
         "title": "Picture guide for the Gemini key",
         "description": "Getting a Gemini key now shows each Google AI Studio screen with the button to press, including the project step that new accounts need. You can paste the copied key right on the last screen."
