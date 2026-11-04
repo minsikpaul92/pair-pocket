@@ -344,7 +344,7 @@ export default function OnboardingScreenshotScan({
         <p className="text-xs text-blue-600 dark:text-blue-400">{status}</p>
       )}
       {error && (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">{error}</p>
       )}
     </div>
   );

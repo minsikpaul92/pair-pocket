@@ -82,7 +82,7 @@ export default function InviteAcceptPage() {
         )}
         {error && (
           <div className="space-y-3">
-            <p className="text-sm text-red-500 whitespace-pre-wrap">{error}</p>
+            <p className="text-sm text-red-500 whitespace-pre-wrap" role="alert">{error}</p>
             <button
               type="button"
               onClick={() => router.replace("/")}

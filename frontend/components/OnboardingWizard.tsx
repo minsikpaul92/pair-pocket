@@ -1479,7 +1479,7 @@ export default function OnboardingWizard() {
         </header>
 
         {error && (
-          <div className="rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-700 dark:text-red-400">
+          <div className="rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-700 dark:text-red-400" role="alert">
             {error}
           </div>
         )}

@@ -869,6 +869,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 key={item.id}
                 type="button"
                 onClick={() => openView(item.id)}
+                aria-current={view === item.id ? "page" : undefined}
                 title={navCollapsed ? label : undefined}
                 className={`w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-colors ${
                   navCollapsed ? "justify-center px-2" : "px-3"
@@ -1290,6 +1291,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 type="button"
                 disabled={aiParsing}
                 onClick={() => setScanQueueOpen(false)}
+                aria-label={tCommon("close")}
                 className="text-gray-400 hover:text-gray-700 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
@@ -1316,7 +1318,8 @@ export default function AppShell({ user, onLogout }: Props) {
                       type="button"
                       disabled={aiParsing}
                       onClick={() => removeScanQueued(q.id)}
-                      className="absolute -top-1.5 -right-1.5 rounded-full bg-gray-900/80 text-white p-0.5"
+                      aria-label={tScan("remove")}
+                      className="absolute -top-1.5 -right-1.5 rounded-full bg-gray-900/80 text-white p-0.5 after:absolute after:-inset-2"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -1333,7 +1336,7 @@ export default function AppShell({ user, onLogout }: Props) {
               </p>
             )}
             {scanQueueError && (
-              <p className="text-xs text-red-500">{scanQueueError}</p>
+              <p className="text-xs text-red-500" role="alert">{scanQueueError}</p>
             )}
             {recentScans.length > 0 && !aiParsing && (
               <button
@@ -1485,6 +1488,7 @@ export default function AppShell({ user, onLogout }: Props) {
               key={item.id}
               type="button"
               onClick={() => openView(item.id)}
+              aria-current={view === item.id ? "page" : undefined}
               className={`flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors ${
                 view === item.id
                   ? "text-blue-500"

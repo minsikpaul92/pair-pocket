@@ -150,6 +150,7 @@ function PieExpenseTooltip({
   monthTransactions?: Transaction[];
   tCategories?: any;
 }) {
+  const t = useTranslations("dashboard");
   if (!active || !payload?.length) return null;
   const slice = payload[0]?.payload;
   if (!slice) return null;
@@ -169,7 +170,7 @@ function PieExpenseTooltip({
         (tCategories &&
           translateCategory(tx.category, tCategories) === slice.name);
       if (isMatch) {
-        const name = tx.merchant?.trim() || tx.sub_category?.trim() || "기타";
+        const name = tx.merchant?.trim() || tx.sub_category?.trim() || t("otherSpending");
         const amt = effectiveExpenseAmount(tx);
         map[name] = (map[name] || 0) + amt;
         catSum += amt;
@@ -205,7 +206,7 @@ function PieExpenseTooltip({
 
       <div className="mt-2.5 border-t border-gray-100 dark:border-gray-800/80 pt-2">
         <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-          주요 사용처
+          {t("topSpending")}
         </p>
         {topItems.length > 0 ? (
           <div className="space-y-1">
@@ -440,6 +441,7 @@ export default function DashboardAnalytics({
   const t = useTranslations("dashboard");
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
+  const tCommon = useTranslations("common");
 
   const [expenseRange, setExpenseRange] = useState<ExpenseRange>(1);
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() =>
@@ -937,9 +939,10 @@ export default function DashboardAnalytics({
                                 <button
                                   type="button"
                                   onClick={() => setActiveColorPicker(null)}
+                                  aria-label={tCommon("close")}
                                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs font-bold"
                                 >
-                                  ✕
+                                  <X className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
@@ -1095,11 +1098,12 @@ export default function DashboardAnalytics({
                 <span className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
                   {translateCategory(popoverCategory, tCategories)}
                 </span>
-                <span className="text-xs text-gray-500 font-medium">소비 내역 (중분류)</span>
+                <span className="text-xs text-gray-500 font-medium">{t("subCategoryBreakdown")}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setPopoverCategory(null)}
+                aria-label={tCommon("close")}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg"
               >
                 <X className="h-5 w-5" />
@@ -1108,7 +1112,7 @@ export default function DashboardAnalytics({
 
             <div className="space-y-3">
               {subCategoryGroupMap.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">이번 달 지출 내역이 없습니다.</p>
+                <p className="text-xs text-gray-400 text-center py-4">{t("noExpenseData")}</p>
               ) : (
                 subCategoryGroupMap.map(({ subCategory, total, txs }) => (
                   <div
@@ -1122,7 +1126,9 @@ export default function DashboardAnalytics({
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-bold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                        {translateSubCategory(subCategory, tSubCategories)} ›
+                        {subCategory === "미분류"
+                          ? t("uncategorized")
+                          : translateSubCategory(subCategory, tSubCategories)} ›
                       </span>
                       <span className="text-xs font-bold tabular-nums text-gray-900 dark:text-white">
                         {formatAmount(total, displayCurrency)}
@@ -1137,7 +1143,7 @@ export default function DashboardAnalytics({
                       ))}
                       {txs.length > 3 && (
                         <li className="text-[10px] text-indigo-500 font-semibold text-right pt-0.5">
-                          외 {txs.length - 3}건 더보기 (클릭)
+                          {t("moreTransactions", { count: txs.length - 3 })}
                         </li>
                       )}
                     </ul>

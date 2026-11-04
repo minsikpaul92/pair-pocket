@@ -521,7 +521,7 @@ export default function SettingsView({
                     })}
                   </p>
                   {provinceError && (
-                    <p className="text-xs text-red-500">{t("salesTaxError")}</p>
+                    <p className="text-xs text-red-500" role="alert">{t("salesTaxError")}</p>
                   )}
                 </section>
                 <section className="card-inset p-5 space-y-4">

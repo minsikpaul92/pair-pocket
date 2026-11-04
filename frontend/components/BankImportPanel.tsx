@@ -863,7 +863,7 @@ export default function BankImportPanel({
         )}
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-red-500" role="alert">{error}</p>}
       {saved !== null && (
         <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
           <span className="min-w-0 flex-1">
