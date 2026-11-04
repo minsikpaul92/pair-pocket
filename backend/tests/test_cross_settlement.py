@@ -34,7 +34,7 @@ def settle(env, expense_id, receive, pay, amount=100, **extra):
     )
 
 
-def stats(env, ledger):
+def stats(env, ledger, month="2026-09"):
     owners = [env.users["owner"].id, env.users["partner"].id]
     return run(
         compute_stats(
@@ -43,7 +43,7 @@ def stats(env, ledger):
             account_type=AccountType(ledger),
             shared_group_id="home",
             currency=Currency.CAD,
-            month="2026-09",
+            month=month,
         )
     )
 
@@ -317,3 +317,28 @@ def test_partner_does_not_see_a_personal_expense_behind_a_settlement(env):
 
     env.act_as("partner")
     assert listed(env, "shared")[str(payment["_id"])]["origin"] is None
+
+
+def test_a_late_refund_reduces_the_month_of_the_expense_not_the_month_received(env):
+    shared = env.accounts.shared
+    expense_id = add_expense(env, "shared", shared)  # 2026-09-15
+    refund = env.client.post(
+        "/api/transactions",
+        json=body(
+            type="income",
+            account_type="shared",
+            category="정산",
+            sub_category="N빵 정산/환급",
+            settles_expense_id=expense_id,
+            account_id=str(shared["_id"]),
+            amount=60,
+            date="2026-10-02T00:00:00",
+        ),
+    )
+    assert refund.status_code == 201, refund.text
+
+    assert stats(env, "shared", "2026-09")["adjusted_expense"] == 40
+    october = stats(env, "shared", "2026-10")
+    assert october["adjusted_expense"] == 0
+    # Cash view still sees the money that came in during October.
+    assert october["settlement_refund_total"] == 60

@@ -164,7 +164,9 @@ async def compute_stats(
 ) -> dict:
     """Aggregate income/expense totals with adjusted metrics.
 
-    - adjusted_expense: total_expense − N빵 정산/환급 (actual out-of-pocket spend)
+    - adjusted_expense: total_expense − N빵 settlements linked to this period's
+      expenses (out-of-pocket spend; a refund counts in the month of the expense
+      it pays back, not the month it was received)
     - pure_consumption: total_expense − 투자/저축 (spending charts, excludes transfers)
     - exclude_categories: expense categories left out of every expense figure
     - exclude_account_ids: leave out expenses paid from these accounts (budget view)
@@ -256,7 +258,6 @@ async def compute_stats(
                 by_sub_category.get(f"{cat} › {sub}", 0) + amount
             )
 
-    adjusted_expense = max(total_expense - settlement_refund_total, 0)
     pure_consumption = max(total_expense - investment_savings_total, 0)
 
     # Per-expense effective spending after linked N빵 settlements
@@ -269,11 +270,7 @@ async def compute_stats(
     expense_docs = (
         await db[COLLECTION]
         .find(
-            {
-                **base_filter,
-                "type": TransactionType.EXPENSE.value,
-                "kind": {"$ne": TransactionKind.TRANSFER.value},
-            }
+            {**stats_filter, "type": TransactionType.EXPENSE.value}
         )
         .to_list(length=1000)
     )
@@ -282,15 +279,18 @@ async def compute_stats(
     effective_by_sub_category: dict[tuple[str, str], float] = {}
     effective_by_merchant: dict[str, float] = {}
     settlement_details: list[dict] = []
+    linked_settlement_total = 0.0
     for doc in expense_docs:
         cat = doc.get("category", "")
         sub = doc.get("sub_category", "")
-        if is_non_cashflow_transfer(cat, sub):
-            continue
         if normalize_transfer_category(cat) in excluded:
             continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)
+        # Same scope as total_expense, so the two stay comparable.
+        linked_settlement_total += min(settled, doc["amount"])
+        if is_non_cashflow_transfer(cat, sub):
+            continue
         effective = max(doc["amount"] - settled, 0.0)
 
         # Expense-ratio slices: consumption only — no 투자/저축 or 자산 이동/카드
@@ -316,6 +316,10 @@ async def compute_stats(
                 }
             )
 
+    adjusted_expense = max(total_expense - linked_settlement_total, 0)
+    # Cash view: refunds received this period, whichever month they paid back.
+    received_adjusted_expense = max(total_expense - settlement_refund_total, 0)
+
     return {
         "total_income": total_income,
         "total_expense": total_expense,
@@ -324,7 +328,7 @@ async def compute_stats(
         "adjusted_expense": adjusted_expense,
         "pure_consumption": pure_consumption,
         # Settlement reduces out-of-pocket spend; do not also count it as income.
-        "net_cashflow": total_income - adjusted_expense,
+        "net_cashflow": total_income - received_adjusted_expense,
         "breakdown_by_category": [
             {"category": k, "amount": v}
             for k, v in sorted(by_category.items(), key=lambda x: -x[1])
