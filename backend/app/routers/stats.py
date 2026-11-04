@@ -56,10 +56,13 @@ class StatsSummary(BaseModel):
         description="Sum of [투자/저축] expenses (excluded from pure_consumption)."
     )
     settlement_refund_total: float = Field(
-        description="Sum of [정산 › N빵 정산/환급] income (subtracted from adjusted_expense)."
+        description="Sum of [정산 › N빵 정산/환급] income received this period (cash view; used by net_cashflow)."
     )
     adjusted_expense: float = Field(
-        description="total_expense − settlement_refund_total (actual out-of-pocket)."
+        description=(
+            "total_expense − settlements linked to this period's expenses "
+            "(actual out-of-pocket)."
+        )
     )
     pure_consumption: float = Field(
         description="total_expense − investment_savings_total (spending charts)."
