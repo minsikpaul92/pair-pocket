@@ -18,7 +18,10 @@ from app.models.transaction import AccountType
 from app.models.ledger import TRANSFER_CATEGORY
 from app.models.user import UserOut
 from app.models.user_settings import (
+    COUNTRY_ORDER,
     DEFAULT_SALES_TAX_PROVINCE,
+    HOME_COUNTRY,
+    LEGACY_LOCALE_COUNTRIES,
     ActiveLocaleBody,
     AddInstitutionBody,
     BudgetBody,
@@ -94,27 +97,26 @@ def _normalize_locales(raw: object, fallback: str | None = None) -> list[str]:
     return locales[:2]
 
 
-COUNTRY_ORDER = ("CA", "KR")
-
-
 def _countries_for_locales(locales: list[str]) -> list[str]:
-    """Legacy rule: Korean among the languages turns on Korea next to Canada."""
-    return list(COUNTRY_ORDER) if "ko" in locales else ["CA"]
+    """Legacy rule: the home country plus any country a chosen language implies
+    (Korean turns on Korea)."""
+    implied = {LEGACY_LOCALE_COUNTRIES[loc] for loc in locales if loc in LEGACY_LOCALE_COUNTRIES}
+    return [code for code in COUNTRY_ORDER if code == HOME_COUNTRY or code in implied]
 
 
 def _enabled_countries(doc: dict) -> list[str]:
     """Stored countries, or the language-derived ones for older documents.
-    Canada is always included and the order is fixed."""
+    The home country is always included and the order is fixed."""
     stored = doc.get("enabled_countries")
     if isinstance(stored, list):
-        chosen = {str(code) for code in stored}
+        chosen = {str(code) for code in stored if str(code) in COUNTRY_ORDER}
     else:
         chosen = set(
             _countries_for_locales(
                 _normalize_locales(doc.get("preferred_locales"), doc.get("preferred_locale"))
             )
         )
-    chosen.add("CA")
+    chosen.add(HOME_COUNTRY)
     return [code for code in COUNTRY_ORDER if code in chosen]
 
 
@@ -299,15 +301,17 @@ async def update_enabled_countries(
 ) -> dict:
     """Choose which countries' ledgers are shown.
 
-    Canada is required. Turning a country off only hides its ledger; its
-    accounts and entries stay and come back when it is turned on again.
+    The home country (Canada) is required. Turning a country off only hides
+    its ledger; its accounts and entries stay and come back when it is turned
+    on again.
     """
-    if "CA" not in payload.countries:
+    requested = {country.value for country in payload.countries}
+    if HOME_COUNTRY not in requested:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Canada cannot be turned off",
+            detail="The home country cannot be turned off",
         )
-    countries = [code for code in COUNTRY_ORDER if code in payload.countries]
+    countries = [code for code in COUNTRY_ORDER if code in requested]
     await _get_or_create(db, current_user.id)
     await db[COLLECTION].update_one(
         {"owner_id": current_user.id},

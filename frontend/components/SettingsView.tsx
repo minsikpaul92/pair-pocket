@@ -54,7 +54,12 @@ import {
   salesTaxPercent,
 } from "@/lib/canada-tax";
 import { dayKey } from "@/lib/date";
-import { enabledCountriesFromSettings } from "@/lib/locale-countries";
+import type { BankCountry } from "@/lib/banks";
+import {
+  COUNTRIES,
+  HOME_COUNTRY,
+  enabledCountriesFromSettings,
+} from "@/lib/locale-countries";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LOCALE_OPTIONS, type AppLocale } from "@/i18n/locales";
@@ -186,17 +191,18 @@ export default function SettingsView({
 
   const [savingCountries, setSavingCountries] = useState(false);
   const [countriesError, setCountriesError] = useState(false);
-  const koreaEnabled = enabledCountriesFromSettings(settings).includes("KR");
+  const enabledCountries = enabledCountriesFromSettings(settings);
 
-  // Hiding Korea only hides its ledger; its accounts and entries stay.
-  async function toggleKorea() {
-    if (savingCountries || !settings) return;
+  // Turning a country off only hides its ledger; its accounts and entries stay.
+  async function toggleCountry(code: BankCountry) {
+    if (savingCountries || !settings || code === HOME_COUNTRY) return;
+    const next = enabledCountries.includes(code)
+      ? enabledCountries.filter((c) => c !== code)
+      : [...enabledCountries, code];
     setSavingCountries(true);
     setCountriesError(false);
     try {
-      setSettings(
-        await updateEnabledCountries(koreaEnabled ? ["CA"] : ["CA", "KR"])
-      );
+      setSettings(await updateEnabledCountries(next));
       onChanged();
     } catch {
       setCountriesError(true);
@@ -801,64 +807,48 @@ export default function SettingsView({
                     {t("countriesHelp")}
                   </p>
                   <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                    <div className="flex items-center justify-between gap-3 py-2.5">
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                          {t("countryCanada")}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {t("countryCanadaHint")}
-                        </p>
-                      </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={true}
-                          aria-label={t("countryCanada")}
-                          disabled
-                          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 ${
-                            true ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
-                          }`}
+                    {COUNTRIES.map(({ code }) => {
+                      const isHome = code === HOME_COUNTRY;
+                      const on = isHome || enabledCountries.includes(code);
+                      return (
+                        <div
+                          key={code}
+                          className="flex items-center justify-between gap-3 py-2.5"
                         >
-                          <span
-                            className={`absolute top-0.5 left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${
-                              true ? "translate-x-5" : "translate-x-0"
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                              {t(`countryList.${code}.name`)}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {isHome
+                                ? t("countryAlwaysOn")
+                                : t(`countryList.${code}.hint`)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={on}
+                            aria-label={t(`countryList.${code}.name`)}
+                            onClick={() => void toggleCountry(code)}
+                            disabled={isHome || !settings || savingCountries}
+                            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 ${
+                              on ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
                             }`}
                           >
-                          </span>
-                        </button>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 py-2.5">
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                          {t("countryKorea")}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {t("countryKoreaHint")}
-                        </p>
-                      </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={koreaEnabled}
-                          aria-label={t("countryKorea")}
-                          onClick={() => void toggleKorea()}
-                          disabled={!settings || savingCountries}
-                          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 ${
-                            koreaEnabled ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
-                          }`}
-                        >
-                          <span
-                            className={`absolute top-0.5 left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${
-                              koreaEnabled ? "translate-x-5" : "translate-x-0"
-                            }`}
-                          >
-                            {savingCountries && (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
-                            )}
-                          </span>
-                        </button>
-                    </div>
+                            <span
+                              className={`absolute top-0.5 left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${
+                                on ? "translate-x-5" : "translate-x-0"
+                              }`}
+                            >
+                              {savingCountries && !isHome && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                              )}
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                     {t("countriesKeepData")}

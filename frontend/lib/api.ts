@@ -1,5 +1,6 @@
 import { ApiError } from "@/lib/errors";
 import { dayKey } from "./date";
+import type { BankCountry } from "./banks";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -700,7 +701,7 @@ export interface UserSettings {
   preferred_locale?: string | null;
   preferred_locales?: string[];
   /** Countries whose ledgers are shown; Canada is always first. */
-  enabled_countries?: ("CA" | "KR")[];
+  enabled_countries?: BankCountry[];
   ledger_start_date?: string | null;
   shared_ledger_start_date?: string | null;
   ledger_start_date_locked?: boolean;
@@ -2419,7 +2420,7 @@ export async function updateActiveLocale(locale: string): Promise<UserSettings> 
 
 /** Show or hide country ledgers. Hiding a country deletes nothing. */
 export async function updateEnabledCountries(
-  countries: ("CA" | "KR")[]
+  countries: BankCountry[]
 ): Promise<UserSettings> {
   const res = await apiFetch(`${API_BASE_URL}/api/settings/countries`, {
     method: "PUT",

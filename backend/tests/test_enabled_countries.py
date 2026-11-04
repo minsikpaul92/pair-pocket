@@ -143,3 +143,12 @@ def test_onboarding_sets_the_starting_countries_from_languages(env, locales, exp
     assert res.json()["enabled_countries"] == expected
     stored = run(env.db.user_settings.find_one({"owner_id": env.user.id}))
     assert stored["enabled_countries"] == expected
+
+
+def test_every_supported_country_can_be_turned_on(env):
+    from app.models.user_settings import COUNTRY_ORDER
+
+    res = set_countries(env, list(reversed(COUNTRY_ORDER)))
+
+    assert res.status_code == 200, res.text
+    assert res.json()["enabled_countries"] == list(COUNTRY_ORDER)
