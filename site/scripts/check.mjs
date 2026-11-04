@@ -39,7 +39,9 @@ for (const [id, c] of Object.entries(clips)) {
     if (statSync(mp4).size > max && c.status === "done") errors.push(`media/${c.file}.mp4 is over ${max / KB} KB`);
     if (!existsSync(poster)) errors.push(`media/${c.file}-poster.webp is missing`);
   }
-  if (existsSync(poster) && statSync(poster).size > 40 * KB) errors.push(`media/${c.file}-poster.webp is over 40 KB`);
+  // A phone clip's poster is a sharp 780x1688 screen, which does not fit in 40 KB.
+  const posterMax = (c.h > c.w ? 60 : 40) * KB;
+  if (existsSync(poster) && statSync(poster).size > posterMax) errors.push(`media/${c.file}-poster.webp is over ${posterMax / KB} KB`);
 }
 for (const f of readdirSync(join(root, "src"))) {
   const text = readFileSync(join(root, "src", f), "utf8");
