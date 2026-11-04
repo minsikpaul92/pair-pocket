@@ -1286,6 +1286,10 @@
   },
   "whatsNew": {
     "items": {
+      "easierReading": {
+        "title": "Easier to read, and you can zoom",
+        "description": "Small text and labels are darker so they are easier to read in light and dark mode, and chart colors stand out clearly in both. You can now pinch to zoom, and typing in a field on your phone no longer zooms the screen."
+      },
       "dashboardEnglishText": {
         "title": "Dashboard text in English",
         "description": "The spending breakdown on the dashboard no longer shows Korean labels when the app is in English. Windows now also close with the Esc key, and screen readers name the icon buttons."

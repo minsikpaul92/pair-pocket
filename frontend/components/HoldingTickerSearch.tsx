@@ -79,11 +79,11 @@ export default function HoldingTickerSearch({
           placeholder={t("searchPlaceholder")}
           className={
             inputClassName ??
-            "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent pl-9 pr-3 py-2 text-sm text-gray-900 dark:text-white"
+            "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent pl-9 pr-3 py-2 text-base sm:text-sm text-gray-900 dark:text-white"
           }
           autoComplete="off"
         />
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400 pointer-events-none" />
       </div>
 
       {suggestions.length > 0 && (
@@ -107,7 +107,7 @@ export default function HoldingTickerSearch({
               <span className="font-bold text-gray-800 dark:text-gray-200 shrink-0">
                 {s.ticker}
               </span>
-              <span className="text-[10px] text-gray-400 truncate min-w-0">
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate min-w-0">
                 {s.name}
               </span>
             </button>

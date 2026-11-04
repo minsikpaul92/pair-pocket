@@ -79,14 +79,14 @@ export default function Dropdown({
           <span
             className={cn(
               "min-w-0 flex-1 truncate",
-              !selected && "font-normal text-gray-400"
+              !selected && "font-normal text-gray-500 dark:text-gray-400"
             )}
           >
             {selected?.label ?? placeholder}
           </span>
           <ChevronDown
             className={cn(
-              "h-4 w-4 shrink-0 text-gray-400 transition-transform",
+              "h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400 transition-transform",
               open && "rotate-180"
             )}
             aria-hidden

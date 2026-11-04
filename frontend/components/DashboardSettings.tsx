@@ -200,7 +200,7 @@ export default function DashboardSettings({ accountType, scope }: Props) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                   }}
-                  className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm tabular-nums dark:border-gray-700 dark:bg-gray-900"
+                  className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-base sm:text-sm tabular-nums dark:border-gray-700 dark:bg-gray-900"
                 />
                 {savedKey === key && (
                   <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
@@ -283,7 +283,7 @@ export default function DashboardSettings({ accountType, scope }: Props) {
               <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                 {t("layoutTitle")}
                 {scope === "ALL" && (
-                  <span className="ml-2 text-sm font-medium text-gray-500">
+                  <span className="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">
                     {t(country === "CAD" ? "budgetCanada" : "budgetKorea")}
                   </span>
                 )}

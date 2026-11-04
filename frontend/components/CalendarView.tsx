@@ -160,7 +160,7 @@ export default function CalendarView({
                 ? "text-red-400"
                 : i === 6
                   ? "text-blue-400"
-                  : "text-gray-400 dark:text-gray-500"
+                  : "text-gray-500 dark:text-gray-400"
             }`}
           >
             {w}
@@ -211,7 +211,7 @@ export default function CalendarView({
 
               {(hasTx || hasPending) && (
                 <>
-                  <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                  <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400">
                     {hasTx ? tCommon("count", { count: totals!.count }) : ""}
                     {hasTx && hasPending ? " · " : ""}
                     {hasPending ? (

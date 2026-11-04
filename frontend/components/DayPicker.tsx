@@ -108,7 +108,7 @@ export default function DayPicker({
               "min-w-0 flex-1 text-sm font-semibold truncate",
               value
                 ? "text-gray-900 dark:text-white"
-                : "text-gray-400 dark:text-gray-500"
+                : "text-gray-500 dark:text-gray-400"
             )}
           >
             {value ? formatDayLabel(value, locale) : t("selectDate")}
@@ -151,7 +151,7 @@ export default function DayPicker({
                   ? "text-red-400"
                   : i === 6
                     ? "text-blue-400"
-                    : "text-gray-400 dark:text-gray-500"
+                    : "text-gray-500 dark:text-gray-400"
               )}
             >
               {label}

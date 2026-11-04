@@ -1609,7 +1609,7 @@ export default function TransactionModal({
           <select
             value={payFromId}
             onChange={(e) => setPayFromId(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+            className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-base sm:text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
           >
             <option value="">{tTx("settlementPaidExternal")}</option>
             {payAccounts.map((a) => (
@@ -1635,7 +1635,7 @@ export default function TransactionModal({
               <select
                 value={accountId}
                 onChange={(e) => pickAccount(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-base sm:text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
               >
                 <option value="">{tTx("settlementSelectReceiveAccount")}</option>
                 {accounts
@@ -1681,7 +1681,7 @@ export default function TransactionModal({
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder={tTx("notePlaceholder")}
-        className="input-field text-sm"
+        className="input-field text-base sm:text-sm"
       />
     </div>
   );
@@ -1751,7 +1751,7 @@ export default function TransactionModal({
           filterAccounts={toAccountFilter}
         />
       </div>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
         {ledgerPair
           ? tTx(
               ledgerPair[0] === "personal"
@@ -1790,7 +1790,7 @@ export default function TransactionModal({
           filterAccounts={(acc) => acc.kind === "investment"}
         />
         {accountId && accountId !== ACCOUNT_NONE && (
-          <label className="flex items-center gap-1.5 mt-2 text-xs text-gray-500 cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 mt-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={
@@ -1856,7 +1856,7 @@ export default function TransactionModal({
                 setMerchant("");
               }
             }}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-base sm:text-sm focus:border-blue-500 focus:outline-none dark:text-white"
             required
           >
             <option value="">보유 주식 선택...</option>
@@ -1892,7 +1892,7 @@ export default function TransactionModal({
             onChange={(e) => {
               setTickerSearch(e.target.value);
             }}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-base sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
             placeholder="예: AAPL, 삼성전자"
             required
           />
@@ -1942,7 +1942,7 @@ export default function TransactionModal({
               className={`flex-1 rounded-md py-1 text-xs font-semibold transition-colors ${
                 txCurrency === c
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                  : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
               {c}
@@ -1961,7 +1961,7 @@ export default function TransactionModal({
             step="any"
             value={shares}
             onChange={(e) => setShares(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-base sm:text-sm focus:border-blue-500 focus:outline-none dark:text-white"
             placeholder="0"
             required
           />
@@ -1975,7 +1975,7 @@ export default function TransactionModal({
             step="any"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 text-base sm:text-sm focus:border-blue-500 focus:outline-none dark:text-white"
             placeholder="0.00"
             required
           />
@@ -2115,7 +2115,7 @@ export default function TransactionModal({
               type="button"
               onClick={onClose}
               aria-label={tCommon("close")}
-              className="shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+              className="shrink-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -2132,7 +2132,7 @@ export default function TransactionModal({
                       className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
                         currency === c
                           ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                          : "text-gray-500"
+                          : "text-gray-500 dark:text-gray-400"
                       }`}
                     >
                       {c}
@@ -2181,7 +2181,7 @@ export default function TransactionModal({
                   <span className={`text-sm truncate ${tone}`}>
                     {occ.subscription_name || tSub("defaultName")}
                     {translateSubscriptionSource(occ.subscription_billing_cycle, tSub) && (
-                      <span className="text-[10px] text-gray-400 font-normal">
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-normal">
                         {" "}
                         {translateSubscriptionSource(occ.subscription_billing_cycle, tSub)}
                       </span>
@@ -2199,7 +2199,7 @@ export default function TransactionModal({
                     onClick={() => onSkipPendingOccurrence(occ)}
                     title={tSub("skipPayment")}
                     aria-label={tSub("skipPayment")}
-                    className="shrink-0 mr-2 rounded-lg p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                    className="shrink-0 mr-2 rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
                   >
                     <SkipForward className="h-4 w-4" />
                   </button>
@@ -2452,7 +2452,7 @@ export default function TransactionModal({
                   <button
                     type="button"
                     onClick={clearScanQueue}
-                    className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-500"
+                    className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
                   >
                     <Trash2 className="h-3 w-3" />
                     {tTx("scanClear")}
@@ -2709,14 +2709,14 @@ export default function TransactionModal({
                 <select
                   value={transactionCurrency}
                   onChange={(e) => setTransactionCurrency(e.target.value as Currency)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-gray-50 dark:bg-gray-800 text-xs font-bold text-gray-700 dark:text-gray-200 border-0 rounded-lg py-1.5 px-2 focus:ring-0 focus:outline-none"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-gray-50 dark:bg-gray-800 text-base sm:text-xs font-bold text-gray-700 dark:text-gray-200 border-0 rounded-lg py-1.5 px-2 focus:ring-0 focus:outline-none"
                 >
                   <option value="KRW">KRW</option>
                   <option value="CAD">CAD</option>
                   <option value="USD">USD</option>
                 </select>
               ) : (
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 dark:text-gray-400">
                   {transactionCurrency}
                 </span>
               )}
@@ -2855,7 +2855,7 @@ export default function TransactionModal({
                     <button
                       type="button"
                       onClick={() => setShowItems(false)}
-                      className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold ml-1"
+                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-semibold ml-1"
                     >
                       {tTx("itemsHide")}
                     </button>
@@ -2864,7 +2864,7 @@ export default function TransactionModal({
 
                 <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-x-auto">
                   <div className="min-w-[620px]">
-                    <div className={`${ITEM_GRID} bg-gray-50 dark:bg-gray-900/60 px-2 py-1.5 text-[10px] font-semibold text-gray-500`}>
+                    <div className={`${ITEM_GRID} bg-gray-50 dark:bg-gray-900/60 px-2 py-1.5 text-[10px] font-semibold text-gray-500 dark:text-gray-400`}>
                       <span>{tTx("itemName")}</span>
                       <span>{tTx("itemStandard")}</span>
                       <span className="text-right">{tTx("itemQty")}</span>
@@ -2938,7 +2938,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("name", e.target.value)
                               }
-                              className="input-field py-1.5 text-xs"
+                              className="input-field py-1.5 text-base sm:text-xs"
                             />
                             <input
                               type="text"
@@ -2947,7 +2947,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("standardized_name", e.target.value)
                               }
-                              className="input-field py-1.5 text-xs"
+                              className="input-field py-1.5 text-base sm:text-xs"
                             />
                             <input
                               type="text"
@@ -2956,7 +2956,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("quantity", e.target.value)
                               }
-                              className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
+                              className={`input-field py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
                             />
                             <select
                               value={item.unit || "개"}
@@ -2967,7 +2967,7 @@ export default function TransactionModal({
                                   updateItem("unit", e.target.value);
                                 }
                               }}
-                              className="input-field py-1.5 px-1 text-xs w-full cursor-pointer bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                              className="input-field py-1.5 px-1 text-base sm:text-xs w-full cursor-pointer bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                             >
                               {availableUnits.map((u) => (
                                 <option key={u} value={u} className="text-xs py-1">
@@ -2985,7 +2985,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("unit_price", e.target.value)
                               }
-                              className={`input-field py-1.5 text-xs text-right ${NO_SPIN}`}
+                              className={`input-field py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
                             />
                             <input
                               type="text"
@@ -2994,7 +2994,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("total_price", e.target.value)
                               }
-                              className={`input-field py-1.5 text-xs text-right font-semibold ${NO_SPIN}`}
+                              className={`input-field py-1.5 text-base sm:text-xs text-right font-semibold ${NO_SPIN}`}
                             />
                             <button
                               type="button"

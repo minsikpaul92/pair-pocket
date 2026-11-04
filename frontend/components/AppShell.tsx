@@ -851,7 +851,7 @@ export default function AppShell({ user, onLogout }: Props) {
             aria-label={
               navCollapsed ? tNav("expandSidebar") : tNav("collapseSidebar")
             }
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-white transition-colors shrink-0"
+            className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-white transition-colors shrink-0"
           >
             {navCollapsed ? (
               <PanelLeftOpen className="h-5 w-5" />
@@ -942,7 +942,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 type="button"
                 onClick={handleLogout}
                 aria-label={tNav("logout")}
-                className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
               >
                 <LogOut className="h-5 w-5" />
               </button>
@@ -1088,7 +1088,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 type="button"
                 onClick={() => setMonth((m) => addMonths(m, -1))}
                 aria-label={tCommon("previousMonth")}
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="rounded-lg p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
@@ -1100,7 +1100,7 @@ export default function AppShell({ user, onLogout }: Props) {
                     return new Date(n.getFullYear(), n.getMonth(), 1);
                   })
                 }
-                className="whitespace-nowrap rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="whitespace-nowrap rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 {tCommon("thisMonth")}
               </button>
@@ -1108,7 +1108,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 type="button"
                 onClick={() => setMonth((m) => addMonths(m, 1))}
                 aria-label={tCommon("nextMonth")}
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="rounded-lg p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
@@ -1292,7 +1292,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 disabled={aiParsing}
                 onClick={() => setScanQueueOpen(false)}
                 aria-label={tCommon("close")}
-                className="text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1310,7 +1310,7 @@ export default function AppShell({ user, onLogout }: Props) {
                         className="h-full w-full rounded-lg object-cover border border-gray-200 dark:border-gray-700"
                       />
                     ) : (
-                      <div className="h-full w-full rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                      <div className="h-full w-full rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-500 dark:text-gray-400">
                         PDF
                       </div>
                     )}
@@ -1327,7 +1327,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-gray-500">아직 파일이 없습니다.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">아직 파일이 없습니다.</p>
             )}
 
             {scanRestored > 0 && (
@@ -1386,7 +1386,7 @@ export default function AppShell({ user, onLogout }: Props) {
               <button
                 type="button"
                 onClick={() => clearScanQueue()}
-                className="w-full inline-flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-red-500"
+                className="w-full inline-flex items-center justify-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
               >
                 <Trash2 className="h-3 w-3" />
                 대기열 비우기
@@ -1449,7 +1449,7 @@ export default function AppShell({ user, onLogout }: Props) {
               }}
               className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
             >
-              <Repeat className="h-4.5 w-4.5 text-gray-400" />
+              <Repeat className="h-4.5 w-4.5 text-gray-500 dark:text-gray-400" />
               {tScan("openRecent", { count: recentScans.length })}
             </button>
           )}
@@ -1492,7 +1492,7 @@ export default function AppShell({ user, onLogout }: Props) {
               className={`flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors ${
                 view === item.id
                   ? "text-blue-500"
-                  : "text-gray-400 dark:text-gray-500"
+                  : "text-gray-500 dark:text-gray-400"
               }`}
             >
               <item.icon className="h-6 w-6" />
