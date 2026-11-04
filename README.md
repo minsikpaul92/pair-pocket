@@ -4,6 +4,7 @@
 > (John C. Maxwell)
 
 [![Live demo](https://img.shields.io/badge/Live-www.pairpocket.me-2563eb?style=flat-square)](https://www.pairpocket.me/en)
+[![Landing page](https://img.shields.io/badge/Landing-minsikpaul92.github.io%2Fpair--pocket-0f766e?style=flat-square)](https://minsikpaul92.github.io/pair-pocket/)
 [![CI](https://img.shields.io/github/actions/workflow/status/minsikpaul92/pair-pocket/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/minsikpaul92/pair-pocket/actions/workflows/ci.yml)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/minsikpaul92)
 
