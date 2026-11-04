@@ -4,7 +4,7 @@
   "ai-scan":       { "file": "ai-scan",       "w": 800, "h": 434, "status": "interim", "shot": "AI receipt scan to review screen. Interim clip from the README; re-record." },
   "settlement":    { "file": "settlement",    "w": 1280, "h": 800, "status": "todo", "shot": "Settle a shared expense with a personal account. Both sides appear, the expense shows Settled." },
   "moves":         { "file": "moves",         "w": 1280, "h": 800, "status": "todo", "shot": "A card payment and an account move sit in the list but the spending chart does not change." },
-  "subscriptions": { "file": "subscriptions", "w": 1280, "h": 800, "status": "todo", "shot": "Add a fixed expense with promo price, then see Due this month." },
-  "stocks":        { "file": "stocks",        "w": 1280, "h": 800, "status": "todo", "shot": "Brokerage holdings with live prices and CAD/KRW totals." },
+  "subscriptions": { "file": "subscriptions", "w": 1280, "h": 800, "status": "done", "shot": "Add Spotify with a promo price, end date and reminder, then see it in Due this month and the list. Recorded with record/clips/subscriptions.mjs at 1.5x." },
+  "stocks":        { "file": "stocks",        "w": 1280, "h": 800, "status": "done", "shot": "Stock tab in All: filter to the Korea brokerage, then the Canada one, then Show all. Recorded with record/clips/stocks.mjs." },
   "invite":        { "file": "invite",        "w": 1024, "h": 466, "status": "interim", "kind": "image", "shot": "Invite partner modal. Interim still from the README; re-record as a short clip." }
 }
