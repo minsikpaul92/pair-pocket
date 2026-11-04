@@ -16,6 +16,7 @@ import {
   CalendarDays,
   Coffee,
   Languages,
+  Globe,
   Receipt,
   RefreshCw,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import {
   updateLedgerStartDate,
   resetUserData,
   updateActiveLocale,
+  updateEnabledCountries,
   ResetScope,
   ResetAccountType,
   AccountType,
@@ -52,6 +54,7 @@ import {
   salesTaxPercent,
 } from "@/lib/canada-tax";
 import { dayKey } from "@/lib/date";
+import { enabledCountriesFromSettings } from "@/lib/locale-countries";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LOCALE_OPTIONS, type AppLocale } from "@/i18n/locales";
@@ -178,6 +181,27 @@ export default function SettingsView({
       setProvinceError(true);
     } finally {
       setSavingProvince(false);
+    }
+  }
+
+  const [savingCountries, setSavingCountries] = useState(false);
+  const [countriesError, setCountriesError] = useState(false);
+  const koreaEnabled = enabledCountriesFromSettings(settings).includes("KR");
+
+  // Hiding Korea only hides its ledger; its accounts and entries stay.
+  async function toggleKorea() {
+    if (savingCountries || !settings) return;
+    setSavingCountries(true);
+    setCountriesError(false);
+    try {
+      setSettings(
+        await updateEnabledCountries(koreaEnabled ? ["CA"] : ["CA", "KR"])
+      );
+      onChanged();
+    } catch {
+      setCountriesError(true);
+    } finally {
+      setSavingCountries(false);
     }
   }
 
@@ -765,6 +789,83 @@ export default function SettingsView({
                     disabled={changingLanguage}
                     ariaLabel={t("languageLabel")}
                   />
+                </section>
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <Globe className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("countriesTitle")}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("countriesHelp")}
+                  </p>
+                  <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                    <div className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                          {t("countryCanada")}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {t("countryCanadaHint")}
+                        </p>
+                      </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={true}
+                          aria-label={t("countryCanada")}
+                          disabled
+                          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 ${
+                            true ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${
+                              true ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          >
+                          </span>
+                        </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                          {t("countryKorea")}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {t("countryKoreaHint")}
+                        </p>
+                      </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={koreaEnabled}
+                          aria-label={t("countryKorea")}
+                          onClick={() => void toggleKorea()}
+                          disabled={!settings || savingCountries}
+                          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 ${
+                            koreaEnabled ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${
+                              koreaEnabled ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          >
+                            {savingCountries && (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                            )}
+                          </span>
+                        </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("countriesKeepData")}
+                  </p>
+                  {countriesError && (
+                    <p className="text-xs text-red-500">{t("countriesError")}</p>
+                  )}
                 </section>
                 <section className="card-inset p-5 space-y-3">
                   <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">

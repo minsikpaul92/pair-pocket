@@ -1,5 +1,6 @@
 import type { BankCountry } from "@/lib/banks";
-import type { LedgerScope } from "@/lib/api";
+import type { LedgerScope, UserSettings } from "@/lib/api";
+import { preferredLocalesList } from "@/lib/api";
 
 const COUNTRY_ORDER: BankCountry[] = ["CA", "KR"];
 
@@ -15,6 +16,23 @@ export function countriesForLocales(locales: string[]): BankCountry[] {
   const hasKorean = locales.some((loc) => loc === "ko");
   if (hasKorean) return [...COUNTRY_ORDER];
   return ["CA"];
+}
+
+/**
+ * Countries shown for a user: the Settings choice, or for older settings
+ * without one, the countries their languages imply. Canada always comes first.
+ */
+export function enabledCountriesFromSettings(
+  settings: Pick<
+    UserSettings,
+    "enabled_countries" | "preferred_locales" | "preferred_locale"
+  > | null | undefined
+): BankCountry[] {
+  const chosen = settings?.enabled_countries;
+  if (chosen?.length) {
+    return COUNTRY_ORDER.filter((c) => c === "CA" || chosen.includes(c));
+  }
+  return countriesForLocales(preferredLocalesList(settings));
 }
 
 /** Header ledger scopes for the enabled countries. */

@@ -24,6 +24,7 @@ from app.models.user_settings import (
     BudgetBody,
     BudgetCarryBody,
     DashboardLayoutBody,
+    EnabledCountriesBody,
     SpendingAccountExclusionsBody,
     SpendingExclusionsBody,
     CustomCategoryMap,
@@ -93,6 +94,30 @@ def _normalize_locales(raw: object, fallback: str | None = None) -> list[str]:
     return locales[:2]
 
 
+COUNTRY_ORDER = ("CA", "KR")
+
+
+def _countries_for_locales(locales: list[str]) -> list[str]:
+    """Legacy rule: Korean among the languages turns on Korea next to Canada."""
+    return list(COUNTRY_ORDER) if "ko" in locales else ["CA"]
+
+
+def _enabled_countries(doc: dict) -> list[str]:
+    """Stored countries, or the language-derived ones for older documents.
+    Canada is always included and the order is fixed."""
+    stored = doc.get("enabled_countries")
+    if isinstance(stored, list):
+        chosen = {str(code) for code in stored}
+    else:
+        chosen = set(
+            _countries_for_locales(
+                _normalize_locales(doc.get("preferred_locales"), doc.get("preferred_locale"))
+            )
+        )
+    chosen.add("CA")
+    return [code for code in COUNTRY_ORDER if code in chosen]
+
+
 def _valid_ledger_start(value: str) -> bool:
     return len(value) == 10 and value[4] == "-" and value[7] == "-"
 
@@ -150,6 +175,7 @@ async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
         "share_gemini_api_key": bool(doc.get("share_gemini_api_key")),
         "preferred_locale": preferred_locale,
         "preferred_locales": preferred_locales,
+        "enabled_countries": _enabled_countries(doc),
         "ledger_start_date": doc.get("ledger_start_date"),
         "shared_ledger_start_date": doc.get("shared_ledger_start_date"),
         "ledger_start_date_locked": False,
@@ -243,9 +269,10 @@ async def update_active_locale(
 ) -> dict:
     """Make `preferred_locale` the active UI language.
 
-    The language list that decides which countries are enabled never shrinks
-    here: the chosen language moves to the front and is added when missing, so
-    flipping the KO/EN toggle cannot hide the Korea ledger.
+    The chosen language moves to the front and is added when missing. Which
+    countries are shown never changes here: a document that still derives its
+    countries from the language list gets them stored first, so flipping the
+    KO/EN toggle cannot show or hide the Korea ledger.
     """
     locale = payload.preferred_locale.strip()
     if locale not in SUPPORTED_LOCALE_CODES:
@@ -256,9 +283,42 @@ async def update_active_locale(
     doc = await _get_or_create(db, current_user.id)
     current = _normalize_locales(doc.get("preferred_locales"), doc.get("preferred_locale"))
     ordered = ([locale] + [item for item in current if item != locale])[:2]
+    updates: dict = {"preferred_locale": locale, "preferred_locales": ordered}
+    if not isinstance(doc.get("enabled_countries"), list) and current:
+        updates["enabled_countries"] = _enabled_countries(doc)
+    await db[COLLECTION].update_one({"owner_id": current_user.id}, {"$set": updates})
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
+@router.put("/countries", response_model=UserSettingsOut)
+async def update_enabled_countries(
+    payload: EnabledCountriesBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    """Choose which countries' ledgers are shown.
+
+    Canada is required. Turning a country off only hides its ledger; its
+    accounts and entries stay and come back when it is turned on again.
+    """
+    if "CA" not in payload.countries:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Canada cannot be turned off",
+        )
+    countries = [code for code in COUNTRY_ORDER if code in payload.countries]
+    await _get_or_create(db, current_user.id)
     await db[COLLECTION].update_one(
         {"owner_id": current_user.id},
-        {"$set": {"preferred_locale": locale, "preferred_locales": ordered}},
+        {"$set": {"enabled_countries": countries}},
+    )
+    await write_audit_log(
+        db,
+        owner_id=current_user.id,
+        action="update",
+        entity="enabled_countries",
+        detail={"enabled_countries": countries},
     )
     doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
     return await _settings_out(db, doc)
@@ -649,6 +709,9 @@ async def save_onboarding_basics(
     updates: dict = {
         "preferred_locale": locales[0],
         "preferred_locales": locales,
+        # Onboarding picks the starting countries from the chosen languages;
+        # Settings can change them later without touching the languages.
+        "enabled_countries": _countries_for_locales(locales),
         "ledger_start_date": start,
         "onboarding_personal_step": 1,
     }
@@ -822,6 +885,7 @@ async def reset_user_data(
                     "onboarding_personal_step": 0,
                     "preferred_locale": None,
                     "preferred_locales": [],
+                    "enabled_countries": None,
                     "ledger_start_date": None,
                     "shared_ledger_start_date": None,
                 }

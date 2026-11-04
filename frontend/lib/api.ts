@@ -699,6 +699,8 @@ export interface UserSettings {
   share_gemini_api_key?: boolean;
   preferred_locale?: string | null;
   preferred_locales?: string[];
+  /** Countries whose ledgers are shown; Canada is always first. */
+  enabled_countries?: ("CA" | "KR")[];
   ledger_start_date?: string | null;
   shared_ledger_start_date?: string | null;
   ledger_start_date_locked?: boolean;
@@ -2412,6 +2414,19 @@ export async function updateActiveLocale(locale: string): Promise<UserSettings> 
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || "Failed to update language");
   }
+  return (await res.json()) as UserSettings;
+}
+
+/** Show or hide country ledgers. Hiding a country deletes nothing. */
+export async function updateEnabledCountries(
+  countries: ("CA" | "KR")[]
+): Promise<UserSettings> {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/countries`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ countries }),
+  });
+  if (!res.ok) throw new ApiError("updateEnabledCountries");
   return (await res.json()) as UserSettings;
 }
 

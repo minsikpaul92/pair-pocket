@@ -1032,6 +1032,14 @@
     "updateTitle": "앱 업데이트",
     "updateHelp": "Dock이나 홈 화면에 추가한 앱은 처음 열린 버전을 계속 사용해요. 새로고침하면 최신 버전으로 바뀝니다.",
     "updateCta": "앱 새로고침",
+    "countriesTitle": "국가",
+    "countriesHelp": "돈을 관리하는 국가를 켜 주세요. 두 국가 이상 켜면 위쪽 막대에서 캐나다, 한국, 전체를 바꿔 볼 수 있어요. 앱 언어는 바뀌지 않아요.",
+    "countryCanada": "캐나다",
+    "countryCanadaHint": "항상 켜짐",
+    "countryKorea": "한국",
+    "countryKoreaHint": "원화 계좌와 내역",
+    "countriesKeepData": "한국을 끄면 한국 가계부가 숨겨질 뿐이에요. 한국 계좌와 내역은 그대로 남고, 다시 켜면 돌아와요.",
+    "countriesError": "저장하지 못했어요. 다시 시도해 주세요.",
     "salesTaxTitle": "판매세",
     "salesTaxHelp": "거주하는 주를 고르세요. 지출을 추가할 때 그 주의 GST, HST, PST 세율로 세금을 추정해요. 세금은 직접 고칠 수도 있어요.",
     "salesTaxRate": "세율: {rate}%",
@@ -1286,6 +1294,10 @@
   },
   "whatsNew": {
     "items": {
+      "countrySettings": {
+        "title": "설정에서 한국을 켜고 끌 수 있어요",
+        "description": "설정의 국가 항목에서 앱 언어를 바꾸지 않고 한국 가계부를 보이거나 숨길 수 있어요. 한국을 꺼도 숨겨질 뿐이라 지워지는 내용은 없어요."
+      },
       "easierReading": {
         "title": "더 읽기 쉬워졌고 확대할 수 있어요",
         "description": "작은 글씨와 라벨을 진하게 바꿔 라이트 모드와 다크 모드 모두에서 더 잘 보여요. 차트 색도 두 모드에서 또렷하게 구분돼요. 이제 두 손가락으로 화면을 확대할 수 있고, 휴대폰에서 입력란을 눌러도 화면이 저절로 확대되지 않아요."

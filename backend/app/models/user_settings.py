@@ -24,6 +24,9 @@ CanadaProvince = Literal[
 ]
 DEFAULT_SALES_TAX_PROVINCE = "ON"
 
+# Countries whose ledgers a user can turn on. Canada is always on.
+CountryCode = Literal["CA", "KR"]
+
 
 class UserSettingsBase(BaseModel):
     merchants: list[str] = Field(default_factory=list)
@@ -36,6 +39,9 @@ class UserSettingsBase(BaseModel):
     share_gemini_api_key: bool = False
     preferred_locale: str | None = None
     preferred_locales: list[str] = Field(default_factory=list)
+    # Countries whose ledgers are shown. Stored once the user (or onboarding)
+    # picks them; older documents fall back to the language list.
+    enabled_countries: list[CountryCode] = Field(default_factory=lambda: ["CA"])
     ledger_start_date: str | None = None
     shared_ledger_start_date: str | None = None
     onboarding_personal_completed: bool = False
@@ -86,6 +92,13 @@ class ExpenseRatioHiddenCategoriesBody(BaseModel):
 
 class SalesTaxProvinceBody(BaseModel):
     province: CanadaProvince
+
+
+class EnabledCountriesBody(BaseModel):
+    """Countries to show. Canada must be included; others only hide or show
+    their ledgers, nothing is deleted."""
+
+    countries: list[CountryCode] = Field(min_length=1, max_length=2)
 
 
 class AddInstitutionBody(BaseModel):
