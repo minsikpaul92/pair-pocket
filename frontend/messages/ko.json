@@ -1230,7 +1230,10 @@
     "card4": "No Cloud Projects Available이라고 나오면 그 목록을 열고 Create project를 누르세요.",
     "card5": "이름은 그대로 두고 Create project를 누르세요.",
     "card6": "Create key를 누르세요.",
-    "card7": "Copy key를 누른 다음, 이 화면으로 돌아와 아래 Gemini API Key 입력란에 붙여넣으세요.",
+    "card7": "Copy key를 누른 다음, 이 화면으로 돌아와 아래 칸에 붙여넣으세요.",
+    "keyPlaceholder": "복사한 키를 여기에 붙여넣기",
+    "paste": "붙여넣기",
+    "keyFilled": "키가 입력됐어요. 아래에서 마무리하면 저장됩니다.",
     "cardAlt": "{current}단계 Google AI Studio 화면",
     "counter": "{current} / {total}",
     "prev": "이전",
@@ -1275,7 +1278,7 @@
     "items": {
       "geminiKeyCards": {
         "title": "Gemini 키 발급을 그림으로 안내해요",
-        "description": "Gemini 키를 받을 때 Google AI Studio 화면을 한 장씩 보여 주고 눌러야 할 버튼을 표시해요. 새 계정에 필요한 프로젝트 만들기 단계도 들어 있어요."
+        "description": "Gemini 키를 받을 때 Google AI Studio 화면을 한 장씩 보여 주고 눌러야 할 버튼을 표시해요. 새 계정에 필요한 프로젝트 만들기 단계도 들어 있고, 마지막 화면에서 복사한 키를 바로 붙여넣을 수 있어요."
       },
       "geminiKeyGuide": {
         "title": "Gemini 키 안내가 자세해졌어요",

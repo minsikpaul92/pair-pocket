@@ -1543,7 +1543,7 @@ export default function OnboardingWizard() {
                   {t("apiKeyOptionalTitle")}
                 </h2>
               </summary>
-              <GeminiKeyGuide stepsOpen />
+              <GeminiKeyGuide stepsOpen apiKey={apiKey} onApiKeyChange={setApiKey} />
               {settings?.has_gemini_key ? (
                 <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4" />

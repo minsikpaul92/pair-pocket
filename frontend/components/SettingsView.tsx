@@ -558,7 +558,7 @@ export default function SettingsView({
                     </p>
                   )}
 
-                  <GeminiKeyGuide />
+                  <GeminiKeyGuide apiKey={apiKey} onApiKeyChange={setApiKey} />
 
                   <form onSubmit={handleSaveKey} className="space-y-3">
                     <div>

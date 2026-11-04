@@ -1,7 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardPaste,
+  ExternalLink,
+  ShieldCheck,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 
 const AI_STUDIO_KEYS_URL = "https://aistudio.google.com/apikey";
@@ -10,21 +18,58 @@ const GEMINI_TERMS_URL = "https://ai.google.dev/gemini-api/terms";
 // Screenshots of Google AI Studio (English UI), one per step, in public/gemini-guide.
 const CARD_KEYS = ["card1", "card2", "card3", "card4", "card5", "card6", "card7"] as const;
 
+// Gemini API keys look like "AIza" followed by 35 characters.
+const GEMINI_KEY_PATTERN = /^AIza[0-9A-Za-z_-]{35}$/;
+
+type KeyInputProps = {
+  apiKey?: string;
+  onApiKeyChange?: (value: string) => void;
+};
+
 /** Swipeable screenshot cards that walk through creating a key in AI Studio. */
-function StepCards() {
+function StepCards({ apiKey = "", onApiKeyChange }: KeyInputProps) {
   const t = useTranslations("geminiGuide");
   const [index, setIndex] = useState(0);
   const touchX = useRef<number | null>(null);
+  const keyInput = useRef<HTMLInputElement>(null);
   const total = CARD_KEYS.length;
   const go = (step: number) => setIndex((i) => Math.min(total - 1, Math.max(0, i + step)));
+  const onKeyCard = index === total - 1 && Boolean(onApiKeyChange);
+
+  // On the last card, a paste anywhere on the page that looks like a Gemini key fills the
+  // key field, so coming back from AI Studio and pasting is enough.
+  useEffect(() => {
+    if (!onKeyCard || !onApiKeyChange) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) return;
+      const text = e.clipboardData?.getData("text").trim() ?? "";
+      if (!GEMINI_KEY_PATTERN.test(text)) return;
+      e.preventDefault();
+      onApiKeyChange(text);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [onKeyCard, onApiKeyChange]);
+
+  async function pasteFromClipboard() {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (text) {
+        onApiKeyChange?.(text);
+        return;
+      }
+    } catch {
+      // Clipboard reading is blocked or unsupported; let the user paste by hand.
+    }
+    keyInput.current?.focus();
+  }
 
   return (
     <div className="space-y-3">
-      {index === 0 && (
-        <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-          {t("stepsIntro")}
-        </p>
-      )}
+      <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+        {t("stepsIntro")}
+      </p>
       <a
         href={AI_STUDIO_KEYS_URL}
         target="_blank"
@@ -46,20 +91,16 @@ function StepCards() {
           if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
         }}
       >
-        <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white">
+        {/* One frame size for every card, sized to the tallest screenshot and capped so the
+            card fits a phone screen; shorter screenshots sit centered with blank space. */}
+        <div className="relative aspect-[750/1120] max-h-[50svh] w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/gemini-guide/step${index + 1}.webp`}
             alt={t("cardAlt", { current: index + 1 })}
-            className="mx-auto block max-h-80 w-auto max-w-full object-contain"
+            className="absolute inset-0 h-full w-full object-contain p-2"
           />
         </div>
-        <p className="min-h-[2.5rem] text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-          <span className="mr-1.5 font-semibold text-blue-600 dark:text-blue-400 tabular-nums">
-            {index + 1}.
-          </span>
-          {t(CARD_KEYS[index])}
-        </p>
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
@@ -83,6 +124,42 @@ function StepCards() {
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
+        <p className="min-h-[4.5rem] text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+          <span className="mr-1.5 font-semibold text-blue-600 dark:text-blue-400 tabular-nums">
+            {index + 1}.
+          </span>
+          {t(CARD_KEYS[index])}
+        </p>
+        {onKeyCard && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <input
+                ref={keyInput}
+                type="password"
+                value={apiKey}
+                onChange={(e) => onApiKeyChange?.(e.target.value.trim())}
+                placeholder={t("keyPlaceholder")}
+                aria-label={t("keyPlaceholder")}
+                autoComplete="off"
+                className="min-w-0 flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={pasteFromClipboard}
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl bg-blue-500 hover:bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+              >
+                <ClipboardPaste className="h-4 w-4" />
+                {t("paste")}
+              </button>
+            </div>
+            {apiKey && (
+              <p className="flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                {t("keyFilled")}
+              </p>
+            )}
+          </div>
+        )}
         <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{t("screensNote")}</p>
       </div>
     </div>
@@ -93,7 +170,11 @@ function StepCards() {
  * Shared Gemini API key guide for onboarding and Settings: a folded notice on
  * what is sent to Google and what works without a key, and how to create one.
  */
-export default function GeminiKeyGuide({ stepsOpen = false }: { stepsOpen?: boolean }) {
+export default function GeminiKeyGuide({
+  stepsOpen = false,
+  apiKey,
+  onApiKeyChange,
+}: { stepsOpen?: boolean } & KeyInputProps) {
   const t = useTranslations("geminiGuide");
 
   return (
@@ -131,7 +212,7 @@ export default function GeminiKeyGuide({ stepsOpen = false }: { stepsOpen?: bool
           <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
         </summary>
         <div className="space-y-3 px-4 pb-4">
-          <StepCards />
+          <StepCards apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
           <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
             {t("freeTier")}
           </p>

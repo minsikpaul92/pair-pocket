@@ -1230,7 +1230,10 @@
     "card4": "If it says No Cloud Projects Available, open that list and press Create project.",
     "card5": "Keep the name and press Create project.",
     "card6": "Press Create key.",
-    "card7": "Press Copy key, then come back here and paste it into the Gemini API key field below.",
+    "card7": "Press Copy key, then come back here and paste it into the field below.",
+    "keyPlaceholder": "Paste the copied key here",
+    "paste": "Paste",
+    "keyFilled": "Key added. Finish below to save it.",
     "cardAlt": "Google AI Studio screen for step {current}",
     "counter": "{current} / {total}",
     "prev": "Back",
@@ -1275,7 +1278,7 @@
     "items": {
       "geminiKeyCards": {
         "title": "Picture guide for the Gemini key",
-        "description": "Getting a Gemini key now shows each Google AI Studio screen with the button to press, including the project step that new accounts need."
+        "description": "Getting a Gemini key now shows each Google AI Studio screen with the button to press, including the project step that new accounts need. You can paste the copied key right on the last screen."
       },
       "geminiKeyGuide": {
         "title": "Clearer Gemini key setup",
