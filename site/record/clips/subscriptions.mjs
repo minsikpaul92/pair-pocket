@@ -2,7 +2,6 @@
 // then $11.99) and a promo end reminder, then see it in Due this month.
 // Recorded on a phone.
 export const account = 'tester3';
-export const crf = '26';
 // A whole form is a lot of steps; play it faster so the clip stays short.
 export const speed = 1.25;
 

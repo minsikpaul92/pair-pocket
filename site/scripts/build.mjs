@@ -46,7 +46,7 @@ function media(id, loc, t, base, ctx) {
   if (c.kind === "image") {
     return `<img class="shot" src="${base}media/${c.file}-poster.webp" width="${c.w}" height="${c.h}" alt="${esc(info.alt)}" loading="lazy" ${ar}>`;
   }
-  return `<video class="shot" muted loop playsinline preload="none" tabindex="-1" disablepictureinpicture disableremoteplayback controlslist="nodownload nofullscreen noremoteplayback" poster="${base}media/${c.file}-poster.webp" width="${c.w}" height="${c.h}" aria-label="${esc(info.alt)}" ${ar}><source src="${base}media/${c.file}.webm" type="video/webm"><source src="${base}media/${c.file}.mp4" type="video/mp4"></video>`;
+  return `<video class="shot${c.h > c.w ? " tall" : ""}" muted loop playsinline preload="none" tabindex="-1" disablepictureinpicture disableremoteplayback controlslist="nodownload nofullscreen noremoteplayback" poster="${base}media/${c.file}-poster.webp" width="${c.w}" height="${c.h}" aria-label="${esc(info.alt)}" ${ar}><source src="${base}media/${c.file}.webm" type="video/webm"><source src="${base}media/${c.file}.mp4" type="video/mp4"></video>`;
 }
 
 function render(loc) {

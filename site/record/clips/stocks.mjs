@@ -2,7 +2,6 @@
 // filter to the Korea brokerage and show its holdings, then the Canada one,
 // then show everything again.
 export const account = 'tester3';
-export const crf = '25'; // budget 450 KB
 
 const button = (page, name) => page.getByRole('button', { name, exact: true });
 // Bottom tab bar on a phone (the sidebar buttons with the same names are hidden).

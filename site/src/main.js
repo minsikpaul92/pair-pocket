@@ -67,6 +67,8 @@
     figs.forEach(function (f) {
       var on = f.getAttribute("data-clip") === id;
       f.classList.toggle("on", on);
+      // A wide (older) clip fills the stage, so the decoration goes behind it.
+      if (on && stage) stage.classList.toggle("wide", !f.querySelector(".tall"));
       var v = f.querySelector("video");
       if (v) { if (on) play(v); else v.pause(); }
     });

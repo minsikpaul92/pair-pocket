@@ -101,22 +101,29 @@ a { color: inherit; text-decoration-thickness: 0.08em; text-underline-offset: 0.
   grid-column: 2; grid-row: 1;
   position: sticky; top: var(--gap); height: calc(100svh - 2 * var(--gap));
   background: var(--accent); border-radius: 40px; overflow: hidden;
+  container-type: size; --sp: clamp(16px, 2vw, 32px);
+}
+/* Size of a phone clip (780x1688): as tall as the stage allows, minus the
+   caption, but narrow enough to leave room beside it for the coins and
+   bubbles. The decoration is placed from these numbers too. */
+.stage > * {
+  --ph: min(100cqh - 2 * var(--sp) - 44px, (100cqw - 2 * var(--sp) - 120px) * 1688 / 780);
+  --pw: calc(var(--ph) * 780 / 1688);
 }
 .stage figure {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; padding: clamp(16px, 2vw, 32px);
+  gap: 12px; padding: var(--sp);
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity 0.9s var(--ease), visibility 0s linear 0.9s;
 }
 .stage figure.on { opacity: 1; visibility: visible; transition-delay: 0s; }
-/* The clip sits above the floating coins and bubbles, which peek out around it
-   (the figure itself is transparent). */
 .stage figure { z-index: 3; }
 .stage figcaption { font-size: var(--step-small); color: var(--accent-ink); font-weight: 600; }
 .stage .ph { background: var(--paper); }
 /* As large as the stage allows: tall (phone) clips fill the height, wide ones the width. */
 .stage .ph { width: 100%; max-height: calc(100% - 40px); border-radius: 20px; }
 .stage .shot { background: var(--paper); width: auto; height: auto; max-width: 100%; max-height: calc(100% - 40px); border-radius: 20px; object-fit: contain; }
+.stage .shot.tall { width: var(--pw); height: var(--ph); max-width: none; max-height: none; }
 /* Clips are pictures, not players: nothing to click, no controls or menus. */
 video.shot { pointer-events: none; user-select: none; -webkit-user-select: none; }
 video.shot::-webkit-media-controls { display: none !important; }
@@ -304,27 +311,30 @@ details.langs div { position: absolute; right: 0; top: 100%; background: var(--p
 }
 
 /* Playful decoration on the stage: coins and speech bubbles, all decorative. */
-.deco { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+/* In front of a phone clip: the coins float beside it and the bubbles overlap
+   its edge a little. Behind a wide (older) clip, which fills the stage. */
+.deco { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.stage.wide .deco { z-index: 2; }
 .coin {
   position: absolute; width: 64px; height: 64px; border-radius: 50%;
   display: grid; place-items: center; font-weight: 700; font-size: 28px;
   background: var(--paper); color: var(--accent);
   animation: bob 5s ease-in-out infinite;
 }
-.c1 { left: 6%; top: 8%; }
-.c2 { right: 8%; top: 12%; width: 52px; height: 52px; font-size: 24px; animation-delay: -1.5s; }
-.c3 { left: 10%; bottom: 10%; width: 48px; height: 48px; font-size: 22px; animation-delay: -3s; }
-.c4 { right: 7%; bottom: 14%; width: 70px; height: 70px; animation-delay: -2.2s; }
+/* Placed from the phone's edges: 50% is the stage centre, --pw the phone width. */
+.c1 { right: calc(50% + var(--pw) / 2 + 4px); top: 10%; }
+.c2 { left: calc(50% + var(--pw) / 2 + 6px); top: 16%; width: 52px; height: 52px; font-size: 24px; animation-delay: -1.5s; }
+.c3 { right: calc(50% + var(--pw) / 2 + 8px); bottom: 12%; width: 48px; height: 48px; font-size: 22px; animation-delay: -3s; }
+.c4 { left: calc(50% + var(--pw) / 2 + 2px); bottom: 18%; width: 70px; height: 70px; animation-delay: -2.2s; }
 .bubble {
   position: absolute; padding: 10px 20px; border-radius: 999px 999px 999px 8px;
   font-weight: 700; font-size: var(--step-body); white-space: nowrap;
   background: var(--paper); color: var(--accent-hover);
   animation: bob 6s ease-in-out infinite;
 }
-/* Bubbles sit in the space beside the phone-sized clips. */
-.b1 { left: 5%; top: 24%; transform: rotate(-5deg); }
-.b2 { right: 5%; top: 40%; border-radius: 999px 999px 8px 999px; background: var(--field); color: var(--ink); animation-delay: -2s; }
-.b3 { left: 6%; bottom: 28%; background: var(--ink); color: var(--paper); animation-delay: -4s; }
+.b1 { right: calc(50% + var(--pw) / 2 - 28px); top: 30%; transform: rotate(-5deg); }
+.b2 { left: calc(50% + var(--pw) / 2 - 28px); top: 46%; border-radius: 999px 999px 8px 999px; background: var(--field); color: var(--ink); animation-delay: -2s; }
+.b3 { right: calc(50% + var(--pw) / 2 - 28px); bottom: 32%; background: var(--ink); color: var(--paper); animation-delay: -4s; }
 @keyframes bob { 0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); } 50% { transform: translateY(-10px) rotate(var(--tilt, 0deg)); } }
 .b1 { --tilt: -5deg; } .b2 { --tilt: 4deg; } .b3 { --tilt: -2deg; }
 @media (prefers-reduced-motion: reduce) { .coin, .bubble { animation: none; } }

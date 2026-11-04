@@ -6,11 +6,12 @@
 // first frame, not recorded) and `play(page, ui)` (the recorded part). The
 // output goes to site/media/<clip>.mp4, .webm and -poster.webp.
 //
-// Frames are captured straight from Chrome (CDP screencast) at high pixel
-// density as high quality JPEGs, then scaled down (phone: 780x1688, desktop:
-// 1280x800) and encoded once. Playwright's own recorder encodes at about 1 Mbps first, which blurs
-// text whenever the screen moves. `--keep-raw` keeps the frames in
-// site/media/raw/<clip>-frames/.
+// Frames are screenshots taken back to back at 2x pixel density (CDP
+// captureScreenshot with an explicit scale), saved as high quality JPEGs and
+// encoded once (phone: 780x1688, desktop: 1280x800). Neither Playwright's own
+// recorder nor the CDP screencast work here: headless Chromium sends their
+// frames at 1x whatever the pixel density, so text came out soft.
+// `--keep-raw` keeps the frames in site/media/raw/<clip>-frames/.
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -22,11 +23,12 @@ import { installOverlay, ui } from './cursor.mjs';
 
 // Clips are recorded on a phone by default: they fit the tall stage on the
 // landing page and the text reads larger. `layout = 'desktop'` opts out.
-// `scale` is the capture density; the output is scaled down to `out`.
-// `poster` is the webp quality that keeps the poster under its 40 KB budget.
+// `capture` is the screenshot density; the output is scaled to `out`.
+// `poster` is the webp quality, `crf` / `webmCrf` the default video quality
+// that keeps a clip in its budget (see scripts/check.mjs); a clip can override.
 const LAYOUTS = {
-  phone: { width: 390, height: 844, scale: 3, out: [780, 1688], touch: true, poster: 70 },
-  desktop: { width: 1280, height: 800, scale: 2, out: [1280, 800], touch: false, poster: 80 },
+  phone: { width: 390, height: 844, capture: 2, out: [780, 1688], touch: true, poster: 70, crf: '28', webmCrf: '40' },
+  desktop: { width: 1280, height: 800, capture: 2, out: [1280, 800], touch: false, poster: 80, crf: '24', webmCrf: '34' },
 };
 const media = (name) => fileURLToPath(new URL(`../media/${name}`, import.meta.url));
 
@@ -41,7 +43,7 @@ if (!flags.includes('--no-reset')) await resetDemo();
 const browser = await chromium.launch();
 const contextOptions = {
   viewport: { width: layout.width, height: layout.height },
-  deviceScaleFactor: layout.scale,
+  deviceScaleFactor: layout.capture,
   isMobile: layout.touch,
   hasTouch: layout.touch,
   colorScheme: 'light',
@@ -69,20 +71,25 @@ const page = await context.newPage();
 await page.goto(`${APP}/en`);
 await clip.setup(page);
 
-// Chrome sends a frame only when the screen changes; each frame keeps its
-// timestamp so still moments last exactly as long as they did live.
+// Screenshots back to back while the clip plays. Each frame keeps the time it
+// was taken, so the video runs at the same pace as it did live.
 const frames = [];
 const cdp = await context.newCDPSession(page);
-cdp.on('Page.screencastFrame', ({ data, metadata, sessionId }) => {
-  cdp.send('Page.screencastFrameAck', { sessionId }).catch(() => {});
-  const file = `${frameDir}/${String(frames.length).padStart(5, '0')}.jpg`;
-  writeFileSync(file, Buffer.from(data, 'base64'));
-  frames.push({ file, t: metadata.timestamp });
-});
-await cdp.send('Page.startScreencast', {
-  format: 'jpeg', quality: 95, everyNthFrame: 1,
-  maxWidth: layout.width * layout.scale, maxHeight: layout.height * layout.scale,
-});
+let capturing = true;
+const capture = (async () => {
+  while (capturing) {
+    // The clip is in page coordinates, so follow the scroll position.
+    const { cssVisualViewport: v } = await cdp.send('Page.getLayoutMetrics');
+    const t = Date.now() / 1000;
+    const { data } = await cdp.send('Page.captureScreenshot', {
+      format: 'jpeg', quality: 92, optimizeForSpeed: true,
+      clip: { x: v.pageX, y: v.pageY, width: layout.width, height: layout.height, scale: layout.capture },
+    });
+    const file = `${frameDir}/${String(frames.length).padStart(5, '0')}.jpg`;
+    writeFileSync(file, Buffer.from(data, 'base64'));
+    frames.push({ file, t });
+  }
+})();
 
 const pointer = ui(page, { touch: layout.touch });
 await pointer.place(...(clip.pointer ?? [layout.width - 10, layout.height / 2]));
@@ -91,7 +98,8 @@ const start = Date.now() / 1000;
 await clip.play(page, pointer);
 const end = Date.now() / 1000;
 await page.waitForTimeout(200);
-await cdp.send('Page.stopScreencast');
+capturing = false;
+await capture;
 await context.close();
 await browser.close();
 
@@ -114,9 +122,9 @@ writeFileSync(list, lines.join('\n'));
 const scale = `scale=${W}:${H}:flags=lanczos`;
 const input = ['-f', 'concat', '-safe', '0', '-i', list, '-an'];
 const run = (...args) => execFileSync(ffmpeg, ['-y', '-loglevel', 'error', ...args]);
-run(...input, '-vf', `fps=30,${scale},format=yuv420p`, '-c:v', 'libx264', '-crf', clip.crf ?? '24',
+run(...input, '-vf', `fps=30,${scale},format=yuv420p`, '-c:v', 'libx264', '-crf', clip.crf ?? layout.crf,
   '-preset', 'veryslow', '-tune', 'animation', '-movflags', '+faststart', media(`${clipId}.mp4`));
-run(...input, '-vf', `fps=30,${scale}`, '-c:v', 'libvpx-vp9', '-crf', clip.webmCrf ?? '34', '-b:v', '0',
+run(...input, '-vf', `fps=30,${scale}`, '-c:v', 'libvpx-vp9', '-crf', clip.webmCrf ?? layout.webmCrf, '-b:v', '0',
   '-row-mt', '1', media(`${clipId}.webm`));
 // Pass a buffer: sharp keeps a file it opened by path locked on Windows.
 await sharp(readFileSync(used[0].file)).resize(W, H, { kernel: 'lanczos3' }).webp({ quality: layout.poster })
