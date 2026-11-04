@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 PRIMARY_MODEL = "gemini-3.5-flash-lite"
 FALLBACK_MODELS = (
-    "gemini-3.6-flash",
+    "gemini-3.8-flash",
     "gemini-3.1-flash-lite",
 )
 MODEL_CHAIN = (PRIMARY_MODEL, *FALLBACK_MODELS)
@@ -640,7 +640,7 @@ async def _generate_with_single_key(
     models, skip_info = build_model_chain(state)
 
     if force_model or retry_count >= 2:
-        target = force_model or "gemini-3.6-flash"
+        target = force_model or "gemini-3.8-flash"
         models = [target, *[m for m in ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite") if m != target]]
         skip_info = None
 

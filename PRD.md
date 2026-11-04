@@ -9,7 +9,7 @@
 * **Design System:** Apple HIG (Refer to `design.md` for details). Maintain an intuitive and minimal UI.
 
 ## 2. Tech Stack
-* **Frontend:** Next.js (App Router), React, Tailwind CSS, Lucide React (Icons), next-intl (i18n), @ducanh2912/next-pwa
+* **Frontend:** Next.js (App Router), React, Tailwind CSS, Lucide React (Icons), next-intl (i18n), Serwist (PWA)
 * **Backend:** FastAPI (Python), Motor (async MongoDB)
 * **Database:** MongoDB (Atlas)
 * **AI & Data Analysis:**

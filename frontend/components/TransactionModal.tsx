@@ -381,7 +381,7 @@ export default function TransactionModal({
     setScanning(true);
     setScanHint(
       nextRetry >= 2
-        ? "⚡ 고성능 AI 모델(gemini-3.6-flash)로 정밀 스캔 중..."
+        ? "⚡ 고성능 AI 모델(gemini-3.8-flash)로 정밀 스캔 중..."
         : tTx("scanning")
     );
     setError(null);
