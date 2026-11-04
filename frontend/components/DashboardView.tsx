@@ -101,7 +101,7 @@ function ListCard({
         {title}
       </h2>
       {isEmpty ? (
-        <p className="mt-3 text-xs text-gray-400">{emptyLabel}</p>
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">{emptyLabel}</p>
       ) : (
         <ul className="mt-2 -mr-1 flex-1 divide-y divide-gray-100 overflow-y-auto pr-1 dark:divide-gray-800">
           {children}
@@ -113,12 +113,12 @@ function ListCard({
 
 function KindIcon({ kind }: { kind: FinancialAccountKind }) {
   if (kind === "credit_card") {
-    return <CreditCard className="h-4 w-4 text-gray-400 shrink-0" />;
+    return <CreditCard className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" />;
   }
   if (kind === "cash") {
-    return <Wallet className="h-4 w-4 text-gray-400 shrink-0" />;
+    return <Wallet className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" />;
   }
-  return <Landmark className="h-4 w-4 text-gray-400 shrink-0" />;
+  return <Landmark className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" />;
 }
 
 export default function DashboardView({
@@ -792,7 +792,7 @@ export default function DashboardView({
                   className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
                     display === c
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                      : "text-gray-500"
+                      : "text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   {c}
@@ -811,7 +811,7 @@ export default function DashboardView({
           {balance ? fmt(balance.amount, balance.currency) : "\u2014"}
         </p>
         {balance?.label && (
-          <p className="mt-1 truncate text-xs text-gray-400">{balance.label}</p>
+          <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{balance.label}</p>
         )}
         {!balance && (
           <button
@@ -856,7 +856,7 @@ export default function DashboardView({
               </p>
             )}
             {budget.skipped && budget.overspend > 0 && (
-              <p className="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+              <p className="mt-1 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
                 {tDashboard("budgetCarrySkipped")}
               </p>
             )}
@@ -884,7 +884,7 @@ export default function DashboardView({
             </div>
             <p
               className={`mt-1 text-[11px] ${
-                overBudget ? "text-red-500" : "text-gray-400"
+                overBudget ? "text-red-500" : "text-gray-500 dark:text-gray-400"
               }`}
             >
               {overBudget
@@ -929,7 +929,7 @@ export default function DashboardView({
               {s.name}
             </p>
             <div className="mt-0.5 flex items-baseline justify-between gap-1 text-[11px]">
-              <span className="text-gray-400">
+              <span className="text-gray-500 dark:text-gray-400">
                 {s.next_due_date ? shortDate(s.next_due_date) : ""}
               </span>
               <span className="font-semibold tabular-nums text-gray-700 dark:text-gray-200">
@@ -952,7 +952,7 @@ export default function DashboardView({
               {tx.merchant || translateCategory(tx.category, tCategories)}
             </p>
             <div className="mt-0.5 flex items-baseline justify-between gap-1 text-[11px]">
-              <span className="text-gray-400">{shortDate(tx.date)}</span>
+              <span className="text-gray-500 dark:text-gray-400">{shortDate(tx.date)}</span>
               <span className="font-semibold tabular-nums text-gray-700 dark:text-gray-200">
                 {fmt(tx.effective_amount ?? tx.amount, tx.currency)}
               </span>
@@ -977,7 +977,7 @@ export default function DashboardView({
                   className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
                     display === c
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                      : "text-gray-500"
+                      : "text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   {c}
@@ -999,7 +999,7 @@ export default function DashboardView({
         </p>
         <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
-            <p className="text-gray-400">{tDashboard("assets")}</p>
+            <p className="text-gray-500 dark:text-gray-400">{tDashboard("assets")}</p>
             <p className="mt-0.5 font-semibold text-blue-500">
               {netWorth
                 ? formatAmount(netWorth.total_assets, heroCurrency)
@@ -1007,7 +1007,7 @@ export default function DashboardView({
             </p>
           </div>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
-            <p className="text-gray-400">{tDashboard("totalLiabilities")}</p>
+            <p className="text-gray-500 dark:text-gray-400">{tDashboard("totalLiabilities")}</p>
             {(() => {
               const liabilities = netWorth?.total_liabilities ?? 0;
               const overpaid = liabilities < 0;
@@ -1121,7 +1121,7 @@ export default function DashboardView({
         </div>
         <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {liabilityAccounts.length === 0 ? (
-            <li className="col-span-full rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-6 text-center text-xs text-gray-400">
+            <li className="col-span-full rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-6 text-center text-xs text-gray-500 dark:text-gray-400">
               {tDashboard("emptyCards")}
             </li>
           ) : (
@@ -1161,7 +1161,7 @@ export default function DashboardView({
                     className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <GripVertical className="h-3.5 w-3.5 text-gray-300 shrink-0 cursor-grab" />
+                      <GripVertical className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400 shrink-0 cursor-grab" />
                       <KindIcon kind={acc.kind} />
                       <p className="text-sm font-medium truncate flex-1 pr-7">
                         {scope === "ALL" &&
@@ -1225,7 +1225,7 @@ export default function DashboardView({
                   className={`flex-1 min-[400px]:flex-none rounded-md px-2 py-1 text-[10px] font-semibold transition-colors whitespace-nowrap ${
                     stockTotalMode === mode
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                      : "text-gray-500"
+                      : "text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   {label}
@@ -1251,7 +1251,7 @@ export default function DashboardView({
         </div>
         <ul className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {orderedStockAccounts.length === 0 ? (
-            <li className="col-span-full rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-6 text-center text-xs text-gray-400">
+            <li className="col-span-full rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-6 text-center text-xs text-gray-500 dark:text-gray-400">
               {tDashboard("emptyBrokers")}
             </li>
           ) : (
@@ -1293,7 +1293,7 @@ export default function DashboardView({
                     >
                       <div className="flex items-center justify-between gap-2 min-w-0">
                         <span className="flex items-center gap-1 min-w-0 text-[11px] font-bold text-gray-700 dark:text-gray-300">
-                          <GripVertical className="h-3 w-3 text-gray-300 shrink-0 cursor-grab" />
+                          <GripVertical className="h-3 w-3 text-gray-500 dark:text-gray-400 shrink-0 cursor-grab" />
                           <span className="truncate">
                             {inst ? `[${inst}] ` : ""}
                             {label}
@@ -1304,14 +1304,14 @@ export default function DashboardView({
                         </span>
                       </div>
                       <div className="mt-2.5 flex items-baseline justify-between gap-2 min-w-0">
-                        <span className="text-[10px] text-gray-400 shrink-0">
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">
                           {tDashboard("stockPlusCash")}
                         </span>
                         <span className="text-base font-black text-gray-900 dark:text-white tabular-nums truncate text-right">
                           {fmt(total, account.currency as Currency)}
                         </span>
                       </div>
-                      <div className="mt-1.5 space-y-0.5 text-[10px] text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
+                      <div className="mt-1.5 space-y-0.5 text-[10px] text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
                         <div className="flex items-center justify-between gap-2 min-w-0">
                           <span className="shrink-0">
                             {tDashboard("stocksLabel")}
@@ -1518,12 +1518,12 @@ function AccountGroup({
               onClick={onAdd}
               className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
             >
-              <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
+              <Wallet className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">
                   {cashPlaceholderLabel}
                 </p>
-                <p className="text-[11px] text-gray-400 truncate">
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                   {kindLabel("cash")}
                 </p>
               </div>
@@ -1555,7 +1555,7 @@ function AccountGroup({
                           : "🇺🇸 ")}
                     {label}
                   </p>
-                  <p className="text-[11px] text-gray-400 truncate">
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                     {kindLabel(acc.kind)}
                   </p>
                   {defaults?.badges}

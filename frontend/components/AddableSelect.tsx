@@ -94,10 +94,10 @@ export default function AddableSelect({
               <span className="truncate">{labelFor(value)}</span>
             </>
           ) : (
-            <span className="text-gray-400">{resolvedPlaceholder}</span>
+            <span className="text-gray-500 dark:text-gray-400">{resolvedPlaceholder}</span>
           )}
         </span>
-        <ChevronDown className={`${iconSizeClass} text-gray-400 shrink-0`} />
+        <ChevronDown className={`${iconSizeClass} text-gray-500 dark:text-gray-400 shrink-0`} />
       </button>
 
       {open && (
@@ -136,7 +136,7 @@ export default function AddableSelect({
                     onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                     placeholder={t("nameInput")}
                     className={`flex-1 bg-gray-50 dark:bg-gray-900 rounded-lg px-2 py-1 ${
-                      compact ? "text-xs" : "text-sm"
+                      compact ? "text-base sm:text-xs" : "text-base sm:text-sm"
                     } focus:ring-2 focus:ring-blue-500 outline-none min-w-0`}
                   />
                   <button

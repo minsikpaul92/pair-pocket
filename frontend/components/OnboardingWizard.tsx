@@ -1441,7 +1441,7 @@ export default function OnboardingWizard() {
     );
   }, [presets]);
   const inputClass =
-    "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm text-gray-900 dark:text-white";
+    "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-base sm:text-sm text-gray-900 dark:text-white";
   // Native/custom selects get extra inset; pull content one step left to match text inputs.
   const selectClass = `${inputClass} appearance-none pl-2`;
   const dropdownClass = `${inputClass} flex items-center justify-between text-left pl-2`;
@@ -1479,7 +1479,7 @@ export default function OnboardingWizard() {
         </header>
 
         {error && (
-          <div className="rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-700 dark:text-red-400">
+          <div className="rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-700 dark:text-red-400" role="alert">
             {error}
           </div>
         )}
@@ -1646,7 +1646,7 @@ export default function OnboardingWizard() {
                     onClick={() =>
                       setAccounts((prev) => prev.filter((x) => x.key !== a.key))
                     }
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
                     aria-label={t("remove")}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -1810,7 +1810,7 @@ export default function OnboardingWizard() {
                       }
                       className={inputClass}
                     />
-                    <p className="text-[10px] text-gray-400 mt-1">
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
                       {t("accountNumberHint")}
                     </p>
                   </OnboardingField>
@@ -1846,7 +1846,7 @@ export default function OnboardingWizard() {
                     />
                   </div>
                   {a.kind === "investment" && (
-                    <p className="text-[10px] text-gray-400 mt-1">
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
                       {t("investmentBalanceHint")}
                     </p>
                   )}
@@ -2073,7 +2073,7 @@ export default function OnboardingWizard() {
                   <button
                     type="button"
                     onClick={() => setSubs((prev) => prev.filter((x) => x.key !== s.key))}
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
                     aria-label={t("remove")}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -2283,7 +2283,7 @@ export default function OnboardingWizard() {
                       );
                       if (current == null) {
                         return (
-                          <p className="mt-1 text-[11px] text-gray-400">
+                          <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                             {t("installmentSyncHint")}
                           </p>
                         );
@@ -2385,7 +2385,7 @@ export default function OnboardingWizard() {
                   }
                 >
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-sm text-gray-500">
+                    <span className="absolute left-3 top-2.5 text-sm text-gray-500 dark:text-gray-400">
                       {currencySymbol(s.currency)}
                     </span>
                     <input
@@ -2486,7 +2486,7 @@ export default function OnboardingWizard() {
                       <div className="grid grid-cols-2 gap-2">
                         <OnboardingField label={t("promoAmount")}>
                           <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-sm text-gray-500">
+                            <span className="absolute left-3 top-2.5 text-sm text-gray-500 dark:text-gray-400">
                               {currencySymbol(s.currency)}
                             </span>
                             <input
@@ -2534,7 +2534,7 @@ export default function OnboardingWizard() {
                             }
                             locale={locale}
                           />
-                          <p className="mt-1 text-[11px] text-gray-400">
+                          <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                             {t("promoEndOptionalHint")}
                           </p>
                         </OnboardingField>
@@ -2709,7 +2709,7 @@ export default function OnboardingWizard() {
                     onClick={() =>
                       setHoldings((prev) => prev.filter((x) => x.key !== h.key))
                     }
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
                     aria-label={t("remove")}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -2822,7 +2822,7 @@ export default function OnboardingWizard() {
                 </div>
                 <OnboardingField label={t("avgPrice")}>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-sm text-gray-500">
+                    <span className="absolute left-3 top-2.5 text-sm text-gray-500 dark:text-gray-400">
                       {currencySymbol(h.currency)}
                     </span>
                     <input

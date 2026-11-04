@@ -44,7 +44,7 @@ export default function SubscriptionOffer({ count, onStart, onDismiss }: Props) 
           type="button"
           onClick={onDismiss}
           aria-label={t("notNow")}
-          className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="shrink-0 rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
         >
           <X className="h-4 w-4" />
         </button>

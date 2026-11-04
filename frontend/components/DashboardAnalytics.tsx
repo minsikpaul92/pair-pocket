@@ -37,38 +37,45 @@ import {
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { addDays, addMonths, dayKey, monthKey, weekStart } from "@/lib/date";
 
-const WEB_PRESET_COLORS = [
-  "#000000", // Black
-  "#808080", // Gray
-  "#C0C0C0", // Silver
-  "#FFFFFF", // White
-  "#FF0000", // Red
-  "#800000", // Maroon
-  "#FFFF00", // Yellow
-  "#808000", // Olive
-  "#00FF00", // Lime
-  "#008000", // Green
-  "#00FFFF", // Aqua / Cyan
-  "#008080", // Teal
-  "#0000FF", // Blue
-  "#000080", // Navy
-  "#FF00FF", // Fuchsia / Magenta
-  "#800080", // Purple
+/**
+ * Category colors are mid-tone system hues: each one is at least 3:1 against
+ * white cards and the gray-800/900 dark cards, so a slice never fades into
+ * either theme. Users pick custom colors from this same set.
+ */
+const CATEGORY_PRESET_COLORS = [
+  "#DC2626", // Red
+  "#E11D48", // Rose
+  "#EA580C", // Orange
+  "#D97706", // Amber
+  "#65A30D", // Lime
+  "#16A34A", // Green
+  "#059669", // Emerald
+  "#0D9488", // Teal
+  "#0891B2", // Cyan
+  "#0284C7", // Sky
+  "#3B82F6", // Blue
+  "#6366F1", // Indigo
+  "#8B5CF6", // Violet
+  "#C026D3", // Fuchsia
+  "#EC4899", // Pink
+  "#64748B", // Slate
 ];
 
+// Listed in an order where every neighbor (and last to first) stays easy to
+// tell apart, including for red-green color blindness.
 const CATEGORY_DEFAULT_COLORS: Record<string, string> = {
-  "식비": "#0000FF",       // Blue
-  "주거/통신": "#808000",  // Olive
-  "교통/차량": "#008080",  // Teal
-  "생활/쇼핑": "#00FFFF",  // Aqua / Cyan
-  "건강/의료": "#FF0000",  // Red
-  "문화/취미": "#800080",  // Purple
-  "경조사/선물": "#800000", // Maroon
-  "투자/저축": "#008000",  // Green
-  "세금": "#808080",       // Gray
-  "교육": "#FFA500",       // Orange
-  "금융/수수료": "#A52A2A", // Brown
-  "이체": "#C0C0C0",       // Silver
+  "세금": "#6366F1",       // Indigo
+  "경조사/선물": "#EA580C", // Orange
+  "교통/차량": "#0891B2",  // Cyan
+  "식비": "#D97706",       // Amber
+  "이체": "#64748B",       // Slate
+  "건강/의료": "#DC2626",  // Red
+  "금융/수수료": "#0D9488", // Teal
+  "문화/취미": "#8B5CF6",  // Violet
+  "투자/저축": "#16A34A",  // Green
+  "주거/통신": "#3B82F6",  // Blue
+  "교육": "#65A30D",       // Lime
+  "생활/쇼핑": "#EC4899",  // Pink
 };
 
 /** Show icon inside pie slice only when the slice is large enough. */
@@ -150,6 +157,7 @@ function PieExpenseTooltip({
   monthTransactions?: Transaction[];
   tCategories?: any;
 }) {
+  const t = useTranslations("dashboard");
   if (!active || !payload?.length) return null;
   const slice = payload[0]?.payload;
   if (!slice) return null;
@@ -169,7 +177,7 @@ function PieExpenseTooltip({
         (tCategories &&
           translateCategory(tx.category, tCategories) === slice.name);
       if (isMatch) {
-        const name = tx.merchant?.trim() || tx.sub_category?.trim() || "기타";
+        const name = tx.merchant?.trim() || tx.sub_category?.trim() || t("otherSpending");
         const amt = effectiveExpenseAmount(tx);
         map[name] = (map[name] || 0) + amt;
         catSum += amt;
@@ -204,8 +212,8 @@ function PieExpenseTooltip({
       </div>
 
       <div className="mt-2.5 border-t border-gray-100 dark:border-gray-800/80 pt-2">
-        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-          주요 사용처
+        <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+          {t("topSpending")}
         </p>
         {topItems.length > 0 ? (
           <div className="space-y-1">
@@ -231,7 +239,7 @@ function PieExpenseTooltip({
       </div>
 
       <div className="mt-2.5 flex items-center justify-between border-t border-gray-100 dark:border-gray-800/80 pt-1.5 text-[10px]">
-        <span className="font-semibold text-gray-400 dark:text-gray-500 tabular-nums">
+        <span className="font-semibold text-gray-500 dark:text-gray-400 tabular-nums">
           {formatAmount(slice.amount, displayCurrency)}
         </span>
         <span className="text-[9px] font-black tracking-widest text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.5 rounded uppercase">
@@ -283,7 +291,7 @@ export function defaultCategoryColor(category: string): string {
   for (let i = 0; i < category.length; i += 1) {
     hash = category.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return WEB_PRESET_COLORS[Math.abs(hash) % WEB_PRESET_COLORS.length];
+  return CATEGORY_PRESET_COLORS[Math.abs(hash) % CATEGORY_PRESET_COLORS.length];
 }
 
 export function isLightColor(hex: string): boolean {
@@ -440,6 +448,7 @@ export default function DashboardAnalytics({
   const t = useTranslations("dashboard");
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
+  const tCommon = useTranslations("common");
 
   const [expenseRange, setExpenseRange] = useState<ExpenseRange>(1);
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() =>
@@ -755,7 +764,7 @@ export default function DashboardAnalytics({
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
                   expenseRange === r
                     ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                    : "text-gray-500"
+                    : "text-gray-500 dark:text-gray-400"
                 }`}
               >
                 {t(periodLabelKey(r))}
@@ -769,7 +778,7 @@ export default function DashboardAnalytics({
             <button
               type="button"
               onClick={() => setSelectedWeekStart((d) => addDays(d, -7))}
-              className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               aria-label={t("previousWeek")}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -782,7 +791,7 @@ export default function DashboardAnalytics({
               type="button"
               onClick={() => setSelectedWeekStart((d) => addDays(d, 7))}
               disabled={isCurrentWeek}
-              className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:hover:bg-transparent"
+              className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:hover:bg-transparent"
               aria-label={t("nextWeek")}
             >
               <ChevronRight className="h-4 w-4" />
@@ -791,7 +800,7 @@ export default function DashboardAnalytics({
         )}
 
         {hiddenCategories.size > 0 && (
-          <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+          <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
             {t("hiddenCategoriesNote", { count: hiddenCategories.size })}
           </p>
         )}
@@ -807,7 +816,7 @@ export default function DashboardAnalytics({
             <div className="relative h-56 w-full flex items-center justify-center">
               {/* Centered Total Summary (z-0 so tooltip floats on top) */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
-                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   {t("expenseMixTotal")}
                 </span>
                 <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums mt-0.5">
@@ -937,13 +946,14 @@ export default function DashboardAnalytics({
                                 <button
                                   type="button"
                                   onClick={() => setActiveColorPicker(null)}
-                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs font-bold"
+                                  aria-label={tCommon("close")}
+                                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-xs font-bold"
                                 >
-                                  ✕
+                                  <X className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
-                                {WEB_PRESET_COLORS.map((color) => (
+                                {CATEGORY_PRESET_COLORS.map((color) => (
                                   <button
                                     key={color}
                                     type="button"
@@ -974,7 +984,7 @@ export default function DashboardAnalytics({
                       <p className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
                         {formatAmount(row.amount, displayCurrency)}
                       </p>
-                      <p className="text-xs tabular-nums text-gray-400 dark:text-gray-500 font-medium">
+                      <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400 font-medium">
                         {row.percent.toFixed(0)}%
                       </p>
                     </div>
@@ -1002,7 +1012,7 @@ export default function DashboardAnalytics({
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
                   trendRange === r
                     ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                    : "text-gray-500"
+                    : "text-gray-500 dark:text-gray-400"
                 }`}
               >
                 {t(periodLabelKey(r))}
@@ -1027,11 +1037,12 @@ export default function DashboardAnalytics({
                 />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 12 }}
-                  className="fill-gray-500"
+                  tick={{ fontSize: 12, fill: "currentColor" }}
+                  className="text-gray-500 dark:text-gray-400"
                 />
                 <YAxis
-                  tick={{ fontSize: 11 }}
+                  tick={{ fontSize: 11, fill: "currentColor" }}
+                  className="text-gray-500 dark:text-gray-400"
                   width={48}
                   tickFormatter={(v: number) =>
                     v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
@@ -1056,14 +1067,16 @@ export default function DashboardAnalytics({
                   )}
                 />
                 <Legend
-                  formatter={(value) =>
-                    value === "income" ? t("income") : t("expense")
-                  }
+                  formatter={(value) => (
+                    <span className="text-gray-700 dark:text-gray-200">
+                      {value === "income" ? t("income") : t("expense")}
+                    </span>
+                  )}
                 />
                 <Bar
                   dataKey="income"
                   name="income"
-                  fill="#22C55E"
+                  fill="#16A34A"
                   radius={[6, 6, 0, 0]}
                   maxBarSize={28}
                 />
@@ -1095,12 +1108,13 @@ export default function DashboardAnalytics({
                 <span className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
                   {translateCategory(popoverCategory, tCategories)}
                 </span>
-                <span className="text-xs text-gray-500 font-medium">소비 내역 (중분류)</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("subCategoryBreakdown")}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setPopoverCategory(null)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg"
+                aria-label={tCommon("close")}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1 rounded-lg"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1108,7 +1122,7 @@ export default function DashboardAnalytics({
 
             <div className="space-y-3">
               {subCategoryGroupMap.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">이번 달 지출 내역이 없습니다.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">{t("noExpenseData")}</p>
               ) : (
                 subCategoryGroupMap.map(({ subCategory, total, txs }) => (
                   <div
@@ -1122,7 +1136,9 @@ export default function DashboardAnalytics({
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-bold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                        {translateSubCategory(subCategory, tSubCategories)} ›
+                        {subCategory === "미분류"
+                          ? t("uncategorized")
+                          : translateSubCategory(subCategory, tSubCategories)} ›
                       </span>
                       <span className="text-xs font-bold tabular-nums text-gray-900 dark:text-white">
                         {formatAmount(total, displayCurrency)}
@@ -1137,7 +1153,7 @@ export default function DashboardAnalytics({
                       ))}
                       {txs.length > 3 && (
                         <li className="text-[10px] text-indigo-500 font-semibold text-right pt-0.5">
-                          외 {txs.length - 3}건 더보기 (클릭)
+                          {t("moreTransactions", { count: txs.length - 3 })}
                         </li>
                       )}
                     </ul>

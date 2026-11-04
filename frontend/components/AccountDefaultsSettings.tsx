@@ -38,7 +38,7 @@ function Segmented<T extends string>({
           className={`flex-1 rounded-md px-3 py-1 text-xs font-semibold transition-colors whitespace-nowrap ${
             value === o.value
               ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-              : "text-gray-500"
+              : "text-gray-500 dark:text-gray-400"
           }`}
         >
           {o.label}
@@ -120,13 +120,13 @@ export default function AccountDefaultsSettings({ accountType, scope }: Props) {
         />
       )}
       {accountType === "shared" && (
-        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">
           {t("accountDefaultsSharedHint")}
         </p>
       )}
 
       {error ? (
-        <p className="text-xs text-red-600 dark:text-red-400">
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
           {t("accountDefaultsLoadError")}
         </p>
       ) : (
@@ -146,7 +146,7 @@ export default function AccountDefaultsSettings({ accountType, scope }: Props) {
                     <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                       {tAccount(`defaultRole.${role}`)}
                     </p>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
                       {t(`accountDefaultsRoleHelp.${role}`)}
                     </p>
                   </div>
@@ -154,7 +154,7 @@ export default function AccountDefaultsSettings({ accountType, scope }: Props) {
                     value={selected}
                     disabled={saving !== null || options.length === 0}
                     onChange={(e) => change(role, e.target.value)}
-                    className="w-40 shrink-0 truncate rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                    className="w-40 shrink-0 truncate rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-base sm:text-sm text-gray-900 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                   >
                     <option value="">
                       {options.length === 0

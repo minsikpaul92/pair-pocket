@@ -11,7 +11,8 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: [
-          "Pretendard",
+          // Pretendard, loaded with next/font in app/[locale]/layout.tsx.
+          "var(--font-pretendard)",
           "-apple-system",
           "BlinkMacSystemFont",
           "system-ui",

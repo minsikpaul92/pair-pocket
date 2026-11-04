@@ -175,12 +175,12 @@ export default function BankPicker({
               <span className="truncate">{value}</span>
             </>
           ) : (
-            <span className="text-gray-400">
+            <span className="text-gray-500 dark:text-gray-400">
               {placeholder ?? t("selectBank")}
             </span>
           )}
         </span>
-        <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+        <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" />
       </button>
 
       {open && (
@@ -188,7 +188,7 @@ export default function BankPicker({
           <ul className="py-1">
             {canadaList.length > 0 && (
               <>
-                <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   Canada
                 </li>
                 {canadaList.map((bank) => (
@@ -216,7 +216,7 @@ export default function BankPicker({
             {koreaList.length > 0 && (
               <>
                 <li
-                  className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 ${
+                  className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 ${
                     canadaList.length > 0
                       ? "border-t border-gray-100 dark:border-gray-700 mt-1 pt-2"
                       : ""
@@ -248,7 +248,7 @@ export default function BankPicker({
 
             {customs.length > 0 && (
               <>
-                <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 border-t border-gray-100 dark:border-gray-700 mt-1 pt-2">
+                <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 mt-1 pt-2">
                   {t("customBanks")}
                 </li>
                 {customs.map((name) => (
@@ -269,7 +269,7 @@ export default function BankPicker({
                         type="button"
                         onClick={(e) => handleRemove(name, e)}
                         disabled={busy}
-                        className="p-2 text-gray-400 hover:text-red-500 shrink-0"
+                        className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500 shrink-0"
                         aria-label={tCommon("delete")}
                       >
                         <Minus className="h-4 w-4" />
@@ -295,7 +295,7 @@ export default function BankPicker({
                     }
                   }}
                   placeholder={t("addBankPlaceholder")}
-                  className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-2.5 py-1.5 text-sm text-gray-900 dark:text-white"
+                  className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-2.5 py-1.5 text-base sm:text-sm text-gray-900 dark:text-white"
                 />
                 <button
                   type="button"

@@ -98,7 +98,7 @@ export default function AccountSelect({
         className={triggerClass}
       >
         <span className="truncate">{triggerLabel}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+        <ChevronDown className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
       </button>
 
       {open && (
@@ -114,7 +114,7 @@ export default function AccountSelect({
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
+                  <Wallet className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" />
                   <span className="flex-1">{t("noneCashLong")}</span>
                   {value === ACCOUNT_NONE && (
                     <Check className="h-4 w-4 text-blue-500 shrink-0" />
@@ -136,7 +136,7 @@ export default function AccountSelect({
                     <p className="text-sm font-medium truncate">
                       {accountLabel(acc)}
                     </p>
-                    <p className="text-[11px] text-gray-400 truncate">
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                       {formatAccountDetail(acc)}
                     </p>
                   </div>
@@ -147,7 +147,7 @@ export default function AccountSelect({
               </li>
             ))}
             {visible.length === 0 && (
-              <li className="px-3 py-2 text-sm text-gray-400">
+              <li className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
                 {t("noAccounts")}
               </li>
             )}

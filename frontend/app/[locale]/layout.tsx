@@ -1,5 +1,6 @@
 import { SerwistProvider } from "@serwist/turbopack/react";
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
 import {
   getMessages,
@@ -10,6 +11,15 @@ import { notFound } from "next/navigation";
 
 import { routing, type AppLocale } from "@/i18n/routing";
 import "../globals.css";
+
+// Pretendard Variable 1.3.9 (SIL OFL 1.1, see app/fonts/Pretendard-LICENSE.txt),
+// served from our own origin. tailwind.config.ts uses it for font-sans.
+const pretendard = localFont({
+  src: "../fonts/PretendardVariable.woff2",
+  weight: "45 920",
+  display: "swap",
+  variable: "--font-pretendard",
+});
 
 type Props = {
   children: React.ReactNode;
@@ -53,8 +63,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f9fafb" },
@@ -73,7 +81,7 @@ export default async function LocaleLayout({ children, params }: Props) {
   const messages = await getMessages();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang={locale} className={pretendard.variable} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
