@@ -8,7 +8,7 @@
     "components/MerchantSelect.tsx": 6,
     "components/OnboardingWizard.tsx": 22,
     "components/StocksView.tsx": 2,
-    "components/SubscriptionRegisterModal.tsx": 35,
+    "components/SubscriptionRegisterModal.tsx": 9,
     "components/TransactionModal.tsx": 66,
     "lib/api.ts": 37,
     "lib/banks.ts": 51,

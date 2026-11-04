@@ -625,7 +625,19 @@
     "skipConfirm": "Skip \"{name}\" on {date}? No expense will be recorded.",
     "aiFilled": "Filled from screenshots. Review and save.",
     "aiFilledMany": "Found {count} items. Filled the first — save, then add the rest.",
-    "aiEmpty": "No subscriptions found. Try different screenshots."
+    "aiEmpty": "No subscriptions found. Try different screenshots.",
+    "typeLabel": "Type",
+    "dayOfMonthLabel": "Payment day",
+    "dayOfMonthBefore": "Every month on day",
+    "dayOfMonthAfter": "",
+    "dayOfMonthLast": "(last day)",
+    "dayOfMonthHint": "Pick a day from 1 to 31. 31 means the last day of each month.",
+    "intervalLabel": "Repeat every (days)",
+    "intervalAfter": "days",
+    "intervalHint": "The charge or transfer repeats every this many days (7 is weekly, 14 is every two weeks).",
+    "every30Days": "Every 30 days",
+    "startDate": "Start date",
+    "nextDuePreview": "✨ Next payment"
   },
   "errors": {
     "generic": "Something went wrong.",
@@ -1301,6 +1313,10 @@
   },
   "whatsNew": {
     "items": {
+      "fixedExpenseEnglishText": {
+        "title": "Fixed expense form in English",
+        "description": "Adding or editing a fixed expense no longer shows Korean labels when the app is in English. The type, billing cycle, payment day and start date are all in your language now."
+      },
       "countrySettings": {
         "title": "Turn Korea on or off in Settings",
         "description": "Settings now has a Countries section where you can show or hide your Korean ledger without changing the app language. Turning Korea off only hides it, so nothing is deleted."
