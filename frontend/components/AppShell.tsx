@@ -86,7 +86,7 @@ import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 import { hasUnseenWhatsNew } from "@/lib/whats-new";
 import {
-  countriesForLocales,
+  enabledCountriesFromSettings,
   ledgerScopesForCountries,
 } from "@/lib/locale-countries";
 
@@ -513,7 +513,7 @@ export default function AppShell({ user, onLogout }: Props) {
     fetchUserSettings()
       .then((s) => {
         if (!active) return;
-        const countries = countriesForLocales(preferredLocalesList(s));
+        const countries = enabledCountriesFromSettings(s);
         const scopes = ledgerScopesForCountries(countries);
         setEnabledScopes(scopes);
         setTaxPercent(salesTaxPercent(s.sales_tax_province));

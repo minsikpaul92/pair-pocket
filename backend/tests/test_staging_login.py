@@ -276,6 +276,8 @@ def test_demo_preset_fills_both_couples_in_their_language(env):
                 env.db.user_settings.find_one({"owner_id": str(users[account]["_id"])})
             )
             assert settings["onboarding_personal_completed"] is True
+            # The demo has a Korean account, so Korea is on in both languages.
+            assert settings["enabled_countries"] == ["CA", "KR"]
 
     def account_names(account: str) -> dict[str, dict]:
         docs = run(

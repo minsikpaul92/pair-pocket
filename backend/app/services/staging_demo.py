@@ -161,6 +161,12 @@ async def seed_couple(db: AsyncIOMotorDatabase, users: list[UserOut], locale: st
 
     korean = locale == "ko"
     people = {"a": users[0], "b": users[1], "shared": users[0]}
+    # The demo has a Korean account, so both countries are on whatever the
+    # language, and the Canada / Korea / All toggle shows.
+    for user in users:
+        await db["user_settings"].update_one(
+            {"owner_id": user.id}, {"$set": {"enabled_countries": ["CA", "KR"]}}
+        )
     accounts: dict[str, dict] = {}
     for key, owner, kind, currency, country, institution, opening, en, ko in DEMO_ACCOUNTS:
         accounts[key] = await create_account(

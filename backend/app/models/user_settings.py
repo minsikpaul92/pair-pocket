@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.models.account import AccountCountry
+
 
 class CustomCategoryMap(BaseModel):
     """User-added categories: { category_name: [sub_category, ...] }."""
@@ -24,6 +26,14 @@ CanadaProvince = Literal[
 ]
 DEFAULT_SALES_TAX_PROVINCE = "ON"
 
+# Countries whose ledgers a user can turn on, in display order. Adding a
+# country to AccountCountry makes it selectable here. The home country is
+# always on.
+COUNTRY_ORDER: tuple[str, ...] = tuple(country.value for country in AccountCountry)
+HOME_COUNTRY = AccountCountry.CA.value
+# UI languages that turned a country on before countries were stored.
+LEGACY_LOCALE_COUNTRIES: dict[str, str] = {"ko": AccountCountry.KR.value}
+
 
 class UserSettingsBase(BaseModel):
     merchants: list[str] = Field(default_factory=list)
@@ -36,6 +46,11 @@ class UserSettingsBase(BaseModel):
     share_gemini_api_key: bool = False
     preferred_locale: str | None = None
     preferred_locales: list[str] = Field(default_factory=list)
+    # Countries whose ledgers are shown. Stored once the user (or onboarding)
+    # picks them; older documents fall back to the language list.
+    enabled_countries: list[AccountCountry] = Field(
+        default_factory=lambda: [AccountCountry(HOME_COUNTRY)]
+    )
     ledger_start_date: str | None = None
     shared_ledger_start_date: str | None = None
     onboarding_personal_completed: bool = False
@@ -86,6 +101,13 @@ class ExpenseRatioHiddenCategoriesBody(BaseModel):
 
 class SalesTaxProvinceBody(BaseModel):
     province: CanadaProvince
+
+
+class EnabledCountriesBody(BaseModel):
+    """Countries to show. The home country must be included; turning another
+    off only hides its ledger, nothing is deleted."""
+
+    countries: list[AccountCountry] = Field(min_length=1, max_length=len(AccountCountry))
 
 
 class AddInstitutionBody(BaseModel):
