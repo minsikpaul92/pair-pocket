@@ -2,27 +2,23 @@ const createNextIntlPlugin = require("next-intl/plugin");
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
-/** @type {import('next').NextConfig} */
-const withPWA = require("@ducanh2912/next-pwa").default({
-  dest: "public",
-  register: true,
-  // Disable PWA in development and on Vercel until Edge middleware is stable.
-  // (next-pwa + middleware has caused MIDDLEWARE_INVOCATION_FAILED on some deploys.)
-  disable:
-    process.env.NODE_ENV === "development" || Boolean(process.env.VERCEL),
-  workboxOptions: {
-    skipWaiting: true,
-    clientsClaim: true,
-  },
-});
+const { withSerwist } = require("@serwist/turbopack");
+
+// Service worker (Serwist, see app/sw.ts) stays off in development and on
+// Vercel, as it was with next-pwa. (next-pwa + middleware once caused
+// MIDDLEWARE_INVOCATION_FAILED on some Vercel deploys.)
+const pwaEnabled =
+  process.env.NODE_ENV !== "development" && !process.env.VERCEL;
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   env: {
     // Identifies this deploy so open apps can tell a newer one is available.
     NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA || "dev",
+    NEXT_PUBLIC_PWA_ENABLED: pwaEnabled ? "true" : "false",
   },
   async rewrites() {
     // The API is on another site, where browsers block its cookies. Proxying
@@ -56,13 +52,6 @@ const nextConfig = {
       },
     ];
   },
-  webpack: (config, { dev }) => {
-    // Avoid corrupted on-disk webpack cache when disk space is low (ENOSPC).
-    if (dev) {
-      config.cache = { type: "memory" };
-    }
-    return config;
-  },
 };
 
-module.exports = withNextIntl(withPWA(nextConfig));
+module.exports = withNextIntl(withSerwist(nextConfig));
