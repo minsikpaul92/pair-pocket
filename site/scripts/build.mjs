@@ -149,7 +149,7 @@ function render(loc) {
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
 for (const f of readdirSync(join(root, "src"))) if (f !== "index.template.html") cpSync(join(root, "src", f), join(dist, f), { recursive: true });
-cpSync(join(root, "media"), join(dist, "media"), { recursive: true, filter: (p) => !p.endsWith("clips.json") && !p.endsWith(".md") });
+cpSync(join(root, "media"), join(dist, "media"), { recursive: true, filter: (p) => !p.endsWith("clips.json") && !p.endsWith(".md") && !/[\\/]raw([\\/]|$)/.test(p) });
 if (existsSync(join(root, "og"))) for (const f of readdirSync(join(root, "og"))) cpSync(join(root, "og", f), join(dist, f));
 
 for (const loc of locales) render(loc);

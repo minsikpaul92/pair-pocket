@@ -13,6 +13,7 @@ from calendar import monthrange
 from datetime import date, datetime
 from math import ceil
 
+from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.account import AccountCountry, FinancialAccountKind
@@ -64,7 +65,18 @@ DEMO_ACCOUNTS = (
         "Wealthsimple TFSA",
     ),
     ("a_kiwoom", "a", INVESTMENT, "KRW", "KR", "Kiwoom", 320000.0, "Kiwoom Securities", "키움증권"),
+    ("a_kb", "a", CHECKING, "KRW", "KR", "KB Kookmin", 1850000.0, "KB Chequing", "KB국민 입출금"),
 )
+
+# Display names for the two partners, by couple language (Tester N on the
+# sign-in page stays as it is).
+DEMO_PEOPLE = {"en": ("Alex Morgan", "Jamie Lee"), "ko": ("김민준", "이서연")}
+
+# Monthly budgets: { ledger: { currency: amount } }, the same for both partners.
+DEMO_BUDGETS = {
+    "personal": {"CAD": 1200.0, "KRW": 300000.0},
+    "shared": {"CAD": 3500.0},
+}
 
 # Holdings: (account key, ticker, shares, average price, name in English,
 # name in Korean). Prices are in the brokerage's currency. Average costs sit
@@ -90,7 +102,8 @@ DEMO_HOLDINGS = (
 DINNER_MERCHANT = {"en": "Dinner with friends", "ko": "친구들과 저녁 식사"}
 
 # Entries: (entered by, account key, day, type, category, sub-category,
-# amount in CAD, merchant in English, merchant in Korean). Days are laid out
+# amount in the account's currency, merchant in English, merchant in Korean).
+# The KB entries are a visit home to Korea in KRW. Days are laid out
 # over a 28-day month and squeezed into the days passed so far (_passed).
 # Entries on the shared account are in the shared ledger.
 DEMO_ENTRIES = (
@@ -109,6 +122,10 @@ DEMO_ENTRIES = (
     ("b", "b_visa", 12, EXPENSE, "교통/차량", "택시/우버", 18.75, "Uber", "우버"),
     ("b", "b_visa", 15, EXPENSE, "문화/취미", "문화 생활", 28.0, "Cineplex", "시네플렉스"),
     ("b", "b_visa", 22, EXPENSE, "건강/의료", "병원/약국", 23.6, "Shoppers Drug Mart", "쇼퍼스 드러그마트"),
+    ("a", "a_kb", 6, EXPENSE, "교통/차량", "택시/우버", 15000.0, "Kakao T", "카카오T"),
+    ("a", "a_kb", 9, EXPENSE, "식비", "외식/배달", 24000.0, "Kyochon Chicken", "교촌치킨"),
+    ("a", "a_kb", 14, EXPENSE, "생활/쇼핑", "미용/뷰티", 38000.0, "Olive Young", "올리브영"),
+    ("a", "a_kb", 20, EXPENSE, "생활/쇼핑", "생필품", 12500.0, "Daiso", "다이소"),
     ("a", "shared_chequing", 3, EXPENSE, "식비", "식재료/장보기", 186.42, "Costco", "코스트코"),
     ("b", "shared_chequing", 6, EXPENSE, "주거/통신", "관리비/공과금", 96.3, "Toronto Hydro", "토론토 하이드로"),
     ("a", "shared_chequing", 8, EXPENSE, "주거/통신", "인터넷", 85.0, "Rogers Internet", "로저스 인터넷"),
@@ -163,9 +180,11 @@ async def seed_couple(db: AsyncIOMotorDatabase, users: list[UserOut], locale: st
     people = {"a": users[0], "b": users[1], "shared": users[0]}
     # The demo has a Korean account, so both countries are on whatever the
     # language, and the Canada / Korea / All toggle shows.
-    for user in users:
+    for user, name in zip(users, DEMO_PEOPLE[locale]):
+        await db["users"].update_one({"_id": ObjectId(user.id)}, {"$set": {"name": name}})
         await db["user_settings"].update_one(
-            {"owner_id": user.id}, {"$set": {"enabled_countries": ["CA", "KR"]}}
+            {"owner_id": user.id},
+            {"$set": {"enabled_countries": ["CA", "KR"], "budgets": DEMO_BUDGETS}},
         )
     accounts: dict[str, dict] = {}
     for key, owner, kind, currency, country, institution, opening, en, ko in DEMO_ACCOUNTS:
@@ -211,7 +230,7 @@ async def seed_couple(db: AsyncIOMotorDatabase, users: list[UserOut], locale: st
             TransactionCreate(
                 date=_passed(day),
                 amount=amount,
-                currency=Currency.CAD,
+                currency=Currency(accounts[key]["currency"]),
                 type=tx_type,
                 account_type=ledger(key),
                 category=category,
