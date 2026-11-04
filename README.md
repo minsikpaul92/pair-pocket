@@ -63,7 +63,7 @@ You do not need a partner or a second currency to use it. A solo user gets a ful
 
 ```mermaid
 flowchart LR
-  Browser["Browser / installed PWA"] --> Web["Next.js 15 on Vercel"]
+  Browser["Browser / installed PWA"] --> Web["Next.js 16 on Vercel"]
   Web -- "API calls and /api/auth/* proxy (first-party cookie)" --> API["FastAPI on Heroku"]
   API --> DB[("MongoDB Atlas")]
   API --> Gemini["Google Gemini (user's own key)"]
@@ -73,7 +73,7 @@ flowchart LR
 
 | Layer | Stack |
 | --- | --- |
-| Frontend | Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS, next-intl, PWA via `@ducanh2912/next-pwa` |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, next-intl, PWA via Serwist (`@serwist/turbopack`) |
 | Backend | FastAPI, Pydantic, Motor (async MongoDB driver), Authlib, PyJWT |
 | Data | MongoDB Atlas |
 | AI | Google Gemini with a model fallback chain, using each user's own API key |

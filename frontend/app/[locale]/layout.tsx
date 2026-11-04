@@ -1,3 +1,4 @@
+import { SerwistProvider } from "@serwist/turbopack/react";
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import {
@@ -81,9 +82,14 @@ export default async function LocaleLayout({ children, params }: Props) {
         />
       </head>
       <body className="font-sans antialiased">
-        <NextIntlClientProvider messages={messages}>
-          {children}
-        </NextIntlClientProvider>
+        <SerwistProvider
+          swUrl="/serwist/sw.js"
+          disable={process.env.NEXT_PUBLIC_PWA_ENABLED !== "true"}
+        >
+          <NextIntlClientProvider messages={messages}>
+            {children}
+          </NextIntlClientProvider>
+        </SerwistProvider>
       </body>
     </html>
   );
