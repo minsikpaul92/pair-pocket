@@ -333,7 +333,7 @@ export default function OnboardingScreenshotScan({
         <button
           type="button"
           onClick={clearQueue}
-          className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-500"
+          className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
         >
           <Trash2 className="h-3 w-3" />
           {t("aiClearQueue")}
@@ -344,7 +344,7 @@ export default function OnboardingScreenshotScan({
         <p className="text-xs text-blue-600 dark:text-blue-400">{status}</p>
       )}
       {error && (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">{error}</p>
       )}
     </div>
   );

@@ -16,6 +16,7 @@ import {
   CalendarDays,
   Coffee,
   Languages,
+  Globe,
   Receipt,
   RefreshCw,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import {
   updateLedgerStartDate,
   resetUserData,
   updateActiveLocale,
+  updateEnabledCountries,
   ResetScope,
   ResetAccountType,
   AccountType,
@@ -52,6 +54,12 @@ import {
   salesTaxPercent,
 } from "@/lib/canada-tax";
 import { dayKey } from "@/lib/date";
+import type { BankCountry } from "@/lib/banks";
+import {
+  COUNTRIES,
+  HOME_COUNTRY,
+  enabledCountriesFromSettings,
+} from "@/lib/locale-countries";
 import { BUY_ME_A_COFFEE_URL } from "@/lib/links";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { LOCALE_OPTIONS, type AppLocale } from "@/i18n/locales";
@@ -178,6 +186,28 @@ export default function SettingsView({
       setProvinceError(true);
     } finally {
       setSavingProvince(false);
+    }
+  }
+
+  const [savingCountries, setSavingCountries] = useState(false);
+  const [countriesError, setCountriesError] = useState(false);
+  const enabledCountries = enabledCountriesFromSettings(settings);
+
+  // Turning a country off only hides its ledger; its accounts and entries stay.
+  async function toggleCountry(code: BankCountry) {
+    if (savingCountries || !settings || code === HOME_COUNTRY) return;
+    const next = enabledCountries.includes(code)
+      ? enabledCountries.filter((c) => c !== code)
+      : [...enabledCountries, code];
+    setSavingCountries(true);
+    setCountriesError(false);
+    try {
+      setSettings(await updateEnabledCountries(next));
+      onChanged();
+    } catch {
+      setCountriesError(true);
+    } finally {
+      setSavingCountries(false);
     }
   }
 
@@ -399,7 +429,7 @@ export default function SettingsView({
           className={`flex-1 shrink-0 whitespace-nowrap rounded-lg px-2 py-2 text-[13px] font-semibold sm:px-3 sm:text-sm transition-colors ${
             tab === k
               ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white"
-              : "text-gray-500"
+              : "text-gray-500 dark:text-gray-400"
           }`}
         >
           {t(TAB_LABEL_KEYS[k])}
@@ -521,7 +551,7 @@ export default function SettingsView({
                     })}
                   </p>
                   {provinceError && (
-                    <p className="text-xs text-red-500">{t("salesTaxError")}</p>
+                    <p className="text-xs text-red-500" role="alert">{t("salesTaxError")}</p>
                   )}
                 </section>
                 <section className="card-inset p-5 space-y-4">
@@ -575,7 +605,7 @@ export default function SettingsView({
                         {t("apiKeyLabel")}
                       </label>
                       <div className="relative">
-                        <Key className="absolute left-3 top-2.5 h-4.5 w-4.5 text-gray-400" />
+                        <Key className="absolute left-3 top-2.5 h-4.5 w-4.5 text-gray-500 dark:text-gray-400" />
                         <input
                           type="password"
                           value={apiKey}
@@ -585,7 +615,7 @@ export default function SettingsView({
                               ? "••••••••••••••••••••••••••••"
                               : t("apiKeyPlaceholder")
                           }
-                          className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 pl-10 pr-3.5 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
+                          className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 pl-10 pr-3.5 text-base sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
                           required
                         />
                       </div>
@@ -702,7 +732,7 @@ export default function SettingsView({
 
                   {(onInvite || onLogout) && (
                     <div className="border-t border-gray-100 dark:border-gray-800 pt-1 mt-1">
-                      <p className="pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                      <p className="pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         {t("accountSection")}
                       </p>
                       {onInvite && (
@@ -768,11 +798,72 @@ export default function SettingsView({
                 </section>
                 <section className="card-inset p-5 space-y-3">
                   <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <Globe className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("countriesTitle")}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("countriesHelp")}
+                  </p>
+                  <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {COUNTRIES.map(({ code }) => {
+                      const isHome = code === HOME_COUNTRY;
+                      const on = isHome || enabledCountries.includes(code);
+                      return (
+                        <div
+                          key={code}
+                          className="flex items-center justify-between gap-3 py-2.5"
+                        >
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                              {t(`countryList.${code}.name`)}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {isHome
+                                ? t("countryAlwaysOn")
+                                : t(`countryList.${code}.hint`)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={on}
+                            aria-label={t(`countryList.${code}.name`)}
+                            onClick={() => void toggleCountry(code)}
+                            disabled={isHome || !settings || savingCountries}
+                            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60 ${
+                              on ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
+                            }`}
+                          >
+                            <span
+                              className={`absolute top-0.5 left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform ${
+                                on ? "translate-x-5" : "translate-x-0"
+                              }`}
+                            >
+                              {savingCountries && !isHome && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                              )}
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("countriesKeepData")}
+                  </p>
+                  {countriesError && (
+                    <p className="text-xs text-red-500">{t("countriesError")}</p>
+                  )}
+                </section>
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
                     <RefreshCw className="h-5 w-5 text-blue-500" />
                     <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                       {t("updateTitle")}
                     </h2>
-                    <span className="ml-auto text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
+                    <span className="ml-auto text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
                       v{WHATS_NEW[0].version}
                     </span>
                   </div>
@@ -968,7 +1059,7 @@ export default function SettingsView({
                     value={resetConfirmText}
                     onChange={(e) => setResetConfirmText(e.target.value)}
                     placeholder={resetPhrase}
-                    className="w-full rounded-xl border-0 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full rounded-xl border-0 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-base sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                 </div>
 

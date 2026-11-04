@@ -87,7 +87,7 @@ function SortableCard({
         onKeyDown={onKeyDown}
         aria-label={handleLabel}
         title={handleLabel}
-        className="absolute -right-2 -top-2 z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm hover:text-gray-600 active:cursor-grabbing dark:border-gray-700 dark:bg-gray-900"
+        className="absolute -right-2 -top-2 z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 dark:text-gray-400 shadow-sm hover:text-gray-700 dark:hover:text-gray-200 active:cursor-grabbing dark:border-gray-700 dark:bg-gray-900"
       >
         <GripVertical className="h-3.5 w-3.5" />
       </button>
@@ -96,7 +96,7 @@ function SortableCard({
         onClick={() => onToggleSize(item.id)}
         aria-label={sizeLabel}
         title={sizeLabel}
-        className="absolute -top-2 right-5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm hover:text-gray-600 dark:border-gray-700 dark:bg-gray-900"
+        className="absolute -top-2 right-5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 dark:text-gray-400 shadow-sm hover:text-gray-700 dark:hover:text-gray-200 dark:border-gray-700 dark:bg-gray-900"
       >
         {item.half ? (
           <Maximize2 className="h-3 w-3" />

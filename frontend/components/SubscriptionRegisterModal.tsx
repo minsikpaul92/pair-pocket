@@ -2,7 +2,7 @@
 
 import { Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
 import AccountSelect, { ACCOUNT_NONE } from "@/components/AccountSelect";
@@ -44,6 +44,7 @@ import {
 } from "@/lib/api";
 import { dayKey, parseDate } from "@/lib/date";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 import { translateError } from "@/lib/errors";
 import {
   formatSubscriptionDate,
@@ -90,6 +91,7 @@ export default function SubscriptionRegisterModal({
   const tTx = useTranslations("transaction");
   const tErrors = useTranslations("errors");
   const tAccountType = useTranslations("accountType");
+  const titleId = useId();
   const locale = useLocale();
 
   const isEditing = Boolean(editing);
@@ -187,13 +189,7 @@ export default function SubscriptionRegisterModal({
     setNextDueDate(dayKey(candidate));
   }, []);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   useEffect(() => {
     if (!editing) return;
@@ -537,12 +533,15 @@ export default function SubscriptionRegisterModal({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">
+            <h2 id={titleId} className="text-xl font-bold tracking-tight">
               {isEditing ? t("editTitle") : t("registerTitle")}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -553,7 +552,7 @@ export default function SubscriptionRegisterModal({
             type="button"
             onClick={onClose}
             aria-label={tCommon("close")}
-            className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -676,7 +675,7 @@ export default function SubscriptionRegisterModal({
                     className={`flex-1 rounded-lg px-2 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                       selected
                         ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400 font-bold"
-                        : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                     }`}
                   >
                     {item.label}
@@ -741,7 +740,7 @@ export default function SubscriptionRegisterModal({
                   onChange={(d) => setInstallmentStartDate(dayKey(d))}
                   locale={locale}
                 />
-                <p className="mt-1 text-[11px] text-gray-400">
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                   {t("installmentStartHint")}
                 </p>
               </div>
@@ -786,7 +785,7 @@ export default function SubscriptionRegisterModal({
                   placeholder={String(autoCompletedInstallments)}
                   className="input-field"
                 />
-                <p className="mt-1 text-[11px] text-gray-400">
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                   {t("completedAutoHint", { count: autoCompletedInstallments })}
                 </p>
               </div>
@@ -821,7 +820,7 @@ export default function SubscriptionRegisterModal({
                       일 결제 {dayOfMonth === 31 && "(말일)"}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-gray-400">
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                     1~31일 중 지정할 수 있으며, 31일은 해당 월의 말일로 자동 처리됩니다.
                   </p>
                 </div>
@@ -845,7 +844,7 @@ export default function SubscriptionRegisterModal({
                       일 마다 자동 반복
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-gray-400">
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                     설정한 일수마다 자동으로 결제 및 계좌 이체가 반복됩니다 (예: 7일 = 매주, 14일 = 격주)
                   </p>
                   <div className="flex gap-1.5 mt-2">
@@ -1087,7 +1086,7 @@ export default function SubscriptionRegisterModal({
                     {t("endReminder")}
                   </p>
                   {userEmail && (
-                    <p className="text-[11px] text-gray-400 truncate">
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                       {t("emailTo", { email: userEmail })}
                     </p>
                   )}
@@ -1116,7 +1115,7 @@ export default function SubscriptionRegisterModal({
                 placeholder="0"
                 className="input-field pr-14 text-lg font-semibold"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 dark:text-gray-400">
                 {currency}
               </span>
             </div>
@@ -1163,7 +1162,7 @@ export default function SubscriptionRegisterModal({
                     placeholder="0"
                     className="input-field pr-14"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 dark:text-gray-400">
                     {currency}
                   </span>
                 </div>
@@ -1182,7 +1181,7 @@ export default function SubscriptionRegisterModal({
                   }}
                   locale={locale}
                 />
-                <p className="mt-1 text-[11px] text-gray-400">
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                   {t("promoEndHint")}
                 </p>
               </div>
@@ -1209,7 +1208,7 @@ export default function SubscriptionRegisterModal({
                     </p>
                   )}
                   {!promoEndDate && (
-                    <p className="text-[11px] text-gray-400 truncate">
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                       {t("promoReminderNeedsEnd")}
                     </p>
                   )}
@@ -1225,7 +1224,7 @@ export default function SubscriptionRegisterModal({
             </>
           )}
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-red-500" role="alert">{error}</p>}
 
           <div className="flex gap-2">
             {isEditing && (

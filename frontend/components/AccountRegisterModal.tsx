@@ -2,7 +2,7 @@
 
 import { Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import BankPicker from "@/components/BankPicker";
 import OnboardingScreenshotScan from "@/components/OnboardingScreenshotScan";
@@ -30,6 +30,7 @@ import {
 } from "@/lib/api";
 import type { BankCountry } from "@/lib/banks";
 import { translateError } from "@/lib/errors";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 interface Props {
   currency: Currency;
@@ -71,6 +72,8 @@ export default function AccountRegisterModal({
   const tKinds = useTranslations("accountKinds");
   const tCommon = useTranslations("common");
   const tErrors = useTranslations("errors");
+  const titleId = useId();
+  useEscapeKey(onClose);
 
   const [name, setName] = useState(account?.name ?? "");
   const [nickname, setNickname] = useState(account?.nickname ?? "");
@@ -251,12 +254,15 @@ export default function AccountRegisterModal({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[90dvh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold tracking-tight">
+            <h3 id={titleId} className="text-lg font-bold tracking-tight">
               {isEdit ? t("editTitle") : t("registerTitle")}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -271,7 +277,7 @@ export default function AccountRegisterModal({
             type="button"
             onClick={onClose}
             aria-label={tCommon("close")}
-            className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -319,7 +325,7 @@ export default function AccountRegisterModal({
               placeholder={t("nicknamePlaceholder")}
               className="input-field"
             />
-            <p className="mt-1 text-[10px] text-gray-400">
+            <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
               {t("nicknameHint")}
             </p>
           </div>
@@ -332,7 +338,7 @@ export default function AccountRegisterModal({
               <select
                 value={selectedCurrency}
                 onChange={(e) => setSelectedCurrency(e.target.value as Currency)}
-                className="input-field bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none dark:text-white"
+                className="input-field bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-3.5 py-2 text-base sm:text-sm focus:border-blue-500 focus:outline-none dark:text-white"
               >
                 <option value="KRW">KRW (₩)</option>
                 <option value="CAD">CAD (C$)</option>
@@ -382,7 +388,7 @@ export default function AccountRegisterModal({
                 }
                 className="input-field"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
                 {isCreditCard
                   ? t("cardDebt")
                   : isInvestment
@@ -407,7 +413,7 @@ export default function AccountRegisterModal({
                     inputMode="numeric"
                     maxLength={4}
                   />
-                  <p className="mt-1 text-[10px] text-gray-400">
+                  <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
                     {t("lastFourHint")}
                   </p>
                 </>
@@ -422,7 +428,7 @@ export default function AccountRegisterModal({
                     placeholder={t("accountNumberPlaceholder")}
                     className="input-field"
                   />
-                  <p className="mt-1 text-[10px] text-gray-400">
+                  <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
                     {t("accountNumberHint")}
                   </p>
                 </>
@@ -473,7 +479,7 @@ export default function AccountRegisterModal({
                 </label>
               ))}
               {!isEdit && (
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed">
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
                   {t("defaultRolesAutoHint")}
                 </p>
               )}

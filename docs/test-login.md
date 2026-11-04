@@ -18,7 +18,7 @@ Open `/test` (redirects to `/en/auth/test`). The page is not linked anywhere and
 
 The demo reset gives both couples the same month, so the test server and a local run start from the same state (for example before recording screens). Tester 1 and 2 get Korean names, Tester 3 and 4 English ones. The data lives in `backend/app/services/staging_demo.py`:
 
-- People: the testers get display names (Alex Morgan and Jamie Lee for Tester 3 and 4, 김민준 and 이서연 for Tester 1 and 2). The sign-in page still lists them as Tester 1 to 4. Both languages are on for every tester, so Canada and Korea both show and the country toggle appears.
+- People: the testers get display names (Alex Morgan and Jamie Lee for Tester 3 and 4, 김민준 and 이서연 for Tester 1 and 2). The sign-in page still lists them as Tester 1 to 4. Canada and Korea are both on for every tester, so the country toggle appears.
 - Accounts: a Chequing, Visa and Savings account for each tester (TD for Tester 1 and 3, RBC for Tester 2 and 4), a Tangerine joint chequing account for the couple, a Wealthsimple TFSA (CAD) and Kiwoom (KRW) brokerage for Tester 1 and 3 with three well-known stocks each, and a KB Kookmin chequing account (KRW) for Tester 1 and 3. Everything else is in CAD.
 - Budgets: a monthly personal budget (CAD and KRW) and a shared budget (CAD).
 - This month: salaries and a side income, both partners funding the joint account, a savings transfer, a few KRW expenses from a visit to Korea, and everyday spending across categories in both ledgers, spread over the days of the month that have passed (early in the month they share the days up to today; nothing is dated later).

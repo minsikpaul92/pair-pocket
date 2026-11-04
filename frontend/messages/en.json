@@ -248,7 +248,12 @@
     "thisWeek": "This week",
     "previousWeek": "Previous week",
     "nextWeek": "Next week",
-    "hiddenCategoriesNote": "{count, plural, one {# category} other {# categories}} hidden in Settings."
+    "hiddenCategoriesNote": "{count, plural, one {# category} other {# categories}} hidden in Settings.",
+    "topSpending": "Top spending",
+    "otherSpending": "Other",
+    "subCategoryBreakdown": "Spending by subcategory",
+    "uncategorized": "Uncategorized",
+    "moreTransactions": "{count, plural, one {View # more transaction} other {View # more transactions}}"
   },
   "list": {
     "allAccounts": "All accounts",
@@ -307,6 +312,7 @@
     "itemNamePlaceholder": "e.g. watermelon",
     "itemStandardPlaceholder": "Standard name",
     "itemsScanAi": "Extract sub-items from receipt with AI",
+    "itemRemove": "Remove item",
     "subtotalLabel": "Subtotal",
     "taxLabel": "Tax (HST 13%)",
     "totalLabel": "Total",
@@ -824,7 +830,8 @@
   "scanQueue": {
     "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
     "addRecent": "Scan recent files again ({count}, kept {days} days)",
-    "openRecent": "Recent scans ({count})"
+    "openRecent": "Recent scans ({count})",
+    "remove": "Remove file"
   },
   "importPage": {
     "title": "Import & export",
@@ -1025,6 +1032,21 @@
     "updateTitle": "App update",
     "updateHelp": "An app added to your Dock or home screen keeps running the version it opened with. Refresh to load the latest version.",
     "updateCta": "Refresh app",
+    "countriesTitle": "Countries",
+    "countriesHelp": "Turn on the countries you keep money in. With more than one on, the top bar lets you switch between each country and All. This does not change the app language.",
+    "countriesKeepData": "Turning a country off only hides its ledger. Its accounts and entries are kept and come back when you turn it on again.",
+    "countriesError": "Couldn't save. Please try again.",
+    "countryAlwaysOn": "Always on",
+    "countryList": {
+      "CA": {
+        "name": "Canada",
+        "hint": "CAD accounts and entries"
+      },
+      "KR": {
+        "name": "Korea",
+        "hint": "KRW accounts and entries"
+      }
+    },
     "salesTaxTitle": "Sales tax",
     "salesTaxHelp": "Choose your province. Its GST, HST and PST rate is used to estimate the tax when you add an expense. You can still edit the tax.",
     "salesTaxRate": "Rate: {rate}%",
@@ -1279,6 +1301,18 @@
   },
   "whatsNew": {
     "items": {
+      "countrySettings": {
+        "title": "Turn Korea on or off in Settings",
+        "description": "Settings now has a Countries section where you can show or hide your Korean ledger without changing the app language. Turning Korea off only hides it, so nothing is deleted."
+      },
+      "easierReading": {
+        "title": "Easier to read, and you can zoom",
+        "description": "Small text and labels are darker so they are easier to read in light and dark mode, and chart colors stand out clearly in both. You can now pinch to zoom, and typing in a field on your phone no longer zooms the screen."
+      },
+      "dashboardEnglishText": {
+        "title": "Dashboard text in English",
+        "description": "The spending breakdown on the dashboard no longer shows Korean labels when the app is in English. Windows now also close with the Esc key, and screen readers name the icon buttons."
+      },
       "geminiKeyCards": {
         "title": "Picture guide for the Gemini key",
         "description": "Getting a Gemini key now shows each Google AI Studio screen with the button to press, including the project step that new accounts need. You can paste the copied key right on the last screen."

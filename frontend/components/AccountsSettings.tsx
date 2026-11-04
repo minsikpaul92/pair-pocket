@@ -263,7 +263,7 @@ export default function AccountsSettings({
           <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
         </div>
       ) : accounts.length === 0 ? (
-        <p className="py-4 text-center text-sm text-gray-400">
+        <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
           {t("accountsEmpty")}
         </p>
       ) : (
@@ -326,7 +326,7 @@ export default function AccountsSettings({
                       onClick={() => setEditing(a)}
                       aria-label={t("accountEdit")}
                       title={t("accountEdit")}
-                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                      className="rounded-lg p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
@@ -338,7 +338,7 @@ export default function AccountsSettings({
                       }}
                       aria-label={t("accountDelete")}
                       title={t("accountDelete")}
-                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                      className="rounded-lg p-2 text-gray-500 dark:text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

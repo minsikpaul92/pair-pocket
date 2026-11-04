@@ -122,10 +122,10 @@ export default function SettlementExpenseSelect({
               </span>
             </>
           ) : (
-            <span className="text-gray-400">{tTx("selectSettlementExpense")}</span>
+            <span className="text-gray-500 dark:text-gray-400">{tTx("selectSettlementExpense")}</span>
           )}
         </span>
-        <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+        <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" />
       </button>
 
       {open && (
@@ -178,23 +178,23 @@ export default function SettlementExpenseSelect({
                 <X className="h-3 w-3" />
               </button>
             )}
-            <span className="ml-auto text-[11px] text-gray-400">
+            <span className="ml-auto text-[11px] text-gray-500 dark:text-gray-400">
               {tCommon("latestFirst")} · {tCommon("count", { count: filteredOptions.length })}
             </span>
             <div className="relative basis-full">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={tSettlement("searchPlaceholder")}
-                className="w-full rounded-lg bg-gray-100 dark:bg-gray-900 py-1.5 pl-8 pr-2.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none"
+                className="w-full rounded-lg bg-gray-100 dark:bg-gray-900 py-1.5 pl-8 pr-2.5 text-base sm:text-xs text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none"
               />
             </div>
           </div>
 
           <div className="max-h-52 overflow-auto">
             {filteredOptions.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-gray-400">
+              <p className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                 {filterDate
                   ? tSettlement("noExpensesOnDate")
                   : query.trim()

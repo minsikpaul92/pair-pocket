@@ -421,7 +421,7 @@ export default function ImportView({
             className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeSubTab === "bank"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             {t("tabBank")}
@@ -431,7 +431,7 @@ export default function ImportView({
             className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeSubTab === "csv"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             {t("tabCsv")}
@@ -441,7 +441,7 @@ export default function ImportView({
             className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
               activeSubTab === "logs"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             {t("tabLogs")}
@@ -498,7 +498,7 @@ export default function ImportView({
               onDrop={handleCSVDrop}
               className="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/10 hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800/20 p-8 text-center transition-all flex flex-col items-center justify-center min-h-[150px]"
             >
-              <UploadCloud className="h-8 w-8 text-gray-400 mb-2" />
+              <UploadCloud className="h-8 w-8 text-gray-500 dark:text-gray-400 mb-2" />
               <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
                 {csvFile ? csvFile.name : t("csvDrop")}
               </span>
@@ -547,7 +547,7 @@ export default function ImportView({
                           <td className="p-2 text-right font-mono">
                             {tx.currency} {tx.amount.toFixed(2)}
                           </td>
-                          <td className="p-2 text-gray-500">{tx.category}</td>
+                          <td className="p-2 text-gray-500 dark:text-gray-400">{tx.category}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -647,7 +647,7 @@ export default function ImportView({
                               type="button"
                               aria-label={tCommon("previousMonth")}
                               onClick={() => shiftExport(which, -1)}
-                              className="shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              className="shrink-0 rounded-lg p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                             >
                               <ChevronLeft className="h-4 w-4" />
                             </button>
@@ -662,7 +662,7 @@ export default function ImportView({
                               type="button"
                               aria-label={tCommon("nextMonth")}
                               onClick={() => shiftExport(which, 1)}
-                              className="shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              className="shrink-0 rounded-lg p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                             >
                               <ChevronRight className="h-4 w-4" />
                             </button>
@@ -720,12 +720,12 @@ export default function ImportView({
               <Loader2 className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
             </div>
           ) : logs.length === 0 ? (
-            <div className="text-sm text-gray-400 py-12 text-center italic">
+            <div className="text-sm text-gray-500 dark:text-gray-400 py-12 text-center italic">
               {t("logsEmpty")}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-gray-500">
+              <table className="w-full text-left text-xs text-gray-500 dark:text-gray-400">
                 <thead className="bg-gray-50 dark:bg-gray-800/40 text-gray-600 dark:text-gray-300 border-b border-gray-150 dark:border-gray-800">
                   <tr>
                     <th className="p-3">{t("colUploadedAt")}</th>
@@ -738,7 +738,7 @@ export default function ImportView({
                 <tbody className="divide-y divide-gray-150 dark:divide-gray-800/80">
                   {logs.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50/50">
-                      <td className="p-3 font-mono text-gray-400">
+                      <td className="p-3 font-mono text-gray-500 dark:text-gray-400">
                         {new Date(log.timestamp).toLocaleString()}
                       </td>
                       <td className="p-3 font-semibold text-gray-800 dark:text-white">
@@ -769,7 +769,7 @@ export default function ImportView({
                               loadLogs();
                             }}
                             className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                              log.feedback === "thumbs_up" ? "text-green-500" : "text-gray-300"
+                              log.feedback === "thumbs_up" ? "text-green-500" : "text-gray-500 dark:text-gray-400"
                             }`}
                             title={t("ratingGood")}
                           >
@@ -782,7 +782,7 @@ export default function ImportView({
                               loadLogs();
                             }}
                             className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                              log.feedback === "thumbs_down" ? "text-red-500" : "text-gray-300"
+                              log.feedback === "thumbs_down" ? "text-red-500" : "text-gray-500 dark:text-gray-400"
                             }`}
                             title={t("ratingBad")}
                           >

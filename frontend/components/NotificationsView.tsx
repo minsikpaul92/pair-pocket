@@ -158,7 +158,7 @@ export default function NotificationsView({
 
       {tab === "alerts" ? (
         items === null && !failed ? (
-          <div className="flex justify-center py-10 text-gray-400">
+          <div className="flex justify-center py-10 text-gray-500 dark:text-gray-400">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
         ) : failed ? (
@@ -232,14 +232,14 @@ export default function NotificationsView({
                   <h3 className="min-w-0 text-sm font-semibold text-gray-900 dark:text-white">
                     {tNew(`items.${entry.id}.title`)}
                   </h3>
-                  <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-gray-400">
+                  <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-gray-500 dark:text-gray-400">
                     v{entry.version}
                   </span>
                 </div>
                 <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
                   {tNew(`items.${entry.id}.description`)}
                 </p>
-                <p className="text-xs tabular-nums text-gray-400">
+                <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
                   {dateFmt.format(new Date(`${entry.date}T00:00:00`))}
                 </p>
               </li>
@@ -258,14 +258,14 @@ export default function NotificationsView({
                         <h3 className="min-w-0 text-sm font-semibold text-gray-900 dark:text-white">
                           {tNew(`items.${entry.id}.title`)}
                         </h3>
-                        <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-gray-400">
+                        <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-gray-500 dark:text-gray-400">
                           v{entry.version}
                         </span>
                       </div>
                       <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
                         {tNew(`items.${entry.id}.description`)}
                       </p>
-                      <p className="text-xs tabular-nums text-gray-400">
+                      <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
                         {dateFmt.format(new Date(`${entry.date}T00:00:00`))}
                       </p>
                     </li>

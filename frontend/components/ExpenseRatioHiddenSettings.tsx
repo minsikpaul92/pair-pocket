@@ -32,7 +32,7 @@ interface Props {
 function chipClass(isHidden: boolean): string {
   return `flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap disabled:opacity-60 ${
     isHidden
-      ? "border-gray-300 bg-gray-100 text-gray-400 line-through dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500"
+      ? "border-gray-300 bg-gray-100 text-gray-500 line-through dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
       : "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300"
   }`;
 }
@@ -160,7 +160,7 @@ export default function ExpenseRatioHiddenSettings({ settings, onSaved }: Props)
         })}
       </ul>
       {error && (
-        <p className="text-xs text-red-600 dark:text-red-400">
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
           {t("expenseRatioHiddenError")}
         </p>
       )}

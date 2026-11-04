@@ -72,9 +72,6 @@ DEMO_ACCOUNTS = (
 # sign-in page stays as it is).
 DEMO_PEOPLE = {"en": ("Alex Morgan", "Jamie Lee"), "ko": ("김민준", "이서연")}
 
-# Both languages, so Canada and Korea are both on and the country toggle shows.
-DEMO_LOCALES = {"en": ["en", "ko"], "ko": ["ko", "en"]}
-
 # Monthly budgets: { ledger: { currency: amount } }, the same for both partners.
 DEMO_BUDGETS = {
     "personal": {"CAD": 1200.0, "KRW": 300000.0},
@@ -180,18 +177,15 @@ async def seed_couple(db: AsyncIOMotorDatabase, users: list[UserOut], locale: st
     from app.routers.transactions import create_transaction
 
     korean = locale == "ko"
+    people = {"a": users[0], "b": users[1], "shared": users[0]}
+    # The demo has a Korean account, so both countries are on whatever the
+    # language, and the Canada / Korea / All toggle shows.
     for user, name in zip(users, DEMO_PEOPLE[locale]):
         await db["users"].update_one({"_id": ObjectId(user.id)}, {"$set": {"name": name}})
         await db["user_settings"].update_one(
             {"owner_id": user.id},
-            {
-                "$set": {
-                    "preferred_locales": DEMO_LOCALES[locale],
-                    "budgets": DEMO_BUDGETS,
-                }
-            },
+            {"$set": {"enabled_countries": ["CA", "KR"], "budgets": DEMO_BUDGETS}},
         )
-    people = {"a": users[0], "b": users[1], "shared": users[0]}
     accounts: dict[str, dict] = {}
     for key, owner, kind, currency, country, institution, opening, en, ko in DEMO_ACCOUNTS:
         accounts[key] = await create_account(
