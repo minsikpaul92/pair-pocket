@@ -632,13 +632,13 @@ export default function SubscriptionRegisterModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              구독/지출 유형
+              {t("typeLabel")}
             </label>
             <div className="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
               {[
-                { key: "subscription", label: "구독" },
-                { key: "installment", label: "할부" },
-                { key: "fixed", label: "고정지출" },
+                { key: "subscription", label: t("sourceSubscription") },
+                { key: "installment", label: t("sourceInstallment") },
+                { key: "fixed", label: t("sourceFixedBill") },
               ].map((item) => {
                 const selected = subType === item.key;
                 return (
@@ -688,13 +688,13 @@ export default function SubscriptionRegisterModal({
           {subType !== "installment" && (
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                결제 주기 규칙
+                {t("cycleLabel")}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { rule: "monthly", label: "매월" },
-                  { rule: "yearly", label: "매년" },
-                  { rule: "every_x_days", label: "N일 마다" },
+                  { rule: "monthly", label: t("cycle.monthly") },
+                  { rule: "yearly", label: t("cycle.yearly") },
+                  { rule: "every_x_days", label: t("cycle.every_x_days") },
                 ].map((r) => {
                   const active = recurrenceRule === r.rule;
                   return (
@@ -715,7 +715,7 @@ export default function SubscriptionRegisterModal({
                           setNextDueDate(dayKey(nextYear));
                         }
                       }}
-                      className={`rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold transition-all border ${
+                      className={`rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all border ${
                         active
                           ? "bg-blue-50 dark:bg-blue-500/20 border-blue-500 text-blue-600 dark:text-blue-400 shadow-xs"
                           : "bg-gray-50 dark:bg-gray-800 border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -795,11 +795,11 @@ export default function SubscriptionRegisterModal({
               {recurrenceRule === "monthly" && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                    매월 정기 결제일
+                    {t("dayOfMonthLabel")}
                   </label>
                   <div className="flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/80 p-2.5 px-3 border border-gray-200 dark:border-gray-700">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      매월
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                      {t("dayOfMonthBefore")}
                     </span>
                     <input
                       type="number"
@@ -816,12 +816,14 @@ export default function SubscriptionRegisterModal({
                       }}
                       className="input-field w-20 text-center font-bold text-blue-600 dark:text-blue-400 text-base py-1"
                     />
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      일 결제 {dayOfMonth === 31 && "(말일)"}
+                    {/* The day input sits inside the sentence, so the words
+                        before and after it are separate messages. */}
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                      {t("dayOfMonthAfter")} {dayOfMonth === 31 && t("dayOfMonthLast")}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                    1~31일 중 지정할 수 있으며, 31일은 해당 월의 말일로 자동 처리됩니다.
+                    {t("dayOfMonthHint")}
                   </p>
                 </div>
               )}
@@ -829,7 +831,7 @@ export default function SubscriptionRegisterModal({
               {recurrenceRule === "every_x_days" && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                    결제/이체 주기 간격 (며칠 마다)
+                    {t("intervalLabel")}
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -841,23 +843,23 @@ export default function SubscriptionRegisterModal({
                       className="input-field max-w-[120px]"
                     />
                     <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                      일 마다 자동 반복
+                      {t("intervalAfter")}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                    설정한 일수마다 자동으로 결제 및 계좌 이체가 반복됩니다 (예: 7일 = 매주, 14일 = 격주)
+                    {t("intervalHint")}
                   </p>
-                  <div className="flex gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2">
                     {[
-                      { days: "7", label: "매주 (7일)" },
-                      { days: "14", label: "격주 (14일)" },
-                      { days: "30", label: "30일 마다" },
+                      { days: "7", label: t("cycle.weekly") },
+                      { days: "14", label: t("cycle.biweekly") },
+                      { days: "30", label: t("every30Days") },
                     ].map((preset) => (
                       <button
                         key={preset.days}
                         type="button"
                         onClick={() => setIntervalDays(preset.days)}
-                        className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                        className={`rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
                           intervalDays === preset.days
                             ? "bg-blue-600 text-white font-bold"
                             : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200"
@@ -952,7 +954,7 @@ export default function SubscriptionRegisterModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {tTx("fromAccount") || "보내는 계좌 (출금)"}
+                  {tTx("fromAccount")}
                 </label>
                 <AccountSelect
                   accounts={transferFromAccounts}
@@ -960,13 +962,13 @@ export default function SubscriptionRegisterModal({
                   onChange={pickAccount}
                   onRegister={() => setShowAccountRegister(true)}
                   allowNone={false}
-                  placeholder={tTx("selectFromAccount") || "출금 계좌 선택"}
+                  placeholder={tTx("selectFromAccount")}
                   variant="field"
                 />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {tTx("toAccount") || "받는 계좌 (입금)"}
+                  {tTx("toAccount")}
                 </label>
                 <AccountSelect
                   accounts={transferToAccounts}
@@ -974,7 +976,7 @@ export default function SubscriptionRegisterModal({
                   onChange={setCounterAccountId}
                   onRegister={() => setShowAccountRegister(true)}
                   allowNone={false}
-                  placeholder={tTx("selectToAccount") || "입금 계좌 선택"}
+                  placeholder={tTx("selectToAccount")}
                   variant="field"
                 />
               </div>
@@ -999,7 +1001,7 @@ export default function SubscriptionRegisterModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                구독/이체 시작일 (기준일)
+                {t("startDate")}
               </label>
               <DayPicker
                 value={parseDate(startDate)}
@@ -1025,7 +1027,7 @@ export default function SubscriptionRegisterModal({
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-1">
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {t("nextPaymentDate") || "다음 정기 결제일"}
+                  {t("nextPaymentDate")}
                 </label>
                 {subType !== "installment" && (
                   <button
@@ -1041,7 +1043,7 @@ export default function SubscriptionRegisterModal({
                     }}
                     className="text-[11px] font-medium text-blue-500 hover:underline"
                   >
-                    {showEndDate ? "종료일 취소" : "+ 종료일 지정"}
+                    {showEndDate ? t("removeEndDate") : `+ ${t("addEndDate")}`}
                   </button>
                 )}
               </div>
@@ -1060,7 +1062,7 @@ export default function SubscriptionRegisterModal({
           {nextDueDate && (
             <div className="rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 p-2.5 px-3.5 text-xs flex items-center justify-between">
               <span className="font-medium text-blue-800 dark:text-blue-200">
-                ✨ 다음 결제 예정일
+                {t("nextDuePreview")}
               </span>
               <span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">
                 {formatSubscriptionDate(`${nextDueDate}T00:00:00`, locale)}
