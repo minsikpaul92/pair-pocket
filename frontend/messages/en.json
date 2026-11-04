@@ -1095,7 +1095,7 @@
     "sharedStartDateTitle": "Shared ledger start date",
     "sharedStartDateReadOnly": "This shared start date was set when you were invited. You can change it later in Settings.",
     "apiKeyTitle": "Gemini API key",
-    "apiKeyPlaceholder": "API key (optional, for screenshot AI)",
+    "apiKeyPlaceholder": "Paste your Gemini API key",
     "apiKeySaved": "A key is already saved.",
     "continue": "Continue",
     "back": "Back",
@@ -1217,19 +1217,32 @@
     "apiKeyOptionalTitle": "Optional: fill in from screenshots"
   },
   "geminiGuide": {
-    "dataTitle": "What goes to Google",
-    "dataSent": "When you scan a receipt or statement, the image or PDF is sent to Google's Gemini service with your own key.",
+    "noticeSummary": "Scans are sent to Google with your key",
     "dataTiers": "With a free key, Google may use what you send to improve its products and people may review it, so Google advises not to send personal information. With a paid key, it is not used to improve products and is logged only for a limited time to detect misuse.",
     "termsLink": "Google's terms",
     "optional": "The key is optional. Manual entry and CSV import work without it, and you can add a key later in Settings. If your linked partner saved a key, theirs is used when you have none.",
     "stepsTitle": "How to get a key",
-    "step1": "Press Open AI Studio below. Google AI Studio opens its API keys page in a new tab.",
-    "step2": "Sign in with your Google account. The first time, Google asks you to accept its terms and may create a starter project for you.",
-    "step3": "Press Create API key. If you are asked to choose a project, pick the one Google created.",
-    "step4": "Copy the new key. It is a long code of letters and numbers.",
-    "step5": "Come back to this page and paste the key into the field below.",
+    "stepsIntro": "Sign in with your Google account, press Open AI Studio, then follow these screens.",
+    "screensNote": "Screens are shown in English. If yours are in another language, press the button in the same place.",
+    "card1": "Tick the first box, then press Continue.",
+    "card2": "If you are asked what brings you here, press Skip.",
+    "card3": "On the API Keys page, press Create API key.",
+    "card4": "If it says No Cloud Projects Available, open that list and press Create project.",
+    "card5": "Keep the name and press Create project.",
+    "card6": "Press Create key.",
+    "card7": "Press Copy key, then come back here and paste it into the field below.",
+    "keyPlaceholder": "Paste the copied key here",
+    "paste": "Paste",
+    "saveKey": "Save key",
+    "savingKey": "Saving...",
+    "keySaved": "Key saved. AI features are ready to use.",
+    "keySaveError": "Could not save the key. Check it and try again.",
+    "cardAlt": "Google AI Studio screen for step {current}",
+    "counter": "{current} / {total}",
+    "prev": "Back",
+    "next": "Next",
     "openStudio": "Open AI Studio",
-    "freeTier": "New keys start on Google's free tier, which has usage limits. Paid use starts only if you set up billing in AI Studio."
+    "freeTier": "Nothing is charged unless you add a payment method in AI Studio. Enjoy AI features within the free limit, and if you use it up, you can keep going once it resets."
   },
   "notifications": {
     "title": "Notifications",
@@ -1266,6 +1279,10 @@
   },
   "whatsNew": {
     "items": {
+      "geminiKeyCards": {
+        "title": "Picture guide for the Gemini key",
+        "description": "Getting a Gemini key now shows each Google AI Studio screen with the button to press, including the project step that new accounts need. You can paste the copied key right on the last screen."
+      },
       "geminiKeyGuide": {
         "title": "Clearer Gemini key setup",
         "description": "Onboarding and Settings now walk you through getting a free Gemini key step by step and explain what is sent to Google when you scan. The key is still optional."

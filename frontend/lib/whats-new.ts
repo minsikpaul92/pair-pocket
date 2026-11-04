@@ -9,6 +9,7 @@ export interface WhatsNewEntry {
 }
 
 export const WHATS_NEW: WhatsNewEntry[] = [
+  { id: "geminiKeyCards", version: "0.21.0", date: "2026-11-03" },
   { id: "geminiKeyGuide", version: "0.20.0", date: "2026-11-03" },
   { id: "notificationOpensEntry", version: "0.19.1", date: "2026-11-02" },
   { id: "settlementMoveTab", version: "0.19.0", date: "2026-11-02" },
