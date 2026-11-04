@@ -48,11 +48,14 @@ Apply smooth, rounded corners to all interactive elements.
 Include these tags in the HTML `<head>` to ensure a native-like full-screen experience on mobile devices.
 * `<meta name="apple-mobile-web-app-capable" content="yes" />`
 * `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />`
-* `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />` (Prevents pinch-to-zoom)
+* `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />` (Pinch-to-zoom stays available; never set `maximum-scale` or `user-scalable=no`)
+* **Inputs are at least 16px on mobile.** iOS zooms in when a field under 16px gets focus, so every input, textarea and select uses `text-base` below `sm` and may drop to its denser size above it (for example `text-base sm:text-sm`). `.input-field` does this by default.
 
 ## 6. Color Palette
 * **App Background:** `bg-gray-50 dark:bg-black`
 * **Surface (Cards/Modals):** `bg-white dark:bg-gray-900`
 * **Primary Accent:** `text-blue-500` (Apple System Blue)
 * **Destructive/Warning:** `text-red-500` (Apple System Red)
+* **Text Hierarchy:** Primary text is `text-gray-900 dark:text-white`. Secondary text (captions, form labels, timestamps, inactive tabs, meaningful icons, placeholders) is `text-gray-500 dark:text-gray-400`, which keeps at least 4.5:1 on white, gray-50, gray-800 and gray-900. Do not use `text-gray-400` or lighter for text in light mode, or `dark:text-gray-500` or darker in dark mode. Hover states go one step darker in light mode (`hover:text-gray-700`) and one step lighter in dark mode. Only disabled controls may be lighter.
+* **Chart Colors:** Category colors come from the mid-tone set in `components/DashboardAnalytics.tsx`. Every chart color must reach at least 3:1 against both white and the gray-800/900 dark cards, and neighboring series must stay easy to tell apart. Do not add white, near-white or near-black swatches.
 * **Currency Distinction (Optional):** Use subtle visual cues (like different soft background tints or icons) to differentiate CAD and KRW transactions.

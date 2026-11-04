@@ -161,7 +161,7 @@ export default function TestLoginPanel() {
 
   const name = accounts.find((item) => item.id === account)?.name ?? "";
   const field =
-    "w-full rounded-2xl bg-gray-100 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-gray-100";
+    "w-full rounded-2xl bg-gray-100 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-gray-100";
   const options: {
     choice: ResetChoice;
     title: string;

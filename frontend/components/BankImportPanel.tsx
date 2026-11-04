@@ -654,7 +654,7 @@ export default function BankImportPanel({
                   onChange={(e) => patch(r.key, { merchant: e.target.value })}
                   placeholder={t("merchant")}
                   aria-label={t("merchant")}
-                  className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                  className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-base sm:text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 />
               )}
               <input
@@ -663,7 +663,7 @@ export default function BankImportPanel({
                 placeholder={t("note")}
                 aria-label={t("note")}
                 maxLength={200}
-                className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-base sm:text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
           </div>
@@ -734,7 +734,7 @@ export default function BankImportPanel({
               {hint}
             </span>
           </span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400 transition-transform group-open:rotate-180" />
         </summary>
         {bucket === "review" && (
           <button
@@ -826,14 +826,14 @@ export default function BankImportPanel({
                 type="button"
                 onClick={() => setFile(null)}
                 aria-label={t("removeFile")}
-                className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                className="shrink-0 rounded-lg p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:text-gray-200 dark:hover:bg-gray-800"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           ) : (
             <>
-              <UploadCloud className="h-7 w-7 text-gray-400" />
+              <UploadCloud className="h-7 w-7 text-gray-500 dark:text-gray-400" />
               <span className="max-w-full truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
                 {t("dropHere")}
               </span>
@@ -859,7 +859,7 @@ export default function BankImportPanel({
           {t("analyze")}
         </button>
         {accounts.length === 0 && (
-          <p className="text-xs text-gray-500">{t("noAccounts")}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{t("noAccounts")}</p>
         )}
       </div>
 

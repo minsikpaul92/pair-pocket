@@ -70,7 +70,7 @@ export default function LanguageSelect({
           </span>
           <ChevronDown
             className={cn(
-              "h-4 w-4 shrink-0 text-gray-400 transition-transform",
+              "h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400 transition-transform",
               open && "rotate-180"
             )}
             aria-hidden
@@ -109,7 +109,7 @@ export default function LanguageSelect({
                 )}
               >
                 <span className="min-w-0 flex-1 truncate">{option.native}</span>
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   {option.code}
                 </span>
                 <Check

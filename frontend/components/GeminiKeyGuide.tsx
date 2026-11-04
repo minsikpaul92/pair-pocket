@@ -173,7 +173,7 @@ function StepCards({ apiKey = "", onApiKeyChange, onSaveKey }: KeyInputProps) {
                 placeholder={t("keyPlaceholder")}
                 aria-label={t("keyPlaceholder")}
                 autoComplete="off"
-                className="min-w-0 flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
+                className="min-w-0 flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-base sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:text-white"
               />
               <button
                 type="button"
@@ -256,7 +256,7 @@ export default function GeminiKeyGuide({
           <span className="whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
             {t("stepsTitle")}
           </span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400 transition-transform group-open:rotate-180" />
         </summary>
         <div className="space-y-3 px-4 pb-4">
           <StepCards apiKey={apiKey} onApiKeyChange={onApiKeyChange} onSaveKey={onSaveKey} />

@@ -127,7 +127,7 @@ export default function BudgetQuickModal({
             <span className="text-xs leading-snug text-gray-600 dark:text-gray-300">
               {t("budgetCarryOption")}
               {overspend > 0 && (
-                <span className="block text-gray-400 dark:text-gray-500">
+                <span className="block text-gray-500 dark:text-gray-400">
                   {t("budgetCarryAmount", {
                     over: formatAmount(overspend, currency),
                   })}

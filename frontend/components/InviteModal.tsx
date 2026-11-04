@@ -158,7 +158,7 @@ export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
             type="button"
             onClick={onClose}
             aria-label={t("close")}
-            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="rounded-lg p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <X className="h-5 w-5" />
           </button>

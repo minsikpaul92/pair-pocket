@@ -97,7 +97,7 @@ export function DefaultRoleMenu({
         onClick={() => setOpen((v) => !v)}
         aria-label={t("defaultMenuLabel")}
         aria-expanded={open}
-        className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-amber-500 dark:hover:bg-gray-800"
+        className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-amber-500 dark:hover:text-amber-500 dark:hover:bg-gray-800"
       >
         <Star
           className={`h-4 w-4 ${hasAny ? "fill-amber-400 text-amber-400" : ""}`}
@@ -105,7 +105,7 @@ export function DefaultRoleMenu({
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-          <p className="px-2 py-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500">
+          <p className="px-2 py-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
             {t("defaultMenuLabel")}
           </p>
           {roles.map((role) => {

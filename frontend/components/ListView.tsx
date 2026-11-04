@@ -584,7 +584,7 @@ export default function ListView({
         />
 
         <div ref={searchContainerRef} className="relative flex-1 min-w-[10rem]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
           <input
             value={merchantQuery}
             onChange={(e) => {
@@ -593,7 +593,7 @@ export default function ListView({
             }}
             onFocus={() => setShowSearchDropdown(true)}
             placeholder={tList("searchMerchantOrNote")}
-            className="input-field pl-9 py-2 text-sm"
+            className="input-field pl-9 py-2 text-base sm:text-sm"
           />
           {showSearchDropdown && searchSuggestions.length > 0 && (
             <div className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">
@@ -633,7 +633,7 @@ export default function ListView({
       <div className="mt-4 card-inset overflow-hidden flex flex-col max-h-[32rem]">
         <ul className="divide-y divide-gray-100 dark:divide-gray-700 flex-1 overflow-y-auto min-h-0">
           {sorted.length === 0 ? (
-            <li className="px-4 py-12 text-center text-gray-400 text-sm">
+            <li className="px-4 py-12 text-center text-gray-500 dark:text-gray-400 text-sm">
               {tList("noTransactions")}
             </li>
           ) : (
@@ -654,7 +654,7 @@ export default function ListView({
                             (item.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
                           {item.merchant}
                         </p>
-                        <p className="text-[11px] text-gray-400 truncate">
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                           {formatDay(item.date)} · {translateCategory(item.category, tCategories)}
                           {item.sub_category
                             ? ` › ${translateSubCategory(item.sub_category, tSubCategories)}`
@@ -698,7 +698,7 @@ export default function ListView({
                             (tx.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
                           {title}
                         </p>
-                        <p className="text-[11px] text-gray-400 truncate">
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                           {formatDay(tx.date)} · {translateCategory(tx.category, tCategories)}
                           {tx.sub_category
                             ? ` › ${translateSubCategory(tx.sub_category, tSubCategories)}`
@@ -722,7 +722,7 @@ export default function ListView({
                       <p
                         className={`shrink-0 text-sm font-semibold tabular-nums ${
                           transfer
-                            ? "text-gray-500"
+                            ? "text-gray-500 dark:text-gray-400"
                             : tx.type === "income"
                               ? "text-blue-500"
                               : "text-gray-900 dark:text-white"
@@ -746,7 +746,7 @@ export default function ListView({
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
               {tList("total")}
             </span>
-            <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">
               {tList("count", { count: sorted.length })}
             </span>
           </div>
@@ -764,7 +764,7 @@ export default function ListView({
               return (
                 <div key={c} className="flex items-center gap-1.5">
                   {activeCurrencies.length > 1 && (
-                    <span className="text-[10px] font-medium text-gray-400">
+                    <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
                       {c === "CAD" ? "🇨🇦" : c === "KRW" ? "🇰🇷" : "🇺🇸"}
                     </span>
                   )}

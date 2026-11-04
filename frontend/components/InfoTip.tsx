@@ -98,7 +98,7 @@ export default function InfoTip({ label, children, className }: Props) {
         onPointerLeave={(e) => e.pointerType === "mouse" && setHovered(false)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:text-indigo-500 focus-visible:text-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-500"
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:text-indigo-500 focus-visible:text-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400"
       >
         <HelpCircle className="h-4 w-4" aria-hidden />
       </button>

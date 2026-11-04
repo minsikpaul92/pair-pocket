@@ -333,7 +333,7 @@ export default function OnboardingScreenshotScan({
         <button
           type="button"
           onClick={clearQueue}
-          className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-500"
+          className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
         >
           <Trash2 className="h-3 w-3" />
           {t("aiClearQueue")}
