@@ -8,6 +8,9 @@
     "close": "Close",
     "updateAvailable": "A new version is available",
     "updateRefresh": "Refresh",
+    "pullToRefresh": "Pull to refresh",
+    "pullRelease": "Release to refresh",
+    "pullRefreshing": "Refreshing…",
     "add": "Add",
     "save": "Save",
     "saving": "Saving...",
@@ -1313,6 +1316,10 @@
   },
   "whatsNew": {
     "items": {
+      "pullToRefresh": {
+        "title": "Pull down to refresh",
+        "description": "On your phone, pull down from the top of any screen to reload the latest numbers. Negative card balances on the dashboard now show with a minus instead of a plus."
+      },
       "fixedExpenseEnglishText": {
         "title": "Fixed expense form in English",
         "description": "Adding or editing a fixed expense no longer shows Korean labels when the app is in English. The type, billing cycle, payment day and start date are all in your language now."
