@@ -8,6 +8,9 @@
     "close": "닫기",
     "updateAvailable": "새 버전이 있어요",
     "updateRefresh": "새로고침",
+    "pullToRefresh": "당겨서 새로고침",
+    "pullRelease": "놓으면 새로고침",
+    "pullRefreshing": "새로고침 중…",
     "add": "추가",
     "save": "저장",
     "saving": "저장 중...",
@@ -1313,6 +1316,10 @@
   },
   "whatsNew": {
     "items": {
+      "pullToRefresh": {
+        "title": "당겨서 새로고침",
+        "description": "휴대폰에서 화면 맨 위를 아래로 당기면 최신 금액으로 다시 불러와요. 대시보드에서 카드 잔액이 마이너스일 때도 이제 플러스가 아니라 마이너스로 보여요."
+      },
       "fixedExpenseEnglishText": {
         "title": "영어 화면의 고정지출 입력창을 고쳤어요",
         "description": "앱을 영어로 볼 때 고정지출을 추가하거나 수정하는 창에 한국어가 섞여 나오던 문제를 고쳤어요. 유형, 결제 주기, 결제일, 시작일이 모두 선택한 언어로 나와요."

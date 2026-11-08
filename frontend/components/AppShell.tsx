@@ -42,6 +42,7 @@ import InviteModal from "@/components/InviteModal";
 import ListView from "@/components/ListView";
 import NotificationBell from "@/components/NotificationBell";
 import NotificationsView from "@/components/NotificationsView";
+import PullToRefresh from "@/components/PullToRefresh";
 import ThemeToggle from "@/components/ThemeToggle";
 import SubscriptionOffer from "@/components/SubscriptionOffer";
 import SubscriptionsView from "@/components/SubscriptionsView";
@@ -273,6 +274,35 @@ export default function AppShell({ user, onLogout }: Props) {
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
   const bumpVersion = useCallback(() => setVersion((v) => v + 1), []);
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+
+  const handlePullRefresh = useCallback(async () => {
+    bumpVersion();
+    const started = Date.now();
+    let sawLoading = false;
+    await new Promise<void>((resolve) => {
+      const id = window.setInterval(() => {
+        if (loadingRef.current) sawLoading = true;
+        const elapsed = Date.now() - started;
+        if (sawLoading && !loadingRef.current) {
+          window.clearInterval(id);
+          resolve();
+          return;
+        }
+        // Dashboard / settings / stocks may refresh without AppShell loading.
+        if (!sawLoading && elapsed > 700) {
+          window.clearInterval(id);
+          resolve();
+          return;
+        }
+        if (elapsed > 8_000) {
+          window.clearInterval(id);
+          resolve();
+        }
+      }, 50);
+    });
+  }, [bumpVersion]);
 
   const [modalDate, setModalDate] = useState<Date | null>(null);
   const [modalCurrency, setModalCurrency] = useState<Currency>("CAD");
@@ -1027,6 +1057,16 @@ export default function AppShell({ user, onLogout }: Props) {
         </header>
 
         <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-32 md:pb-10">
+          <PullToRefresh
+            onRefresh={handlePullRefresh}
+            disabled={
+              Boolean(modalDate) ||
+              Boolean(editingTransaction) ||
+              scanMenuOpen ||
+              scanQueueOpen ||
+              aiParsing
+            }
+          >
           {view === "notifications" ? null : view === "settings" ? (
             <div className="mb-4">
               <div className="flex md:hidden items-center gap-2.5">
@@ -1235,6 +1275,7 @@ export default function AppShell({ user, onLogout }: Props) {
               }}
             />
           )}
+          </PullToRefresh>
         </main>
       </div>
 
