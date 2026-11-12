@@ -44,6 +44,8 @@ const nextConfig = {
         permanent: false,
       },
       // Short address for the unlisted test sign-in page.
+      { source: "/privacy", destination: "/en/privacy", permanent: false },
+      { source: "/terms", destination: "/en/terms", permanent: false },
       { source: "/test", destination: "/en/auth/test", permanent: false },
       {
         source: "/invite/:token",
