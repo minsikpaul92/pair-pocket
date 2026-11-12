@@ -372,8 +372,6 @@ async def list_settleable_expenses(
             doc.get("category", ""), doc.get("sub_category", "")
         ):
             continue
-        if cross_settlement.is_settlement_pair(doc):
-            continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)
         if exclude_expense_id == exp_id:

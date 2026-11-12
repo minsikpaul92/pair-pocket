@@ -1654,30 +1654,33 @@ export function formatAmount(
 ): string {
   // CAD → $… ; USD → US$… so Canada holdings never look identical.
   // `plainUsd` kept for call-site compat but USD always uses the US$ prefix.
+  // Negative amounts use a leading minus (e.g. −$12.34), never $+ or $−.
   void options?.plainUsd;
+  const negative = amount < 0;
+  const abs = Math.abs(amount);
+  let body: string;
   if (currency === "USD") {
-    return (
+    body =
       "US$" +
-      amount.toLocaleString("en-US", {
+      abs.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      })
-    );
-  }
-  if (currency === "CAD") {
-    return (
+      });
+  } else if (currency === "CAD") {
+    body =
       "$" +
-      amount.toLocaleString("en-CA", {
+      abs.toLocaleString("en-CA", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      })
-    );
+      });
+  } else {
+    body = new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency: "KRW",
+      maximumFractionDigits: 0,
+    }).format(abs);
   }
-  return new Intl.NumberFormat("ko-KR", {
-    style: "currency",
-    currency: "KRW",
-    maximumFractionDigits: 0,
-  }).format(amount);
+  return negative ? `\u2212${body}` : body;
 }
 
 /** Format a typed amount string with thousands separators (e.g. 12,900). */

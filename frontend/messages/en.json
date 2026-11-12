@@ -8,6 +8,9 @@
     "close": "Close",
     "updateAvailable": "A new version is available",
     "updateRefresh": "Refresh",
+    "pullToRefresh": "Pull to refresh",
+    "pullRelease": "Release to refresh",
+    "pullRefreshing": "Refreshing…",
     "add": "Add",
     "save": "Save",
     "saving": "Saving...",
@@ -1313,6 +1316,14 @@
   },
   "whatsNew": {
     "items": {
+      "resettlePayment": {
+        "title": "Settle a settlement again",
+        "description": "The money you paid out when settling between personal and shared can now be settled again later, for example when you pay it back. It can be repeated as many times as you need."
+      },
+      "pullToRefresh": {
+        "title": "Pull down to refresh",
+        "description": "On your phone, pull down from the top of any screen to reload the latest numbers. Negative card balances on the dashboard now show with a minus instead of a plus."
+      },
       "fixedExpenseEnglishText": {
         "title": "Fixed expense form in English",
         "description": "Adding or editing a fixed expense no longer shows Korean labels when the app is in English. The type, billing cycle, payment day and start date are all in your language now."
@@ -1420,5 +1431,73 @@
     "hint": "It will repeat from next month. This month's entry stays as it is.",
     "register": "Add",
     "notNow": "Not now"
+  },
+  "legal": {
+    "back": "Back to PairPocket",
+    "updated": "Last updated: November 12, 2026",
+    "privacy": {
+      "title": "Privacy Policy",
+      "intro": "PairPocket is a household budgeting app for individuals and couples. This policy explains what information we handle and why.",
+      "sections": {
+        "collect": {
+          "title": "Information we collect",
+          "body": "When you sign in with Google we receive your Google account ID, email address, name and profile picture. We also store what you enter in the app, such as transactions, accounts, budgets, categories and notes, and the Google sign-in tokens needed to keep you signed in. We request no other Google permissions."
+        },
+        "use": {
+          "title": "How we use it",
+          "body": "We use this information only to run the app: to sign you in, show your ledgers, share a ledger with the partner you invite, send the reminders you turn on, and help you if you contact us. We do not sell your data and we do not show ads."
+        },
+        "share": {
+          "title": "Sharing",
+          "body": "A shared ledger is visible to the partner you invite. If you use receipt scanning or AI features, the content you submit is sent to Google Gemini with your own API key. Apart from the hosting and database services that run the app, we share nothing else with third parties."
+        },
+        "storage": {
+          "title": "Storage and security",
+          "body": "Data is stored in a managed database. Your Gemini API key is encrypted before it is stored, and sign-in sessions use short-lived tokens. No system is perfectly secure, so we cannot promise absolute protection."
+        },
+        "rights": {
+          "title": "Your choices",
+          "body": "You can edit or delete your entries in the app at any time. To have your account and all of its data deleted, or to ask for a copy of your data, contact us using the support email shown on the Google sign-in screen."
+        },
+        "contact": {
+          "title": "Contact",
+          "body": "Questions about this policy can be sent to the support email shown on the Google sign-in screen. If this policy changes, we will update the date at the top of this page."
+        }
+      }
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "intro": "By signing in to PairPocket you agree to these terms. If you do not agree, please do not use the app.",
+      "sections": {
+        "service": {
+          "title": "The service",
+          "body": "PairPocket helps you record income and spending and see your household finances. It is a personal record-keeping tool. It is not financial, tax or investment advice, and it does not move real money."
+        },
+        "account": {
+          "title": "Your account",
+          "body": "You sign in with a Google account and are responsible for activity under it. Keep your sign-in and any API key you add private. You must be old enough to enter into this agreement where you live."
+        },
+        "data": {
+          "title": "Your data",
+          "body": "The data you enter belongs to you. You allow us to store and process it only to run the app for you. Shared ledgers are visible to the partner you invite, so share only with people you trust."
+        },
+        "acceptable": {
+          "title": "Acceptable use",
+          "body": "Do not misuse the service: no attempts to break into it, overload it, access other people's data, or use it for anything unlawful."
+        },
+        "disclaimer": {
+          "title": "No warranty",
+          "body": "The service is provided as is, without warranties. Amounts and statistics may contain errors, so check them yourself. To the extent the law allows, we are not liable for losses that result from using the app."
+        },
+        "changes": {
+          "title": "Changes and ending",
+          "body": "We may change the service or these terms, and we may suspend access if these terms are broken. You may stop using the app at any time and ask us to delete your account."
+        },
+        "contact": {
+          "title": "Contact",
+          "body": "Questions about these terms can be sent to the support email shown on the Google sign-in screen."
+        }
+      }
+    }
   }
 }

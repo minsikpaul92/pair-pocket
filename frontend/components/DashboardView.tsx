@@ -1010,20 +1010,16 @@ export default function DashboardView({
             <p className="text-gray-500 dark:text-gray-400">{tDashboard("totalLiabilities")}</p>
             {(() => {
               const liabilities = netWorth?.total_liabilities ?? 0;
-              const overpaid = liabilities < 0;
-              const display = netWorth
-                ? formatAmount(
-                    overpaid ? Math.abs(liabilities) : liabilities,
-                    heroCurrency
-                  )
-                : "—";
+              const credit = liabilities < 0;
               return (
                 <p
                   className={`mt-0.5 font-semibold ${
-                    overpaid ? "text-blue-500" : "text-red-500"
+                    credit ? "text-blue-500" : "text-red-500"
                   }`}
                 >
-                  {overpaid && netWorth ? `+${display}` : display}
+                  {netWorth
+                    ? formatAmount(liabilities, heroCurrency)
+                    : "—"}
                 </p>
               );
             })()}
@@ -1127,11 +1123,8 @@ export default function DashboardView({
           ) : (
             liabilityAccounts.map((acc) => {
               const label = acc.nickname?.trim() || acc.name;
-              const overpaid = acc.balance < 0;
-              const displayAmt = formatAmount(
-                overpaid ? Math.abs(acc.balance) : acc.balance,
-                acc.currency
-              );
+              // Negative card balance = overpaid / credit; keep blue, show a minus.
+              const credit = acc.balance < 0;
               const isDragging = dragCardId === acc.account_id;
               return (
                 <li
@@ -1175,10 +1168,10 @@ export default function DashboardView({
                     </div>
                     <p
                       className={`mt-1.5 text-base font-bold tabular-nums truncate ${
-                        overpaid ? "text-blue-500" : "text-red-500"
+                        credit ? "text-blue-500" : "text-red-500"
                       }`}
                     >
-                      {overpaid ? `+${displayAmt}` : displayAmt}
+                      {formatAmount(acc.balance, acc.currency)}
                     </p>
                     {renderDefaults(acc.account_id)?.badges}
                   </button>
