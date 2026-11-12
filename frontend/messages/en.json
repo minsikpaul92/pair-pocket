@@ -1316,6 +1316,10 @@
   },
   "whatsNew": {
     "items": {
+      "resettlePayment": {
+        "title": "Settle a settlement again",
+        "description": "The money you paid out when settling between personal and shared can now be settled again later, for example when you pay it back. It can be repeated as many times as you need."
+      },
       "pullToRefresh": {
         "title": "Pull down to refresh",
         "description": "On your phone, pull down from the top of any screen to reload the latest numbers. Negative card balances on the dashboard now show with a minus instead of a plus."

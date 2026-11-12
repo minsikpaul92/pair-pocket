@@ -30,7 +30,7 @@ from app.models.user import UserOut
 from app.services import db_transactions
 from app.services.access import assert_can_access_doc, resolve_owner_ids
 from app.services.notifications import remove_for_transactions
-from app.services.settlement import check_settlement
+from app.services.settlement import SETTLEMENT_EPSILON, check_settlement, settled_total
 from app.services.validation import _assert_account_type, _load_owned_account
 
 COLLECTION = "transactions"
@@ -153,7 +153,6 @@ async def create(
     if (
         expense.get("type") != TransactionType.EXPENSE.value
         or expense.get("kind") == TransactionKind.TRANSFER.value
-        or is_settlement_pair(expense)
         or (
             expense["account_type"] == AccountType.PERSONAL.value
             and expense["owner_id"] != user.id
@@ -295,6 +294,11 @@ async def update(
             lock=True,
             session=session,
         )
+        # The payment entry can itself be settled again; keep it covering that.
+        if payload.amount + SETTLEMENT_EPSILON < await settled_total(
+            db, str(expense["_id"]), session=session
+        ):
+            _reject("이 정산금이 다시 정산되어 있어 그보다 적게 바꿀 수 없습니다.")
         await db[COLLECTION].update_many(
             {"_id": {"$in": [income["_id"], expense["_id"]]}},
             {
@@ -316,6 +320,8 @@ async def delete(db: AsyncIOMotorDatabase, user: UserOut, existing: dict) -> Non
     income, expense = await _load_pair(db, user, existing)
 
     async def write(session):
+        if await settled_total(db, str(expense["_id"]), session=session) > 0:
+            _reject("이 정산금이 다시 정산되어 있어 삭제할 수 없습니다. 그 정산을 먼저 삭제해 주세요.")
         await db[COLLECTION].delete_many(
             {"_id": {"$in": [income["_id"], expense["_id"]]}}, session=session
         )
