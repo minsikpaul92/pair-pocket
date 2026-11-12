@@ -242,18 +242,38 @@ def test_accounts_must_sit_in_the_right_ledger_and_currency(env):
     assert len(docs(env)) == 1
 
 
-def test_payment_entry_cannot_be_settled_again(env):
+def test_payment_entry_can_be_settled_again(env):
     shared, personal = env.accounts.shared, env.accounts.personal
     expense_id = add_expense(env, "shared", shared)
     settle(env, expense_id, shared, personal, amount=40)
     _, payment = pair(env)
 
-    res = settle(env, str(payment["_id"]), personal, shared, amount=10)
-    assert res.status_code == 422
     listed = env.client.get(
         "/api/transactions/settleable?currency=CAD&account_type=personal"
     )
-    assert str(payment["_id"]) not in {row["id"] for row in listed.json()}
+    assert str(payment["_id"]) in {row["id"] for row in listed.json()}
+
+    res = settle(env, str(payment["_id"]), personal, shared, amount=10)
+    assert res.status_code == 201, res.text
+    assert run(settled_total(env.db, str(payment["_id"]))) == 10
+    assert settle(
+        env, str(payment["_id"]), personal, shared, amount=31
+    ).status_code == 422
+
+
+def test_resettled_payment_cannot_shrink_or_go_until_the_resettlement_goes(env):
+    shared, personal = env.accounts.shared, env.accounts.personal
+    expense_id = add_expense(env, "shared", shared)
+    settle(env, expense_id, shared, personal, amount=40)
+    _, payment = pair(env)
+    settle(env, str(payment["_id"]), personal, shared, amount=30)
+    path = f"/api/transactions/{payment['_id']}"
+
+    assert env.client.delete(path).status_code == 422
+    shrink = body(
+        account_type="personal", account_id=str(personal["_id"]), amount=20
+    )
+    assert env.client.put(path, json=shrink).status_code == 422
 
 
 def test_unknown_expense_is_rejected(env):
