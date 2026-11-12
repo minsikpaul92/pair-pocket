@@ -248,6 +248,27 @@ export function completeSignIn(code: string): Promise<boolean> {
   });
 }
 
+/**
+ * Finish a first sign-in: the account is created only now, after the user
+ * agreed. False when the pending sign-up expired.
+ */
+export async function signUp(token: string): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await fetch(`${SESSION_BASE}/signup`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, agree: true }),
+    });
+  } catch {
+    throw new ApiError("network");
+  }
+  if (res.status === 401) return false;
+  if (!res.ok) throw new ApiError("serverUnavailable");
+  return completeSignIn(((await res.json()) as { code: string }).code);
+}
+
 /** Tokens issued before renewable sessions carry no session id (`sid`). */
 function isLegacyToken(token: string): boolean {
   try {

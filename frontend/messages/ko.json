@@ -134,7 +134,8 @@
       "body": "PairPocket을 쓰려면 이용약관과 개인정보 처리방침에 동의해 주세요.",
       "label": "<terms>이용약관</terms>과 <privacy>개인정보 처리방침</privacy>에 동의합니다.",
       "continue": "계속",
-      "signOut": "로그아웃"
+      "signOut": "로그아웃",
+      "cancel": "취소"
     }
   },
   "invite": {
@@ -672,6 +673,7 @@
     "createInvitation": "초대를 보내지 못했습니다.",
     "acceptInvitation": "초대를 수락하지 못했습니다.",
     "acceptTerms": "동의를 저장하지 못했어요.",
+    "signupExpired": "로그인 시간이 지났어요. 다시 로그인해 주세요.",
     "revokePendingInvitation": "초대를 취소하지 못했습니다.",
     "unlinkPartnership": "파트너 연결을 해제하지 못했습니다.",
     "invalidAmount": "금액을 올바르게 입력해 주세요.",

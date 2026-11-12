@@ -4,16 +4,17 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
-import { acceptTerms, signOut } from "@/lib/api";
 import { translateError } from "@/lib/errors";
 
 interface Props {
-  onAccepted: () => void;
-  onSignedOut: () => void;
+  /** Save the agreement; throw to show an error and let the user retry. */
+  onAgree: () => Promise<void>;
+  onCancel: () => void;
+  cancelKey: "signOut" | "cancel";
 }
 
-/** Shown after sign-in until the user agrees to the current terms. */
-export default function TermsConsent({ onAccepted, onSignedOut }: Props) {
+/** Asks the user to agree to the current terms and privacy policy. */
+export default function TermsConsent({ onAgree, onCancel, cancelKey }: Props) {
   const t = useTranslations("auth.consent");
   const tErrors = useTranslations("errors");
   const [agreed, setAgreed] = useState(false);
@@ -24,8 +25,7 @@ export default function TermsConsent({ onAccepted, onSignedOut }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await acceptTerms();
-      onAccepted();
+      await onAgree();
     } catch (err) {
       setError(translateError(err, tErrors));
       setSaving(false);
@@ -33,7 +33,7 @@ export default function TermsConsent({ onAccepted, onSignedOut }: Props) {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-gray-50 px-5 dark:bg-black">
+    <div className="flex min-h-dvh items-center justify-center bg-gray-50 px-5 dark:bg-black">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm dark:bg-gray-900">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
           {t("title")}
@@ -65,10 +65,10 @@ export default function TermsConsent({ onAccepted, onSignedOut }: Props) {
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => void signOut().finally(onSignedOut)}
+            onClick={onCancel}
             className="whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
           >
-            {t("signOut")}
+            {t(cancelKey)}
           </button>
           <button
             type="button"
@@ -80,6 +80,6 @@ export default function TermsConsent({ onAccepted, onSignedOut }: Props) {
           </button>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

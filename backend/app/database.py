@@ -76,6 +76,7 @@ async def _ensure_indexes() -> None:
         ("auth_sessions", "token_hash"),
         ("auth_login_codes", "code_hash"),
         ("auth_legacy_upgrades", "token_hash"),
+        ("auth_pending_signups", "token_hash"),
     ):
         await db.database[collection].create_index(key, unique=True)
         await db.database[collection].create_index("expires_at", expireAfterSeconds=0)

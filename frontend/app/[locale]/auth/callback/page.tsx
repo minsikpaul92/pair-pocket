@@ -5,7 +5,9 @@ import { useTranslations } from "next-intl";
 import { Suspense, useEffect, useState } from "react";
 
 import { useRouter } from "@/i18n/navigation";
-import { completeSignIn, setToken } from "@/lib/api";
+import TermsConsent from "@/components/TermsConsent";
+import { completeSignIn, setToken, signUp } from "@/lib/api";
+import { ApiError } from "@/lib/errors";
 
 // The code is single-use; re-running the effect (Strict Mode) must not spend it twice.
 const redemptions = new Map<string, Promise<boolean>>();
@@ -19,25 +21,28 @@ function redeemOnce(code: string): Promise<boolean> {
   return redemption;
 }
 
+function continueIntoApp(replace: (href: string) => void) {
+  const pendingInvite =
+    typeof window !== "undefined"
+      ? window.sessionStorage.getItem("pairpocket_pending_invite")
+      : null;
+  replace(pendingInvite ? `/invite/${pendingInvite}` : "/");
+}
+
 function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useTranslations("auth");
   const [message, setMessage] = useState(t("processing"));
+  // First sign-in: the account is not created until the user agrees.
+  const signup = searchParams.get("signup");
 
   useEffect(() => {
+    if (signup) return;
     const code = searchParams.get("code");
     // Legacy: an API deployed before renewable sessions sends the token itself.
     const token = searchParams.get("token");
     const error = searchParams.get("error");
-
-    function continueIntoApp() {
-      const pendingInvite =
-        typeof window !== "undefined"
-          ? window.sessionStorage.getItem("pairpocket_pending_invite")
-          : null;
-      router.replace(pendingInvite ? `/invite/${pendingInvite}` : "/");
-    }
 
     if (error) {
       setMessage(
@@ -53,7 +58,7 @@ function CallbackHandler() {
       redeemOnce(code).then((ok) => {
         if (cancelled) return;
         if (ok) {
-          continueIntoApp();
+          continueIntoApp(router.replace);
           return;
         }
         setMessage(t("failed"));
@@ -67,14 +72,27 @@ function CallbackHandler() {
 
     if (token) {
       setToken(token);
-      continueIntoApp();
+      continueIntoApp(router.replace);
       return;
     }
 
     setMessage(t("invalidAccess"));
     const timer = setTimeout(() => router.replace("/"), 2000);
     return () => clearTimeout(timer);
-  }, [router, searchParams, t]);
+  }, [router, searchParams, signup, t]);
+
+  if (signup) {
+    return (
+      <TermsConsent
+        cancelKey="cancel"
+        onAgree={async () => {
+          if (!(await signUp(signup))) throw new ApiError("signupExpired");
+          continueIntoApp(router.replace);
+        }}
+        onCancel={() => router.replace("/")}
+      />
+    );
+  }
 
   return (
     <p className="text-base text-gray-700 dark:text-gray-300">{message}</p>

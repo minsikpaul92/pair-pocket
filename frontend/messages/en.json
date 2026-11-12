@@ -134,7 +134,8 @@
       "body": "Please agree to our terms and privacy policy to use PairPocket.",
       "label": "I agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
       "continue": "Continue",
-      "signOut": "Sign out"
+      "signOut": "Sign out",
+      "cancel": "Cancel"
     }
   },
   "invite": {
@@ -672,6 +673,7 @@
     "createInvitation": "Could not send invite.",
     "acceptInvitation": "Could not accept invite.",
     "acceptTerms": "Could not save your agreement.",
+    "signupExpired": "Your sign-in expired. Please sign in again.",
     "revokePendingInvitation": "Could not cancel invite.",
     "unlinkPartnership": "Could not disconnect partner.",
     "invalidAmount": "Enter a valid amount.",

@@ -271,3 +271,61 @@ def test_terms_must_be_accepted_once_per_version(env, monkeypatch):
 
 def test_accepting_terms_needs_a_sign_in(env):
     assert env.client.post("/api/auth/terms").status_code in (401, 403)
+
+
+def google_callback(env, monkeypatch, sub, email):
+    async def fake_token(request):
+        return {"userinfo": {"sub": sub, "email": email, "name": "New", "picture": None}}
+
+    monkeypatch.setattr(auth.oauth.google, "authorize_access_token", fake_token)
+    return env.client.get("/api/auth/callback", follow_redirects=False)
+
+
+def test_first_google_sign_in_is_not_saved_until_the_user_agrees(env, monkeypatch):
+    res = google_callback(env, monkeypatch, "g-new", "new@example.com")
+    query = parse_qs(urlparse(res.headers["location"]).query)
+    assert "signup" in query and "code" not in query
+    assert run(env.db.users.find_one({"google_id": "g-new"})) is None
+    assert run(env.db[sessions.PENDING_SIGNUPS].count_documents({})) == 1
+
+    # Agreeing creates the account, records the agreement, and signs in.
+    res = env.client.post(
+        "/api/auth/signup", json={"token": query["signup"][0], "agree": True}
+    )
+    assert res.status_code == 200, res.text
+    saved = run(env.db.users.find_one({"google_id": "g-new"}))
+    assert saved["email"] == "new@example.com"
+    assert saved["terms_version"] == "2026-11-12" and saved["terms_agreed_at"]
+    assert run(env.db.user_settings.find_one({"owner_id": str(saved["_id"])}))
+    session = env.client.post("/api/auth/session", json={"code": res.json()["code"]})
+    assert env.me(session.json()["access_token"]).json()["terms_accepted"] is True
+
+
+def test_signup_without_agreeing_creates_nothing(env, monkeypatch):
+    res = google_callback(env, monkeypatch, "g-new", "new@example.com")
+    token = parse_qs(urlparse(res.headers["location"]).query)["signup"][0]
+
+    refused = env.client.post("/api/auth/signup", json={"token": token, "agree": False})
+    assert refused.status_code == 422
+    assert run(env.db.users.find_one({"google_id": "g-new"})) is None
+
+
+def test_pending_signup_is_single_use_and_expires(env, monkeypatch):
+    res = google_callback(env, monkeypatch, "g-new", "new@example.com")
+    token = parse_qs(urlparse(res.headers["location"]).query)["signup"][0]
+    run(
+        env.db[sessions.PENDING_SIGNUPS].update_one(
+            {}, {"$set": {"expires_at": datetime.utcnow() - timedelta(seconds=1)}}
+        )
+    )
+    expired = env.client.post("/api/auth/signup", json={"token": token, "agree": True})
+    assert expired.status_code == 401
+    assert run(env.db.users.find_one({"google_id": "g-new"})) is None
+    again = env.client.post("/api/auth/signup", json={"token": token, "agree": True})
+    assert again.status_code == 401
+
+
+def test_a_returning_user_signs_in_without_the_signup_step(env, monkeypatch):
+    res = google_callback(env, monkeypatch, "g-1", "owner@example.com")
+    query = parse_qs(urlparse(res.headers["location"]).query)
+    assert "code" in query and "signup" not in query

@@ -7,6 +7,13 @@ class LoginCodeIn(BaseModel):
     code: str
 
 
+class SignupIn(BaseModel):
+    """Finish a first sign-in: the pending token plus the user's agreement."""
+
+    token: str
+    agree: bool
+
+
 class SessionOut(BaseModel):
     """A fresh access token; the refresh credential travels as a cookie."""
 
