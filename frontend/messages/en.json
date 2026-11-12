@@ -128,7 +128,14 @@
     "valueSettleBody": "See who paid what and the amount to settle right away.",
     "setupNote": "Setup takes about 3 minutes. Everything after the first screen can be skipped.",
     "googleNote": "Google only confirms who you are, using your name, email and profile photo.",
-    "currencyNote": "Works with both KRW and CAD."
+    "currencyNote": "Works with both KRW and CAD.",
+    "consent": {
+      "title": "Before you start",
+      "body": "Please agree to our terms and privacy policy to use PairPocket.",
+      "label": "I agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+      "continue": "Continue",
+      "signOut": "Sign out"
+    }
   },
   "invite": {
     "title": "Invite partner",
@@ -664,6 +671,7 @@
     "fetchInvitationMe": "Could not load invite status.",
     "createInvitation": "Could not send invite.",
     "acceptInvitation": "Could not accept invite.",
+    "acceptTerms": "Could not save your agreement.",
     "revokePendingInvitation": "Could not cancel invite.",
     "unlinkPartnership": "Could not disconnect partner.",
     "invalidAmount": "Enter a valid amount.",

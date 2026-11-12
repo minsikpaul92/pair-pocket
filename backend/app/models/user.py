@@ -3,6 +3,10 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
 
+# Bump when the terms or privacy policy change; everyone then agrees again.
+CURRENT_TERMS_VERSION = "2026-11-12"
+
+
 class UserBase(BaseModel):
     """Profile fields sourced from the Google account (PRD.md §4 `users`)."""
 
@@ -34,3 +38,5 @@ class UserOut(UserBase):
     id: str
     google_id: str
     shared_group_id: str | None = None
+    # True once the user agreed to the current terms version.
+    terms_accepted: bool = False

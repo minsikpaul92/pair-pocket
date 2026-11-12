@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
+from bson import ObjectId
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -16,7 +17,7 @@ from app.core.security import (
 )
 from app.database import get_database
 from app.models.session import LoginCodeIn, SessionOut
-from app.models.user import UserOut
+from app.models.user import CURRENT_TERMS_VERSION, UserOut
 from app.services.sessions import (
     IssuedSession,
     SessionError,
@@ -258,6 +259,23 @@ async def upgrade_legacy_session(
 @router.get("/me", response_model=UserOut)
 async def read_me(current_user: UserOut = Depends(get_current_user)) -> UserOut:
     return current_user
+
+
+@router.post("/terms", status_code=status.HTTP_204_NO_CONTENT)
+async def accept_terms(
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> None:
+    """Record that the user agreed to the current terms and privacy policy."""
+    await db["users"].update_one(
+        {"_id": ObjectId(current_user.id)},
+        {
+            "$set": {
+                "terms_version": CURRENT_TERMS_VERSION,
+                "terms_agreed_at": datetime.now(timezone.utc),
+            }
+        },
+    )
 
 
 def _require_trusted_origin(request: Request) -> None:

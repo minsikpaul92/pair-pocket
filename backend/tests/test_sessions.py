@@ -252,3 +252,22 @@ def test_session_token_cannot_be_upgraded(env):
         "/api/auth/session/upgrade", headers={"Authorization": f"Bearer {token}"}
     )
     assert res.status_code == 409
+
+
+def test_terms_must_be_accepted_once_per_version(env, monkeypatch):
+    token = env.sign_in()
+    headers = {"Authorization": f"Bearer {token}"}
+    assert env.me(token).json()["terms_accepted"] is False
+
+    assert env.client.post("/api/auth/terms", headers=headers).status_code == 204
+    assert env.me(token).json()["terms_accepted"] is True
+    saved = run(env.db.users.find_one({}))
+    assert saved["terms_version"] == "2026-11-12" and saved["terms_agreed_at"]
+
+    # A new terms version asks everyone again.
+    monkeypatch.setattr("app.core.security.CURRENT_TERMS_VERSION", "2027-01-01")
+    assert env.me(token).json()["terms_accepted"] is False
+
+
+def test_accepting_terms_needs_a_sign_in(env):
+    assert env.client.post("/api/auth/terms").status_code in (401, 403)

@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import AppShell from "@/components/AppShell";
 import LoginLanding from "@/components/LoginLanding";
+import TermsConsent from "@/components/TermsConsent";
 import { useRouter } from "@/i18n/navigation";
 import { locales, type AppLocale } from "@/i18n/locales";
 import {
@@ -44,6 +45,8 @@ export default function Home() {
         setLoadFailed(false);
         const u = await fetchCurrentUser();
         setUser(u);
+        // Agree to the terms first; the redirects below wait until then.
+        if (u && !u.terms_accepted) return;
         const storedLocal =
           typeof window !== "undefined"
             ? localStorage.getItem("pairpocket_user_locale")
@@ -127,6 +130,18 @@ export default function Home() {
 
   if (!user) {
     return <LoginLanding />;
+  }
+
+  if (!user.terms_accepted) {
+    return (
+      <TermsConsent
+        onAccepted={() => {
+          setLoading(true);
+          setAttempt((n) => n + 1);
+        }}
+        onSignedOut={() => setUser(null)}
+      />
+    );
   }
 
   return <AppShell user={user} onLogout={() => setUser(null)} />;

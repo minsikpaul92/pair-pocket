@@ -144,6 +144,7 @@ export interface CurrentUser {
   name: string;
   picture: string | null;
   shared_group_id: string | null;
+  terms_accepted: boolean;
 }
 
 /**
@@ -264,6 +265,15 @@ async function upgradeLegacySession(): Promise<void> {
   await requestSession("/session/upgrade", {
     headers: { Authorization: `Bearer ${token}` },
   }).catch(() => false);
+}
+
+/** Record that the signed-in user agreed to the current terms. */
+export async function acceptTerms(): Promise<void> {
+  const res = await apiFetch(`${SESSION_BASE}/terms`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new ApiError("acceptTerms");
 }
 
 export async function signOut(): Promise<void> {

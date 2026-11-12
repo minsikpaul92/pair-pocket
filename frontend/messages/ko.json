@@ -128,7 +128,14 @@
     "valueSettleBody": "누가 얼마를 냈는지 보고, 정산할 금액을 바로 확인해요.",
     "setupNote": "설정은 약 3분이면 돼요. 첫 화면 이후는 모두 건너뛸 수 있어요.",
     "googleNote": "Google은 이름, 이메일, 프로필 사진으로 본인 확인만 해요.",
-    "currencyNote": "원화(KRW)와 캐나다 달러(CAD)를 함께 쓸 수 있어요."
+    "currencyNote": "원화(KRW)와 캐나다 달러(CAD)를 함께 쓸 수 있어요.",
+    "consent": {
+      "title": "시작하기 전에",
+      "body": "PairPocket을 쓰려면 이용약관과 개인정보 처리방침에 동의해 주세요.",
+      "label": "<terms>이용약관</terms>과 <privacy>개인정보 처리방침</privacy>에 동의합니다.",
+      "continue": "계속",
+      "signOut": "로그아웃"
+    }
   },
   "invite": {
     "title": "파트너 초대",
@@ -664,6 +671,7 @@
     "fetchInvitationMe": "초대 상태를 불러오지 못했습니다.",
     "createInvitation": "초대를 보내지 못했습니다.",
     "acceptInvitation": "초대를 수락하지 못했습니다.",
+    "acceptTerms": "동의를 저장하지 못했어요.",
     "revokePendingInvitation": "초대를 취소하지 못했습니다.",
     "unlinkPartnership": "파트너 연결을 해제하지 못했습니다.",
     "invalidAmount": "금액을 올바르게 입력해 주세요.",
