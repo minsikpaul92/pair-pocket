@@ -86,6 +86,7 @@
     "tagline": "둘이 함께, 또 각자 쓰는 가계부",
     "description": "공용 주머니와 개인 주머니를 한 앱에서 관리하고, 정산까지 한 번에 해요.",
     "loginWithGoogle": "Google 계정으로 로그인",
+    "agreeNote": "로그인하면 <terms>이용약관</terms>과 <privacy>개인정보 처리방침</privacy>에 동의한 것으로 봐요.",
     "processing": "로그인 처리 중...",
     "failed": "로그인에 실패했습니다. 다시 시도해 주세요.",
     "oauthNotConfigured": "Google 로그인이 아직 설정되지 않았습니다. 관리자에게 문의하거나 로컬 미리보기를 사용하세요.",

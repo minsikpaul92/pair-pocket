@@ -4,6 +4,7 @@ import { HandCoins, Users, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import LocaleToggle from "@/components/LocaleToggle";
+import { Link } from "@/i18n/navigation";
 import { loginUrl } from "@/lib/api";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -68,6 +69,20 @@ export default function LoginLanding() {
           <GoogleIcon className="h-5 w-5" />
           {t("loginWithGoogle")}
         </a>
+        <p className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">
+          {t.rich("agreeNote", {
+            terms: (chunks) => (
+              <Link href="/terms" className="underline">
+                {chunks}
+              </Link>
+            ),
+            privacy: (chunks) => (
+              <Link href="/privacy" className="underline">
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
         <p className="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">
           {t("setupNote")}
         </p>

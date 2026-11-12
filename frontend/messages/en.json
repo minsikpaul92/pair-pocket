@@ -86,6 +86,7 @@
     "tagline": "Shared and personal money, side by side",
     "description": "Keep shared and personal pockets in one app, and settle up in a tap.",
     "loginWithGoogle": "Sign in with Google",
+    "agreeNote": "By signing in, you agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
     "processing": "Signing in...",
     "failed": "Sign-in failed. Please try again.",
     "oauthNotConfigured": "Google sign-in is not configured yet. Ask an admin, or use local preview login.",
