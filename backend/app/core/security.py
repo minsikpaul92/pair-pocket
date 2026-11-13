@@ -7,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import get_settings
 from app.database import get_database
-from app.models.user import UserOut
+from app.models.user import CURRENT_TERMS_VERSION, UserOut
 
 bearer_scheme = HTTPBearer(auto_error=True)
 
@@ -76,4 +76,5 @@ async def get_current_user(
         name=document["name"],
         picture=document.get("picture"),
         shared_group_id=document.get("shared_group_id"),
+        terms_accepted=document.get("terms_version") == CURRENT_TERMS_VERSION,
     )

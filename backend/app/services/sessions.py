@@ -21,6 +21,9 @@ from app.services import db_transactions
 SESSIONS = "auth_sessions"
 LOGIN_CODES = "auth_login_codes"
 LEGACY_UPGRADES = "auth_legacy_upgrades"
+PENDING_SIGNUPS = "auth_pending_signups"
+# A first-time Google profile waits this long for the user to agree to the terms.
+PENDING_SIGNUP_SECONDS = 15 * 60
 
 
 class SessionError(Exception):
@@ -82,6 +85,29 @@ async def redeem_login_code(db, code: str) -> str:
     if doc is None or doc["expires_at"] <= datetime.utcnow():
         raise SessionError("Sign-in code is invalid or expired.")
     return doc["user_id"]
+
+
+async def create_pending_signup(db, profile: dict) -> str:
+    """Hold a new Google profile until the user agrees; nothing goes in `users`."""
+    token = _new_secret()
+    now = datetime.utcnow()
+    await db[PENDING_SIGNUPS].insert_one(
+        {
+            "token_hash": _hash(token),
+            "profile": profile,
+            "created_at": now,
+            "expires_at": now + timedelta(seconds=PENDING_SIGNUP_SECONDS),
+        }
+    )
+    return token
+
+
+async def claim_pending_signup(db, token: str) -> dict:
+    """Consume a pending sign-up and return the held Google profile."""
+    doc = await db[PENDING_SIGNUPS].find_one_and_delete({"token_hash": _hash(token)})
+    if doc is None or doc["expires_at"] <= datetime.utcnow():
+        raise SessionError("Sign-up is invalid or expired. Please sign in again.")
+    return doc["profile"]
 
 
 async def start_session(

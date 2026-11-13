@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
+from bson import ObjectId
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -15,12 +16,14 @@ from app.core.security import (
     get_current_user,
 )
 from app.database import get_database
-from app.models.session import LoginCodeIn, SessionOut
-from app.models.user import UserOut
+from app.models.session import LoginCodeIn, SessionOut, SignupIn
+from app.models.user import CURRENT_TERMS_VERSION, UserOut
 from app.services.sessions import (
     IssuedSession,
     SessionError,
     claim_legacy_upgrade,
+    claim_pending_signup,
+    create_pending_signup,
     create_login_code,
     redeem_login_code,
     revoke_session,
@@ -113,7 +116,7 @@ async def _dev_login_redirect(db: AsyncIOMotorDatabase) -> RedirectResponse:
 
 @router.get("/callback")
 async def callback(request: Request, db: AsyncIOMotorDatabase = Depends(get_database)):
-    """Handle Google's redirect: exchange the code, upsert the user, issue a JWT."""
+    """Handle Google's redirect: sign a known user in, or hold a new profile aside."""
     try:
         token = await oauth.google.authorize_access_token(request)
     except OAuthError:
@@ -130,28 +133,34 @@ async def callback(request: Request, db: AsyncIOMotorDatabase = Depends(get_data
         "expires_at": token.get("expires_at"),
     }
 
-    # Upsert the user, keeping any existing shared_group_id intact.
+    profile = {
+        "google_id": google_id,
+        "email": userinfo.get("email"),
+        "name": userinfo.get("name"),
+        "picture": userinfo.get("picture"),
+        "google_tokens": google_tokens,
+    }
+
+    existing = await db["users"].find_one({"google_id": google_id}, {"_id": 1})
+    if existing is None:
+        # First sign-in: keep the profile aside, not in `users`, until the user
+        # agrees to the terms (see POST /signup).
+        return _redirect_to_frontend(signup=await create_pending_signup(db, profile))
+
+    # Returning user: refresh the profile, keeping shared_group_id intact.
+    user_id = str(existing["_id"])
     await db["users"].update_one(
-        {"google_id": google_id},
-        {
-            "$set": {
-                "email": userinfo.get("email"),
-                "name": userinfo.get("name"),
-                "picture": userinfo.get("picture"),
-                "google_tokens": google_tokens,
-            },
-            "$setOnInsert": {
-                "google_id": google_id,
-                "shared_group_id": None,
-            },
-        },
-        upsert=True,
+        {"_id": existing["_id"]},
+        {"$set": {k: v for k, v in profile.items() if k != "google_id"}},
     )
+    await _ensure_user_settings(db, user_id)
 
-    document = await db["users"].find_one({"google_id": google_id})
-    user_id = str(document["_id"])
+    # A one-time code, not a token: URLs end up in history and logs.
+    return _redirect_to_frontend(code=await create_login_code(db, user_id))
 
-    # Ensure a settings document exists for merchant/institution autocomplete hints.
+
+async def _ensure_user_settings(db: AsyncIOMotorDatabase, user_id: str) -> None:
+    """Make sure a settings document exists for merchant/institution hints."""
     await db["user_settings"].update_one(
         {"owner_id": user_id},
         {
@@ -168,8 +177,39 @@ async def callback(request: Request, db: AsyncIOMotorDatabase = Depends(get_data
         upsert=True,
     )
 
-    # A one-time code, not a token: URLs end up in history and logs.
-    return _redirect_to_frontend(code=await create_login_code(db, user_id))
+
+@router.post("/signup")
+async def signup(
+    body: SignupIn, request: Request, db: AsyncIOMotorDatabase = Depends(get_database)
+) -> dict:
+    """Create the account once the user has agreed; return a login code."""
+    _require_trusted_origin(request)
+    if not body.agree:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Agree to the terms to continue."
+        )
+    try:
+        profile = await claim_pending_signup(db, body.token)
+    except SessionError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc))
+
+    now = datetime.now(timezone.utc)
+    await db["users"].update_one(
+        {"google_id": profile["google_id"]},
+        {
+            "$set": {
+                **{k: v for k, v in profile.items() if k != "google_id"},
+                "terms_version": CURRENT_TERMS_VERSION,
+                "terms_agreed_at": now,
+            },
+            "$setOnInsert": {"google_id": profile["google_id"], "shared_group_id": None},
+        },
+        upsert=True,
+    )
+    document = await db["users"].find_one({"google_id": profile["google_id"]})
+    user_id = str(document["_id"])
+    await _ensure_user_settings(db, user_id)
+    return {"code": await create_login_code(db, user_id)}
 
 
 @router.post("/session", response_model=SessionOut)
@@ -260,6 +300,23 @@ async def read_me(current_user: UserOut = Depends(get_current_user)) -> UserOut:
     return current_user
 
 
+@router.post("/terms", status_code=status.HTTP_204_NO_CONTENT)
+async def accept_terms(
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> None:
+    """Record that the user agreed to the current terms and privacy policy."""
+    await db["users"].update_one(
+        {"_id": ObjectId(current_user.id)},
+        {
+            "$set": {
+                "terms_version": CURRENT_TERMS_VERSION,
+                "terms_agreed_at": datetime.now(timezone.utc),
+            }
+        },
+    )
+
+
 def _require_trusted_origin(request: Request) -> None:
     """Cookie-authenticated routes reject requests from other sites."""
     origin = request.headers.get("origin")
@@ -303,11 +360,13 @@ def _session_ended(detail: str) -> JSONResponse:
 
 
 def _redirect_to_frontend(
-    *, code: str | None = None, error: str | None = None
+    *, code: str | None = None, signup: str | None = None, error: str | None = None
 ) -> RedirectResponse:
     params = {}
     if code:
         params["code"] = code
+    if signup:
+        params["signup"] = signup
     if error:
         params["error"] = error
     query = f"?{urlencode(params)}" if params else ""
