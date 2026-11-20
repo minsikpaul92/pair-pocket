@@ -52,6 +52,11 @@ import SettingsView, { type SettingsTab } from "@/components/SettingsView";
 import ImportView from "@/components/ImportView";
 import MonthPicker from "@/components/MonthPicker";
 import FloatingActionStack from "@/components/FloatingActionStack";
+import TourProvider, {
+  type TourApi,
+  type TourSetupHandlers,
+} from "@/components/tour/TourProvider";
+import { signal } from "@/lib/tour/signals";
 import { LineChart, Sparkles } from "lucide-react";
 import {
   AccountType,
@@ -249,6 +254,7 @@ export default function AppShell({ user, onLogout }: Props) {
   const [partner, setPartner] = useState<PartnerSummary | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
+  const tourRef = useRef<TourApi>(null);
   const [month, setMonth] = useState<Date>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -569,12 +575,15 @@ export default function AppShell({ user, onLogout }: Props) {
     const viewParam = params.get("view");
     const subId = params.get("subscription");
     const action = params.get("action");
+    // `?tour=<id>` starts a tour from the first step (testing and clip recording).
+    const tourParam = params.get("tour");
     if (isView(viewParam)) setView(viewParam);
     if (subId) {
       setSubscriptionFocusId(subId);
       if (action === "cancel") setSubscriptionCancelAction(true);
     }
-    if (viewParam || subId) {
+    if (tourParam) tourRef.current?.start(tourParam);
+    if (viewParam || subId || tourParam) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -789,6 +798,7 @@ export default function AppShell({ user, onLogout }: Props) {
     setEditingTransaction(null);
     setParsedData(null);
     bumpVersion();
+    signal("txSaved");
   }
 
   function closeModal() {
@@ -841,6 +851,41 @@ export default function AppShell({ user, onLogout }: Props) {
     }
   }
 
+  // Tell a running tour when the entry form opens or closes.
+  const entryModalOpen = Boolean(modalDate && presets);
+  const entryModalWasOpen = useRef(false);
+  useEffect(() => {
+    if (entryModalOpen === entryModalWasOpen.current) return;
+    entryModalWasOpen.current = entryModalOpen;
+    signal(entryModalOpen ? "entryModalOpened" : "entryModalClosed");
+  }, [entryModalOpen]);
+
+  // What a tour step may ask the app to do before it is shown.
+  const tourSetup: TourSetupHandlers = {
+    openView: ({ view: next }) => openView(next),
+    setAccountType: ({ accountType: next }) => {
+      if (next === "shared" && !currentUser.shared_group_id) return;
+      setAccountType(next);
+    },
+    setScope: ({ scope: next }) => {
+      if (enabledScopes.includes(next)) setScope(next);
+    },
+    openSettingsTab: ({ tab }) => {
+      openView("settings");
+      setSettingsTab(tab);
+    },
+    expandFab: () => signal("expandFab"),
+    openEntryModal: () => {
+      if (!modalDate) openModal(new Date());
+    },
+    closeModals: () => {
+      closeModal();
+      setInviteOpen(false);
+      setScanMenuOpen(false);
+      setScanQueueOpen(false);
+    },
+  };
+
   const modalDayTransactions = modalDate
     ? transactions.filter(
         (tx) => dayKey(parseDate(tx.date)) === dayKey(modalDate)
@@ -891,7 +936,7 @@ export default function AppShell({ user, onLogout }: Props) {
           </button>
         </div>
 
-        <nav className="mt-8 space-y-1">
+        <nav data-tour="nav" className="mt-8 space-y-1">
           {NAV.map((item) => {
             const label = tNav(item.labelKey);
             return (
@@ -990,6 +1035,7 @@ export default function AppShell({ user, onLogout }: Props) {
                 aria-hidden
               />
               <div
+                data-tour="ledger-type"
                 className={`flex min-w-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 ${
                   visibleLedgers.length > 1 ? "flex-auto sm:flex-1" : "flex-none"
                 }`}
@@ -1101,7 +1147,10 @@ export default function AppShell({ user, onLogout }: Props) {
               </h1>
             </div>
           ) : (
-          <div className="mb-4 flex items-center justify-between gap-2">
+          <div
+            data-tour="ledger-month"
+            className="mb-4 flex items-center justify-between gap-2"
+          >
             <div className="min-w-0">
               {view === "calendar" ||
               view === "list" ||
@@ -1498,6 +1547,7 @@ export default function AppShell({ user, onLogout }: Props) {
       )}
 
       <AppUpdateWatcher />
+      <TourProvider ref={tourRef} setup={tourSetup} />
 
       {/* Floating Buttons Group — hidden on stocks/subscriptions (view-specific FAB) */}
       {view !== "stocks" && view !== "subscriptions" && (
@@ -1522,7 +1572,7 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
       )}
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 glass-bar border-t pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <nav data-tour="nav" className="md:hidden fixed bottom-0 inset-x-0 z-40 glass-bar border-t pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <div className="flex">
           {MOBILE_NAV.map((item) => (
             <button

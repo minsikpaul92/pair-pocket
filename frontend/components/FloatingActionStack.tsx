@@ -4,6 +4,8 @@ import { ChevronDown, ChevronUp, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 
+import { onSignal } from "@/lib/tour/signals";
+
 const FAB_EXPANDED_KEY = "pairpocket_fab_expanded";
 
 interface Props {
@@ -41,6 +43,10 @@ export default function FloatingActionStack({
     if (stored === "true") setExpanded(true);
   }, []);
 
+  // A tour step that points at the add button opens the stack first. This
+  // does not change the remembered choice.
+  useEffect(() => onSignal("expandFab", () => setExpanded(true)), []);
+
   function setExpandedPersist(next: boolean) {
     setExpanded(next);
     window.localStorage.setItem(FAB_EXPANDED_KEY, String(next));
@@ -69,6 +75,7 @@ export default function FloatingActionStack({
           type="button"
           onClick={onAdd}
           aria-label={addLabel}
+          data-tour="fab-add"
           className={`${actionBtn} bg-blue-500 hover:bg-blue-600 active:bg-blue-700`}
         >
           <AddIcon className="h-6 w-6" />
@@ -95,6 +102,7 @@ export default function FloatingActionStack({
               type="button"
               onClick={onAdd}
               aria-label={addLabel}
+              data-tour="fab-add"
               className={`${actionBtn} bg-blue-500 hover:bg-blue-600 active:bg-blue-700`}
             >
               <AddIcon className="h-6 w-6" />
