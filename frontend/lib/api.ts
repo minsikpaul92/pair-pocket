@@ -738,6 +738,7 @@ export interface UserSettings {
   ledger_start_date_locked?: boolean;
   onboarding_personal_completed?: boolean;
   onboarding_personal_step?: number;
+  tutorial?: TutorialProgress;
   budgets?: Partial<Record<AccountType, Partial<Record<"CAD" | "KRW", number>>>>;
   /** Months (YYYY-MM) that start without last month's overspend deducted. */
   budget_carry_skipped?: Partial<Record<AccountType, string[]>>;
@@ -2490,6 +2491,34 @@ export async function saveOnboardingStep(step: number): Promise<UserSettings> {
     body: JSON.stringify({ step }),
   });
   if (!res.ok) throw new ApiError("saveOnboardingStep");
+  return (await res.json()) as UserSettings;
+}
+
+export type TutorialModuleId =
+  | "basics"
+  | "concepts"
+  | "subs"
+  | "stocks"
+  | "partner"
+  | "country";
+
+export interface TutorialProgress {
+  completed: TutorialModuleId[];
+  dismissed: boolean;
+  offer_shown: boolean;
+  whats_new_done: string[];
+}
+
+/** Always sends the whole object; saving the same one twice changes nothing. */
+export async function saveTutorialProgress(
+  tutorial: TutorialProgress
+): Promise<UserSettings> {
+  const res = await apiFetch(`${API_BASE_URL}/api/settings/tutorial`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(tutorial),
+  });
+  if (!res.ok) throw new ApiError("saveTutorialProgress");
   return (await res.json()) as UserSettings;
 }
 

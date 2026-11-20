@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.account import AccountCountry
 
@@ -33,6 +33,30 @@ COUNTRY_ORDER: tuple[str, ...] = tuple(country.value for country in AccountCount
 HOME_COUNTRY = AccountCountry.CA.value
 # UI languages that turned a country on before countries were stored.
 LEGACY_LOCALE_COUNTRIES: dict[str, str] = {"ko": AccountCountry.KR.value}
+
+
+# Tutorial modules, in display order. The client sends these ids back as-is.
+TUTORIAL_MODULE_IDS: tuple[str, ...] = (
+    "basics",
+    "concepts",
+    "subs",
+    "stocks",
+    "partner",
+    "country",
+)
+TUTORIAL_MAX_WHATS_NEW = 100
+TUTORIAL_MAX_ID_LENGTH = 64
+
+
+class TutorialProgress(BaseModel):
+    """Where a user is in the in-app tutorial. All fields have defaults so
+    older settings documents work."""
+
+    completed: list[str] = Field(default_factory=list)
+    dismissed: bool = False
+    offer_shown: bool = False
+    # What's New entries whose "Try it" walkthrough was finished.
+    whats_new_done: list[str] = Field(default_factory=list)
 
 
 class UserSettingsBase(BaseModel):
@@ -70,6 +94,7 @@ class UserSettingsBase(BaseModel):
     spending_excluded_accounts: list[str] | None = None
     # Province whose sales tax rate is used to estimate tax on CAD expenses.
     sales_tax_province: CanadaProvince = DEFAULT_SALES_TAX_PROVINCE
+    tutorial: TutorialProgress = Field(default_factory=TutorialProgress)
 
 
 class UserSettingsInDB(UserSettingsBase):
@@ -84,6 +109,32 @@ class UserSettingsOut(UserSettingsBase):
     partner_using_my_key: bool = False
     using_partner_key: bool = False
     ledger_start_date_locked: bool = False
+
+
+class TutorialProgressBody(BaseModel):
+    """The whole tutorial object; saving the same body twice changes nothing."""
+
+    completed: list[Annotated[str, Field(max_length=TUTORIAL_MAX_ID_LENGTH)]] = Field(
+        default_factory=list, max_length=len(TUTORIAL_MODULE_IDS)
+    )
+    dismissed: bool = False
+    offer_shown: bool = False
+    whats_new_done: list[
+        Annotated[str, Field(min_length=1, max_length=TUTORIAL_MAX_ID_LENGTH)]
+    ] = Field(default_factory=list, max_length=TUTORIAL_MAX_WHATS_NEW)
+
+    @field_validator("completed")
+    @classmethod
+    def _known_modules(cls, value: list[str]) -> list[str]:
+        unknown = [m for m in value if m not in TUTORIAL_MODULE_IDS]
+        if unknown:
+            raise ValueError(f"unknown tutorial module: {', '.join(unknown)}")
+        return list(dict.fromkeys(value))
+
+    @field_validator("whats_new_done")
+    @classmethod
+    def _dedupe(cls, value: list[str]) -> list[str]:
+        return list(dict.fromkeys(value))
 
 
 class ShareGeminiKeyBody(BaseModel):
