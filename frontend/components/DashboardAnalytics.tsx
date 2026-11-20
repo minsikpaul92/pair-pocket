@@ -61,6 +61,9 @@ const CATEGORY_PRESET_COLORS = [
   "#64748B", // Slate
 ];
 
+/** Group key for expenses with no sub-category; shown as t("uncategorized"). */
+const NO_SUB_CATEGORY = "";
+
 // Listed in an order where every neighbor (and last to first) stays easy to
 // tell apart, including for red-green color blindness.
 const CATEGORY_DEFAULT_COLORS: Record<string, string> = {
@@ -491,7 +494,7 @@ export default function DashboardAnalytics({
     );
     const map = new Map<string, { total: number; txs: Transaction[] }>();
     for (const tx of catTxs) {
-      const sub = tx.sub_category || "미분류";
+      const sub = tx.sub_category || NO_SUB_CATEGORY;
       const existing = map.get(sub) || { total: 0, txs: [] };
       existing.total += effectiveExpenseAmount(tx);
       existing.txs.push(tx);
@@ -1128,7 +1131,7 @@ export default function DashboardAnalytics({
                   <div
                     key={subCategory}
                     onClick={() => {
-                      const subVal = subCategory === "미분류" ? undefined : subCategory;
+                      const subVal = subCategory === NO_SUB_CATEGORY ? undefined : subCategory;
                       onCategoryClick?.(popoverCategory, subVal, true);
                       setPopoverCategory(null);
                     }}
@@ -1136,7 +1139,7 @@ export default function DashboardAnalytics({
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-bold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                        {subCategory === "미분류"
+                        {subCategory === NO_SUB_CATEGORY
                           ? t("uncategorized")
                           : translateSubCategory(subCategory, tSubCategories)} ›
                       </span>

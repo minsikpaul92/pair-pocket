@@ -1509,5 +1509,33 @@
         }
       }
     }
+  },
+  "tutorial": {
+    "common": {
+      "next": "Next",
+      "back": "Back",
+      "skip": "Skip",
+      "done": "Done",
+      "exit": "Exit tour",
+      "stepOf": "Step {current} of {total}",
+      "skipStep": "Skip this step",
+      "notFound": "This part is not on screen right now. You can skip this step or exit the tour."
+    },
+    "steps": {
+      "basics": {
+        "nav": {
+          "title": "Move around the app",
+          "body": "Open the calendar, list, dashboard, fixed expenses and stocks from here."
+        },
+        "ledger": {
+          "title": "Pick a ledger and a month",
+          "body": "Switch between your personal and shared ledger at the top. Change the month below it to see other months."
+        },
+        "add": {
+          "title": "Add an entry",
+          "body": "Press the add button to open the entry form. Nothing is saved until you choose to save."
+        }
+      }
+    }
   }
 }

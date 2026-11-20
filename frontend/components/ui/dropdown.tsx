@@ -26,6 +26,8 @@ interface Props {
   /** "sm" for dense rows such as table cells and review lists. */
   size?: "md" | "sm";
   className?: string;
+  /** Tour target id, set on the trigger button. */
+  "data-tour"?: string;
 }
 
 /**
@@ -41,6 +43,7 @@ export default function Dropdown({
   disabled = false,
   size = "md",
   className,
+  "data-tour": dataTour,
 }: Props) {
   const [open, setOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -70,6 +73,7 @@ export default function Dropdown({
           aria-label={ariaLabel}
           aria-haspopup="listbox"
           aria-expanded={open}
+          data-tour={dataTour}
           className={cn(
             "flex w-full min-w-0 items-center gap-2 rounded-xl border border-gray-200 bg-white text-left font-semibold text-gray-800 transition-colors hover:border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600",
             size === "sm" ? "px-3 py-2 text-xs" : "px-3.5 py-3 text-sm",
