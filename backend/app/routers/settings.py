@@ -30,6 +30,8 @@ from app.models.user_settings import (
     EnabledCountriesBody,
     SpendingAccountExclusionsBody,
     SpendingExclusionsBody,
+    TutorialProgress,
+    TutorialProgressBody,
     CustomCategoryMap,
     ExpenseRatioHiddenCategoriesBody,
     LedgerStartDateBody,
@@ -124,6 +126,15 @@ def _valid_ledger_start(value: str) -> bool:
     return len(value) == 10 and value[4] == "-" and value[7] == "-"
 
 
+def _tutorial_out(doc: dict) -> dict:
+    raw = doc.get("tutorial")
+    if not isinstance(raw, dict):
+        raw = {}
+    return TutorialProgress.model_validate(
+        {k: v for k, v in raw.items() if k in TutorialProgress.model_fields}
+    ).model_dump()
+
+
 async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
     colors = doc.get("category_colors") or {}
     if not isinstance(colors, dict):
@@ -183,6 +194,7 @@ async def _settings_out(db: AsyncIOMotorDatabase, doc: dict) -> dict:
         "ledger_start_date_locked": False,
         "onboarding_personal_completed": onboarded,
         "onboarding_personal_step": int(doc.get("onboarding_personal_step") or 0),
+        "tutorial": _tutorial_out(doc),
         "budgets": doc.get("budgets") or {},
         "budget_carry_skipped": doc.get("budget_carry_skipped") or {},
         "sales_tax_province": doc.get("sales_tax_province")
@@ -787,6 +799,27 @@ async def complete_onboarding(
     return await _settings_out(db, doc)
 
 
+@router.put("/tutorial", response_model=UserSettingsOut)
+async def save_tutorial_progress(
+    payload: TutorialProgressBody,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> dict:
+    await _get_or_create(db, current_user.id)
+    await db[COLLECTION].update_one(
+        {"owner_id": current_user.id},
+        {"$set": {"tutorial": payload.model_dump()}},
+    )
+    await write_audit_log(
+        db,
+        owner_id=current_user.id,
+        action="update",
+        entity="tutorial_progress",
+    )
+    doc = await db[COLLECTION].find_one({"owner_id": current_user.id})
+    return await _settings_out(db, doc)
+
+
 RESET_SCOPES = ("all", "ledger", "subscriptions", "stocks")
 RESET_LEDGER_TYPES = ("all", "personal", "shared")
 
@@ -892,6 +925,7 @@ async def reset_user_data(
                     "enabled_countries": None,
                     "ledger_start_date": None,
                     "shared_ledger_start_date": None,
+                    "tutorial": TutorialProgress().model_dump(),
                 }
             },
             upsert=True,
