@@ -856,7 +856,23 @@
     "restored": "지난 스캔에서 못 끝낸 파일 {count}개를 다시 불러왔어요.",
     "addRecent": "최근 스캔한 파일 다시 넣기 ({count}개, {days}일 보관)",
     "openRecent": "최근 스캔 ({count}개)",
-    "remove": "파일 빼기"
+    "remove": "파일 빼기",
+    "title": "AI 스캔 대기열",
+    "description": "사진을 모은 뒤 분석을 시작하세요. ({count} / {max})",
+    "empty": "아직 파일이 없습니다.",
+    "add": "추가",
+    "start": "분석 시작",
+    "analyzing": "분석 중…",
+    "clear": "대기열 비우기",
+    "errorUnsupported": "지원하지 않는 파일 형식입니다.",
+    "errorMax": "최대 {max}장까지 올릴 수 있습니다.",
+    "errorInvalidResult": "AI 분석 결과가 올바르지 않습니다.",
+    "errorFailed": "AI 분석 중 오류가 발생했습니다.",
+    "takePhoto": "사진 촬영",
+    "uploadPhoto": "사진 올리기 (갤러리)",
+    "uploadFile": "파일 올리기 (PDF/이미지)",
+    "loadingTitle": "AI 영수증 분석 중...",
+    "loadingBody": "Gemini가 항목을 판별하고 있습니다. 잠시만 기다려 주세요."
   },
   "importPage": {
     "title": "가져오기 · 내보내기",
@@ -1326,6 +1342,10 @@
   },
   "whatsNew": {
     "items": {
+      "scanQueueEnglishText": {
+        "title": "영어 화면의 영수증 스캔을 고쳤어요",
+        "description": "앱을 영어로 볼 때 영수증 스캔 대기열과 버튼, 오류 안내에 한국어가 섞여 나오던 문제를 고쳤어요."
+      },
       "resettlePayment": {
         "title": "정산한 금액을 다시 정산",
         "description": "개인과 공용 사이에서 정산하며 나간 금액을 나중에 다시 정산할 수 있어요. 예를 들어 갚을 때 쓸 수 있고, 필요한 만큼 반복할 수 있어요."

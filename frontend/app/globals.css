@@ -18,6 +18,11 @@ body {
   .glass-bar {
     @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-gray-200/50 dark:border-gray-800/50;
   }
+  @media (prefers-reduced-transparency: reduce) {
+    .glass-bar {
+      @apply bg-white dark:bg-gray-900 backdrop-blur-none;
+    }
+  }
 
   /* design.md §4-C inputs; at least 16px on phones so iOS does not zoom on focus */
   .input-field {

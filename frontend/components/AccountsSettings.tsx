@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscapeKey } from "@/lib/useEscapeKey";
 import { Landmark, Loader2, Pencil, Plus, Scale, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
@@ -49,6 +50,7 @@ function BalanceMatchModal({
 }) {
   const t = useTranslations("settingsPage");
   const tCommon = useTranslations("common");
+  useEscapeKey(onClose);
   const [actual, setActual] = useState("");
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
