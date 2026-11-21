@@ -909,7 +909,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           {selectedAccountIdFilter !== "ALL" && (
             <button
               onClick={() => setSelectedAccountIdFilter("ALL")}
-              className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline transition-all bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md"
+              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline transition-all bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md"
             >
               {t("showAll")}
             </button>
@@ -926,7 +926,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 : "bg-gray-50 dark:bg-gray-900 border-transparent hover:border-gray-200 dark:hover:border-gray-700"
             }`}
           >
-            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap">
+            <div className="text-xs text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap">
               {allAccountsLabel}
             </div>
             {useFxRollup ? (
@@ -935,7 +935,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   {formatStockAmount(totalStats.valuation, rollupCurrency)}
                 </div>
                 <div
-                  className={`text-[11px] font-bold mt-1.5 ${
+                  className={`text-xs font-bold mt-1.5 ${
                     totalStats.profit >= 0 ? "text-red-500" : "text-blue-500"
                   }`}
                 >
@@ -952,7 +952,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       {formatStockAmount(line.valuation, line.currency)}
                     </div>
                     <div
-                      className={`text-[11px] font-bold ${
+                      className={`text-xs font-bold ${
                         line.profit >= 0 ? "text-red-500" : "text-blue-500"
                       }`}
                     >
@@ -1022,7 +1022,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 >
                   <div className="flex items-center justify-between gap-1 min-w-0">
                     <GripVertical className="h-3 w-3 text-gray-500 dark:text-gray-400 shrink-0 cursor-grab" />
-                    <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap flex-1" title={`${acc.institution ? `[${acc.institution}] ` : ""}${acc.nickname || acc.name}`}>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-bold truncate whitespace-nowrap flex-1" title={`${acc.institution ? `[${acc.institution}] ` : ""}${acc.nickname || acc.name}`}>
                       {acc.institution ? `[${acc.institution}] ` : ""}{acc.nickname || acc.name}
                     </span>
                     <button
@@ -1043,7 +1043,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       <Filter className="h-3 w-3" />
                     </button>
                   </div>
-                  <div className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 mt-0.5">
+                  <div className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 mt-0.5">
                     {acc.currency}
                     {useFxRollup && acc.currency !== rollupCurrency
                       ? ` → ${rollupCurrency}`
@@ -1052,11 +1052,11 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   <div className="text-base font-black text-gray-900 dark:text-white mt-0.5 tabular-nums">
                     {formatStockAmount(cardValuation, cardCurrency)}
                   </div>
-                  <div className={`text-[11px] font-bold mt-1 ${isProfit ? "text-red-500" : "text-blue-500"}`}>
+                  <div className={`text-xs font-bold mt-1 ${isProfit ? "text-red-500" : "text-blue-500"}`}>
                     {isProfit ? "+" : ""}
                     {formatStockAmount(cardProfit, cardCurrency)} ({cardYield.toFixed(1)}%)
                   </div>
-                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 tabular-nums">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 tabular-nums">
                     {t("cashBalance")}: {formatStockAmount(cashDisplay, cardCurrency)}
                   </div>
                 </div>
@@ -1078,7 +1078,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <button
                   type="button"
                   onClick={() => setAllNative(true)}
-                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
                     allNative
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500 dark:text-gray-400"
@@ -1094,7 +1094,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       setAllNative(false);
                       setDisplayCurrency(code);
                     }}
-                    className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                    className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
                       !allNative && displayCurrency === code
                         ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                         : "text-gray-500 dark:text-gray-400"
@@ -1116,7 +1116,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <button
                   type="button"
                   onClick={() => setDisplayCurrency("KRW")}
-                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
                     displayCurrency === "KRW"
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500 dark:text-gray-400"
@@ -1127,7 +1127,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <button
                   type="button"
                   onClick={() => setDisplayCurrency("USD")}
-                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
                     displayCurrency === "USD"
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500 dark:text-gray-400"
@@ -1142,7 +1142,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <button
                   type="button"
                   onClick={() => setCadViewMode("ALL")}
-                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
                     cadViewMode === "ALL"
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500 dark:text-gray-400"
@@ -1153,7 +1153,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <button
                   type="button"
                   onClick={() => setCadViewMode("CAD")}
-                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
                     cadViewMode === "CAD"
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500 dark:text-gray-400"
@@ -1164,7 +1164,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <button
                   type="button"
                   onClick={() => setCadViewMode("USD")}
-                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  className={`rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
                     cadViewMode === "USD"
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500 dark:text-gray-400"
@@ -1202,7 +1202,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                     {line.yield.toFixed(2)}%)
                   </span>
                 </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-2">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   {t("totalInvestedLabel", {
                     amount: formatStockAmount(line.invested, line.currency),
                   })}
@@ -1210,7 +1210,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               </div>
             ))}
             {cashTotalLines.length > 0 && (
-              <div className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums space-y-0.5">
+              <div className="text-xs text-gray-500 dark:text-gray-400 tabular-nums space-y-0.5">
                 {cashTotalLines.map((line) => (
                   <div key={line.currency}>
                     {t("cashBalance")}:{" "}
@@ -1369,9 +1369,9 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold text-gray-900 dark:text-white text-sm truncate">{row.name}</span>
-                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">{row.ticker}</span>
+                      <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">{row.ticker}</span>
                     </div>
-                    <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {t("sharesAvg", {
                         shares: row.shares,
                         avg: formatStockAmount(listAvg, listCurrency),
@@ -1495,7 +1495,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                         className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center justify-between"
                       >
                         <span className="font-bold text-gray-800 dark:text-gray-200">{s.ticker}</span>
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate max-w-[200px]">{s.name}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">{s.name}</span>
                       </button>
                     ))}
                   </div>
@@ -1506,9 +1506,9 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-xl flex justify-between items-center text-xs">
                   <div>
                     <div className="font-bold text-blue-600 dark:text-blue-400">{selectedName}</div>
-                    <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{selectedTicker} · {selectedCurrency}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{selectedTicker} · {selectedCurrency}</div>
                   </div>
-                  <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-black px-2 py-0.5 rounded text-[10px]">
+                  <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-black px-2 py-0.5 rounded text-xs">
                     {t("selected")}
                   </span>
                 </div>

@@ -76,7 +76,7 @@ interface RowState {
 const SAVED_KEY = "pairpocket.bankImportSaved";
 
 const rowButton =
-  "rounded-lg bg-gray-100 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700";
+  "rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700";
 
 const isSettlement = (r: Pick<RowState, "category">) => r.category === INCOME_CATEGORY_SETTLEMENT;
 const isMove = (r: Pick<RowState, "category" | "subCategory">) =>
@@ -531,7 +531,7 @@ export default function BankImportPanel({
             <span className="block truncate text-xs font-semibold text-gray-800 dark:text-gray-100">
               {row.description}
             </span>
-            <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+            <span className="block text-xs text-gray-500 dark:text-gray-400">
               {row.date}
             </span>
           </span>
@@ -547,11 +547,11 @@ export default function BankImportPanel({
           </span>
         </div>
         {hintNote && !isDuplicate && (
-          <p className="text-[11px] text-amber-600 dark:text-amber-400">{hintNote}</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400">{hintNote}</p>
         )}
         {matchNote && (
           <p
-            className={`text-[11px] font-semibold ${
+            className={`text-xs font-semibold ${
               isDuplicate
                 ? "text-gray-600 dark:text-gray-300"
                 : "text-amber-600 dark:text-amber-400"
@@ -613,7 +613,7 @@ export default function BankImportPanel({
               )}
               {isSettlement(r) && (
                 <div className="space-y-1 sm:col-span-3">
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {t("settlesWhich")}
                   </p>
                   <SettlementExpenseSelect
@@ -669,13 +669,13 @@ export default function BankImportPanel({
           </div>
         )}
         {moveBlocked && (
-          <p className="text-[11px] text-red-500">{t("moveSameLedgerIn")}</p>
+          <p className="text-xs text-red-500">{t("moveSameLedgerIn")}</p>
         )}
         {r.include && !isDuplicate && !isComplete(r) && !moveBlocked && (
-          <p className="text-[11px] text-red-500">{t("needsChoice")}</p>
+          <p className="text-xs text-red-500">{t("needsChoice")}</p>
         )}
         {r.mine === false && (
-          <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
+          <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
             {t("fromPartner")}
           </p>
         )}
@@ -730,7 +730,7 @@ export default function BankImportPanel({
             <span className="block text-sm font-bold text-gray-900 dark:text-white">
               {title} · {list.length}
             </span>
-            <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+            <span className="block text-xs text-gray-500 dark:text-gray-400">
               {hint}
             </span>
           </span>
@@ -744,7 +744,7 @@ export default function BankImportPanel({
                 prev.map((r) => (r.bucket === bucket ? { ...r, include: !allOn } : r))
               )
             }
-            className="mt-3 rounded-lg bg-gray-100 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="mt-3 rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
           >
             {allOn ? t("clearAll") : t("selectAll")}
           </button>
@@ -808,7 +808,7 @@ export default function BankImportPanel({
                 <span className="block truncate text-xs font-semibold text-gray-800 dark:text-gray-100">
                   {file.name}
                 </span>
-                <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+                <span className="block text-xs text-gray-500 dark:text-gray-400">
                   CSV · {Math.max(1, Math.round(file.size / 1024))} KB
                   {fileRows !== null ? ` · ${t("fileRows", { count: fileRows })}` : ""}
                 </span>
@@ -938,7 +938,7 @@ export default function BankImportPanel({
 
           <div className="space-y-2 rounded-2xl border border-gray-150 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
             {waiting > 0 && (
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {t("waiting", { count: waiting })}
               </p>
             )}

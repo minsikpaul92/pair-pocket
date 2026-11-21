@@ -866,7 +866,7 @@ export default function SettingsView({
                     <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                       {t("updateTitle")}
                     </h2>
-                    <span className="ml-auto text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+                    <span className="ml-auto text-xs tabular-nums text-gray-500 dark:text-gray-400">
                       v{WHATS_NEW[0].version}
                     </span>
                   </div>

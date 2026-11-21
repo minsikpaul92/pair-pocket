@@ -27,7 +27,7 @@ export default function NotificationBell({ count, dot = false, active, onClick }
     >
       <Bell className="h-5 w-5" />
       {count > 0 && (
-        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center whitespace-nowrap rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none tabular-nums text-white">
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center whitespace-nowrap rounded-full bg-red-500 px-1 text-xs font-bold leading-none tabular-nums text-white">
           {count > 99 ? "99+" : count}
         </span>
       )}

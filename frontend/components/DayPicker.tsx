@@ -146,7 +146,7 @@ export default function DayPicker({
             <div
               key={WEEKDAY_KEYS[i]}
               className={cn(
-                "py-1 text-center text-[10px] font-semibold",
+                "py-1 text-center text-xs font-semibold",
                 i === 0
                   ? "text-red-400"
                   : i === 6

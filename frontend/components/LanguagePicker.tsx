@@ -181,18 +181,18 @@ export default function LanguagePicker({
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
               {isPrimary && (
-                <span className="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                <span className="rounded-md bg-white/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
                   {tOnboarding("languagePrimary")}
                 </span>
               )}
               {isSecondary && (
-                <span className="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                <span className="rounded-md bg-white/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
                   {tOnboarding("languageSecondary")}
                 </span>
               )}
               {isBetaLocale(item.code) && (
                 <span
-                  className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                  className={`rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${
                     isSelected
                       ? "bg-white/20 text-white"
                       : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"

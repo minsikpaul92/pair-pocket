@@ -216,7 +216,7 @@ function PieExpenseTooltip({
       </div>
 
       <div className="mt-2.5 border-t border-gray-100 dark:border-gray-800/80 pt-2">
-        <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+        <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
           {t("topSpending")}
         </p>
         {topItems.length > 0 ? (
@@ -229,7 +229,7 @@ function PieExpenseTooltip({
                 <span className="truncate font-medium text-gray-700 dark:text-gray-300 max-w-[9rem]">
                   {item.name}
                 </span>
-                <span className="font-bold tabular-nums text-gray-900 dark:text-white text-[11px]">
+                <span className="font-bold tabular-nums text-gray-900 dark:text-white text-xs">
                   {item.percent}%
                 </span>
               </div>
@@ -242,11 +242,11 @@ function PieExpenseTooltip({
         )}
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between border-t border-gray-100 dark:border-gray-800/80 pt-1.5 text-[10px]">
+      <div className="mt-2.5 flex items-center justify-between border-t border-gray-100 dark:border-gray-800/80 pt-1.5 text-xs">
         <span className="font-semibold text-gray-500 dark:text-gray-400 tabular-nums">
           {formatAmount(slice.amount, displayCurrency)}
         </span>
-        <span className="text-[9px] font-black tracking-widest text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.5 rounded uppercase">
+        <span className="text-xs font-black tracking-widest text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.5 rounded uppercase">
           CLICK
         </span>
       </div>
@@ -805,7 +805,7 @@ export default function DashboardAnalytics({
         )}
 
         {hiddenCategories.size > 0 && (
-          <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {t("hiddenCategoriesNote", { count: hiddenCategories.size })}
           </p>
         )}
@@ -821,7 +821,7 @@ export default function DashboardAnalytics({
             <div className="relative h-56 w-full flex items-center justify-center">
               {/* Centered Total Summary (z-0 so tooltip floats on top) */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
-                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   {t("expenseMixTotal")}
                 </span>
                 <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums mt-0.5">
@@ -1154,13 +1154,13 @@ export default function DashboardAnalytics({
                     </div>
                     <ul className="space-y-1 pl-1 border-t border-gray-100 dark:border-gray-700/40 pt-1.5 mt-1">
                       {txs.slice(0, 3).map((tx) => (
-                        <li key={tx.id} className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                        <li key={tx.id} className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                           <span className="truncate max-w-[170px]">{tx.note?.trim() || tx.merchant}</span>
                           <span className="tabular-nums shrink-0 font-medium">{formatAmount(effectiveExpenseAmount(tx), tx.currency)}</span>
                         </li>
                       ))}
                       {txs.length > 3 && (
-                        <li className="text-[10px] text-indigo-500 font-semibold text-right pt-0.5">
+                        <li className="text-xs text-indigo-500 font-semibold text-right pt-0.5">
                           {t("moreTransactions", { count: txs.length - 3 })}
                         </li>
                       )}

@@ -2181,7 +2181,7 @@ export default function TransactionModal({
                   <span className={`text-sm truncate ${tone}`}>
                     {occ.subscription_name || tSub("defaultName")}
                     {translateSubscriptionSource(occ.subscription_billing_cycle, tSub) && (
-                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-normal">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">
                         {" "}
                         {translateSubscriptionSource(occ.subscription_billing_cycle, tSub)}
                       </span>
@@ -2382,7 +2382,7 @@ export default function TransactionModal({
               </div>
 
               {scanQueue.length === 0 ? (
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
                   {tTx("scanCardHint", { max: MAX_IMAGES })}
                 </p>
               ) : (
@@ -2397,7 +2397,7 @@ export default function TransactionModal({
                           className="h-full w-full rounded-lg object-cover border border-purple-200 dark:border-purple-800"
                         />
                       ) : (
-                        <div className="h-full w-full rounded-lg bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                        <div className="h-full w-full rounded-lg bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-xs font-bold text-purple-700 dark:text-purple-300">
                           PDF
                         </div>
                       )}
@@ -2452,7 +2452,7 @@ export default function TransactionModal({
                   <button
                     type="button"
                     onClick={clearScanQueue}
-                    className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
                   >
                     <Trash2 className="h-3 w-3" />
                     {tTx("scanClear")}
@@ -2864,7 +2864,7 @@ export default function TransactionModal({
 
                 <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-x-auto">
                   <div className="min-w-[620px]">
-                    <div className={`${ITEM_GRID} bg-gray-50 dark:bg-gray-900/60 px-2 py-1.5 text-[10px] font-semibold text-gray-500 dark:text-gray-400`}>
+                    <div className={`${ITEM_GRID} bg-gray-50 dark:bg-gray-900/60 px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400`}>
                       <span>{tTx("itemName")}</span>
                       <span>{tTx("itemStandard")}</span>
                       <span className="text-right">{tTx("itemQty")}</span>
