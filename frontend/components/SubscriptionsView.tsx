@@ -154,13 +154,13 @@ function PendingSection({
                 <p className={`text-sm font-medium truncate ${tone}`}>
                   {occ.subscription_name || t("defaultName")}
                   {sourceLabel && (
-                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-normal">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">
                       {" "}
                       {sourceLabel}
                     </span>
                   )}
                 </p>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {formatSubscriptionDate(occ.due_date, locale)}
                 </p>
               </div>
@@ -195,7 +195,7 @@ function PendingSection({
           <>
             {cad.length > 0 && (
               <>
-                <li className="px-4 py-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
+                <li className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
                   🇨🇦 {tCommon("canada")}
                 </li>
                 {renderList(cad)}
@@ -203,7 +203,7 @@ function PendingSection({
             )}
             {krw.length > 0 && (
               <>
-                <li className="px-4 py-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
+                <li className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
                   🇰🇷 {tCommon("korea")}
                 </li>
                 {renderList(krw)}
@@ -461,18 +461,18 @@ export default function SubscriptionsView({
                 {sub.name}
               </p>
               {sourceLabel && (
-                <span className="shrink-0 text-[10px] text-gray-500 dark:text-gray-400 font-normal">
+                <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 font-normal">
                   {sourceLabel}
                 </span>
               )}
-              <span className="shrink-0 rounded-md bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400">
+              <span className="shrink-0 rounded-md bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                 {translateSubscriptionStatus(sub.status, t)}
               </span>
             </div>
-            <p className="mt-0.5 text-[11px] text-blue-500 font-medium">
+            <p className="mt-0.5 text-xs text-blue-500 font-medium">
               {translateSubscriptionTracking(sub, t, locale, month)}
             </p>
-            <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400 truncate">
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate">
               {translateBillingCycle(sub.cycle, t)}
               {" · "}
               {translateCategory(sub.category, tCategories)} ›{" "}
@@ -486,20 +486,20 @@ export default function SubscriptionsView({
             {sub.next_due_date &&
               (sub.status === "active" ||
                 sub.status === "cancel_scheduled") && (
-                <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                   {t("nextPayment")}{" "}
                   {formatSubscriptionDate(sub.next_due_date, locale)}
                 </p>
               )}
             {sub.status === "cancel_scheduled" &&
               sub.cancel_effective_date && (
-                <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
+                <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
                   {formatSubscriptionDate(sub.cancel_effective_date, locale)}{" "}
                   {t("hiddenAfter")}
                 </p>
               )}
             {promoOn && sub.promo_end_date && (
-              <p className="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+              <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">
                 {t("promoUntil")} ~{" "}
                 {formatSubscriptionDate(sub.promo_end_date, locale)}
               </p>
@@ -510,7 +510,7 @@ export default function SubscriptionsView({
               {formatAmount(displayAmount, sub.currency)}
             </p>
             {promoOn && (
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 line-through tabular-nums">
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-through tabular-nums">
                 {formatAmount(sub.amount, sub.currency)}
               </p>
             )}
@@ -520,7 +520,7 @@ export default function SubscriptionsView({
           <button
             type="button"
             onClick={(e) => toggleCancelSchedule(sub, e)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             {sub.status === "cancel_scheduled" ? (
               <>
@@ -569,7 +569,7 @@ export default function SubscriptionsView({
       return [
         <li
           key={`sec-${label}-${showFlag ? "flag" : "plain"}`}
-          className="px-4 py-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50"
+          className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50"
         >
           {label}
         </li>,
@@ -626,7 +626,7 @@ export default function SubscriptionsView({
               <>
                 {cadSubs.length > 0 && (
                   <>
-                    <li className="px-4 py-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
+                    <li className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
                       🇨🇦 {tCommon("canada")}
                     </li>
                     {renderGroupedList(cadSubs, false)}
@@ -634,7 +634,7 @@ export default function SubscriptionsView({
                 )}
                 {krwSubs.length > 0 && (
                   <>
-                    <li className="px-4 py-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
+                    <li className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/50">
                       🇰🇷 {tCommon("korea")}
                     </li>
                     {renderGroupedList(krwSubs, false)}

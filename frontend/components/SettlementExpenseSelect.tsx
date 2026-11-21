@@ -178,7 +178,7 @@ export default function SettlementExpenseSelect({
                 <X className="h-3 w-3" />
               </button>
             )}
-            <span className="ml-auto text-[11px] text-gray-500 dark:text-gray-400">
+            <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
               {tCommon("latestFirst")} · {tCommon("count", { count: filteredOptions.length })}
             </span>
             <div className="relative basis-full">
