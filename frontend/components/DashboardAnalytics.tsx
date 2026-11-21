@@ -34,6 +34,7 @@ import {
   formatAmount,
   setCategoryColor,
 } from "@/lib/api";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { addDays, addMonths, dayKey, monthKey, weekStart } from "@/lib/date";
 
@@ -471,6 +472,7 @@ export default function DashboardAnalytics({
   );
   const [activeColorPicker, setActiveColorPicker] = useState<string | null>(null);
   const [popoverCategory, setPopoverCategory] = useState<string | null>(null);
+  useEscapeKey(() => setPopoverCategory(null), popoverCategory !== null);
 
   const isWeek = expenseRange === "week";
   const weekStartKey = dayKey(selectedWeekStart);
@@ -1103,12 +1105,15 @@ export default function DashboardAnalytics({
           onClick={() => setPopoverCategory(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="category-breakdown-title"
             className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-5 border border-gray-100 dark:border-gray-800 space-y-4 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
               <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                <span id="category-breakdown-title" className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
                   {translateCategory(popoverCategory, tCategories)}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("subCategoryBreakdown")}</span>

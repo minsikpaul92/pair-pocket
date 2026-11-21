@@ -13,6 +13,7 @@ import {
   type TestAccount,
 } from "@/lib/api";
 import { translateError } from "@/lib/errors";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 
 const PASSWORD_KEY = "pairpocket.testLoginPassword";
 /** Accounts reset to "new user"; their next sign-in must not set them up again. */
@@ -62,6 +63,7 @@ export default function TestLoginPanel() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  useEscapeKey(() => setResetOpen(false), resetOpen);
   const passwordRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 

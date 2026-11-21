@@ -1,6 +1,5 @@
 {
   "hangul": {
-    "components/AppShell.tsx": 10,
     "components/CategoryIcon.tsx": 18,
     "components/DashboardAnalytics.tsx": 12,
     "components/ImportView.tsx": 5,

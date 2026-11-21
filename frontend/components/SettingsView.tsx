@@ -1,6 +1,7 @@
 "use client";
 
 import { WHATS_NEW } from "@/lib/whats-new";
+import { useEscapeKey } from "@/lib/useEscapeKey";
 import React, { useState, useEffect } from "react";
 import {
   Key,
@@ -331,6 +332,8 @@ export default function SettingsView({
     setResetStep(1);
     setShowResetModal(true);
   }
+
+  useEscapeKey(closeResetModal, showResetModal);
 
   function closeResetModal() {
     if (resetting) return;

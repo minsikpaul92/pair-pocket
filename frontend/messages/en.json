@@ -856,7 +856,23 @@
     "restored": "{count, plural, one {# file from your last scan was restored.} other {# files from your last scan were restored.}}",
     "addRecent": "Scan recent files again ({count}, kept {days} days)",
     "openRecent": "Recent scans ({count})",
-    "remove": "Remove file"
+    "remove": "Remove file",
+    "title": "AI scan queue",
+    "description": "Collect your photos, then start the analysis. ({count} / {max})",
+    "empty": "No files yet.",
+    "add": "Add",
+    "start": "Start analysis",
+    "analyzing": "Analyzing…",
+    "clear": "Clear queue",
+    "errorUnsupported": "This file type is not supported.",
+    "errorMax": "You can upload up to {max} files.",
+    "errorInvalidResult": "The AI analysis result is not valid.",
+    "errorFailed": "Something went wrong during the AI analysis.",
+    "takePhoto": "Take a photo",
+    "uploadPhoto": "Upload photos (gallery)",
+    "uploadFile": "Upload files (PDF/image)",
+    "loadingTitle": "Analyzing receipt with AI...",
+    "loadingBody": "Gemini is identifying the items. Please wait a moment."
   },
   "importPage": {
     "title": "Import & export",
@@ -1326,6 +1342,10 @@
   },
   "whatsNew": {
     "items": {
+      "scanQueueEnglishText": {
+        "title": "Receipt scan in English",
+        "description": "The receipt scan queue, its buttons and its error messages no longer show Korean when the app is in English."
+      },
       "resettlePayment": {
         "title": "Settle a settlement again",
         "description": "The money you paid out when settling between personal and shared can now be settled again later, for example when you pay it back. It can be repeated as many times as you need."
