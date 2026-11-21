@@ -65,7 +65,7 @@ export default function LanguageSelect({
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900 dark:text-white">
             {selected?.native}
           </span>
-          <span className="shrink-0 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600 dark:bg-gray-800 dark:text-blue-300">
+          <span className="shrink-0 rounded-md bg-white px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-blue-600 dark:bg-gray-800 dark:text-blue-300">
             {selected?.code}
           </span>
           <ChevronDown
@@ -109,7 +109,7 @@ export default function LanguageSelect({
                 )}
               >
                 <span className="min-w-0 flex-1 truncate">{option.native}</span>
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   {option.code}
                 </span>
                 <Check

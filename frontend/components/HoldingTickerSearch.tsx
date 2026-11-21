@@ -107,7 +107,7 @@ export default function HoldingTickerSearch({
               <span className="font-bold text-gray-800 dark:text-gray-200 shrink-0">
                 {s.ticker}
               </span>
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate min-w-0">
+              <span className="text-xs text-gray-500 dark:text-gray-400 truncate min-w-0">
                 {s.name}
               </span>
             </button>
@@ -116,7 +116,7 @@ export default function HoldingTickerSearch({
       )}
 
       {ticker && (
-        <p className="text-[11px] text-blue-500 font-medium truncate">
+        <p className="text-xs text-blue-500 font-medium truncate">
           {name || ticker} · {ticker} · {currency}
         </p>
       )}

@@ -28,7 +28,7 @@ function BankIcon({
   if (!src || failed) {
     return (
       <span
-        className="flex h-6 w-6 items-center justify-center rounded-md text-[9px] font-bold text-white shrink-0"
+        className="flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold text-white shrink-0"
         style={{ backgroundColor: color }}
         aria-hidden
       >
@@ -188,7 +188,7 @@ export default function BankPicker({
           <ul className="py-1">
             {canadaList.length > 0 && (
               <>
-                <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <li className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   Canada
                 </li>
                 {canadaList.map((bank) => (
@@ -216,7 +216,7 @@ export default function BankPicker({
             {koreaList.length > 0 && (
               <>
                 <li
-                  className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 ${
+                  className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 ${
                     canadaList.length > 0
                       ? "border-t border-gray-100 dark:border-gray-700 mt-1 pt-2"
                       : ""
@@ -248,7 +248,7 @@ export default function BankPicker({
 
             {customs.length > 0 && (
               <>
-                <li className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 mt-1 pt-2">
+                <li className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 mt-1 pt-2">
                   {t("customBanks")}
                 </li>
                 {customs.map((name) => (

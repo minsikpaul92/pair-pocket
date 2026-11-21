@@ -740,7 +740,7 @@ export default function SubscriptionRegisterModal({
                   onChange={(d) => setInstallmentStartDate(dayKey(d))}
                   locale={locale}
                 />
-                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {t("installmentStartHint")}
                 </p>
               </div>
@@ -758,7 +758,7 @@ export default function SubscriptionRegisterModal({
                   className="input-field"
                 />
                 {computedInstallmentEnd && (
-                  <p className="mt-1 text-[11px] text-blue-500 font-medium">
+                  <p className="mt-1 text-xs text-blue-500 font-medium">
                     {t("installmentEndPreview")}{" "}
                     {(() => {
                       const [y, m, d] = computedInstallmentEnd
@@ -785,7 +785,7 @@ export default function SubscriptionRegisterModal({
                   placeholder={String(autoCompletedInstallments)}
                   className="input-field"
                 />
-                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {t("completedAutoHint", { count: autoCompletedInstallments })}
                 </p>
               </div>
@@ -822,7 +822,7 @@ export default function SubscriptionRegisterModal({
                       {t("dayOfMonthAfter")} {dayOfMonth === 31 && t("dayOfMonthLast")}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {t("dayOfMonthHint")}
                   </p>
                 </div>
@@ -846,7 +846,7 @@ export default function SubscriptionRegisterModal({
                       {t("intervalAfter")}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {t("intervalHint")}
                   </p>
                   <div className="flex flex-wrap gap-1.5 mt-2">
@@ -1041,7 +1041,7 @@ export default function SubscriptionRegisterModal({
                         return !v;
                       });
                     }}
-                    className="text-[11px] font-medium text-blue-500 hover:underline"
+                    className="text-xs font-medium text-blue-500 hover:underline"
                   >
                     {showEndDate ? t("removeEndDate") : `+ ${t("addEndDate")}`}
                   </button>
@@ -1088,7 +1088,7 @@ export default function SubscriptionRegisterModal({
                     {t("endReminder")}
                   </p>
                   {userEmail && (
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {t("emailTo", { email: userEmail })}
                     </p>
                   )}
@@ -1183,7 +1183,7 @@ export default function SubscriptionRegisterModal({
                   }}
                   locale={locale}
                 />
-                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {t("promoEndHint")}
                 </p>
               </div>
@@ -1205,12 +1205,12 @@ export default function SubscriptionRegisterModal({
                     {t("promoReminder")}
                   </p>
                   {userEmail && promoEndDate && (
-                    <p className="text-[11px] text-emerald-700/70 dark:text-emerald-300/70 truncate">
+                    <p className="text-xs text-emerald-700/70 dark:text-emerald-300/70 truncate">
                       {t("emailTo", { email: userEmail })}
                     </p>
                   )}
                   {!promoEndDate && (
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {t("promoReminderNeedsEnd")}
                     </p>
                   )}

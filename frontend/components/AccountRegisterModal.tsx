@@ -325,7 +325,7 @@ export default function AccountRegisterModal({
               placeholder={t("nicknamePlaceholder")}
               className="input-field"
             />
-            <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {t("nicknameHint")}
             </p>
           </div>
@@ -388,7 +388,7 @@ export default function AccountRegisterModal({
                 }
                 className="input-field"
               />
-              <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {isCreditCard
                   ? t("cardDebt")
                   : isInvestment
@@ -413,7 +413,7 @@ export default function AccountRegisterModal({
                     inputMode="numeric"
                     maxLength={4}
                   />
-                  <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {t("lastFourHint")}
                   </p>
                 </>
@@ -428,7 +428,7 @@ export default function AccountRegisterModal({
                     placeholder={t("accountNumberPlaceholder")}
                     className="input-field"
                   />
-                  <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {t("accountNumberHint")}
                   </p>
                 </>
@@ -479,7 +479,7 @@ export default function AccountRegisterModal({
                 </label>
               ))}
               {!isEdit && (
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                   {t("defaultRolesAutoHint")}
                 </p>
               )}

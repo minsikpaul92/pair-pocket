@@ -34,7 +34,7 @@ export function DefaultRoleBadges({ roles }: { roles: DefaultRole[] }) {
       {roles.map((role) => (
         <span
           key={role}
-          className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300 whitespace-nowrap"
+          className="rounded-full bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300 whitespace-nowrap"
         >
           {t(`defaultBadge.${role}`)}
         </span>
@@ -105,7 +105,7 @@ export function DefaultRoleMenu({
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-          <p className="px-2 py-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+          <p className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
             {t("defaultMenuLabel")}
           </p>
           {roles.map((role) => {

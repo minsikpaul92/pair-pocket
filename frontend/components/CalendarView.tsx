@@ -9,7 +9,6 @@ import {
   SubscriptionOccurrence,
   Transaction,
   effectiveExpenseAmount,
-  formatAmount,
   formatPendingDayLabels,
   isNonCashflowTransaction,
   isSubscriptionDueOrPast,
@@ -21,6 +20,16 @@ import {
   isSameMonth,
   isoDayKey,
 } from "@/lib/date";
+
+/** Short amount for a narrow day cell: $1.2K, ₩12M, $45. */
+function formatDayAmount(amount: number, currency: Currency): string {
+  const symbol = currency === "KRW" ? "\u20A9" : currency === "USD" ? "US$" : "$";
+  const body = new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: amount >= 1000 ? 1 : 0,
+  }).format(amount);
+  return symbol + body;
+}
 
 interface Props {
   month: Date;
@@ -211,7 +220,7 @@ export default function CalendarView({
 
               {(hasTx || hasPending) && (
                 <>
-                  <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                  <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                     {hasTx ? tCommon("count", { count: totals!.count }) : ""}
                     {hasTx && hasPending ? " · " : ""}
                     {hasPending ? (
@@ -264,36 +273,36 @@ export default function CalendarView({
                     {hasTx && totals && scope === "ALL" ? (
                       <>
                         {(totals as AllDayTotals).cadIncome > 0 && (
-                          <span className="max-w-full truncate text-[9px] sm:text-[10px] font-semibold whitespace-nowrap text-blue-500">
-                            {formatAmount((totals as AllDayTotals).cadIncome, "CAD")}
+                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-blue-500">
+                            {formatDayAmount((totals as AllDayTotals).cadIncome, "CAD")}
                           </span>
                         )}
                         {(totals as AllDayTotals).krwIncome > 0 && (
-                          <span className="max-w-full truncate text-[9px] sm:text-[10px] font-semibold whitespace-nowrap text-blue-500">
-                            {formatAmount((totals as AllDayTotals).krwIncome, "KRW")}
+                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-blue-500">
+                            {formatDayAmount((totals as AllDayTotals).krwIncome, "KRW")}
                           </span>
                         )}
                         {(totals as AllDayTotals).cadExpense > 0 && (
-                          <span className="max-w-full truncate text-[9px] sm:text-[10px] font-semibold whitespace-nowrap text-red-500">
-                            {formatAmount((totals as AllDayTotals).cadExpense, "CAD")}
+                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-red-500">
+                            {formatDayAmount((totals as AllDayTotals).cadExpense, "CAD")}
                           </span>
                         )}
                         {(totals as AllDayTotals).krwExpense > 0 && (
-                          <span className="max-w-full truncate text-[9px] sm:text-[10px] font-semibold whitespace-nowrap text-red-500">
-                            {formatAmount((totals as AllDayTotals).krwExpense, "KRW")}
+                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-red-500">
+                            {formatDayAmount((totals as AllDayTotals).krwExpense, "KRW")}
                           </span>
                         )}
                       </>
                     ) : hasTx && totals ? (
                       <>
                         {(totals as SingleDayTotals).income > 0 && (
-                          <span className="max-w-full truncate text-[10px] sm:text-[11px] font-semibold whitespace-nowrap text-blue-500">
-                            {formatAmount((totals as SingleDayTotals).income, displayCurrency)}
+                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-blue-500">
+                            {formatDayAmount((totals as SingleDayTotals).income, displayCurrency)}
                           </span>
                         )}
                         {(totals as SingleDayTotals).expense > 0 && (
-                          <span className="max-w-full truncate text-[10px] sm:text-[11px] font-semibold whitespace-nowrap text-red-500">
-                            {formatAmount((totals as SingleDayTotals).expense, displayCurrency)}
+                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-red-500">
+                            {formatDayAmount((totals as SingleDayTotals).expense, displayCurrency)}
                           </span>
                         )}
                       </>

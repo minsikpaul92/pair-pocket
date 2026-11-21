@@ -82,9 +82,9 @@ export default function MerchantSelect({
 
       {open && (
         <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">
-          <div className="px-3 py-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700/60 flex justify-between items-center">
+          <div className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700/60 flex justify-between items-center">
             <span>자주 / 최근 사용한 사용처</span>
-            <span className="text-[9px] font-normal text-indigo-500">목록</span>
+            <span className="text-xs font-normal text-indigo-500">목록</span>
           </div>
 
           {matchingOptions.length > 0 || otherOptions.length > 0 ? (
@@ -112,7 +112,7 @@ export default function MerchantSelect({
 
               {searchLower && otherOptions.length > 0 && (
                 <>
-                  <li className="px-3 py-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-t border-b border-gray-100 dark:border-gray-700/60 mt-1">
+                  <li className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-t border-b border-gray-100 dark:border-gray-700/60 mt-1">
                     기타 전체 사용처 ({otherOptions.length})
                   </li>
                   {otherOptions.map((opt) => (

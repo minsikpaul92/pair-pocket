@@ -292,12 +292,12 @@ export default function AccountsSettings({
                         {accountLabel(a)}
                       </span>
                       {!a.is_active && (
-                        <span className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        <span className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                           {t("accountInactive")}
                         </span>
                       )}
                     </div>
-                    <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
                       {[a.institution, number, tKinds(ACCOUNT_KIND_KEYS[a.kind])]
                         .filter(Boolean)
                         .join(" · ")}
@@ -313,7 +313,7 @@ export default function AccountsSettings({
                       <button
                         type="button"
                         onClick={() => setMatching(a)}
-                        className="flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-300"
+                        className="flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-blue-600 hover:underline dark:text-blue-300"
                       >
                         <Scale className="h-3 w-3" />
                         {t("matchBalance")}

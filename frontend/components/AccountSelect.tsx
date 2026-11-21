@@ -136,7 +136,7 @@ export default function AccountSelect({
                     <p className="text-sm font-medium truncate">
                       {accountLabel(acc)}
                     </p>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {formatAccountDetail(acc)}
                     </p>
                   </div>

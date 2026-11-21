@@ -841,14 +841,14 @@ export default function DashboardView({
           <button
             type="button"
             onClick={() => setShowBudgetModal(true)}
-            className="mt-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
           >
             {tDashboard("budgetSet")}
           </button>
         ) : (
           <>
             {budget.carry > 0 && (
-              <p className="mt-1 text-[11px] leading-snug text-red-500">
+              <p className="mt-1 text-xs leading-snug text-red-500">
                 {tDashboard("budgetCarry", {
                   base: fmt(budget.base, budgetCurrency),
                   over: fmt(budget.carry, budgetCurrency),
@@ -856,7 +856,7 @@ export default function DashboardView({
               </p>
             )}
             {budget.skipped && budget.overspend > 0 && (
-              <p className="mt-1 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-xs leading-snug text-gray-500 dark:text-gray-400">
                 {tDashboard("budgetCarrySkipped")}
               </p>
             )}
@@ -883,7 +883,7 @@ export default function DashboardView({
               />
             </div>
             <p
-              className={`mt-1 text-[11px] ${
+              className={`mt-1 text-xs ${
                 overBudget ? "text-red-500" : "text-gray-500 dark:text-gray-400"
               }`}
             >
@@ -928,7 +928,7 @@ export default function DashboardView({
             <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-100">
               {s.name}
             </p>
-            <div className="mt-0.5 flex items-baseline justify-between gap-1 text-[11px]">
+            <div className="mt-0.5 flex items-baseline justify-between gap-1 text-xs">
               <span className="text-gray-500 dark:text-gray-400">
                 {s.next_due_date ? shortDate(s.next_due_date) : ""}
               </span>
@@ -951,7 +951,7 @@ export default function DashboardView({
             <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-100">
               {tx.merchant || translateCategory(tx.category, tCategories)}
             </p>
-            <div className="mt-0.5 flex items-baseline justify-between gap-1 text-[11px]">
+            <div className="mt-0.5 flex items-baseline justify-between gap-1 text-xs">
               <span className="text-gray-500 dark:text-gray-400">{shortDate(tx.date)}</span>
               <span className="font-semibold tabular-nums text-gray-700 dark:text-gray-200">
                 {fmt(tx.effective_amount ?? tx.amount, tx.currency)}
@@ -1215,7 +1215,7 @@ export default function DashboardView({
                   key={mode}
                   type="button"
                   onClick={() => setStockTotalMode(mode)}
-                  className={`flex-1 min-[400px]:flex-none rounded-md px-2 py-1 text-[10px] font-semibold transition-colors whitespace-nowrap ${
+                  className={`flex-1 min-[400px]:flex-none rounded-md px-2 py-1 text-xs font-semibold transition-colors whitespace-nowrap ${
                     stockTotalMode === mode
                       ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                       : "text-gray-500 dark:text-gray-400"
@@ -1285,26 +1285,26 @@ export default function DashboardView({
                       className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 text-left hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-all border border-gray-100 dark:border-gray-800/80"
                     >
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="flex items-center gap-1 min-w-0 text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                        <span className="flex items-center gap-1 min-w-0 text-xs font-bold text-gray-700 dark:text-gray-300">
                           <GripVertical className="h-3 w-3 text-gray-500 dark:text-gray-400 shrink-0 cursor-grab" />
                           <span className="truncate">
                             {inst ? `[${inst}] ` : ""}
                             {label}
                           </span>
                         </span>
-                        <span className="shrink-0 text-[9px] bg-gray-200 dark:bg-gray-850 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                        <span className="shrink-0 text-xs bg-gray-200 dark:bg-gray-850 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
                           {account.currency}
                         </span>
                       </div>
                       <div className="mt-2.5 flex items-baseline justify-between gap-2 min-w-0">
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
                           {tDashboard("stockPlusCash")}
                         </span>
                         <span className="text-base font-black text-gray-900 dark:text-white tabular-nums truncate text-right">
                           {fmt(total, account.currency as Currency)}
                         </span>
                       </div>
-                      <div className="mt-1.5 space-y-0.5 text-[10px] text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
+                      <div className="mt-1.5 space-y-0.5 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-1.5">
                         <div className="flex items-center justify-between gap-2 min-w-0">
                           <span className="shrink-0">
                             {tDashboard("stocksLabel")}
@@ -1516,7 +1516,7 @@ function AccountGroup({
                 <p className="text-sm font-medium truncate">
                   {cashPlaceholderLabel}
                 </p>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                   {kindLabel("cash")}
                 </p>
               </div>
@@ -1548,7 +1548,7 @@ function AccountGroup({
                           : "🇺🇸 ")}
                     {label}
                   </p>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                     {kindLabel(acc.kind)}
                   </p>
                   {defaults?.badges}

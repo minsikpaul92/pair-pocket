@@ -609,7 +609,7 @@ export default function ListView({
                       className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-950/40 text-gray-800 dark:text-gray-200 truncate flex items-center justify-between"
                     >
                       <span className="truncate">{sug}</span>
-                      <span className="text-[10px] text-blue-500 font-semibold shrink-0 ml-2">{tList("autocomplete")}</span>
+                      <span className="text-xs text-blue-500 font-semibold shrink-0 ml-2">{tList("autocomplete")}</span>
                     </button>
                   </li>
                 ))}
@@ -654,7 +654,7 @@ export default function ListView({
                             (item.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
                           {item.merchant}
                         </p>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {formatDay(item.date)} · {translateCategory(item.category, tCategories)}
                           {item.sub_category
                             ? ` › ${translateSubCategory(item.sub_category, tSubCategories)}`
@@ -698,7 +698,7 @@ export default function ListView({
                             (tx.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
                           {title}
                         </p>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {formatDay(tx.date)} · {translateCategory(tx.category, tCategories)}
                           {tx.sub_category
                             ? ` › ${translateSubCategory(tx.sub_category, tSubCategories)}`
@@ -706,7 +706,7 @@ export default function ListView({
                           {note ? ` - ${note}` : ""}
                         </p>
                         {tx.origin && (
-                          <p className="text-[11px] text-blue-500 truncate">
+                          <p className="text-xs text-blue-500 truncate">
                             {tList("settlesOrigin", {
                               merchant:
                                 tx.origin.merchant || tCommon("unspecified"),
@@ -764,7 +764,7 @@ export default function ListView({
               return (
                 <div key={c} className="flex items-center gap-1.5">
                   {activeCurrencies.length > 1 && (
-                    <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                       {c === "CAD" ? "🇨🇦" : c === "KRW" ? "🇰🇷" : "🇺🇸"}
                     </span>
                   )}

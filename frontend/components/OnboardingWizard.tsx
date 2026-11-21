@@ -1810,7 +1810,7 @@ export default function OnboardingWizard() {
                       }
                       className={inputClass}
                     />
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {t("accountNumberHint")}
                     </p>
                   </OnboardingField>
@@ -1846,7 +1846,7 @@ export default function OnboardingWizard() {
                     />
                   </div>
                   {a.kind === "investment" && (
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {t("investmentBalanceHint")}
                     </p>
                   )}
@@ -2283,13 +2283,13 @@ export default function OnboardingWizard() {
                       );
                       if (current == null) {
                         return (
-                          <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                             {t("installmentSyncHint")}
                           </p>
                         );
                       }
                       return (
-                        <p className="mt-1 text-[11px] font-medium text-blue-500">
+                        <p className="mt-1 text-xs font-medium text-blue-500">
                           {t("installmentProgress", {
                             current,
                             total: s.total_installments,
@@ -2534,7 +2534,7 @@ export default function OnboardingWizard() {
                             }
                             locale={locale}
                           />
-                          <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                             {t("promoEndOptionalHint")}
                           </p>
                         </OnboardingField>
