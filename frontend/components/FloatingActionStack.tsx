@@ -263,7 +263,7 @@ export default function FloatingActionStack({
         onClick={onCamera}
         disabled={cameraBusy}
         aria-label={cameraLabel}
-        className={`glass-fab ${expanded ? appear : "max-md:hidden"}`}
+        className={`glass-fab glass-fab-primary ${expanded ? appear : "max-md:hidden"}`}
       >
         {cameraBusy && cameraBusyIcon ? (
           cameraBusyIcon
