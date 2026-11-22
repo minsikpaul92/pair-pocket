@@ -1,14 +1,20 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+
+import { onSignal } from "@/lib/tour/signals";
+
+const FAB_EXPANDED_KEY = "pairpocket_fab_expanded";
 
 export type FabCorner = "tl" | "tr" | "bl" | "br";
 
@@ -34,9 +40,10 @@ function isPhone() {
 }
 
 /**
- * Camera and add buttons in one row, as small regular Liquid Glass controls.
- * On phones the pair can be picked up with a long press and dropped in any
- * screen corner. Taps and keyboard use are unchanged.
+ * Camera and add buttons in one row as small clear Liquid Glass controls.
+ * On phones the row folds into a toggle, and the whole group can be picked up
+ * with a long press and dropped in any screen corner. Desktop always shows
+ * both buttons.
  */
 export default function FloatingActionStack({
   onCamera,
@@ -49,7 +56,9 @@ export default function FloatingActionStack({
   cameraBusyIcon,
   onCornerChange,
 }: Props) {
+  const t = useTranslations("common");
   const ref = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
   const [corner, setCorner] = useState<FabCorner>("br");
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -87,6 +96,27 @@ export default function FloatingActionStack({
       tl: { x: left, y: top },
     };
   }, []);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(FAB_EXPANDED_KEY);
+    // Default collapsed on phones so content stays readable.
+    if (stored === "true") setExpanded(true);
+  }, []);
+
+  // A tour step that points at the add button opens the stack first. This
+  // does not change the remembered choice.
+  useEffect(() => onSignal("expandFab", () => setExpanded(true)), []);
+
+  function setExpandedPersist(next: boolean) {
+    setExpanded(next);
+    window.localStorage.setItem(FAB_EXPANDED_KEY, String(next));
+  }
+
+  // The row grows toward the screen center, so a left corner needs a new offset.
+  useLayoutEffect(() => {
+    const target = cornerOffsets()?.[corner];
+    if (target) applyOffset(target);
+  }, [expanded, corner, cornerOffsets, applyOffset]);
 
   useEffect(() => {
     onCornerChange?.(corner);
@@ -193,6 +223,7 @@ export default function FloatingActionStack({
   const reduceMotion =
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const isLeft = corner === "tl" || corner === "bl";
   const moved = offset.x !== 0 || offset.y !== 0 || dragging;
 
   return (
@@ -230,7 +261,7 @@ export default function FloatingActionStack({
         onClick={onCamera}
         disabled={cameraBusy}
         aria-label={cameraLabel}
-        className="glass-fab"
+        className={`glass-fab ${expanded ? "" : "max-md:hidden"}`}
       >
         {cameraBusy && cameraBusyIcon ? (
           cameraBusyIcon
@@ -243,9 +274,23 @@ export default function FloatingActionStack({
         onClick={onAdd}
         aria-label={addLabel}
         data-tour="fab-add"
-        className="glass-fab glass-fab-primary"
+        className={`glass-fab glass-fab-primary ${expanded ? "" : "max-md:hidden"}`}
       >
         <AddIcon className="h-6 w-6" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setExpandedPersist(!expanded)}
+        aria-label={expanded ? t("collapseActions") : t("expandActions")}
+        aria-expanded={expanded}
+        className={`glass-fab h-11 w-11 md:hidden ${isLeft ? "order-first" : ""}`}
+      >
+        {/* The arrow points where the row will open (or close). */}
+        {expanded === isLeft ? (
+          <ChevronLeft className="h-5 w-5" />
+        ) : (
+          <ChevronRight className="h-5 w-5" />
+        )}
       </button>
     </div>
   );

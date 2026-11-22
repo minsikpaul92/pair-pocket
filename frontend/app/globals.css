@@ -14,32 +14,37 @@ body {
     @apply bg-white dark:bg-gray-800 rounded-2xl shadow-sm;
   }
 
-  /* Floating action buttons: small regular Liquid Glass controls (never used on large surfaces). */
+  /* Floating action buttons: small clear Liquid Glass controls (never used on large surfaces). The icons carry the look. */
   .glass-fab {
-    @apply flex h-12 w-12 items-center justify-center rounded-full border text-gray-800 transition-colors disabled:opacity-50;
-    background: rgba(255, 255, 255, 0.5);
+    @apply flex h-12 w-12 items-center justify-center rounded-full border text-gray-700 transition-colors disabled:opacity-50;
+    background: rgba(255, 255, 255, 0.14);
     border-color: rgba(255, 255, 255, 0.6);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.7),
-      0 4px 14px rgba(0, 0, 0, 0.12);
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    backdrop-filter: blur(20px) saturate(1.4);
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 0 0 0.5px rgba(0, 0, 0, 0.08),
+      0 2px 10px rgba(0, 0, 0, 0.08);
+    -webkit-backdrop-filter: blur(10px) saturate(1.3);
+    backdrop-filter: blur(10px) saturate(1.3);
+  }
+  .glass-fab svg {
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95));
   }
   .dark .glass-fab {
-    @apply text-gray-100;
-    background: rgba(55, 65, 81, 0.4);
-    border-color: rgba(255, 255, 255, 0.18);
+    @apply text-white;
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.22);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.2),
-      0 4px 14px rgba(0, 0, 0, 0.4);
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+  .dark .glass-fab svg {
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
   }
   .glass-fab.glass-fab-primary {
-    @apply text-white;
-    background: rgba(59, 130, 246, 0.6);
-    border-color: rgba(255, 255, 255, 0.45);
+    @apply text-blue-500;
   }
   .dark .glass-fab.glass-fab-primary {
-    background: rgba(59, 130, 246, 0.55);
+    @apply text-blue-400;
   }
   @media (prefers-reduced-transparency: reduce) {
     .glass-fab {
@@ -49,10 +54,6 @@ body {
     }
     .dark .glass-fab {
       background: #374151;
-    }
-    .glass-fab.glass-fab-primary,
-    .dark .glass-fab.glass-fab-primary {
-      background: #3b82f6;
     }
   }
   @media (prefers-contrast: more) {
@@ -64,10 +65,11 @@ body {
       background: rgba(31, 41, 55, 0.92);
       border-color: #f9fafb;
     }
-    .glass-fab.glass-fab-primary,
+    .glass-fab.glass-fab-primary {
+      @apply text-blue-700;
+    }
     .dark .glass-fab.glass-fab-primary {
-      background: #2563eb;
-      border-color: #ffffff;
+      @apply text-blue-300;
     }
   }
 

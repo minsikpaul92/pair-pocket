@@ -31,6 +31,8 @@
     "thisMonth": "This month",
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
+    "expandActions": "Show quick actions",
+    "collapseActions": "Hide quick actions",
     "selectMonth": "Select year and month",
     "selectDate": "Select date",
     "clear": "Clear",

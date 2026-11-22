@@ -31,6 +31,8 @@
     "thisMonth": "이번달",
     "previousMonth": "이전 달",
     "nextMonth": "다음 달",
+    "expandActions": "빠른 실행 펼치기",
+    "collapseActions": "빠른 실행 접기",
     "selectMonth": "년/월 선택",
     "selectDate": "날짜 선택",
     "clear": "지우기",

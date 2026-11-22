@@ -1027,7 +1027,12 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
       </aside>
 
-      <div className={`${mainPad} transition-all duration-200`}>
+      <div
+        className={`${mainPad} transition-all duration-200 ${
+          // Calendar on phones: the page is exactly one screen tall and the grid takes what is left.
+          view === "calendar" ? "max-md:flex max-md:min-h-dvh max-md:flex-col" : ""
+        }`}
+      >
         <header className="sticky top-0 z-40 glass-bar border-b pt-[env(safe-area-inset-top)]">
           <div className="mx-auto max-w-3xl px-3 sm:px-6 py-3 flex items-center gap-2 flex-nowrap">
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1104,14 +1109,17 @@ export default function AppShell({ user, onLogout }: Props) {
         </header>
 
         <main
-          className={`mx-auto max-w-3xl px-4 sm:px-6 ${
+          className={`mx-auto w-full max-w-3xl px-4 sm:px-6 ${
             view === "settings" ? "pt-5" : "pt-1 sm:pt-5"
           } md:pb-10 ${
             // Calendar on phones: only clear the fixed tab bar so the grid can fill the screen.
-            view === "calendar" ? "pb-[calc(4.1rem+max(0.5rem,env(safe-area-inset-bottom)))]" : "pb-32"
+            view === "calendar"
+              ? "max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col pb-[calc(4.1rem+max(0.5rem,env(safe-area-inset-bottom)))]"
+              : "pb-32"
           }`}
         >
           <PullToRefresh
+            className={view === "calendar" ? "max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col" : undefined}
             onRefresh={handlePullRefresh}
             disabled={
               Boolean(modalDate) ||
@@ -1157,7 +1165,7 @@ export default function AppShell({ user, onLogout }: Props) {
           ) : (
           <div
             data-tour="ledger-month"
-            className="mb-1 sm:mb-4 flex items-center justify-between gap-2"
+            className="mb-1 sm:mb-4 flex shrink-0 items-center justify-between gap-2"
           >
             <div className="flex min-w-0 items-baseline gap-1.5">
               {view === "calendar" ||
