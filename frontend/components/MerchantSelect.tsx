@@ -12,6 +12,8 @@ interface Props {
   placeholder?: string;
   disabled?: boolean;
   addLabel?: string;
+  /** Income entries call this field a source, not a merchant. */
+  income?: boolean;
 }
 
 export default function MerchantSelect({
@@ -22,11 +24,13 @@ export default function MerchantSelect({
   placeholder,
   disabled = false,
   addLabel,
+  income = false,
 }: Props) {
   const t = useTranslations("transaction");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  const noun = t(income ? "sourceNoun" : "merchantNoun");
   const resolvedPlaceholder = placeholder ?? t("selectMerchant");
 
   useEffect(() => {
@@ -74,7 +78,7 @@ export default function MerchantSelect({
           disabled={disabled}
           onClick={() => setOpen((prev) => !prev)}
           className="absolute right-2 p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-          title="사용처 목록 보기"
+          title={t("merchantListShow", { noun })}
         >
           <ChevronDown className="h-4 w-4" />
         </button>
@@ -83,8 +87,8 @@ export default function MerchantSelect({
       {open && (
         <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">
           <div className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700/60 flex justify-between items-center">
-            <span>자주 / 최근 사용한 사용처</span>
-            <span className="text-xs font-normal text-indigo-500">목록</span>
+            <span>{t("merchantRecent", { noun })}</span>
+            <span className="text-xs font-normal text-indigo-500">{t("merchantListTag")}</span>
           </div>
 
           {matchingOptions.length > 0 || otherOptions.length > 0 ? (
@@ -113,7 +117,7 @@ export default function MerchantSelect({
               {searchLower && otherOptions.length > 0 && (
                 <>
                   <li className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-t border-b border-gray-100 dark:border-gray-700/60 mt-1">
-                    기타 전체 사용처 ({otherOptions.length})
+                    {t("merchantOthers", { noun, count: otherOptions.length })}
                   </li>
                   {otherOptions.map((opt) => (
                     <li key={`other-${opt}`}>
@@ -137,7 +141,7 @@ export default function MerchantSelect({
             </ul>
           ) : (
             <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 text-center">
-              추천 목록이 없습니다. 직접 입력할 수 있습니다.
+              {t("merchantNoSuggestions")}
             </div>
           )}
 
@@ -152,7 +156,7 @@ export default function MerchantSelect({
                 className="w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
-                {`"${value.trim()}" (새 사용처 추가)`}
+                {t("merchantAddNew", { name: value.trim(), noun })}
               </button>
             </div>
           )}

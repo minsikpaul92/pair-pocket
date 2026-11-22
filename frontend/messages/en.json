@@ -301,6 +301,7 @@
     "scanCardTitle": "Fill from screenshot / receipt",
     "scanCardCount": "{count} / {max}",
     "scanCardHint": "Drag, paste (Cmd+V), or tap [Add photo] below to add photos or PDF statements. (Up to {max})",
+    "scanCardHintShort": "Tap [Add photo] to pick photos or PDFs. (Up to {max})",
     "scanRemove": "Remove",
     "scanAddPhoto": "Add photo",
     "scanDeep": "Deep AI analysis…",
@@ -345,6 +346,18 @@
     "selectMerchant": "Select merchant",
     "selectSubCategoryForMerchant": "Select a sub-category first",
     "addMerchant": "Add merchant",
+    "merchantNoun": "merchant",
+    "sourceNoun": "source",
+    "merchantListShow": "Show {noun} list",
+    "merchantRecent": "Frequent / recent {noun}s",
+    "merchantListTag": "List",
+    "merchantOthers": "All other {noun}s ({count})",
+    "merchantNoSuggestions": "No suggestions. You can type one.",
+    "merchantAddNew": "Add new {noun} \"{name}\"",
+    "sourceLabel": "Source",
+    "selectSource": "Select source",
+    "addSource": "Add source",
+    "dayMore": "+{count} more",
     "note": "Note / Description",
     "notePlaceholder": "Enter brief note or items (e.g. Groceries, Dinner)",
     "institution": "Institution / account",
@@ -1347,7 +1360,11 @@
     "items": {
       "calendarFitsScreen": {
         "title": "Calendar fits your screen",
-        "description": "On your phone, the calendar now fits on one screen for most months and fills the width. Each day shows the name of its first entry with a +N for the rest. The camera and add buttons sit side by side in a glass style, and the upload menu has one item for photos and PDFs."
+        "description": "On your phone, the calendar now fits on one screen for most months and fills the width. Each day shows the name of its first entry with a +N for the rest. The camera and add buttons are glass beads that fold into one button and can be moved to any corner, and the upload menu has one item for photos and PDFs."
+      },
+      "openInYourLanguage": {
+        "title": "Opens in your language",
+        "description": "The app no longer flashes in English before switching to your saved language when you open it."
       },
       "quickAmountEntry": {
         "title": "Faster expense entry",

@@ -301,6 +301,7 @@
     "scanCardTitle": "스크린샷 / 영수증으로 채우기",
     "scanCardCount": "{count} / {max}장",
     "scanCardHint": "사진이나 PDF 명세서를 드래그하거나 붙여넣기(Cmd+V)하거나, 아래 [사진 추가] 버튼을 눌러 선택하세요. (최대 {max}장)",
+    "scanCardHintShort": "[사진 추가]를 눌러 사진이나 PDF를 선택하세요. (최대 {max}장)",
     "scanRemove": "삭제",
     "scanAddPhoto": "사진 추가",
     "scanDeep": "정밀 AI 분석 중…",
@@ -345,6 +346,18 @@
     "selectMerchant": "사용처 선택",
     "selectSubCategoryForMerchant": "먼저 중분류를 선택하세요",
     "addMerchant": "새 사용처 추가",
+    "merchantNoun": "사용처",
+    "sourceNoun": "수입처",
+    "merchantListShow": "{noun} 목록 보기",
+    "merchantRecent": "자주 / 최근 사용한 {noun}",
+    "merchantListTag": "목록",
+    "merchantOthers": "기타 전체 {noun} ({count})",
+    "merchantNoSuggestions": "추천 목록이 없습니다. 직접 입력할 수 있습니다.",
+    "merchantAddNew": "\"{name}\" 새 {noun} 추가",
+    "sourceLabel": "수입처",
+    "selectSource": "수입처 선택",
+    "addSource": "새 수입처 추가",
+    "dayMore": "+{count} 더보기",
     "note": "내용 (Note)",
     "notePlaceholder": "간단한 메모나 구매 품목 입력 (예: 장보기, 회식)",
     "institution": "금융기관 / 계좌명",
@@ -1347,7 +1360,11 @@
     "items": {
       "calendarFitsScreen": {
         "title": "캘린더가 한 화면에 들어와요",
-        "description": "휴대폰에서 대부분의 달이 스크롤 없이 한 화면에 꽉 차게 보여요. 날짜마다 첫 번째 내역 이름과 나머지 개수(+N)가 보이고, 카메라와 추가 버튼은 유리 느낌으로 나란히 놓였어요. 올리기 메뉴도 사진과 PDF를 한 번에 고를 수 있게 합쳤어요."
+        "description": "휴대폰에서 대부분의 달이 스크롤 없이 한 화면에 꽉 차게 보여요. 날짜마다 첫 번째 내역 이름과 나머지 개수(+N)가 보여요. 카메라와 추가 버튼은 유리 구슬 모양이 되어 하나로 접고 원하는 모서리로 옮길 수 있고, 올리기 메뉴도 사진과 PDF를 한 번에 고를 수 있게 합쳤어요."
+      },
+      "openInYourLanguage": {
+        "title": "처음부터 내 언어로 열려요",
+        "description": "앱을 열 때 저장된 언어로 바뀌기 전에 영어 화면이 잠깐 보이던 문제를 고쳤어요."
       },
       "quickAmountEntry": {
         "title": "더 빠른 지출 입력",
