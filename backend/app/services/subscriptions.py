@@ -265,13 +265,20 @@ async def schedule_subscription_cancel(
     db: AsyncIOMotorDatabase,
     *,
     subscription: dict,
+    as_of: str | None = None,
 ) -> dict:
-    """Mark 해지예정 — visible until day before next billing cycle after upcoming due."""
+    """Mark 해지예정: the upcoming charge is cancelled, visible until the day before it.
+
+    A charge due today or earlier has already happened (or is happening), so
+    cancelling then stops the following one instead.
+    """
     cycle = BillingCycle(subscription["cycle"])
-    next_due = subscription.get("next_due_date") or subscription["start_date"]
-    cancel_effective = _next_due(
-        next_due, cycle, interval_days=subscription.get("interval_days")
-    )
+    today = _parse_as_of(as_of)
+    cancel_effective = subscription.get("next_due_date") or subscription["start_date"]
+    while _calendar_day(cancel_effective) <= today:
+        cancel_effective = _next_due(
+            cancel_effective, cycle, interval_days=subscription.get("interval_days")
+        )
     end_date = cancel_effective - timedelta(days=1)
     sub_id = str(subscription["_id"])
 
@@ -290,7 +297,7 @@ async def schedule_subscription_cancel(
         {
             "subscription_id": sub_id,
             "status": OccurrenceStatus.PENDING.value,
-            "due_date": {"$gt": end_date},
+            "due_date": {"$gte": cancel_effective},
         }
     )
     updated = await db[SUBS_COL].find_one({"_id": subscription["_id"]})
@@ -849,45 +856,47 @@ async def materialize_due_occurrences(
         if not sub or sub.get("status") not in allowed_statuses:
             continue
 
-        tx_owner = claimed.get("owner_id") or sub.get("owner_id") or ids[0]
-        counter_acc = sub.get("counter_account_id")
-        is_transfer_kind = bool(counter_acc) or sub.get("category") == "자산 이동/카드"
-        tx_doc = {
-            "date": claimed["due_date"],
-            "amount": claimed["amount"],
-            "currency": claimed["currency"],
-            "type": TransactionType.EXPENSE.value,
-            "account_type": sub["account_type"],
-            "shared_group_id": sub.get("shared_group_id"),
-            "category": sub["category"],
-            "sub_category": sub["sub_category"],
-            "merchant": sub.get("merchant") or sub["name"],
-            "institution": None,
-            "settles_expense_id": None,
-            "account_id": sub["account_id"],
-            "counter_account_id": counter_acc,
-            "kind": (
-                TransactionKind.TRANSFER.value
-                if is_transfer_kind
-                else TransactionKind.NORMAL.value
-            ),
-            "owner_id": tx_owner,
-            "subscription_occurrence_id": str(claimed["_id"]),
-            "subscription_id": str(sub["_id"]),
-            "subscription_billing_cycle": sub["cycle"],
-        }
-        result = await db[TX_COL].insert_one(tx_doc)
-        # Backfilled past occurrences are not news to the partner.
-        if claimed["due_date"] >= datetime.utcnow() - timedelta(days=7):
-            await notify_transaction(db, {**tx_doc, "_id": result.inserted_id})
-        await db[OCC_COL].update_one(
-            {"_id": claimed["_id"]},
-            {
-                "$set": {
-                    "transaction_id": str(result.inserted_id),
-                }
-            },
-        )
+        # A $0 (promo) charge is a paid period, not an expense: no transaction.
+        if float(claimed["amount"]) > 0:
+            tx_owner = claimed.get("owner_id") or sub.get("owner_id") or ids[0]
+            counter_acc = sub.get("counter_account_id")
+            is_transfer_kind = bool(counter_acc) or sub.get("category") == "자산 이동/카드"
+            tx_doc = {
+                "date": claimed["due_date"],
+                "amount": claimed["amount"],
+                "currency": claimed["currency"],
+                "type": TransactionType.EXPENSE.value,
+                "account_type": sub["account_type"],
+                "shared_group_id": sub.get("shared_group_id"),
+                "category": sub["category"],
+                "sub_category": sub["sub_category"],
+                "merchant": sub.get("merchant") or sub["name"],
+                "institution": None,
+                "settles_expense_id": None,
+                "account_id": sub["account_id"],
+                "counter_account_id": counter_acc,
+                "kind": (
+                    TransactionKind.TRANSFER.value
+                    if is_transfer_kind
+                    else TransactionKind.NORMAL.value
+                ),
+                "owner_id": tx_owner,
+                "subscription_occurrence_id": str(claimed["_id"]),
+                "subscription_id": str(sub["_id"]),
+                "subscription_billing_cycle": sub["cycle"],
+            }
+            result = await db[TX_COL].insert_one(tx_doc)
+            # Backfilled past occurrences are not news to the partner.
+            if claimed["due_date"] >= datetime.utcnow() - timedelta(days=7):
+                await notify_transaction(db, {**tx_doc, "_id": result.inserted_id})
+            await db[OCC_COL].update_one(
+                {"_id": claimed["_id"]},
+                {
+                    "$set": {
+                        "transaction_id": str(result.inserted_id),
+                    }
+                },
+            )
 
         completed = sub.get("completed_installments", 0) + 1
         next_due = _next_due(
@@ -948,6 +957,9 @@ async def list_pending_occurrences(
         query["due_date"] = {"$gte": start, "$lt": end}
     else:
         query["due_date"] = {"$gte": today}
+
+    # $0 (promo) charges stay on the fixed expenses list but not on the calendar or dashboard.
+    query["amount"] = {"$gt": 0}
 
     docs = await db[OCC_COL].find(query).sort("due_date", 1).to_list(length=100)
     return docs
