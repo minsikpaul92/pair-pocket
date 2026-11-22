@@ -477,6 +477,7 @@ export default function DashboardAnalytics({
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [flow, setFlow] = useState<FlowPoint[]>([]);
   const [flowLoading, setFlowLoading] = useState(true);
+  const [flowSeries, setFlowSeries] = useState<"expense" | "income">("expense");
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
     {}
   );
@@ -1079,15 +1080,21 @@ export default function DashboardAnalytics({
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
               {t("flowTitle")}
             </h3>
-            <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-300">
-              <span className="flex items-center gap-1.5">
-                <span className="h-0.5 w-3 rounded" style={{ backgroundColor: "var(--flow-expense)" }} />
-                {t("expense")}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-0.5 w-3 rounded" style={{ backgroundColor: "var(--flow-income)" }} />
-                {t("income")}
-              </span>
+            <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+              {(["expense", "income"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setFlowSeries(k)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    flowSeries === k
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {t(k)}
+                </button>
+              ))}
             </div>
           </div>
           {flowLoading ? (
@@ -1131,16 +1138,8 @@ export default function DashboardAnalytics({
                   />
                   <Line
                     type="monotone"
-                    dataKey="expense"
-                    stroke="var(--flow-expense)"
-                    strokeWidth={2}
-                    dot={{ r: 2.5 }}
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="income"
-                    stroke="var(--flow-income)"
+                    dataKey={flowSeries}
+                    stroke={`var(--flow-${flowSeries})`}
                     strokeWidth={2}
                     dot={{ r: 2.5 }}
                     isAnimationActive={false}

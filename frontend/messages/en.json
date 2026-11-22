@@ -1361,7 +1361,7 @@
     "items": {
       "incomeExpenseLine": {
         "title": "Income and expenses over time",
-        "description": "The dashboard now has a line chart under the expense mix. It follows the same period tabs and shows how your expenses (red) and income (blue) move by day, week or month."
+        "description": "The dashboard now has a line chart under the expense mix. It follows the same period tabs and shows how your expenses (red) or income (blue) move by day, week or month. Tap Expense or Income to switch."
       },
       "calendarFitsScreen": {
         "title": "Calendar fits your screen",
