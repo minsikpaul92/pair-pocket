@@ -52,7 +52,7 @@ import StocksView from "@/components/StocksView";
 import SettingsView, { type SettingsTab } from "@/components/SettingsView";
 import ImportView from "@/components/ImportView";
 import MonthPicker from "@/components/MonthPicker";
-import FloatingActionStack from "@/components/FloatingActionStack";
+import FloatingActionStack, { type FabCorner } from "@/components/FloatingActionStack";
 import TourProvider, {
   type TourApi,
   type TourSetupHandlers,
@@ -318,6 +318,7 @@ export default function AppShell({ user, onLogout }: Props) {
     useState<Transaction | null>(null);
 
   const [scanMenuOpen, setScanMenuOpen] = useState(false);
+  const [fabCorner, setFabCorner] = useState<FabCorner>("br");
   const [aiParsing, setAiParsing] = useState(false);
   const [parsedData, setParsedData] = useState<any>(null);
   const [scanQueue, setScanQueue] = useState<
@@ -1103,9 +1104,11 @@ export default function AppShell({ user, onLogout }: Props) {
         </header>
 
         <main
-          className={`mx-auto max-w-3xl px-4 sm:px-6 py-5 md:pb-10 ${
+          className={`mx-auto max-w-3xl px-4 sm:px-6 ${
+            view === "settings" ? "pt-5" : "pt-1 sm:pt-5"
+          } md:pb-10 ${
             // Calendar on phones: only clear the fixed tab bar so the grid can fill the screen.
-            view === "calendar" ? "pb-[calc(7.6rem+max(0.5rem,env(safe-area-inset-bottom)))]" : "pb-32"
+            view === "calendar" ? "pb-[calc(4.1rem+max(0.5rem,env(safe-area-inset-bottom)))]" : "pb-32"
           }`}
         >
           <PullToRefresh
@@ -1154,7 +1157,7 @@ export default function AppShell({ user, onLogout }: Props) {
           ) : (
           <div
             data-tour="ledger-month"
-            className="mb-2 sm:mb-4 flex items-center justify-between gap-2"
+            className="mb-1 sm:mb-4 flex items-center justify-between gap-2"
           >
             <div className="flex min-w-0 items-baseline gap-1.5">
               {view === "calendar" ||
@@ -1497,7 +1500,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
       {/* Scan Options Popover */}
       {scanMenuOpen && (
-        <div className="fixed bottom-[calc(8.5rem+max(0.5rem,env(safe-area-inset-bottom)))] md:bottom-28 right-4 md:right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className={`fixed ${fabCorner[0] === "t" ? "top-[calc(env(safe-area-inset-top)+8.6rem)]" : "bottom-[calc(8.5rem+max(0.5rem,env(safe-area-inset-bottom)))]"} ${fabCorner[1] === "l" ? "left-4" : "right-4"} md:top-auto md:left-auto md:bottom-28 md:right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200`}>
           <button
             type="button"
             onClick={() => {
@@ -1542,6 +1545,8 @@ export default function AppShell({ user, onLogout }: Props) {
       {/* Floating Buttons Group — hidden on stocks/subscriptions (view-specific FAB) */}
       {view !== "stocks" && view !== "subscriptions" && (
         <FloatingActionStack
+          key={view} // a new view starts again in the default corner
+          onCornerChange={setFabCorner}
           onCamera={() => setScanMenuOpen((o) => !o)}
           onAdd={() => openModal(new Date())}
           cameraLabel={tNav("scanReceipt")}

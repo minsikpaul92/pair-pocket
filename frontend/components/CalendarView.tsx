@@ -188,7 +188,7 @@ export default function CalendarView({
 
   return (
     // Phones: full bleed and at least one screen tall (page padding 1rem undone, header + tab bar subtracted).
-    <section className="card-inset -mx-4 flex min-h-[calc(100dvh-env(safe-area-inset-top)-8.1rem-7.6rem-max(0.5rem,env(safe-area-inset-bottom)))] flex-col rounded-3xl p-1 shadow-none sm:mx-0 sm:min-h-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
+    <section className="card-inset -mx-4 flex min-h-[calc(100dvh-env(safe-area-inset-top)-7.1rem-4.1rem-max(0.5rem,env(safe-area-inset-bottom)))] flex-col rounded-3xl p-1 shadow-none sm:mx-0 sm:min-h-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
       <div className="grid grid-cols-7 gap-px mb-1 sm:mb-2">
         {weekdays.map((w, i) => (
           <div
@@ -246,20 +246,18 @@ export default function CalendarView({
               >
                 {cell.getDate()}
               </span>
+              {hasTx && totals!.count > 1 && (
+                <span className="absolute right-0.5 top-0.5 text-[11px] font-medium leading-none whitespace-nowrap text-gray-500 dark:text-gray-400">
+                  {totals!.count - 1 >= 10 ? "9+" : `+${totals!.count - 1}`}
+                </span>
+              )}
 
               {(hasTx || hasPending) && (
                 <>
                   <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                     {hasTx && firstByDay.get(key) ? (
-                      <span className="flex w-full min-w-0 items-center justify-center gap-0.5">
-                        <span className="min-w-0 truncate whitespace-nowrap">
-                          {entryName(firstByDay.get(key)!)}
-                        </span>
-                        {totals!.count > 1 && (
-                          <span className="shrink-0 whitespace-nowrap">
-                            +{totals!.count - 1}
-                          </span>
-                        )}
+                      <span className="block w-full min-w-0 truncate whitespace-nowrap text-center text-[11px]">
+                        {entryName(firstByDay.get(key)!)}
                       </span>
                     ) : null}
                     {hasPending ? (
