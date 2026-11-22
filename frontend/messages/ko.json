@@ -244,6 +244,7 @@
     "expenseRatio": "지출 비율",
     "expenseMixTotal": "총 지출",
     "categoryBreakdown": "카테고리별 지출",
+    "flowTitle": "지출·수입 흐름",
     "trendTitle": "수입·지출 추이",
     "trendRange": "{months}개월",
     "periodMonth": "이번 달",
@@ -1358,6 +1359,10 @@
   },
   "whatsNew": {
     "items": {
+      "incomeExpenseLine": {
+        "title": "지출·수입 흐름 그래프",
+        "description": "대시보드의 지출 비율 아래에 꺾은선 그래프가 생겼어요. 같은 기간 탭을 따라가며 지출(빨강)과 수입(파랑)이 일, 주, 월 단위로 어떻게 움직였는지 보여줘요."
+      },
       "calendarFitsScreen": {
         "title": "캘린더가 한 화면에 들어와요",
         "description": "휴대폰에서 대부분의 달이 스크롤 없이 한 화면에 꽉 차게 보여요. 날짜마다 첫 번째 내역 이름과 나머지 개수(+N)가 보여요. 카메라와 추가 버튼은 유리 구슬 모양이 되어 하나로 접고 원하는 모서리로 옮길 수 있고, 올리기 메뉴도 사진과 PDF를 한 번에 고를 수 있게 합쳤어요."

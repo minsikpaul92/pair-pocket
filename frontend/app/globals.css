@@ -200,3 +200,7 @@ body {
     animation-delay: 0s !important;
   }
 }
+
+/* Dashboard income/expense line chart colors (readable on light and dark cards). */
+:root { --flow-expense: #DC2626; --flow-income: #2563EB; }
+.dark { --flow-expense: #F87171; --flow-income: #60A5FA; }

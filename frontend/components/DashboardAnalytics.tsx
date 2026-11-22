@@ -8,6 +8,8 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -38,6 +40,7 @@ import { useEscapeKey } from "@/lib/useEscapeKey";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { realMerchant } from "@/lib/merchant";
 import { addDays, addMonths, dayKey, monthKey, weekStart } from "@/lib/date";
+import { trendBuckets } from "@/lib/trend-buckets";
 
 /**
  * Category colors are mid-tone system hues: each one is at least 3:1 against
@@ -92,6 +95,13 @@ type ExpenseRange = "week" | PeriodRange;
 interface TrendPoint {
   month: string;
   label: string;
+  income: number;
+  expense: number;
+}
+
+interface FlowPoint {
+  label: string;
+  fullLabel: string;
   income: number;
   expense: number;
 }
@@ -465,6 +475,8 @@ export default function DashboardAnalytics({
   const [trendLoading, setTrendLoading] = useState(true);
   const [expenseSlices, setExpenseSlices] = useState<CategorySlice[]>([]);
   const [expenseLoading, setExpenseLoading] = useState(false);
+  const [flow, setFlow] = useState<FlowPoint[]>([]);
+  const [flowLoading, setFlowLoading] = useState(true);
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
     {}
   );
@@ -650,6 +662,67 @@ export default function DashboardAnalytics({
     excludeKey,
     hiddenCategories,
   ]);
+
+  // Income / expense line chart: same period as the pie, one summary per bucket.
+  useEffect(() => {
+    if (!showExpense) return;
+    let active = true;
+    setFlowLoading(true);
+
+    const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, o);
+    const dayLabel = fmt({ weekday: "short" });
+    const dateLabel = fmt({ month: "short", day: "numeric" });
+    const monthLabel = fmt({ month: "short" });
+    const fullMonthLabel = fmt({ year: "numeric", month: "short" });
+    const buckets = trendBuckets(expenseRange, month, selectedWeekStart);
+
+    async function loadBucket(b: (typeof buckets)[number]): Promise<FlowPoint> {
+      let income = 0;
+      let expense = 0;
+      for (const cur of ["CAD", "KRW"] as const) {
+        if (scope !== "ALL" && scope !== cur) continue;
+        const stats = await fetchStatsSummary({
+          start: b.start,
+          end: b.end,
+          currency: cur,
+          accountType,
+          excludeCategories,
+        }).catch(() => null);
+        if (!stats) continue;
+        income += convertAmount(stats.total_income, cur, displayCurrency, rate);
+        expense += convertAmount(stats.adjusted_expense, cur, displayCurrency, rate);
+      }
+      const label =
+        b.unit === "day"
+          ? dayLabel.format(b.date)
+          : b.unit === "week"
+            ? dateLabel.format(b.date)
+            : monthLabel.format(b.date);
+      const fullLabel =
+        b.unit === "month"
+          ? fullMonthLabel.format(b.date)
+          : b.unit === "week"
+            ? `${dateLabel.format(b.date)} – ${dateLabel.format(new Date(b.end + "T00:00:00"))}`
+            : `${dateLabel.format(b.date)} ${dayLabel.format(b.date)}`;
+      return { label, fullLabel, income, expense };
+    }
+
+    Promise.all(buckets.map(loadBucket))
+      .then((rows) => {
+        if (active) setFlow(rows);
+      })
+      .catch(() => {
+        if (active) setFlow([]);
+      })
+      .finally(() => {
+        if (active) setFlowLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expenseRange, weekStartKey, month, version, scope, accountType, displayCurrency, rate, locale, excludeKey, showExpense]);
 
   useEffect(() => {
     let active = true;
@@ -1000,6 +1073,83 @@ export default function DashboardAnalytics({
             </ul>
           </div>
         )}
+
+        <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              {t("flowTitle")}
+            </h3>
+            <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-300">
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-3 rounded" style={{ backgroundColor: "var(--flow-expense)" }} />
+                {t("expense")}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-3 rounded" style={{ backgroundColor: "var(--flow-income)" }} />
+                {t("income")}
+              </span>
+            </div>
+          </div>
+          {flowLoading ? (
+            <div className="mt-3 h-48 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+          ) : (
+            <div className="mt-3 h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={flow} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-gray-200 dark:stroke-gray-700"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    interval="preserveStartEnd"
+                    minTickGap={14}
+                    tick={{ fontSize: 11, fill: "currentColor" }}
+                    className="text-gray-500 dark:text-gray-400"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "currentColor" }}
+                    className="text-gray-500 dark:text-gray-400"
+                    width={40}
+                    tickFormatter={(v: number) =>
+                      v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
+                    }
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => (
+                      <ChartTooltipBox
+                        active={active}
+                        label={(payload?.[0]?.payload as FlowPoint | undefined)?.fullLabel}
+                        rows={(payload ?? []).map((p) => ({
+                          name: p.dataKey === "income" ? t("income") : t("expense"),
+                          value: formatAmount(Number(p.value ?? 0), displayCurrency),
+                          color: typeof p.color === "string" ? p.color : undefined,
+                        }))}
+                      />
+                    )}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="expense"
+                    stroke="var(--flow-expense)"
+                    strokeWidth={2}
+                    dot={{ r: 2.5 }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="income"
+                    stroke="var(--flow-income)"
+                    strokeWidth={2}
+                    dot={{ r: 2.5 }}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       </section>
       )}
 
