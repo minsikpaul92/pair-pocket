@@ -1358,6 +1358,10 @@
   },
   "whatsNew": {
     "items": {
+      "softerCalendarLook": {
+        "title": "A nicer calendar and buttons",
+        "description": "Today now stands out with a bold blue number and underline, and days with entries have a clearer background. There is less empty space under the calendar, and the camera and add buttons look like clear water droplets."
+      },
       "calendarFitsScreen": {
         "title": "Calendar fits your screen",
         "description": "On your phone, the calendar now fits on one screen for most months and fills the width. Each day shows the name of its first entry with a +N for the rest. The camera and add buttons are glass beads that fold into one button and can be moved to any corner, and the upload menu has one item for photos and PDFs."
