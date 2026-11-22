@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -405,6 +405,44 @@ function periodLabelKey(
   return "periodYear";
 }
 
+/** Drawn geometry of one donut slice, captured from the label render. Angles are recharts degrees (0 = 3 o'clock, counter-clockwise). */
+interface SliceGeom {
+  cx: number;
+  cy: number;
+  innerRadius: number;
+  outerRadius: number;
+  startAngle: number;
+  endAngle: number;
+}
+
+// Every slice gets at least this much angle to aim at, so a 0.5% slice is still easy to hit.
+const PIE_HIT_MIN_HALF_ANGLE = 7;
+// The ring's hit area reaches a little past the drawn ring on both sides.
+const PIE_HIT_RING_PAD = 14;
+
+/** Index of the slice under a point in the chart box, or -1. Works on the icons, the gaps and thin slices. */
+export function pieSliceAt(geoms: (SliceGeom | undefined)[], x: number, y: number): number {
+  let best = -1;
+  let bestDist = Infinity;
+  geoms.forEach((g, i) => {
+    if (!g) return;
+    const dx = x - g.cx;
+    const dy = g.cy - y;
+    const r = Math.hypot(dx, dy);
+    if (r < g.innerRadius - PIE_HIT_RING_PAD || r > g.outerRadius + PIE_HIT_RING_PAD) return;
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const mid = (g.startAngle + g.endAngle) / 2;
+    const half = Math.max(Math.abs(g.endAngle - g.startAngle) / 2, PIE_HIT_MIN_HALF_ANGLE);
+    const dist = Math.abs((((angle - mid) % 360) + 540) % 360 - 180);
+    // Nearest slice centre wins, so a thin slice beats the edge of its big neighbour.
+    if (dist <= half && dist < bestDist) {
+      best = i;
+      bestDist = dist;
+    }
+  });
+  return best;
+}
+
 function PieSliceIcon({
   cx,
   cy,
@@ -432,7 +470,7 @@ function PieSliceIcon({
   const Icon = categoryIcon(category);
   const isLight = isLightColor(color);
   return (
-    <g transform={`translate(${x - 8},${y - 8})`}>
+    <g transform={`translate(${x - 8},${y - 8})`} pointerEvents="none">
       <foreignObject width={16} height={16}>
         <div className={`flex h-4 w-4 items-center justify-center ${isLight ? "text-gray-950" : "text-white"}`}>
           <Icon className="h-3.5 w-3.5" strokeWidth={2.25} />
@@ -487,6 +525,9 @@ export default function DashboardAnalytics({
   );
   const [activeColorPicker, setActiveColorPicker] = useState<string | null>(null);
   const [popoverCategory, setPopoverCategory] = useState<string | null>(null);
+  const pieGeoms = useRef<(SliceGeom | undefined)[]>([]);
+  const pieBoxRef = useRef<HTMLDivElement>(null);
+  const [pieHover, setPieHover] = useState<{ index: number; x: number; y: number } | null>(null);
   useEscapeKey(() => setPopoverCategory(null), popoverCategory !== null);
 
   const isWeek = expenseRange === "week";
@@ -911,7 +952,10 @@ export default function DashboardAnalytics({
           </p>
         ) : (
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-            <div className="relative h-56 w-full flex items-center justify-center">
+            <div
+              ref={pieBoxRef}
+              className="relative h-56 w-full flex items-center justify-center"
+            >
               {/* Centered Total Summary (z-0 so tooltip floats on top) */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
                 <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -931,66 +975,106 @@ export default function DashboardAnalytics({
                     cy="50%"
                     innerRadius={52}
                     outerRadius={78}
-                    paddingAngle={4}
+                    paddingAngle={3}
+                    minAngle={3}
                     cornerRadius={4}
                     stroke="none"
                     labelLine={false}
-                    onClick={(entry) => {
-                      if (entry?.category) {
-                        setPopoverCategory(entry.category);
-                      }
-                    }}
-                    cursor="pointer"
                     label={(props: {
+                      index: number;
                       cx: number;
                       cy: number;
                       midAngle: number;
                       innerRadius: number;
                       outerRadius: number;
+                      startAngle: number;
+                      endAngle: number;
                       percent: number;
                       category?: string;
                       payload?: CategorySlice;
-                    }) => (
-                      <PieSliceIcon
-                        cx={props.cx}
-                        cy={props.cy}
-                        midAngle={props.midAngle}
-                        innerRadius={props.innerRadius}
-                        outerRadius={props.outerRadius}
-                        percent={props.percent}
-                        category={
-                          props.category ?? props.payload?.category ?? ""
-                        }
-                        color={
-                          props.payload?.color ?? "#ffffff"
-                        }
-                      />
-                    )}
+                    }) => {
+                      pieGeoms.current[props.index] = {
+                        cx: props.cx,
+                        cy: props.cy,
+                        innerRadius: props.innerRadius,
+                        outerRadius: props.outerRadius,
+                        startAngle: props.startAngle,
+                        endAngle: props.endAngle,
+                      };
+                      return (
+                        <PieSliceIcon
+                          cx={props.cx}
+                          cy={props.cy}
+                          midAngle={props.midAngle}
+                          innerRadius={props.innerRadius}
+                          outerRadius={props.outerRadius}
+                          percent={props.percent}
+                          category={
+                            props.category ?? props.payload?.category ?? ""
+                          }
+                          color={
+                            props.payload?.color ?? "#ffffff"
+                          }
+                        />
+                      );
+                    }}
                   >
-                    {pieData.map((entry) => (
-                      <Cell key={entry.category} fill={entry.color} />
+                    {pieData.map((entry, i) => (
+                      <Cell
+                        key={entry.category}
+                        fill={entry.color}
+                        fillOpacity={pieHover && pieHover.index !== i ? 0.45 : 1}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip
-                    wrapperStyle={{ zIndex: 100, pointerEvents: "none" }}
-                    content={({ active, payload }) => (
-                      <PieExpenseTooltip
-                        active={active}
-                        payload={
-                          payload as Array<{
-                            payload?: CategorySlice;
-                            color?: string;
-                          }>
-                        }
-                        totalExpense={pieTotalExpense}
-                        displayCurrency={displayCurrency}
-                        monthTransactions={periodTransactions}
-                        tCategories={tCategories}
-                      />
-                    )}
-                  />
                 </PieChart>
               </ResponsiveContainer>
+              {/* One hit layer over the whole ring: slices, their icons and the gaps all respond the same way. */}
+              <div
+                className={`absolute inset-0 z-10 ${pieHover ? "cursor-pointer" : ""}`}
+                data-testid="pie-hit-layer"
+                onPointerMove={(e) => {
+                  const box = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - box.left;
+                  const y = e.clientY - box.top;
+                  const index = pieSliceAt(pieGeoms.current, x, y);
+                  setPieHover(index >= 0 ? { index, x, y } : null);
+                }}
+                onPointerLeave={() => setPieHover(null)}
+                onClick={(e) => {
+                  const box = e.currentTarget.getBoundingClientRect();
+                  const index = pieSliceAt(
+                    pieGeoms.current,
+                    e.clientX - box.left,
+                    e.clientY - box.top,
+                  );
+                  const slice = pieData[index];
+                  if (slice) setPopoverCategory(slice.category);
+                }}
+              />
+              {pieHover && pieData[pieHover.index] && (
+                <div
+                  className="pointer-events-none absolute z-[100] w-max max-w-[16rem]"
+                  style={{
+                    left: Math.min(pieHover.x + 12, Math.max(0, (pieBoxRef.current?.clientWidth ?? 0) - 220)),
+                    top: pieHover.y + 12,
+                  }}
+                >
+                  <PieExpenseTooltip
+                    active
+                    payload={[
+                      {
+                        payload: pieData[pieHover.index],
+                        color: pieData[pieHover.index].color,
+                      },
+                    ]}
+                    totalExpense={pieTotalExpense}
+                    displayCurrency={displayCurrency}
+                    monthTransactions={periodTransactions}
+                    tCategories={tCategories}
+                  />
+                </div>
+              )}
             </div>
             <ul className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
               {displaySlices.map((row) => {
