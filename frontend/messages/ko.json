@@ -310,9 +310,13 @@
     "scanClear": "초기화",
     "scanDropHere": "영수증/명세서 이미지를 여기에 놓으세요",
     "scanQueueProgress": "총 {total}건 중 {current}번째 거래 검토 중",
-    "scanPrev": "이전",
-    "scanNext": "다음",
     "scanSkip": "건너뛰기",
+    "scanQueueFound": "{count}건을 찾았어요. 하나씩 확인하고 저장해 주세요.",
+    "scanQueueSaved": "{count}건 저장됨",
+    "scanTabSaved": "저장됨",
+    "scanTabSkipped": "건너뜀",
+    "scanSaveNext": "저장 후 다음",
+    "scanCloseConfirm": "{saved}건은 이미 저장되었습니다. 남은 {left}건은 저장하지 않고 닫을까요?",
     "itemsTitle": "소분류 세부 품목 내역",
     "itemsHide": "숨기기",
     "itemName": "품목",
@@ -1358,6 +1362,10 @@
   },
   "whatsNew": {
     "items": {
+      "multiReceiptSave": {
+        "title": "여러 영수증이 모두 저장돼요",
+        "description": "영수증 여러 장을 한 번에 스캔하면 각 영수증을 [저장 후 다음]으로 하나씩 저장하고, 원하지 않는 것은 건너뛸 수 있어요. 직접 입력할 때는 금액 칸에 바로 입력할 수 있어요."
+      },
       "calendarFitsScreen": {
         "title": "캘린더가 한 화면에 들어와요",
         "description": "휴대폰에서 대부분의 달이 스크롤 없이 한 화면에 꽉 차게 보여요. 날짜마다 첫 번째 내역 이름과 나머지 개수(+N)가 보여요. 카메라와 추가 버튼은 유리 구슬 모양이 되어 하나로 접고 원하는 모서리로 옮길 수 있고, 올리기 메뉴도 사진과 PDF를 한 번에 고를 수 있게 합쳤어요."
