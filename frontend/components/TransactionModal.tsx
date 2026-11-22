@@ -2,7 +2,7 @@
 
 import { Camera, ChevronDown, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatTaxPercent } from "@/lib/canada-tax";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
@@ -145,6 +145,9 @@ function convertCurrency(
 /** Option value for settlements in the Settle/Move kind list; transfers use their sub-category name. */
 const MOVE_KIND_SETTLEMENT = "settlement";
 
+/** Busy days show this many entries before "+N more". */
+const DAY_LIST_CAP = 4;
+
 export default function TransactionModal({
   currency,
   taxPercent = 13,
@@ -275,41 +278,42 @@ export default function TransactionModal({
   const [scanRetryCount, setScanRetryCount] = useState(0);
   const [isTaxChecked, setIsTaxChecked] = useState(true);
   const amountRowRef = useRef<HTMLDivElement>(null);
-  const [positionTick, setPositionTick] = useState(0);
-  const scrolledByHandRef = useRef(false);
-  // New entries start in the amount field (autoFocus covers the tap that opened the modal). On
-  // phones the scan panel sits above the amount, so the sheet is scrolled to put the amount row at
-  // the top. This runs before paint, jumps without animation, and only once per open or tab switch.
-  useLayoutEffect(() => {
-    if (editingTransaction) return;
-    const input = amountInputRef.current;
-    input?.focus({ preventScroll: true });
-    scrolledByHandRef.current = false;
-    function position() {
-      const dialog = dialogRef.current;
-      const row = amountRowRef.current;
-      if (!dialog) return;
-      const phone = window.matchMedia("(max-width: 639px)").matches;
-      if (!phone || !row || moveTab) {
-        dialog.scrollTop = 0;
-        return;
-      }
+  // Phones: the sheet never moves on open. When the amount is tapped, the sheet scrolls so the
+  // amount row sits at the top (scan panel scrolled out) once the keyboard has resized the view.
+  function scrollAmountToTop() {
+    const dialog = dialogRef.current;
+    const row = amountRowRef.current;
+    if (!dialog || !row || !window.matchMedia("(max-width: 639px)").matches) return;
+    const place = () => {
       const offset =
         row.getBoundingClientRect().top - dialog.getBoundingClientRect().top + dialog.scrollTop;
-      dialog.scrollTop = Math.max(0, offset - 8);
-    }
-    position();
-    // The iOS keyboard resizes the sheet once; settle again unless the user has scrolled.
-    const frame = requestAnimationFrame(() => {
-      if (!scrolledByHandRef.current) position();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [editingTransaction, positionTick]);
+      dialog.scrollTo({ top: Math.max(0, offset - 8), behavior: "auto" });
+    };
+    requestAnimationFrame(place);
+    // iOS resizes the visual viewport as the keyboard opens; place once more after that, then stop.
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const done = () => {
+      vv.removeEventListener("resize", onResize);
+      clearTimeout(timer);
+    };
+    const onResize = () => {
+      place();
+      done();
+    };
+    const timer = setTimeout(done, 700);
+    vv.addEventListener("resize", onResize);
+  }
+  // Desktop keeps the cursor in the amount on open; phones wait for a tap so the keyboard stays closed.
+  useEffect(() => {
+    if (editingTransaction || !window.matchMedia("(min-width: 640px)").matches) return;
+    amountInputRef.current?.focus({ preventScroll: true });
+  }, [editingTransaction]);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [dayListOpen, setDayListOpen] = useState(false);
+  const [dayListAll, setDayListAll] = useState(false);
   const [modalDragY, setModalDragY] = useState(0);
   const touchStartY = useRef<number | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
@@ -1278,6 +1282,12 @@ export default function TransactionModal({
     };
   }, [isSettlement, isEditing, hasPartner, currency, otherLedger]);
 
+  // Show cents once the user leaves a field ("1" becomes "1.00"); KRW stays whole and empty stays empty.
+  function formatOnBlur(value: string, set: (v: string) => void) {
+    if (transactionCurrency === "KRW" || !/\d/.test(value)) return;
+    set(amountToInput(parseAmountInput(value), transactionCurrency));
+  }
+
   function handleTaxToggle(checked: boolean) {
     setIsTaxChecked(checked);
     if (!checked) {
@@ -1303,11 +1313,7 @@ export default function TransactionModal({
     setMerchant("");
     setInstitution("");
     setError(null);
-    // The tab tap is a user gesture, so iOS keeps the keyboard up on the amount.
-    if (!isEditing) {
-      amountInputRef.current?.focus({ preventScroll: true });
-      setPositionTick((n) => n + 1);
-    }
+
   }
 
   function handleSettleableChange(id: string) {
@@ -2156,12 +2162,10 @@ export default function TransactionModal({
     >
       <div
         ref={dialogRef}
-        onWheel={() => (scrolledByHandRef.current = true)}
-        onTouchMove={() => (scrolledByHandRef.current = true)}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto select-none"
+        className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-4 sm:p-5 max-h-[92dvh] overflow-auto select-none"
         style={{
           transform: modalDragY > 0 ? `translateY(${modalDragY}px)` : undefined,
           transition: modalDragY === 0 ? "transform 0.2s ease-out" : "none",
@@ -2174,18 +2178,18 @@ export default function TransactionModal({
           onTouchStart={(e) => startDrag(e.touches[0].clientY)}
           onTouchMove={(e) => updateDrag(e.touches[0].clientY)}
           onTouchEnd={() => finishDrag()}
-          className="w-full py-2 -mt-2 mb-1 flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none group"
+          className="w-full py-1.5 -mt-1 flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none group"
           title="아래로 드래그하여 닫기"
         >
           <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full group-hover:bg-gray-400 dark:group-hover:bg-gray-600 transition-colors" />
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h2 id={titleId} className="text-lg sm:text-xl font-bold tracking-tight whitespace-nowrap">
+            <div className="flex min-w-0 items-baseline gap-2">
+              <h2 id={titleId} className="shrink-0 text-lg sm:text-xl font-bold tracking-tight whitespace-nowrap">
                 {isEditing ? tTx("edit") : tTx("new")}
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+              <p className="min-w-0 text-sm text-gray-500 dark:text-gray-400 truncate">
                 {currency === "CAD"
                   ? tLedger("canadaLedgerShort")
                   : tLedger("koreaLedgerShort")}{" "}
@@ -2196,7 +2200,7 @@ export default function TransactionModal({
               type="button"
               onClick={onClose}
               aria-label={tCommon("close")}
-              className="shrink-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+              className="-m-3 shrink-0 p-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -2240,7 +2244,7 @@ export default function TransactionModal({
           )}
         </div>
 
-        <div className="mt-4">
+        <div className="mt-2">
           <DayPicker
             value={defaultDate}
             onChange={onDateChange}
@@ -2249,7 +2253,7 @@ export default function TransactionModal({
         </div>
 
         {dayPendingOccurrences.length > 0 && (
-          <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-28 overflow-auto">
+          <ul className="mt-2 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-28 overflow-auto">
             {dayPendingOccurrences.map((occ) => {
               const tone = subscriptionScheduleAmountClass(occ.due_date);
               return (
@@ -2292,29 +2296,8 @@ export default function TransactionModal({
         )}
 
         {dayTransactions.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setDayListOpen((v) => !v)}
-            aria-expanded={dayListOpen}
-            className="mt-3 flex min-h-[44px] w-full items-center gap-1 whitespace-nowrap text-sm font-medium text-gray-600 dark:text-gray-300"
-          >
-            <span className="min-w-0 truncate">
-              {dayKey(defaultDate) === dayKey(new Date())
-                ? tTx("todayEntries", { count: dayTransactions.length })
-                : tTx("dayEntries", {
-                    count: dayTransactions.length,
-                    date: defaultDate.toLocaleDateString(locale, { month: "short", day: "numeric" }),
-                  })}
-            </span>
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 transition-transform ${dayListOpen ? "rotate-180" : ""}`}
-            />
-          </button>
-        )}
-
-        {dayTransactions.length > 0 && dayListOpen && (
-          <ul className="card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-40 overflow-auto">
-            {dayTransactions.map((tx) => {
+          <ul className="mt-2 card-inset divide-y divide-gray-100 dark:divide-gray-700">
+            {(dayListAll ? dayTransactions : dayTransactions.slice(0, DAY_LIST_CAP)).map((tx) => {
               const settled = hasSettlement(tx);
               const nonCashflow = isNonCashflowTransaction(tx);
               const isSubscription = Boolean(tx.subscription_id);
@@ -2344,7 +2327,7 @@ export default function TransactionModal({
                       onClick={() => {
                         onSelectTransaction?.(tx);
                       }}
-                      className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors ${
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors ${
                         isActive
                           ? "bg-blue-50 dark:bg-blue-500/10"
                           : "hover:bg-gray-50 dark:hover:bg-gray-800/80"
@@ -2383,10 +2366,21 @@ export default function TransactionModal({
                 </li>
               );
             })}
+            {!dayListAll && dayTransactions.length > DAY_LIST_CAP && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setDayListAll(true)}
+                  className="w-full whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-blue-600 dark:text-blue-400"
+                >
+                  {tTx("dayMore", { count: dayTransactions.length - DAY_LIST_CAP })}
+                </button>
+              </li>
+            )}
           </ul>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-3 space-y-3">
           <div className="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
             <button
               type="button"
@@ -2449,7 +2443,7 @@ export default function TransactionModal({
                 setDragOverModal(false);
                 addScanQueueFiles(e.dataTransfer.files);
               }}
-              className={`relative rounded-2xl border-2 border-dashed p-3 space-y-2.5 transition-all duration-150 ${
+              className={`relative rounded-2xl border-2 border-dashed p-2.5 space-y-2 transition-all duration-150 ${
                 dragOverModal
                   ? "border-blue-500 bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500/30 scale-[1.01]"
                   : "border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/20"
@@ -2680,12 +2674,13 @@ export default function TransactionModal({
               <input
                 id={amountId}
                 ref={amountInputRef}
-                autoFocus={!isEditing}
+                onFocus={scrollAmountToTop}
+                onBlur={() => formatOnBlur(amount, setAmount)}
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => handleTotalChange(e.target.value)}
                 placeholder="0"
-                className="input-field px-16 py-3 text-center text-3xl font-bold tabular-nums"
+                className="input-field px-16 py-2 text-center text-2xl font-bold tabular-nums"
               />
               {isStock ? (
                 <select
@@ -2717,6 +2712,7 @@ export default function TransactionModal({
                   inputMode="decimal"
                   value={subtotal}
                   onChange={(e) => handleSubtotalChange(e.target.value)}
+                  onBlur={() => formatOnBlur(subtotal, setSubtotal)}
                   placeholder="0.00"
                   className={`input-field ${NO_SPIN}`}
                 />
@@ -2737,6 +2733,7 @@ export default function TransactionModal({
                   value={taxAmount}
                   disabled={!isTaxChecked}
                   onChange={(e) => handleTaxChange(e.target.value)}
+                  onBlur={() => formatOnBlur(taxAmount, setTaxAmount)}
                   placeholder="0.00"
                   className={`input-field ${NO_SPIN} ${!isTaxChecked ? "opacity-50 bg-gray-50 dark:bg-gray-800" : ""}`}
                 />
@@ -2781,6 +2778,7 @@ export default function TransactionModal({
                     inputMode="decimal"
                     value={tipAmount}
                     onChange={(e) => handleTipAmountChange(e.target.value)}
+                    onBlur={() => formatOnBlur(tipAmount, setTipAmount)}
                     placeholder={tTx("tipAmount")}
                     className={`input-field ${NO_SPIN}`}
                   />
