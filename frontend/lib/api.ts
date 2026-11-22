@@ -1194,11 +1194,13 @@ export async function fetchSubscriptions(filters: {
   currency?: Currency;
   accountType?: AccountType;
   month?: string;
+  hideZero?: boolean;
 } = {}): Promise<Subscription[]> {
   const params = new URLSearchParams();
   params.set("account_type", filters.accountType ?? "personal");
   if (filters.currency) params.set("currency", filters.currency);
   if (filters.month) params.set("month", filters.month);
+  if (filters.hideZero) params.set("hide_zero", "true");
   const res = await apiFetch(
     `${API_BASE_URL}/api/subscriptions?${params.toString()}`,
     { headers: authHeaders() }
@@ -1305,7 +1307,7 @@ export async function scheduleSubscriptionCancel(
   id: string
 ): Promise<Subscription> {
   const res = await apiFetch(
-    `${API_BASE_URL}/api/subscriptions/${id}/schedule-cancel`,
+    `${API_BASE_URL}/api/subscriptions/${id}/schedule-cancel?as_of=${dayKey(new Date())}`,
     { method: "POST", headers: authHeaders() }
   );
   if (!res.ok) throw await readApiError(res, "scheduleSubscriptionCancel");
