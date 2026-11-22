@@ -89,7 +89,7 @@ export default async function LocaleLayout({ children, params }: Props) {
           }}
         />
       </head>
-      <body className="font-sans antialiased">
+      <body className="font-sans tabular-nums antialiased">
         <SerwistProvider
           swUrl="/serwist/sw.js"
           disable={process.env.NEXT_PUBLIC_PWA_ENABLED !== "true"}
