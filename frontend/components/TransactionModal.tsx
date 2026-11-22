@@ -286,6 +286,7 @@ export default function TransactionModal({
   const amountId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [dayListOpen, setDayListOpen] = useState(false);
   const [modalDragY, setModalDragY] = useState(0);
   const touchStartY = useRef<number | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
@@ -613,6 +614,7 @@ export default function TransactionModal({
   const HST_RATE = taxPercent / 100;
   // The scan row stays one line until it is tapped or files arrive (picker, paste, drop).
   const scanExpanded = scanOpen || scanQueue.length > 0 || scanning || dragOverModal || Boolean(scanHint);
+  const isIncomeSource = type === "income" && !moveTab;
   const amountLabel = moveTab
     ? tTx("totalMove")
     : type === "income"
@@ -1489,7 +1491,7 @@ export default function TransactionModal({
       ticker: isStock ? finalTicker.toUpperCase() : undefined,
       shares: isStock ? parseFloat(shares) : undefined,
       price: isStock ? parseFloat(price) : undefined,
-      items: items && items.length > 0
+      items: !moveTab && items && items.length > 0
         ? items.map((it) => ({
             ...it,
             quantity: typeof it.quantity === "number" ? it.quantity : parseFloat(String(it.quantity)) || 1,
@@ -2262,7 +2264,28 @@ export default function TransactionModal({
         )}
 
         {dayTransactions.length > 0 && (
-          <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-40 overflow-auto">
+          <button
+            type="button"
+            onClick={() => setDayListOpen((v) => !v)}
+            aria-expanded={dayListOpen}
+            className="mt-3 flex min-h-[44px] w-full items-center gap-1 whitespace-nowrap text-sm font-medium text-gray-600 dark:text-gray-300"
+          >
+            <span className="min-w-0 truncate">
+              {dayKey(defaultDate) === dayKey(new Date())
+                ? tTx("todayEntries", { count: dayTransactions.length })
+                : tTx("dayEntries", {
+                    count: dayTransactions.length,
+                    date: defaultDate.toLocaleDateString(locale, { month: "short", day: "numeric" }),
+                  })}
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 transition-transform ${dayListOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+        )}
+
+        {dayTransactions.length > 0 && dayListOpen && (
+          <ul className="card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-40 overflow-auto">
             {dayTransactions.map((tx) => {
               const settled = hasSettlement(tx);
               const nonCashflow = isNonCashflowTransaction(tx);
@@ -2533,7 +2556,7 @@ export default function TransactionModal({
           {!isTransfer && !(moveTab && !moveKind) && (
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {tTx("merchant")}
+                {tTx(isIncomeSource ? "sourceLabel" : "merchant")}
               </label>
               <MerchantSelect
                 options={allMerchants}
@@ -2541,8 +2564,9 @@ export default function TransactionModal({
                 onChange={handleMerchantChange}
                 onAdd={handleAddMerchant}
                 disabled={false}
-                placeholder={tTx("selectMerchant")}
-                addLabel={tTx("addMerchant")}
+                placeholder={tTx(isIncomeSource ? "selectSource" : "selectMerchant")}
+                addLabel={tTx(isIncomeSource ? "addSource" : "addMerchant")}
+                income={isIncomeSource}
               />
             </div>
           )}
@@ -2819,6 +2843,7 @@ export default function TransactionModal({
           )}
 
           {/* Sub-items (소분류 세부항목) Expandable Section */}
+          {!moveTab && (
           <div className="border-t border-gray-100 dark:border-gray-800/80 pt-4 mt-2">
             <input
               ref={itemsScanInputRef}
@@ -3122,6 +3147,7 @@ export default function TransactionModal({
               </div>
             )}
           </div>
+          )}
 
           {editingTransaction?.pair_kind === "settlement" && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
