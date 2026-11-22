@@ -327,6 +327,8 @@
     "subtotalLabel": "공급가액 (Subtotal)",
     "taxLabel": "세금 (HST 13%)",
     "totalLabel": "총 결제액 (Total)",
+    "breakdownSummary": "소계 {subtotal} · 세금 {tax}",
+    "breakdownNoTax": "소계 {subtotal} · 세금 없음",
     "tipLabel": "팁",
     "tipPercent": "퍼센트 (%)",
     "tipAmount": "금액",
@@ -1342,6 +1344,10 @@
   },
   "whatsNew": {
     "items": {
+      "quickAmountEntry": {
+        "title": "더 빠른 지출 입력",
+        "description": "금액이 맨 위에 나오고 입력창을 열면 바로 입력할 수 있어요. 소계와 세금은 자동으로 계산되고, 사용처를 비워 두면 카테고리가 대신 표시돼요."
+      },
       "scanQueueEnglishText": {
         "title": "영어 화면의 영수증 스캔을 고쳤어요",
         "description": "앱을 영어로 볼 때 영수증 스캔 대기열과 버튼, 오류 안내에 한국어가 섞여 나오던 문제를 고쳤어요."

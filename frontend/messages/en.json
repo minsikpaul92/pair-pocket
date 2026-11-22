@@ -327,6 +327,8 @@
     "subtotalLabel": "Subtotal",
     "taxLabel": "Tax (HST 13%)",
     "totalLabel": "Total",
+    "breakdownSummary": "Subtotal {subtotal} · Tax {tax}",
+    "breakdownNoTax": "Subtotal {subtotal} · No tax",
     "tipLabel": "Tip",
     "tipPercent": "Percent (%)",
     "tipAmount": "Amount",
@@ -1342,6 +1344,10 @@
   },
   "whatsNew": {
     "items": {
+      "quickAmountEntry": {
+        "title": "Faster expense entry",
+        "description": "The amount now comes first and is ready to type as soon as you add an entry. Subtotal and tax are worked out for you, and you can leave the merchant empty to show the category instead."
+      },
       "scanQueueEnglishText": {
         "title": "Receipt scan in English",
         "description": "The receipt scan queue, its buttons and its error messages no longer show Korean when the app is in English."
