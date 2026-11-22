@@ -145,6 +145,9 @@ function convertCurrency(
 /** Option value for settlements in the Settle/Move kind list; transfers use their sub-category name. */
 const MOVE_KIND_SETTLEMENT = "settlement";
 
+/** Busy days show this many entries before "+N more". */
+const DAY_LIST_CAP = 4;
+
 export default function TransactionModal({
   currency,
   taxPercent = 13,
@@ -274,18 +277,43 @@ export default function TransactionModal({
   const [queueIndex, setQueueIndex] = useState(0);
   const [scanRetryCount, setScanRetryCount] = useState(0);
   const [isTaxChecked, setIsTaxChecked] = useState(true);
-  // New entries start in the amount field; autoFocus handles the tap that opened the modal,
-  // this covers a modal that stays mounted.
+  const amountRowRef = useRef<HTMLDivElement>(null);
+  // Phones: the sheet never moves on open. When the amount is tapped, the sheet scrolls so the
+  // amount row sits at the top (scan panel scrolled out) once the keyboard has resized the view.
+  function scrollAmountToTop() {
+    const dialog = dialogRef.current;
+    const row = amountRowRef.current;
+    if (!dialog || !row || !window.matchMedia("(max-width: 639px)").matches) return;
+    const place = () => {
+      const offset =
+        row.getBoundingClientRect().top - dialog.getBoundingClientRect().top + dialog.scrollTop;
+      dialog.scrollTo({ top: Math.max(0, offset - 8), behavior: "auto" });
+    };
+    requestAnimationFrame(place);
+    // iOS resizes the visual viewport as the keyboard opens; place once more after that, then stop.
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const done = () => {
+      vv.removeEventListener("resize", onResize);
+      clearTimeout(timer);
+    };
+    const onResize = () => {
+      place();
+      done();
+    };
+    const timer = setTimeout(done, 700);
+    vv.addEventListener("resize", onResize);
+  }
+  // Desktop keeps the cursor in the amount on open; phones wait for a tap so the keyboard stays closed.
   useEffect(() => {
-    if (editingTransaction) return;
-    dialogRef.current?.scrollTo(0, 0);
+    if (editingTransaction || !window.matchMedia("(min-width: 640px)").matches) return;
     amountInputRef.current?.focus({ preventScroll: true });
   }, [editingTransaction]);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [scanOpen, setScanOpen] = useState(false);
+  const [dayListAll, setDayListAll] = useState(false);
   const [modalDragY, setModalDragY] = useState(0);
   const touchStartY = useRef<number | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
@@ -612,7 +640,8 @@ export default function TransactionModal({
 
   const HST_RATE = taxPercent / 100;
   // The scan row stays one line until it is tapped or files arrive (picker, paste, drop).
-  const scanExpanded = scanOpen || scanQueue.length > 0 || scanning || dragOverModal || Boolean(scanHint);
+  const scanShown = !isEditing && !moveTab;
+  const isIncomeSource = type === "income" && !moveTab;
   const amountLabel = moveTab
     ? tTx("totalMove")
     : type === "income"
@@ -1253,6 +1282,12 @@ export default function TransactionModal({
     };
   }, [isSettlement, isEditing, hasPartner, currency, otherLedger]);
 
+  // Show cents once the user leaves a field ("1" becomes "1.00"); KRW stays whole and empty stays empty.
+  function formatOnBlur(value: string, set: (v: string) => void) {
+    if (transactionCurrency === "KRW" || !/\d/.test(value)) return;
+    set(amountToInput(parseAmountInput(value), transactionCurrency));
+  }
+
   function handleTaxToggle(checked: boolean) {
     setIsTaxChecked(checked);
     if (!checked) {
@@ -1278,8 +1313,7 @@ export default function TransactionModal({
     setMerchant("");
     setInstitution("");
     setError(null);
-    // The tab tap is a user gesture, so iOS keeps the keyboard up on the amount.
-    if (!isEditing) amountInputRef.current?.focus({ preventScroll: true });
+
   }
 
   function handleSettleableChange(id: string) {
@@ -1489,7 +1523,7 @@ export default function TransactionModal({
       ticker: isStock ? finalTicker.toUpperCase() : undefined,
       shares: isStock ? parseFloat(shares) : undefined,
       price: isStock ? parseFloat(price) : undefined,
-      items: items && items.length > 0
+      items: !moveTab && items && items.length > 0
         ? items.map((it) => ({
             ...it,
             quantity: typeof it.quantity === "number" ? it.quantity : parseFloat(String(it.quantity)) || 1,
@@ -2131,7 +2165,7 @@ export default function TransactionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-5 max-h-[92dvh] overflow-auto select-none"
+        className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-xl p-4 sm:p-5 max-h-[92dvh] overflow-auto select-none"
         style={{
           transform: modalDragY > 0 ? `translateY(${modalDragY}px)` : undefined,
           transition: modalDragY === 0 ? "transform 0.2s ease-out" : "none",
@@ -2144,18 +2178,18 @@ export default function TransactionModal({
           onTouchStart={(e) => startDrag(e.touches[0].clientY)}
           onTouchMove={(e) => updateDrag(e.touches[0].clientY)}
           onTouchEnd={() => finishDrag()}
-          className="w-full py-2 -mt-2 mb-1 flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none group"
+          className="w-full py-1.5 -mt-1 flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none group"
           title="아래로 드래그하여 닫기"
         >
           <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full group-hover:bg-gray-400 dark:group-hover:bg-gray-600 transition-colors" />
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h2 id={titleId} className="text-lg sm:text-xl font-bold tracking-tight whitespace-nowrap">
+            <div className="flex min-w-0 items-baseline gap-2">
+              <h2 id={titleId} className="shrink-0 text-lg sm:text-xl font-bold tracking-tight whitespace-nowrap">
                 {isEditing ? tTx("edit") : tTx("new")}
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+              <p className="min-w-0 text-sm text-gray-500 dark:text-gray-400 truncate">
                 {currency === "CAD"
                   ? tLedger("canadaLedgerShort")
                   : tLedger("koreaLedgerShort")}{" "}
@@ -2166,7 +2200,7 @@ export default function TransactionModal({
               type="button"
               onClick={onClose}
               aria-label={tCommon("close")}
-              className="shrink-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+              className="-m-3 shrink-0 p-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -2210,7 +2244,7 @@ export default function TransactionModal({
           )}
         </div>
 
-        <div className="mt-4">
+        <div className="mt-2">
           <DayPicker
             value={defaultDate}
             onChange={onDateChange}
@@ -2219,7 +2253,7 @@ export default function TransactionModal({
         </div>
 
         {dayPendingOccurrences.length > 0 && (
-          <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-28 overflow-auto">
+          <ul className="mt-2 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-28 overflow-auto">
             {dayPendingOccurrences.map((occ) => {
               const tone = subscriptionScheduleAmountClass(occ.due_date);
               return (
@@ -2262,8 +2296,8 @@ export default function TransactionModal({
         )}
 
         {dayTransactions.length > 0 && (
-          <ul className="mt-3 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-40 overflow-auto">
-            {dayTransactions.map((tx) => {
+          <ul className="mt-2 card-inset divide-y divide-gray-100 dark:divide-gray-700">
+            {(dayListAll ? dayTransactions : dayTransactions.slice(0, DAY_LIST_CAP)).map((tx) => {
               const settled = hasSettlement(tx);
               const nonCashflow = isNonCashflowTransaction(tx);
               const isSubscription = Boolean(tx.subscription_id);
@@ -2293,7 +2327,7 @@ export default function TransactionModal({
                       onClick={() => {
                         onSelectTransaction?.(tx);
                       }}
-                      className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors ${
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors ${
                         isActive
                           ? "bg-blue-50 dark:bg-blue-500/10"
                           : "hover:bg-gray-50 dark:hover:bg-gray-800/80"
@@ -2332,10 +2366,21 @@ export default function TransactionModal({
                 </li>
               );
             })}
+            {!dayListAll && dayTransactions.length > DAY_LIST_CAP && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setDayListAll(true)}
+                  className="w-full whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-blue-600 dark:text-blue-400"
+                >
+                  {tTx("dayMore", { count: dayTransactions.length - DAY_LIST_CAP })}
+                </button>
+              </li>
+            )}
           </ul>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-3 space-y-3">
           <div className="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
             <button
               type="button"
@@ -2372,229 +2417,8 @@ export default function TransactionModal({
             </button>
           </div>
 
-          <div>
-            <div className="mb-1.5 flex items-center gap-2">
-              <label
-                htmlFor={amountId}
-                className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                {amountLabel}
-              </label>
-              {showTax && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowBreakdown((v) => !v)}
-                    aria-expanded={breakdownOpen}
-                    className="flex min-w-0 flex-1 items-center justify-end gap-0.5 text-xs tabular-nums text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                  >
-                    <span className="truncate">
-                      {isTaxChecked
-                        ? tTx("breakdownSummary", {
-                            subtotal: formatAmount(parseAmountInput(subtotal), transactionCurrency),
-                            tax: formatAmount(parseAmountInput(taxAmount), transactionCurrency),
-                          })
-                        : tTx("breakdownNoTax", {
-                            subtotal: formatAmount(parseAmountInput(amount), transactionCurrency),
-                          })}
-                    </span>
-                    <ChevronDown
-                      className={`h-3.5 w-3.5 shrink-0 transition-transform ${breakdownOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  {/* Negative margins keep the 44px tap area from adding row height. */}
-                  <label className="-my-3 flex min-h-[44px] shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                    <input
-                      type="checkbox"
-                      checked={isTaxChecked}
-                      onChange={(e) => handleTaxToggle(e.target.checked)}
-                      className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    {tTx("taxLabel")}
-                  </label>
-                </>
-              )}
-            </div>
-            <div className="relative">
-              <input
-                id={amountId}
-                ref={amountInputRef}
-                autoFocus={!isEditing}
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => handleTotalChange(e.target.value)}
-                placeholder="0"
-                className="input-field px-16 py-3 text-center text-3xl font-bold tabular-nums"
-              />
-              {isStock ? (
-                <select
-                  value={transactionCurrency}
-                  onChange={(e) => setTransactionCurrency(e.target.value as Currency)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-gray-50 dark:bg-gray-800 text-base sm:text-xs font-bold text-gray-700 dark:text-gray-200 border-0 rounded-lg py-1.5 px-2 focus:ring-0 focus:outline-none"
-                >
-                  <option value="KRW">KRW</option>
-                  <option value="CAD">CAD</option>
-                  <option value="USD">USD</option>
-                </select>
-              ) : (
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {transactionCurrency}
-                </span>
-              )}
-            </div>
-          </div>
 
-          {breakdownOpen && (
-            <>
-          {showTax && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {tTx("subtotalLabel")}
-                </label>
-                <input
-                  inputMode="decimal"
-                  value={subtotal}
-                  onChange={(e) => handleSubtotalChange(e.target.value)}
-                  placeholder="0.00"
-                  className={`input-field ${NO_SPIN}`}
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {tTx("taxLabel")}
-                  </span>
-                  {!isMixedTaxCategory && (
-                    <span className="text-xs font-semibold tabular-nums whitespace-nowrap text-blue-600 dark:text-blue-400">
-                      {formatTaxPercent(taxPercent)}%
-                    </span>
-                  )}
-                </div>
-                <input
-                  inputMode="decimal"
-                  value={taxAmount}
-                  disabled={!isTaxChecked}
-                  onChange={(e) => handleTaxChange(e.target.value)}
-                  placeholder="0.00"
-                  className={`input-field ${NO_SPIN} ${!isTaxChecked ? "opacity-50 bg-gray-50 dark:bg-gray-800" : ""}`}
-                />
-              </div>
-            </div>
-          )}
-          {showTip && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {tTx("tipLabel")}
-                </label>
-                <div className="flex items-center gap-1.5">
-                  {["15", "18", "20"].map((pct) => (
-                    <button
-                      key={pct}
-                      type="button"
-                      onClick={() => handleTipPercentChange(pct)}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors ${
-                        tipPercent === pct
-                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                          : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      }`}
-                    >
-                      {pct}%
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <input
-                    inputMode="decimal"
-                    value={tipPercent}
-                    onChange={(e) => handleTipPercentChange(e.target.value)}
-                    placeholder={tTx("tipPercent")}
-                    className={`input-field ${NO_SPIN}`}
-                  />
-                </div>
-                <div>
-                  <input
-                    inputMode="decimal"
-                    value={tipAmount}
-                    onChange={(e) => handleTipAmountChange(e.target.value)}
-                    placeholder={tTx("tipAmount")}
-                    className={`input-field ${NO_SPIN}`}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-            </>
-          )}
-
-          {!isTransfer && !(moveTab && !moveKind) && (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {tTx("merchant")}
-              </label>
-              <MerchantSelect
-                options={allMerchants}
-                value={merchant}
-                onChange={handleMerchantChange}
-                onAdd={handleAddMerchant}
-                disabled={false}
-                placeholder={tTx("selectMerchant")}
-                addLabel={tTx("addMerchant")}
-              />
-            </div>
-          )}
-
-          {moveTab ? (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {tTx("moveKind")}
-              </label>
-              <Dropdown
-                value={moveKind}
-                options={moveKindOptions}
-                onChange={handleMoveKindChange}
-                ariaLabel={tTx("moveKind")}
-                placeholder={tTx("moveKindPlaceholder")}
-              />
-            </div>
-          ) : (
-            <>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {tTx("category")}
-              </label>
-              <CategorySelect
-                categories={categoryOptions}
-                value={category}
-                onChange={handleCategoryChange}
-                onAdd={handleAddCategory}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {tTx("subCategory")}
-              </label>
-              <SubCategorySelect
-                options={subCategoryOptions}
-                value={subCategory}
-                onChange={handleSubCategoryChange}
-                onAdd={handleAddSubCategory}
-                disabled={!category}
-                placeholder={
-                  category ? tTx("selectSubCategory") : tTx("selectSubCategoryFirst")
-                }
-              />
-            </div>
-            </>
-          )}
-
-          {detailFields()}
-
-          {!isEditing && !moveTab && (
+          {scanShown && (
             <div
               onDragEnter={(e) => {
                 e.preventDefault();
@@ -2619,9 +2443,7 @@ export default function TransactionModal({
                 setDragOverModal(false);
                 addScanQueueFiles(e.dataTransfer.files);
               }}
-              className={`relative rounded-2xl border-2 border-dashed transition-all duration-150 ${
-                scanExpanded ? "p-3 space-y-2.5" : ""
-              } ${
+              className={`relative rounded-2xl border-2 border-dashed p-2.5 space-y-2 transition-all duration-150 ${
                 dragOverModal
                   ? "border-blue-500 bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500/30 scale-[1.01]"
                   : "border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/20"
@@ -2644,22 +2466,6 @@ export default function TransactionModal({
                 onChange={(e) => addScanQueueFiles(e.target.files)}
               />
 
-              {!scanExpanded && (
-                <button
-                  type="button"
-                  onClick={() => setScanOpen(true)}
-                  className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left"
-                >
-                  <Camera className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
-                  <span className="min-w-0 flex-1 truncate text-xs font-bold text-gray-800 dark:text-gray-200">
-                    {tTx("scanCardTitle")}
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
-                </button>
-              )}
-
-              {scanExpanded && (
-                <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Camera className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
@@ -2673,9 +2479,14 @@ export default function TransactionModal({
               </div>
 
               {scanQueue.length === 0 ? (
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
-                  {tTx("scanCardHint", { max: MAX_IMAGES })}
-                </p>
+                <>
+                  <p className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                    {tTx("scanCardHint", { max: MAX_IMAGES })}
+                  </p>
+                  <p className="sm:hidden text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                    {tTx("scanCardHintShort", { max: MAX_IMAGES })}
+                  </p>
+                </>
               ) : (
                 <ul className="grid grid-cols-5 gap-1.5 pt-1">
                   {scanQueue.map((q) => (
@@ -2756,8 +2567,6 @@ export default function TransactionModal({
                   {scanHint}
                 </p>
               )}
-                </>
-              )}
             </div>
           )}
 
@@ -2818,7 +2627,235 @@ export default function TransactionModal({
             </div>
           )}
 
+          <div ref={amountRowRef}>
+            <div className="mb-1.5 flex items-center gap-2">
+              <label
+                htmlFor={amountId}
+                className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                {amountLabel}
+              </label>
+              {showTax && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowBreakdown((v) => !v)}
+                    aria-expanded={breakdownOpen}
+                    className="flex min-w-0 flex-1 items-center justify-end gap-0.5 text-xs tabular-nums text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  >
+                    <span className="truncate">
+                      {isTaxChecked
+                        ? tTx("breakdownSummary", {
+                            subtotal: formatAmount(parseAmountInput(subtotal), transactionCurrency),
+                            tax: formatAmount(parseAmountInput(taxAmount), transactionCurrency),
+                          })
+                        : tTx("breakdownNoTax", {
+                            subtotal: formatAmount(parseAmountInput(amount), transactionCurrency),
+                          })}
+                    </span>
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 shrink-0 transition-transform ${breakdownOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {/* Negative margins keep the 44px tap area from adding row height. */}
+                  <label className="-my-3 flex min-h-[44px] shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <input
+                      type="checkbox"
+                      checked={isTaxChecked}
+                      onChange={(e) => handleTaxToggle(e.target.checked)}
+                      className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    {tTx("taxLabel")}
+                  </label>
+                </>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                id={amountId}
+                ref={amountInputRef}
+                onFocus={scrollAmountToTop}
+                onBlur={() => formatOnBlur(amount, setAmount)}
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => handleTotalChange(e.target.value)}
+                placeholder="0"
+                className="input-field px-16 py-2 text-center text-2xl font-bold tabular-nums"
+              />
+              {isStock ? (
+                <select
+                  value={transactionCurrency}
+                  onChange={(e) => setTransactionCurrency(e.target.value as Currency)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-gray-50 dark:bg-gray-800 text-base sm:text-xs font-bold text-gray-700 dark:text-gray-200 border-0 rounded-lg py-1.5 px-2 focus:ring-0 focus:outline-none"
+                >
+                  <option value="KRW">KRW</option>
+                  <option value="CAD">CAD</option>
+                  <option value="USD">USD</option>
+                </select>
+              ) : (
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 dark:text-gray-400">
+                  {transactionCurrency}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {breakdownOpen && (
+            <>
+          {showTax && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {tTx("subtotalLabel")}
+                </label>
+                <input
+                  inputMode="decimal"
+                  value={subtotal}
+                  onChange={(e) => handleSubtotalChange(e.target.value)}
+                  onBlur={() => formatOnBlur(subtotal, setSubtotal)}
+                  placeholder="0.00"
+                  className={`input-field ${NO_SPIN}`}
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {tTx("taxLabel")}
+                  </span>
+                  {!isMixedTaxCategory && (
+                    <span className="text-xs font-semibold tabular-nums whitespace-nowrap text-blue-600 dark:text-blue-400">
+                      {formatTaxPercent(taxPercent)}%
+                    </span>
+                  )}
+                </div>
+                <input
+                  inputMode="decimal"
+                  value={taxAmount}
+                  disabled={!isTaxChecked}
+                  onChange={(e) => handleTaxChange(e.target.value)}
+                  onBlur={() => formatOnBlur(taxAmount, setTaxAmount)}
+                  placeholder="0.00"
+                  className={`input-field ${NO_SPIN} ${!isTaxChecked ? "opacity-50 bg-gray-50 dark:bg-gray-800" : ""}`}
+                />
+              </div>
+            </div>
+          )}
+          {showTip && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {tTx("tipLabel")}
+                </label>
+                <div className="flex items-center gap-1.5">
+                  {["15", "18", "20"].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => handleTipPercentChange(pct)}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors ${
+                        tipPercent === pct
+                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <input
+                    inputMode="decimal"
+                    value={tipPercent}
+                    onChange={(e) => handleTipPercentChange(e.target.value)}
+                    placeholder={tTx("tipPercent")}
+                    className={`input-field ${NO_SPIN}`}
+                  />
+                </div>
+                <div>
+                  <input
+                    inputMode="decimal"
+                    value={tipAmount}
+                    onChange={(e) => handleTipAmountChange(e.target.value)}
+                    onBlur={() => formatOnBlur(tipAmount, setTipAmount)}
+                    placeholder={tTx("tipAmount")}
+                    className={`input-field ${NO_SPIN}`}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+            </>
+          )}
+
+          {!isTransfer && !(moveTab && !moveKind) && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx(isIncomeSource ? "sourceLabel" : "merchant")}
+              </label>
+              <MerchantSelect
+                options={allMerchants}
+                value={merchant}
+                onChange={handleMerchantChange}
+                onAdd={handleAddMerchant}
+                disabled={false}
+                placeholder={tTx(isIncomeSource ? "selectSource" : "selectMerchant")}
+                addLabel={tTx(isIncomeSource ? "addSource" : "addMerchant")}
+                income={isIncomeSource}
+              />
+            </div>
+          )}
+
+          {moveTab ? (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("moveKind")}
+              </label>
+              <Dropdown
+                value={moveKind}
+                options={moveKindOptions}
+                onChange={handleMoveKindChange}
+                ariaLabel={tTx("moveKind")}
+                placeholder={tTx("moveKindPlaceholder")}
+              />
+            </div>
+          ) : (
+            <>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("category")}
+              </label>
+              <CategorySelect
+                categories={categoryOptions}
+                value={category}
+                onChange={handleCategoryChange}
+                onAdd={handleAddCategory}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("subCategory")}
+              </label>
+              <SubCategorySelect
+                options={subCategoryOptions}
+                value={subCategory}
+                onChange={handleSubCategoryChange}
+                onAdd={handleAddSubCategory}
+                disabled={!category}
+                placeholder={
+                  category ? tTx("selectSubCategory") : tTx("selectSubCategoryFirst")
+                }
+              />
+            </div>
+            </>
+          )}
+
+          {detailFields()}
+
           {/* Sub-items (소분류 세부항목) Expandable Section */}
+          {!moveTab && (
           <div className="border-t border-gray-100 dark:border-gray-800/80 pt-4 mt-2">
             <input
               ref={itemsScanInputRef}
@@ -3122,6 +3159,7 @@ export default function TransactionModal({
               </div>
             )}
           </div>
+          )}
 
           {editingTransaction?.pair_kind === "settlement" && (
             <p className="text-xs text-gray-500 dark:text-gray-400">

@@ -17,6 +17,7 @@ const MAX_PULL = 112;
 interface Props {
   onRefresh: () => void | Promise<void>;
   children: ReactNode;
+  className?: string;
   /** Disable while a modal or other overlay owns touch gestures. */
   disabled?: boolean;
 }
@@ -28,6 +29,7 @@ interface Props {
 export default function PullToRefresh({
   onRefresh,
   children,
+  className,
   disabled = false,
 }: Props) {
   const t = useTranslations("common");
@@ -117,6 +119,7 @@ export default function PullToRefresh({
 
   return (
     <div
+      className={className}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}

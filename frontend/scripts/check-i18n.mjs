@@ -70,6 +70,17 @@ for (const [, id] of whatsNewSource.matchAll(/\bid:\s*"([^"]+)"/g)) {
   }
 }
 
+// 5. The redirect locale list in next.config.js matches i18n/locales.ts.
+const localesSource = readFileSync(join(root, "i18n", "locales.ts"), "utf8");
+const configSource = readFileSync(join(root, "next.config.js"), "utf8");
+const listOf = (src, re) =>
+  [...(re.exec(src)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+const appLocales = listOf(localesSource, /locales = \[([^\]]*)\]/).filter((c) => c !== "en").sort().join(",");
+const configLocales = listOf(configSource, /NON_DEFAULT_LOCALES = \[([^\]]*)\]/).sort().join(",");
+if (appLocales !== configLocales) {
+  errors.push(`next.config.js NON_DEFAULT_LOCALES (${configLocales}) differs from i18n/locales.ts without "en" (${appLocales})`);
+}
+
 // 2 + 3. Source scan -----------------------------------------------------
 
 const SCAN_DIRS = ["components", "app", "lib", "i18n"];

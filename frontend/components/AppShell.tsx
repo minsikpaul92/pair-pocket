@@ -52,7 +52,7 @@ import StocksView from "@/components/StocksView";
 import SettingsView, { type SettingsTab } from "@/components/SettingsView";
 import ImportView from "@/components/ImportView";
 import MonthPicker from "@/components/MonthPicker";
-import FloatingActionStack from "@/components/FloatingActionStack";
+import FloatingActionStack, { type FabCorner } from "@/components/FloatingActionStack";
 import TourProvider, {
   type TourApi,
   type TourSetupHandlers,
@@ -318,6 +318,7 @@ export default function AppShell({ user, onLogout }: Props) {
     useState<Transaction | null>(null);
 
   const [scanMenuOpen, setScanMenuOpen] = useState(false);
+  const [fabCorner, setFabCorner] = useState<FabCorner>("br");
   const [aiParsing, setAiParsing] = useState(false);
   const [parsedData, setParsedData] = useState<any>(null);
   const [scanQueue, setScanQueue] = useState<
@@ -330,7 +331,6 @@ export default function AppShell({ user, onLogout }: Props) {
   const [scanRestored, setScanRestored] = useState(0);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanMoreInputRef = useRef<HTMLInputElement>(null);
   const MAX_SCAN_FILES = 15;
@@ -363,7 +363,6 @@ export default function AppShell({ user, onLogout }: Props) {
     void saveDrafts(entries);
     setScanQueueOpen(true);
     if (cameraInputRef.current) cameraInputRef.current.value = "";
-    if (photoInputRef.current) photoInputRef.current.value = "";
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (scanMoreInputRef.current) scanMoreInputRef.current.value = "";
   }
@@ -1028,7 +1027,12 @@ export default function AppShell({ user, onLogout }: Props) {
         </div>
       </aside>
 
-      <div className={`${mainPad} transition-all duration-200`}>
+      <div
+        className={`${mainPad} transition-all duration-200 ${
+          // Calendar on phones: the page is exactly one screen tall and the grid takes what is left.
+          view === "calendar" ? "max-md:flex max-md:min-h-dvh max-md:flex-col" : ""
+        }`}
+      >
         <header className="sticky top-0 z-40 glass-bar border-b pt-[env(safe-area-inset-top)]">
           <div className="mx-auto max-w-3xl px-3 sm:px-6 py-3 flex items-center gap-2 flex-nowrap">
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1104,8 +1108,18 @@ export default function AppShell({ user, onLogout }: Props) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-32 md:pb-10">
+        <main
+          className={`mx-auto w-full max-w-3xl px-4 sm:px-6 ${
+            view === "settings" ? "pt-5" : "pt-1 sm:pt-5"
+          } md:pb-10 ${
+            // Calendar on phones: only clear the fixed tab bar so the grid can fill the screen.
+            view === "calendar"
+              ? "max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col pb-[calc(4.1rem+max(0.5rem,env(safe-area-inset-bottom)))]"
+              : "pb-32"
+          }`}
+        >
           <PullToRefresh
+            className={view === "calendar" ? "max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col" : undefined}
             onRefresh={handlePullRefresh}
             disabled={
               Boolean(modalDate) ||
@@ -1151,9 +1165,9 @@ export default function AppShell({ user, onLogout }: Props) {
           ) : (
           <div
             data-tour="ledger-month"
-            className="mb-4 flex items-center justify-between gap-2"
+            className="mb-1 sm:mb-4 flex shrink-0 items-center justify-between gap-2"
           >
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-baseline gap-1.5">
               {view === "calendar" ||
               view === "list" ||
               view === "subscriptions" ||
@@ -1163,14 +1177,16 @@ export default function AppShell({ user, onLogout }: Props) {
                   value={month}
                   onChange={setMonth}
                   locale={locale}
-                  titleClassName="whitespace-nowrap text-2xl sm:text-3xl"
+                  triggerClassName="shrink-0"
+                  titleClassName="whitespace-nowrap text-lg sm:text-3xl"
                 />
               ) : (
-                <h1 className="whitespace-nowrap text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                <h1 className="shrink-0 whitespace-nowrap text-lg sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                   {monthLabel(month, locale)}
                 </h1>
               )}
-              <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+              <p className="min-w-0 truncate text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                <span aria-hidden>· </span>
                 {scopeLabel}
               </p>
             </div>
@@ -1191,7 +1207,7 @@ export default function AppShell({ user, onLogout }: Props) {
                     return new Date(n.getFullYear(), n.getMonth(), 1);
                   })
                 }
-                className="whitespace-nowrap rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="whitespace-nowrap rounded-lg px-1.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 {tCommon("thisMonth")}
               </button>
@@ -1338,14 +1354,6 @@ export default function AppShell({ user, onLogout }: Props) {
         className="hidden"
         accept="image/*"
         capture="environment"
-      />
-      <input
-        type="file"
-        ref={photoInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        accept="image/*"
-        multiple
       />
       <input
         type="file"
@@ -1500,7 +1508,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
       {/* Scan Options Popover */}
       {scanMenuOpen && (
-        <div className="fixed bottom-56 md:bottom-40 right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className={`fixed ${fabCorner[0] === "t" ? "top-[calc(env(safe-area-inset-top)+15.5rem)]" : "bottom-[calc(14.6rem+max(0.5rem,env(safe-area-inset-bottom)))]"} ${fabCorner[1] === "l" ? "left-4" : "right-4"} md:top-auto md:left-auto md:bottom-28 md:right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200`}>
           <button
             type="button"
             onClick={() => {
@@ -1516,22 +1524,11 @@ export default function AppShell({ user, onLogout }: Props) {
             type="button"
             onClick={() => {
               setScanMenuOpen(false);
-              photoInputRef.current?.click();
-            }}
-            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-          >
-            <Plus className="h-4.5 w-4.5 text-green-500" />
-            {tScan("uploadPhoto")}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setScanMenuOpen(false);
               fileInputRef.current?.click();
             }}
             className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
           >
-            <Repeat className="h-4.5 w-4.5 text-indigo-500" />
+            <Plus className="h-4.5 w-4.5 text-green-500" />
             {tScan("uploadFile")}
           </button>
           {recentScans.length > 0 && (
@@ -1556,6 +1553,8 @@ export default function AppShell({ user, onLogout }: Props) {
       {/* Floating Buttons Group — hidden on stocks/subscriptions (view-specific FAB) */}
       {view !== "stocks" && view !== "subscriptions" && (
         <FloatingActionStack
+          key={view} // a new view starts again in the default corner
+          onCornerChange={setFabCorner}
           onCamera={() => setScanMenuOpen((o) => !o)}
           onAdd={() => openModal(new Date())}
           cameraLabel={tNav("scanReceipt")}
