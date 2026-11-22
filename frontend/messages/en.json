@@ -326,7 +326,9 @@
     "itemRemove": "Remove item",
     "subtotalLabel": "Subtotal",
     "taxLabel": "Tax (HST 13%)",
-    "totalLabel": "Total",
+    "totalExpense": "Total expense",
+    "totalIncome": "Total income",
+    "totalMove": "Amount",
     "breakdownSummary": "Subtotal {subtotal} · Tax {tax}",
     "breakdownNoTax": "Subtotal {subtotal} · No tax",
     "tipLabel": "Tip",
@@ -1346,7 +1348,7 @@
     "items": {
       "quickAmountEntry": {
         "title": "Faster expense entry",
-        "description": "The amount now comes first and is ready to type as soon as you add an entry. Subtotal and tax are worked out for you, and you can leave the merchant empty to show the category instead."
+        "description": "The amount now comes first and is ready to type as soon as you add an entry. Tax is worked out for you with one checkbox, the receipt scan is a single row below the form, and an empty merchant shows the category instead."
       },
       "scanQueueEnglishText": {
         "title": "Receipt scan in English",
