@@ -886,8 +886,7 @@
     "errorInvalidResult": "AI 분석 결과가 올바르지 않습니다.",
     "errorFailed": "AI 분석 중 오류가 발생했습니다.",
     "takePhoto": "사진 촬영",
-    "uploadPhoto": "사진 올리기 (갤러리)",
-    "uploadFile": "파일 올리기 (PDF/이미지)",
+    "uploadFile": "사진/PDF 올리기",
     "loadingTitle": "AI 영수증 분석 중...",
     "loadingBody": "Gemini가 항목을 판별하고 있습니다. 잠시만 기다려 주세요."
   },
@@ -1359,6 +1358,10 @@
   },
   "whatsNew": {
     "items": {
+      "calendarFitsScreen": {
+        "title": "캘린더가 한 화면에 들어와요",
+        "description": "휴대폰에서 대부분의 달이 스크롤 없이 한 화면에 꽉 차게 보여요. 날짜마다 첫 번째 내역 이름과 나머지 개수(+N)가 보여요. 카메라와 추가 버튼은 유리 구슬 모양이 되어 하나로 접고 원하는 모서리로 옮길 수 있고, 올리기 메뉴도 사진과 PDF를 한 번에 고를 수 있게 합쳤어요."
+      },
       "openInYourLanguage": {
         "title": "처음부터 내 언어로 열려요",
         "description": "앱을 열 때 저장된 언어로 바뀌기 전에 영어 화면이 잠깐 보이던 문제를 고쳤어요."

@@ -61,8 +61,10 @@ export function addMonths(date: Date, delta: number): Date {
 /**
  * Build a 6-row (42 cell) calendar grid for the month containing `date`,
  * padded with the trailing/leading days so weeks are complete.
+ * With `trimEmptyWeek`, weeks after the last day of the month are dropped
+ * (4 to 6 rows).
  */
-export function buildCalendarGrid(date: Date): Date[] {
+export function buildCalendarGrid(date: Date, trimEmptyWeek = false): Date[] {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const start = new Date(first);
   start.setDate(first.getDate() - first.getDay()); // back to Sunday
@@ -73,7 +75,9 @@ export function buildCalendarGrid(date: Date): Date[] {
     d.setDate(start.getDate() + i);
     cells.push(d);
   }
-  return cells;
+  if (!trimEmptyWeek) return cells;
+  const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  return cells.slice(0, Math.ceil((first.getDay() + daysInMonth) / 7) * 7);
 }
 
 export function isSameDay(a: Date, b: Date): boolean {

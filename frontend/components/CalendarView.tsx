@@ -20,6 +20,7 @@ import {
   isSameMonth,
   isoDayKey,
 } from "@/lib/date";
+import { merchantLabel } from "@/lib/merchant";
 
 /** Short amount for a narrow day cell: $1.2K, ₩12M, $45. */
 function formatDayAmount(amount: number, currency: Currency): string {
@@ -130,12 +131,14 @@ export default function CalendarView({
   const t = useTranslations("calendar");
   const tCommon = useTranslations("common");
   const tSub = useTranslations("subscriptions");
+  const tCategories = useTranslations("categories");
+  const tSubCategories = useTranslations("subCategories");
   const weekdays = useMemo(
     () => WEEKDAY_KEYS.map((key) => t(`weekdays.${key}`)),
     [t]
   );
 
-  const cells = useMemo(() => buildCalendarGrid(month), [month]);
+  const cells = useMemo(() => buildCalendarGrid(month, true), [month]);
   const today = new Date();
   const displayCurrency = scope === "ALL" ? "CAD" : scope;
 
@@ -146,6 +149,16 @@ export default function CalendarView({
     }
     return map;
   }, [transactions, scope]);
+
+  // First entry per day, in the same order as the day detail list (API order).
+  const firstByDay = useMemo(() => {
+    const map = new Map<string, Transaction>();
+    for (const tx of transactions) {
+      const key = isoDayKey(tx.date);
+      if (!map.has(key)) map.set(key, tx);
+    }
+    return map;
+  }, [transactions]);
 
   const pendingByDay = useMemo(() => {
     const map = new Map<string, SubscriptionOccurrence[]>();
@@ -159,12 +172,13 @@ export default function CalendarView({
   }, [pendingOccurrences]);
 
   return (
-    <section className="card-inset p-4 sm:p-5">
-      <div className="grid grid-cols-7 gap-px mb-2">
+    // Phones: 8px side margin (page padding mostly undone) and it takes all the height the page layout leaves.
+    <section className="card-inset -mx-2 flex min-h-0 flex-1 flex-col md:flex-none rounded-3xl p-1 shadow-none sm:mx-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
+      <div className="grid grid-cols-7 gap-px mb-1 sm:mb-2">
         {weekdays.map((w, i) => (
           <div
             key={WEEKDAY_KEYS[i]}
-            className={`py-2 text-center text-xs font-semibold ${
+            className={`py-0.5 sm:py-2 text-center text-xs font-semibold ${
               i === 0
                 ? "text-red-400"
                 : i === 6
@@ -177,7 +191,7 @@ export default function CalendarView({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+      <div className="grid flex-1 auto-rows-[minmax(4rem,1fr)] grid-cols-7 gap-0.5 sm:auto-rows-auto sm:flex-none sm:gap-2">
         {cells.map((cell) => {
           const key = dayKey(cell);
           const inMonth = isSameMonth(cell, month);
@@ -202,14 +216,14 @@ export default function CalendarView({
               key={key}
               type="button"
               onClick={() => onDayClick(cell)}
-              className={`group relative flex flex-col items-center rounded-2xl border transition-all active:scale-[0.97] min-h-[5.5rem] sm:min-h-[7rem] py-2 px-0.5 ${
+              className={`group relative flex flex-col items-center rounded-2xl border transition-all active:scale-[0.97] sm:min-h-[7rem] py-0.5 sm:py-2 px-0.5 ${
                 inMonth
                   ? "border-transparent hover:border-gray-200 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   : "border-transparent opacity-35"
               } ${hasTx || hasPending ? "bg-gray-50/80 dark:bg-gray-900/40" : ""}`}
             >
               <span
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                className={`flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full text-base sm:text-sm font-medium ${
                   isToday
                     ? "bg-blue-500 font-bold text-white shadow-sm"
                     : "text-gray-800 dark:text-gray-100"
@@ -217,12 +231,25 @@ export default function CalendarView({
               >
                 {cell.getDate()}
               </span>
+              {hasTx && totals!.count > 1 && (
+                <span className="absolute right-0.5 top-0.5 text-[11px] font-medium leading-none whitespace-nowrap text-gray-500 dark:text-gray-400">
+                  {totals!.count - 1 >= 10 ? "9+" : `+${totals!.count - 1}`}
+                </span>
+              )}
 
               {(hasTx || hasPending) && (
                 <>
                   <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {hasTx ? tCommon("count", { count: totals!.count }) : ""}
-                    {hasTx && hasPending ? " · " : ""}
+                    {hasTx && firstByDay.get(key) ? (
+                      <span className="block w-full min-w-0 truncate whitespace-nowrap text-center text-[11px] leading-[14px] sm:leading-normal">
+                        {merchantLabel(
+                          firstByDay.get(key)!,
+                          tCategories,
+                          tSubCategories,
+                          tCommon("unspecified")
+                        )}
+                      </span>
+                    ) : null}
                     {hasPending ? (
                       <span className="flex w-full min-w-0 flex-col items-stretch gap-0">
                         {pendingLines.map((line, idx) => (
@@ -269,7 +296,7 @@ export default function CalendarView({
                       </span>
                     ) : null}
                   </span>
-                  <div className="mt-auto flex w-full flex-col items-center gap-0.5 px-0.5">
+                  <div className="mt-0.5 sm:mt-auto flex w-full flex-col items-center gap-0.5 px-0.5">
                     {hasTx && totals && scope === "ALL" ? (
                       <>
                         {(totals as AllDayTotals).cadIncome > 0 && (
