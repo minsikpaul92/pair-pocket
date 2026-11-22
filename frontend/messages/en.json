@@ -1369,6 +1369,10 @@
         "title": "Income and expenses over time",
         "description": "The expense mix card can now switch between the donut and a line chart. The line chart follows the same period tabs and shows how your expenses (red) or income (blue) move by day, week or month. Tap Expense or Income to switch. Small donut slices and their icons now respond to taps, and the i next to Spending and the expense mix explains what is included."
       },
+      "fixedExpenseCancelDate": {
+        "title": "Cancelling stops the next charge",
+        "description": "Cancelling a fixed expense before its next billing date now stops that charge, instead of keeping one more month. Fixed expenses that cost 0 during a promotion stay in the fixed expenses tab but no longer show on the calendar or dashboard."
+      },
       "calendarFitsScreen": {
         "title": "Calendar fits your screen",
         "description": "On your phone, the calendar now fits on one screen for most months and fills the width. Each day shows the name of its first entry with a +N for the rest. The camera and add buttons are glass beads that fold into one button and can be moved to any corner, and the upload menu has one item for photos and PDFs."

@@ -300,6 +300,7 @@ export default function DashboardView({
       accountType,
       month: monthStr,
       currency: scope === "ALL" ? undefined : scope,
+      hideZero: true,
     })
       .then((list) => active && setFixedBills(list))
       .catch(() => active && setFixedBills([]));

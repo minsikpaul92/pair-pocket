@@ -10,6 +10,7 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: WhatsNewEntry[] = [
   { id: "incomeExpenseLine", version: "0.29.0", date: "2026-11-22" },
+  { id: "fixedExpenseCancelDate", version: "0.27.1", date: "2026-11-22" },
   { id: "calendarFitsScreen", version: "0.27.0", date: "2026-11-21" },
   { id: "openInYourLanguage", version: "0.26.1", date: "2026-11-21" },
   { id: "quickAmountEntry", version: "0.26.0", date: "2026-11-21" },
