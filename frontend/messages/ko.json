@@ -311,9 +311,13 @@
     "scanClear": "초기화",
     "scanDropHere": "영수증/명세서 이미지를 여기에 놓으세요",
     "scanQueueProgress": "총 {total}건 중 {current}번째 거래 검토 중",
-    "scanPrev": "이전",
-    "scanNext": "다음",
     "scanSkip": "건너뛰기",
+    "scanQueueFound": "{count}건을 찾았어요. 하나씩 확인하고 저장해 주세요.",
+    "scanQueueSaved": "{count}건 저장됨",
+    "scanTabSaved": "저장됨",
+    "scanTabSkipped": "건너뜀",
+    "scanSaveNext": "저장 후 다음",
+    "scanCloseConfirm": "{saved}건은 이미 저장되었습니다. 남은 {left}건은 저장하지 않고 닫을까요?",
     "itemsTitle": "소분류 세부 품목 내역",
     "itemsHide": "숨기기",
     "itemName": "품목",
@@ -1362,6 +1366,10 @@
       "softerCalendarLook": {
         "title": "달력과 버튼이 더 예뻐졌어요",
         "description": "오늘 날짜가 파란 굵은 숫자와 밑줄로 눈에 띄고, 내역이 있는 날은 몇 건인지 바로 보여요. 달력 아래 빈 공간도 줄었고, 카메라와 추가 버튼은 투명한 물방울 모양으로 바뀌었고, 금액 숫자는 폭이 같아져 세로로 가지런히 보여요."
+      },
+      "multiReceiptSave": {
+        "title": "여러 영수증이 모두 저장돼요",
+        "description": "영수증 여러 장을 한 번에 스캔하면 각 영수증을 [저장 후 다음]으로 하나씩 저장하고, 원하지 않는 것은 건너뛸 수 있어요. 직접 입력할 때는 금액 칸에 바로 입력할 수 있어요."
       },
       "fixedExpenseCancelDate": {
         "title": "해지하면 다음 결제부터 멈춰요",

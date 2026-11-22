@@ -6,7 +6,7 @@
     "components/OnboardingWizard.tsx": 22,
     "components/StocksView.tsx": 2,
     "components/SubscriptionRegisterModal.tsx": 9,
-    "components/TransactionModal.tsx": 66,
+    "components/TransactionModal.tsx": 64,
     "lib/api.ts": 37,
     "lib/banks.ts": 51,
     "lib/category-i18n.ts": 156,
