@@ -20,6 +20,12 @@ import {
   isSameMonth,
   isoDayKey,
 } from "@/lib/date";
+import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import en from "@/messages/en.json";
+import ko from "@/messages/ko.json";
+
+/** The add-transaction form saves the localized "unspecified" label when merchant is left empty. */
+const UNSPECIFIED_MERCHANTS = new Set([ko.common.unspecified, en.common.unspecified]);
 
 /** Short amount for a narrow day cell: $1.2K, ₩12M, $45. */
 function formatDayAmount(amount: number, currency: Currency): string {
@@ -130,6 +136,8 @@ export default function CalendarView({
   const t = useTranslations("calendar");
   const tCommon = useTranslations("common");
   const tSub = useTranslations("subscriptions");
+  const tCategories = useTranslations("categories");
+  const tSubCategories = useTranslations("subCategories");
   const weekdays = useMemo(
     () => WEEKDAY_KEYS.map((key) => t(`weekdays.${key}`)),
     [t]
@@ -147,6 +155,26 @@ export default function CalendarView({
     return map;
   }, [transactions, scope]);
 
+  // First entry per day, in the same order as the day detail list (API order).
+  const firstByDay = useMemo(() => {
+    const map = new Map<string, Transaction>();
+    for (const tx of transactions) {
+      const key = isoDayKey(tx.date);
+      if (!map.has(key)) map.set(key, tx);
+    }
+    return map;
+  }, [transactions]);
+
+  // shortcut: local copy of the merchant fallback in ListView (and lib/merchant.ts once #146 lands), unify then.
+  function entryName(tx: Transaction): string {
+    const merchant = tx.merchant?.trim();
+    if (merchant && !UNSPECIFIED_MERCHANTS.has(merchant)) return merchant;
+    if (tx.sub_category?.trim())
+      return translateSubCategory(tx.sub_category, tSubCategories);
+    if (tx.category?.trim()) return translateCategory(tx.category, tCategories);
+    return tCommon("unspecified");
+  }
+
   const pendingByDay = useMemo(() => {
     const map = new Map<string, SubscriptionOccurrence[]>();
     for (const occ of pendingOccurrences) {
@@ -160,7 +188,7 @@ export default function CalendarView({
 
   return (
     // Phones: full bleed and at least one screen tall (page padding 1rem undone, header + tab bar subtracted).
-    <section className="card-inset -mx-4 flex min-h-[calc(100dvh-env(safe-area-inset-top)-8.1rem-4.1rem-max(0.5rem,env(safe-area-inset-bottom)))] flex-col rounded-3xl p-1 shadow-none sm:mx-0 sm:min-h-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
+    <section className="card-inset -mx-4 flex min-h-[calc(100dvh-env(safe-area-inset-top)-8.1rem-7.6rem-max(0.5rem,env(safe-area-inset-bottom)))] flex-col rounded-3xl p-1 shadow-none sm:mx-0 sm:min-h-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
       <div className="grid grid-cols-7 gap-px mb-1 sm:mb-2">
         {weekdays.map((w, i) => (
           <div
@@ -222,8 +250,18 @@ export default function CalendarView({
               {(hasTx || hasPending) && (
                 <>
                   <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {hasTx ? tCommon("count", { count: totals!.count }) : ""}
-                    {hasTx && hasPending ? " · " : ""}
+                    {hasTx && firstByDay.get(key) ? (
+                      <span className="flex w-full min-w-0 items-center justify-center gap-0.5">
+                        <span className="min-w-0 truncate whitespace-nowrap">
+                          {entryName(firstByDay.get(key)!)}
+                        </span>
+                        {totals!.count > 1 && (
+                          <span className="shrink-0 whitespace-nowrap">
+                            +{totals!.count - 1}
+                          </span>
+                        )}
+                      </span>
+                    ) : null}
                     {hasPending ? (
                       <span className="flex w-full min-w-0 flex-col items-stretch gap-0">
                         {pendingLines.map((line, idx) => (

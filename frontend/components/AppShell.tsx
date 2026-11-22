@@ -330,7 +330,6 @@ export default function AppShell({ user, onLogout }: Props) {
   const [scanRestored, setScanRestored] = useState(0);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanMoreInputRef = useRef<HTMLInputElement>(null);
   const MAX_SCAN_FILES = 15;
@@ -363,7 +362,6 @@ export default function AppShell({ user, onLogout }: Props) {
     void saveDrafts(entries);
     setScanQueueOpen(true);
     if (cameraInputRef.current) cameraInputRef.current.value = "";
-    if (photoInputRef.current) photoInputRef.current.value = "";
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (scanMoreInputRef.current) scanMoreInputRef.current.value = "";
   }
@@ -1107,7 +1105,7 @@ export default function AppShell({ user, onLogout }: Props) {
         <main
           className={`mx-auto max-w-3xl px-4 sm:px-6 py-5 md:pb-10 ${
             // Calendar on phones: only clear the fixed tab bar so the grid can fill the screen.
-            view === "calendar" ? "pb-[calc(4.1rem+max(0.5rem,env(safe-area-inset-bottom)))]" : "pb-32"
+            view === "calendar" ? "pb-[calc(7.6rem+max(0.5rem,env(safe-area-inset-bottom)))]" : "pb-32"
           }`}
         >
           <PullToRefresh
@@ -1348,14 +1346,6 @@ export default function AppShell({ user, onLogout }: Props) {
       />
       <input
         type="file"
-        ref={photoInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        accept="image/*"
-        multiple
-      />
-      <input
-        type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
@@ -1507,7 +1497,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
       {/* Scan Options Popover */}
       {scanMenuOpen && (
-        <div className="fixed bottom-56 md:bottom-40 right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="fixed bottom-[calc(8.5rem+max(0.5rem,env(safe-area-inset-bottom)))] md:bottom-28 right-4 md:right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <button
             type="button"
             onClick={() => {
@@ -1523,22 +1513,11 @@ export default function AppShell({ user, onLogout }: Props) {
             type="button"
             onClick={() => {
               setScanMenuOpen(false);
-              photoInputRef.current?.click();
-            }}
-            className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-          >
-            <Plus className="h-4.5 w-4.5 text-green-500" />
-            {tScan("uploadPhoto")}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setScanMenuOpen(false);
               fileInputRef.current?.click();
             }}
             className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
           >
-            <Repeat className="h-4.5 w-4.5 text-indigo-500" />
+            <Plus className="h-4.5 w-4.5 text-green-500" />
             {tScan("uploadFile")}
           </button>
           {recentScans.length > 0 && (
