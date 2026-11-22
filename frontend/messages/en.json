@@ -1367,7 +1367,7 @@
     "items": {
       "incomeExpenseLine": {
         "title": "Income and expenses over time",
-        "description": "The expense mix card can now switch between the donut and a line chart. The line chart follows the same period tabs and shows how your expenses (red) or income (blue) move by day, week or month. Tap Expense or Income to switch."
+        "description": "The expense mix card can now switch between the donut and a line chart. The line chart follows the same period tabs and shows how your expenses (red) or income (blue) move by day, week or month. Tap Expense or Income to switch. Small donut slices and their icons now respond to taps, and the i next to Spending and the expense mix explains what is included."
       },
       "calendarFitsScreen": {
         "title": "Calendar fits your screen",
