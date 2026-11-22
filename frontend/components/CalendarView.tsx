@@ -160,7 +160,7 @@ export default function CalendarView({
 
   return (
     // Phones: full bleed and at least one screen tall (page padding 1rem undone, header + tab bar subtracted).
-    <section className="card-inset -mx-4 flex min-h-[calc(100dvh-env(safe-area-inset-top)-8.1rem-4.1rem-max(0.5rem,env(safe-area-inset-bottom)))] flex-col rounded-none p-0.5 shadow-none sm:mx-0 sm:min-h-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
+    <section className="card-inset -mx-4 flex min-h-[calc(100dvh-env(safe-area-inset-top)-8.1rem-4.1rem-max(0.5rem,env(safe-area-inset-bottom)))] flex-col rounded-3xl p-1 shadow-none sm:mx-0 sm:min-h-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
       <div className="grid grid-cols-7 gap-px mb-1 sm:mb-2">
         {weekdays.map((w, i) => (
           <div
