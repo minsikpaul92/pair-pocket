@@ -36,6 +36,7 @@ import {
 } from "@/lib/api";
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import { realMerchant } from "@/lib/merchant";
 import { addDays, addMonths, dayKey, monthKey, weekStart } from "@/lib/date";
 
 /**
@@ -181,7 +182,7 @@ function PieExpenseTooltip({
         (tCategories &&
           translateCategory(tx.category, tCategories) === slice.name);
       if (isMatch) {
-        const name = tx.merchant?.trim() || tx.sub_category?.trim() || t("otherSpending");
+        const name = realMerchant(tx.merchant) || tx.sub_category?.trim() || t("otherSpending");
         const amt = effectiveExpenseAmount(tx);
         map[name] = (map[name] || 0) + amt;
         catSum += amt;
@@ -1155,7 +1156,7 @@ export default function DashboardAnalytics({
                     <ul className="space-y-1 pl-1 border-t border-gray-100 dark:border-gray-700/40 pt-1.5 mt-1">
                       {txs.slice(0, 3).map((tx) => (
                         <li key={tx.id} className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                          <span className="truncate max-w-[170px]">{tx.note?.trim() || tx.merchant}</span>
+                          <span className="truncate max-w-[170px]">{tx.note?.trim() || realMerchant(tx.merchant) || tx.sub_category}</span>
                           <span className="tabular-nums shrink-0 font-medium">{formatAmount(effectiveExpenseAmount(tx), tx.currency)}</span>
                         </li>
                       ))}

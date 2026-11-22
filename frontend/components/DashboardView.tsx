@@ -55,6 +55,7 @@ import {
 } from "@/lib/api";
 import type { BankCountry } from "@/lib/banks";
 import { translateCategory } from "@/lib/category-i18n";
+import { realMerchant } from "@/lib/merchant";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
 import {
   BudgetCurrency,
@@ -949,7 +950,7 @@ export default function DashboardView({
         {expenseItems.map((tx) => (
           <li key={tx.id} className="py-2">
             <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-100">
-              {tx.merchant || translateCategory(tx.category, tCategories)}
+              {realMerchant(tx.merchant) || translateCategory(tx.category, tCategories)}
             </p>
             <div className="mt-0.5 flex items-baseline justify-between gap-1 text-xs">
               <span className="text-gray-500 dark:text-gray-400">{shortDate(tx.date)}</span>
