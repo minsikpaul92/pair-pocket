@@ -1,13 +1,15 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -17,6 +19,7 @@ import {
 } from "recharts";
 
 import { categoryIcon } from "@/components/CategoryIcon";
+import InfoTip from "@/components/InfoTip";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 import {
@@ -38,6 +41,7 @@ import { useEscapeKey } from "@/lib/useEscapeKey";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { realMerchant } from "@/lib/merchant";
 import { addDays, addMonths, dayKey, monthKey, weekStart } from "@/lib/date";
+import { trendBuckets } from "@/lib/trend-buckets";
 
 /**
  * Category colors are mid-tone system hues: each one is at least 3:1 against
@@ -92,6 +96,13 @@ type ExpenseRange = "week" | PeriodRange;
 interface TrendPoint {
   month: string;
   label: string;
+  income: number;
+  expense: number;
+}
+
+interface FlowPoint {
+  label: string;
+  fullLabel: string;
   income: number;
   expense: number;
 }
@@ -395,6 +406,44 @@ function periodLabelKey(
   return "periodYear";
 }
 
+/** Drawn geometry of one donut slice, captured from the label render. Angles are recharts degrees (0 = 3 o'clock, counter-clockwise). */
+interface SliceGeom {
+  cx: number;
+  cy: number;
+  innerRadius: number;
+  outerRadius: number;
+  startAngle: number;
+  endAngle: number;
+}
+
+// Every slice gets at least this much angle to aim at, so a 0.5% slice is still easy to hit.
+const PIE_HIT_MIN_HALF_ANGLE = 7;
+// The ring's hit area reaches a little past the drawn ring on both sides.
+const PIE_HIT_RING_PAD = 14;
+
+/** Index of the slice under a point in the chart box, or -1. Works on the icons, the gaps and thin slices. */
+export function pieSliceAt(geoms: (SliceGeom | undefined)[], x: number, y: number): number {
+  let best = -1;
+  let bestDist = Infinity;
+  geoms.forEach((g, i) => {
+    if (!g) return;
+    const dx = x - g.cx;
+    const dy = g.cy - y;
+    const r = Math.hypot(dx, dy);
+    if (r < g.innerRadius - PIE_HIT_RING_PAD || r > g.outerRadius + PIE_HIT_RING_PAD) return;
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const mid = (g.startAngle + g.endAngle) / 2;
+    const half = Math.max(Math.abs(g.endAngle - g.startAngle) / 2, PIE_HIT_MIN_HALF_ANGLE);
+    const dist = Math.abs((((angle - mid) % 360) + 540) % 360 - 180);
+    // Nearest slice centre wins, so a thin slice beats the edge of its big neighbour.
+    if (dist <= half && dist < bestDist) {
+      best = i;
+      bestDist = dist;
+    }
+  });
+  return best;
+}
+
 function PieSliceIcon({
   cx,
   cy,
@@ -422,7 +471,7 @@ function PieSliceIcon({
   const Icon = categoryIcon(category);
   const isLight = isLightColor(color);
   return (
-    <g transform={`translate(${x - 8},${y - 8})`}>
+    <g transform={`translate(${x - 8},${y - 8})`} pointerEvents="none">
       <foreignObject width={16} height={16}>
         <div className={`flex h-4 w-4 items-center justify-center ${isLight ? "text-gray-950" : "text-white"}`}>
           <Icon className="h-3.5 w-3.5" strokeWidth={2.25} />
@@ -465,6 +514,10 @@ export default function DashboardAnalytics({
   const [trendLoading, setTrendLoading] = useState(true);
   const [expenseSlices, setExpenseSlices] = useState<CategorySlice[]>([]);
   const [expenseLoading, setExpenseLoading] = useState(false);
+  const [flow, setFlow] = useState<FlowPoint[]>([]);
+  const [flowLoading, setFlowLoading] = useState(true);
+  const [chartView, setChartView] = useState<"donut" | "line">("donut");
+  const [flowSeries, setFlowSeries] = useState<"expense" | "income">("expense");
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
     {}
   );
@@ -473,6 +526,9 @@ export default function DashboardAnalytics({
   );
   const [activeColorPicker, setActiveColorPicker] = useState<string | null>(null);
   const [popoverCategory, setPopoverCategory] = useState<string | null>(null);
+  const pieGeoms = useRef<(SliceGeom | undefined)[]>([]);
+  const pieBoxRef = useRef<HTMLDivElement>(null);
+  const [pieHover, setPieHover] = useState<{ index: number; x: number; y: number } | null>(null);
   useEscapeKey(() => setPopoverCategory(null), popoverCategory !== null);
 
   const isWeek = expenseRange === "week";
@@ -651,6 +707,67 @@ export default function DashboardAnalytics({
     hiddenCategories,
   ]);
 
+  // Income / expense line chart: same period as the pie, one summary per bucket.
+  useEffect(() => {
+    if (!showExpense || chartView !== "line") return;
+    let active = true;
+    setFlowLoading(true);
+
+    const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, o);
+    const dayLabel = fmt({ weekday: "short" });
+    const dateLabel = fmt({ month: "short", day: "numeric" });
+    const monthLabel = fmt({ month: "short" });
+    const fullMonthLabel = fmt({ year: "numeric", month: "short" });
+    const buckets = trendBuckets(expenseRange, month, selectedWeekStart);
+
+    async function loadBucket(b: (typeof buckets)[number]): Promise<FlowPoint> {
+      let income = 0;
+      let expense = 0;
+      for (const cur of ["CAD", "KRW"] as const) {
+        if (scope !== "ALL" && scope !== cur) continue;
+        const stats = await fetchStatsSummary({
+          start: b.start,
+          end: b.end,
+          currency: cur,
+          accountType,
+          excludeCategories,
+        }).catch(() => null);
+        if (!stats) continue;
+        income += convertAmount(stats.total_income, cur, displayCurrency, rate);
+        expense += convertAmount(stats.adjusted_expense, cur, displayCurrency, rate);
+      }
+      const label =
+        b.unit === "day"
+          ? dayLabel.format(b.date)
+          : b.unit === "week"
+            ? dateLabel.format(b.date)
+            : monthLabel.format(b.date);
+      const fullLabel =
+        b.unit === "month"
+          ? fullMonthLabel.format(b.date)
+          : b.unit === "week"
+            ? `${dateLabel.format(b.date)} – ${dateLabel.format(new Date(b.end + "T00:00:00"))}`
+            : `${dateLabel.format(b.date)} ${dayLabel.format(b.date)}`;
+      return { label, fullLabel, income, expense };
+    }
+
+    Promise.all(buckets.map(loadBucket))
+      .then((rows) => {
+        if (active) setFlow(rows);
+      })
+      .catch(() => {
+        if (active) setFlow([]);
+      })
+      .finally(() => {
+        if (active) setFlowLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expenseRange, weekStartKey, month, version, scope, accountType, displayCurrency, rate, locale, excludeKey, showExpense, chartView]);
+
   useEffect(() => {
     let active = true;
     setTrendLoading(true);
@@ -758,8 +875,11 @@ export default function DashboardAnalytics({
       {showExpense && (
       <section className="card-inset p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+          <h2 className="flex items-center gap-1 text-sm font-semibold text-gray-700 dark:text-gray-200">
             {t("expenseRatio")}
+            <InfoTip label={t("expenseRatioInfoLabel")} icon="info">
+              {t("expenseRatioInfo")}
+            </InfoTip>
           </h2>
           <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
             {expensePeriods.map((r) => (
@@ -777,6 +897,23 @@ export default function DashboardAnalytics({
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mt-3 flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5 w-fit">
+          {(["donut", "line"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setChartView(v)}
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                chartView === v
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              {t(v === "donut" ? "chartDonut" : "chartLine")}
+            </button>
+          ))}
         </div>
 
         {isWeek && (
@@ -811,7 +948,7 @@ export default function DashboardAnalytics({
           </p>
         )}
 
-        {expenseLoading ? (
+        {chartView === "donut" && (expenseLoading ? (
           <div className="mt-4 h-48 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
         ) : pieData.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
@@ -819,7 +956,10 @@ export default function DashboardAnalytics({
           </p>
         ) : (
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-            <div className="relative h-56 w-full flex items-center justify-center">
+            <div
+              ref={pieBoxRef}
+              className="relative h-56 w-full flex items-center justify-center"
+            >
               {/* Centered Total Summary (z-0 so tooltip floats on top) */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
                 <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -839,66 +979,106 @@ export default function DashboardAnalytics({
                     cy="50%"
                     innerRadius={52}
                     outerRadius={78}
-                    paddingAngle={4}
+                    paddingAngle={3}
+                    minAngle={3}
                     cornerRadius={4}
                     stroke="none"
                     labelLine={false}
-                    onClick={(entry) => {
-                      if (entry?.category) {
-                        setPopoverCategory(entry.category);
-                      }
-                    }}
-                    cursor="pointer"
                     label={(props: {
+                      index: number;
                       cx: number;
                       cy: number;
                       midAngle: number;
                       innerRadius: number;
                       outerRadius: number;
+                      startAngle: number;
+                      endAngle: number;
                       percent: number;
                       category?: string;
                       payload?: CategorySlice;
-                    }) => (
-                      <PieSliceIcon
-                        cx={props.cx}
-                        cy={props.cy}
-                        midAngle={props.midAngle}
-                        innerRadius={props.innerRadius}
-                        outerRadius={props.outerRadius}
-                        percent={props.percent}
-                        category={
-                          props.category ?? props.payload?.category ?? ""
-                        }
-                        color={
-                          props.payload?.color ?? "#ffffff"
-                        }
-                      />
-                    )}
+                    }) => {
+                      pieGeoms.current[props.index] = {
+                        cx: props.cx,
+                        cy: props.cy,
+                        innerRadius: props.innerRadius,
+                        outerRadius: props.outerRadius,
+                        startAngle: props.startAngle,
+                        endAngle: props.endAngle,
+                      };
+                      return (
+                        <PieSliceIcon
+                          cx={props.cx}
+                          cy={props.cy}
+                          midAngle={props.midAngle}
+                          innerRadius={props.innerRadius}
+                          outerRadius={props.outerRadius}
+                          percent={props.percent}
+                          category={
+                            props.category ?? props.payload?.category ?? ""
+                          }
+                          color={
+                            props.payload?.color ?? "#ffffff"
+                          }
+                        />
+                      );
+                    }}
                   >
-                    {pieData.map((entry) => (
-                      <Cell key={entry.category} fill={entry.color} />
+                    {pieData.map((entry, i) => (
+                      <Cell
+                        key={entry.category}
+                        fill={entry.color}
+                        fillOpacity={pieHover && pieHover.index !== i ? 0.45 : 1}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip
-                    wrapperStyle={{ zIndex: 100, pointerEvents: "none" }}
-                    content={({ active, payload }) => (
-                      <PieExpenseTooltip
-                        active={active}
-                        payload={
-                          payload as Array<{
-                            payload?: CategorySlice;
-                            color?: string;
-                          }>
-                        }
-                        totalExpense={pieTotalExpense}
-                        displayCurrency={displayCurrency}
-                        monthTransactions={periodTransactions}
-                        tCategories={tCategories}
-                      />
-                    )}
-                  />
                 </PieChart>
               </ResponsiveContainer>
+              {/* One hit layer over the whole ring: slices, their icons and the gaps all respond the same way. */}
+              <div
+                className={`absolute inset-0 z-10 ${pieHover ? "cursor-pointer" : ""}`}
+                data-testid="pie-hit-layer"
+                onPointerMove={(e) => {
+                  const box = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - box.left;
+                  const y = e.clientY - box.top;
+                  const index = pieSliceAt(pieGeoms.current, x, y);
+                  setPieHover(index >= 0 ? { index, x, y } : null);
+                }}
+                onPointerLeave={() => setPieHover(null)}
+                onClick={(e) => {
+                  const box = e.currentTarget.getBoundingClientRect();
+                  const index = pieSliceAt(
+                    pieGeoms.current,
+                    e.clientX - box.left,
+                    e.clientY - box.top,
+                  );
+                  const slice = pieData[index];
+                  if (slice) setPopoverCategory(slice.category);
+                }}
+              />
+              {pieHover && pieData[pieHover.index] && (
+                <div
+                  className="pointer-events-none absolute z-[100] w-max max-w-[16rem]"
+                  style={{
+                    left: Math.min(pieHover.x + 12, Math.max(0, (pieBoxRef.current?.clientWidth ?? 0) - 220)),
+                    top: pieHover.y + 12,
+                  }}
+                >
+                  <PieExpenseTooltip
+                    active
+                    payload={[
+                      {
+                        payload: pieData[pieHover.index],
+                        color: pieData[pieHover.index].color,
+                      },
+                    ]}
+                    totalExpense={pieTotalExpense}
+                    displayCurrency={displayCurrency}
+                    monthTransactions={periodTransactions}
+                    tCategories={tCategories}
+                  />
+                </div>
+              )}
             </div>
             <ul className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
               {displaySlices.map((row) => {
@@ -999,6 +1179,83 @@ export default function DashboardAnalytics({
               })}
             </ul>
           </div>
+        ))}
+
+        {chartView === "line" && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              {t("flowTitle")}
+            </h3>
+            <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+              {(["expense", "income"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setFlowSeries(k)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    flowSeries === k
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {t(k)}
+                </button>
+              ))}
+            </div>
+          </div>
+          {flowLoading ? (
+            <div className="mt-3 h-48 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+          ) : (
+            <div className="mt-3 h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={flow} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-gray-200 dark:stroke-gray-700"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    interval="preserveStartEnd"
+                    minTickGap={14}
+                    tick={{ fontSize: 11, fill: "currentColor" }}
+                    className="text-gray-500 dark:text-gray-400"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "currentColor" }}
+                    className="text-gray-500 dark:text-gray-400"
+                    width={40}
+                    tickFormatter={(v: number) =>
+                      v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
+                    }
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => (
+                      <ChartTooltipBox
+                        active={active}
+                        label={(payload?.[0]?.payload as FlowPoint | undefined)?.fullLabel}
+                        rows={(payload ?? []).map((p) => ({
+                          name: p.dataKey === "income" ? t("income") : t("expense"),
+                          value: formatAmount(Number(p.value ?? 0), displayCurrency),
+                          color: typeof p.color === "string" ? p.color : undefined,
+                        }))}
+                      />
+                    )}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={flowSeries}
+                    stroke={`var(--flow-${flowSeries})`}
+                    strokeWidth={2}
+                    dot={{ r: 2.5 }}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
         )}
       </section>
       )}

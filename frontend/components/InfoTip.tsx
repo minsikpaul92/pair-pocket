@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Info } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,8 @@ type Props = {
   label: string;
   children: React.ReactNode;
   className?: string;
+  /** "info" shows an i instead of a question mark. */
+  icon?: "help" | "info";
 };
 
 const MARGIN = 12;
@@ -23,7 +25,7 @@ const WIDTH = 288;
  * outside press, Escape, or when the pointer and focus both leave. The bubble
  * is portaled and clamped to the viewport so it is never clipped on a phone.
  */
-export default function InfoTip({ label, children, className }: Props) {
+export default function InfoTip({ label, children, className, icon = "help" }: Props) {
   const id = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -100,7 +102,11 @@ export default function InfoTip({ label, children, className }: Props) {
         onBlur={() => setFocused(false)}
         className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:text-indigo-500 focus-visible:text-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400"
       >
-        <HelpCircle className="h-4 w-4" aria-hidden />
+        {icon === "info" ? (
+          <Info className="h-4 w-4" aria-hidden />
+        ) : (
+          <HelpCircle className="h-4 w-4" aria-hidden />
+        )}
       </button>
       {open &&
         typeof document !== "undefined" &&

@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint .",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "check:ui": "node scripts/check-ui.mjs"
+    "check:ui": "node scripts/check-ui.mjs",
+    "check:trend": "node scripts/check-trend-buckets.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

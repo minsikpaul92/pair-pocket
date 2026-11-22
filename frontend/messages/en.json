@@ -243,8 +243,15 @@
     "income": "Income",
     "investmentSavings": "Invest / save",
     "expenseRatio": "Expense mix",
+    "expenseInfoLabel": "What counts as spending",
+    "expenseInfo": "All spending by card, account or cash, savings included. Split refunds and card payments are left out.",
+    "expenseRatioInfoLabel": "What the expense mix includes",
+    "expenseRatioInfo": "Your spending by category, any payment method. Split refunds, savings and card payments are left out.",
     "expenseMixTotal": "Total spent",
     "categoryBreakdown": "Spending by category",
+    "chartDonut": "Donut",
+    "chartLine": "Line",
+    "flowTitle": "Income & expenses over time",
     "trendTitle": "Income & expense trend",
     "trendRange": "{months} mo",
     "periodMonth": "This month",
@@ -1363,6 +1370,10 @@
   },
   "whatsNew": {
     "items": {
+      "incomeExpenseLine": {
+        "title": "Income and expenses over time",
+        "description": "The expense mix card can now switch between the donut and a line chart. The line chart follows the same period tabs and shows how your expenses (red) or income (blue) move by day, week or month. Tap Expense or Income to switch. Small donut slices and their icons now respond to taps, and the i next to Spending and the expense mix explains what is included."
+      },
       "softerCalendarLook": {
         "title": "A nicer calendar and buttons",
         "description": "Today now stands out with a bold blue number and underline, and days with entries show how many there are. There is less empty space under the calendar, and the camera and add buttons look like clear water droplets. Numbers now share the same width, so amounts line up neatly."
