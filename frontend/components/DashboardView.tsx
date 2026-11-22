@@ -1,5 +1,6 @@
 "use client";
 
+import InfoTip from "@/components/InfoTip";
 import {
   CreditCard,
   GripVertical,
@@ -867,8 +868,11 @@ export default function DashboardView({
     ),
     spent: (
       <section className="card-inset h-full p-4">
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+        <p className="flex items-center gap-1 text-xs font-medium text-gray-500 dark:text-gray-400">
           {tDashboard("expense")}
+          <InfoTip label={tDashboard("expenseInfoLabel")} icon="info">
+            {tDashboard("expenseInfo")}
+          </InfoTip>
         </p>
         <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-gray-900 dark:text-white">
           {flow ? fmt(flow.expense, flow.currency) : "\u2014"}

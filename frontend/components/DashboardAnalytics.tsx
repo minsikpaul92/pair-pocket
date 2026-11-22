@@ -19,6 +19,7 @@ import {
 } from "recharts";
 
 import { categoryIcon } from "@/components/CategoryIcon";
+import InfoTip from "@/components/InfoTip";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 import {
@@ -874,8 +875,11 @@ export default function DashboardAnalytics({
       {showExpense && (
       <section className="card-inset p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+          <h2 className="flex items-center gap-1 text-sm font-semibold text-gray-700 dark:text-gray-200">
             {t("expenseRatio")}
+            <InfoTip label={t("expenseRatioInfoLabel")} icon="info">
+              {t("expenseRatioInfo")}
+            </InfoTip>
           </h2>
           <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
             {expensePeriods.map((r) => (
