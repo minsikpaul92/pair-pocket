@@ -145,6 +145,12 @@ function convertCurrency(
 /** Option value for settlements in the Settle/Move kind list; transfers use their sub-category name. */
 const MOVE_KIND_SETTLEMENT = "settlement";
 
+/** Big amount: shrinks by length so a long number never overflows (never below 28px, above the iOS zoom limit). */
+function amountFontPx(length: number, focused: boolean): number {
+  const max = focused ? 40 : 52;
+  return Math.max(28, Math.min(max, Math.floor(240 / (Math.max(length, 1) * 0.6))));
+}
+
 /** Busy days show this many entries before "+N more". */
 const DAY_LIST_CAP = 4;
 
@@ -314,6 +320,7 @@ export default function TransactionModal({
   const amountId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [dayListAll, setDayListAll] = useState(false);
+  const [amountFocused, setAmountFocused] = useState(false);
   const [modalDragY, setModalDragY] = useState(0);
   const touchStartY = useRef<number | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
@@ -2674,13 +2681,22 @@ export default function TransactionModal({
               <input
                 id={amountId}
                 ref={amountInputRef}
-                onFocus={scrollAmountToTop}
-                onBlur={() => formatOnBlur(amount, setAmount)}
+                onFocus={() => {
+                  setAmountFocused(true);
+                  scrollAmountToTop();
+                }}
+                onBlur={() => {
+                  setAmountFocused(false);
+                  formatOnBlur(amount, setAmount);
+                }}
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => handleTotalChange(e.target.value)}
                 placeholder="0"
-                className="input-field px-16 py-2 text-center text-2xl font-bold tabular-nums"
+                style={{ fontSize: amountFontPx(amount.length, amountFocused) }}
+                className={`input-field px-14 py-0 text-center font-bold leading-none tabular-nums sm:h-20 ${
+                  amountFocused ? "h-[88px]" : "h-28"
+                }`}
               />
               {isStock ? (
                 <select
