@@ -483,18 +483,16 @@ export default function SubscriptionsView({
                   ? ` · ${accountNames[sub.account_id]}`
                   : ""}
             </p>
-            {sub.next_due_date &&
-              (sub.status === "active" ||
-                sub.status === "cancel_scheduled") && (
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  {t("nextPayment")}{" "}
-                  {formatSubscriptionDate(sub.next_due_date, locale)}
-                </p>
-              )}
+            {sub.next_due_date && sub.status === "active" && (
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                {t("nextPayment")}{" "}
+                {formatSubscriptionDate(sub.next_due_date, locale)}
+              </p>
+            )}
             {sub.status === "cancel_scheduled" &&
-              sub.cancel_effective_date && (
+              sub.end_date && (
                 <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
-                  {formatSubscriptionDate(sub.cancel_effective_date, locale)}{" "}
+                  {formatSubscriptionDate(sub.end_date, locale)}{" "}
                   {t("hiddenAfter")}
                 </p>
               )}
