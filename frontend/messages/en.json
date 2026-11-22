@@ -1361,7 +1361,7 @@
     "items": {
       "softerCalendarLook": {
         "title": "A nicer calendar and buttons",
-        "description": "Today now stands out with a bold blue number and underline, and days with entries have a clearer background. There is less empty space under the calendar, and the camera and add buttons look like clear water droplets. Numbers now share the same width, so amounts line up neatly."
+        "description": "Today now stands out with a bold blue number and underline, and days with entries show how many there are. There is less empty space under the calendar, and the camera and add buttons look like clear water droplets. Numbers now share the same width, so amounts line up neatly."
       },
       "calendarFitsScreen": {
         "title": "Calendar fits your screen",
