@@ -1359,6 +1359,10 @@
   },
   "whatsNew": {
     "items": {
+      "openInYourLanguage": {
+        "title": "Opens in your language",
+        "description": "The app no longer flashes in English before switching to your saved language when you open it."
+      },
       "quickAmountEntry": {
         "title": "Faster expense entry",
         "description": "The amount now comes first and is ready to type as soon as you add an entry. Tax is worked out for you with one checkbox, the receipt scan is a single row below the form, and an empty merchant shows the category instead."

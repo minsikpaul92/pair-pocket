@@ -9,6 +9,7 @@ import {
   isBetaLocale,
 } from "@/i18n/locales";
 import { updateActiveLocale, updatePreferredLocales } from "@/lib/api";
+import { rememberUserLocale } from "@/lib/user-locale";
 
 const MAX_LOCALES = 2;
 
@@ -44,9 +45,7 @@ export default function LanguagePicker({
 
   async function applyActiveLocale(next: AppLocale | null) {
     if (!next) return;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("pairpocket_user_locale", next);
-    }
+    rememberUserLocale(next);
     if (onLocaleSelected) {
       await onLocaleSelected(next);
     } else {
@@ -59,9 +58,7 @@ export default function LanguagePicker({
 
   async function switchLocale(next: AppLocale) {
     if (next === locale) return;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("pairpocket_user_locale", next);
-    }
+    rememberUserLocale(next);
     if (onLocaleSelected) {
       await onLocaleSelected(next);
     } else {
@@ -74,9 +71,7 @@ export default function LanguagePicker({
   // list of chosen languages, which decides which country ledgers are enabled.
   async function switchActiveLocale(next: AppLocale) {
     if (next === locale) return;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("pairpocket_user_locale", next);
-    }
+    rememberUserLocale(next);
     await updateActiveLocale(next).catch(() => null);
     router.replace(pathname, { locale: next });
   }

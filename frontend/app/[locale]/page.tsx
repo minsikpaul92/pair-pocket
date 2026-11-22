@@ -17,6 +17,7 @@ import {
   fetchCurrentUser,
   fetchUserSettings,
 } from "@/lib/api";
+import { rememberUserLocale } from "@/lib/user-locale";
 
 function asAppLocale(value: string | null | undefined): AppLocale {
   if (value && (locales as readonly string[]).includes(value)) {
@@ -42,6 +43,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // True while a language redirect is in flight: keep the spinner so the
+    // current (wrong language) page never flashes before the new one arrives.
+    let navigating = false;
     (async () => {
       try {
         setLoadFailed(false);
@@ -62,6 +66,7 @@ export default function Home() {
                 settings.preferred_locale ||
                 storedLocal
             );
+            navigating = true;
             router.replace("/onboarding", { locale: targetLocale });
             return;
           }
@@ -69,10 +74,9 @@ export default function Home() {
             const prefLocale = asAppLocale(
               settings.preferred_locales?.[0] || settings.preferred_locale
             );
-            if (typeof window !== "undefined") {
-              localStorage.setItem("pairpocket_user_locale", prefLocale);
-            }
+            rememberUserLocale(prefLocale);
             if (prefLocale !== currentLocale) {
+              navigating = true;
               router.replace("/", { locale: prefLocale });
               return;
             }
@@ -81,6 +85,7 @@ export default function Home() {
             (locales as readonly string[]).includes(storedLocal) &&
             storedLocal !== currentLocale
           ) {
+            navigating = true;
             router.replace("/", { locale: storedLocal as AppLocale });
             return;
           }
@@ -90,6 +95,7 @@ export default function Home() {
             (locales as readonly string[]).includes(storedLocal) &&
             storedLocal !== currentLocale
           ) {
+            navigating = true;
             router.replace("/", { locale: storedLocal as AppLocale });
             return;
           }
@@ -97,7 +103,7 @@ export default function Home() {
       } catch {
         setLoadFailed(true);
       } finally {
-        setLoading(false);
+        if (!navigating) setLoading(false);
       }
     })();
   }, [router, currentLocale, attempt]);

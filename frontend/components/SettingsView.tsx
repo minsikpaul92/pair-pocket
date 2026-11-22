@@ -55,6 +55,7 @@ import {
   salesTaxPercent,
 } from "@/lib/canada-tax";
 import { dayKey } from "@/lib/date";
+import { rememberUserLocale } from "@/lib/user-locale";
 import type { BankCountry } from "@/lib/banks";
 import {
   COUNTRIES,
@@ -160,11 +161,7 @@ export default function SettingsView({
   async function changeLanguage(next: AppLocale) {
     if (next === locale) return;
     setChangingLanguage(true);
-    try {
-      window.localStorage.setItem("pairpocket_user_locale", next);
-    } catch {
-      /* storage unavailable; the server still remembers the choice */
-    }
+    rememberUserLocale(next);
     await updateActiveLocale(next).catch(() => null);
     router.replace(pathname, { locale: next });
   }
