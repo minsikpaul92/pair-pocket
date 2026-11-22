@@ -1342,6 +1342,10 @@
   },
   "whatsNew": {
     "items": {
+      "calendarFitsScreen": {
+        "title": "Calendar fits your screen",
+        "description": "On your phone, the calendar now fits on one screen for most months. The last empty week is gone, the month and ledger share one line, and the days are a bit tighter."
+      },
       "scanQueueEnglishText": {
         "title": "Receipt scan in English",
         "description": "The receipt scan queue, its buttons and its error messages no longer show Korean when the app is in English."

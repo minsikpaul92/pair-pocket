@@ -135,7 +135,7 @@ export default function CalendarView({
     [t]
   );
 
-  const cells = useMemo(() => buildCalendarGrid(month), [month]);
+  const cells = useMemo(() => buildCalendarGrid(month, true), [month]);
   const today = new Date();
   const displayCurrency = scope === "ALL" ? "CAD" : scope;
 
@@ -159,12 +159,12 @@ export default function CalendarView({
   }, [pendingOccurrences]);
 
   return (
-    <section className="card-inset p-4 sm:p-5">
-      <div className="grid grid-cols-7 gap-px mb-2">
+    <section className="card-inset p-2 sm:p-5">
+      <div className="grid grid-cols-7 gap-px mb-1 sm:mb-2">
         {weekdays.map((w, i) => (
           <div
             key={WEEKDAY_KEYS[i]}
-            className={`py-2 text-center text-xs font-semibold ${
+            className={`py-1 sm:py-2 text-center text-xs font-semibold ${
               i === 0
                 ? "text-red-400"
                 : i === 6
@@ -177,7 +177,7 @@ export default function CalendarView({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
         {cells.map((cell) => {
           const key = dayKey(cell);
           const inMonth = isSameMonth(cell, month);
@@ -202,14 +202,14 @@ export default function CalendarView({
               key={key}
               type="button"
               onClick={() => onDayClick(cell)}
-              className={`group relative flex flex-col items-center rounded-2xl border transition-all active:scale-[0.97] min-h-[5.5rem] sm:min-h-[7rem] py-2 px-0.5 ${
+              className={`group relative flex flex-col items-center rounded-2xl border transition-all active:scale-[0.97] min-h-[4.5rem] sm:min-h-[7rem] py-1 sm:py-2 px-0.5 ${
                 inMonth
                   ? "border-transparent hover:border-gray-200 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   : "border-transparent opacity-35"
               } ${hasTx || hasPending ? "bg-gray-50/80 dark:bg-gray-900/40" : ""}`}
             >
               <span
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-sm font-medium ${
                   isToday
                     ? "bg-blue-500 font-bold text-white shadow-sm"
                     : "text-gray-800 dark:text-gray-100"

@@ -1151,9 +1151,9 @@ export default function AppShell({ user, onLogout }: Props) {
           ) : (
           <div
             data-tour="ledger-month"
-            className="mb-4 flex items-center justify-between gap-2"
+            className="mb-2 sm:mb-4 flex items-center justify-between gap-2"
           >
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-baseline gap-1.5">
               {view === "calendar" ||
               view === "list" ||
               view === "subscriptions" ||
@@ -1163,14 +1163,16 @@ export default function AppShell({ user, onLogout }: Props) {
                   value={month}
                   onChange={setMonth}
                   locale={locale}
-                  titleClassName="whitespace-nowrap text-2xl sm:text-3xl"
+                  triggerClassName="shrink-0"
+                  titleClassName="whitespace-nowrap text-lg sm:text-3xl"
                 />
               ) : (
-                <h1 className="whitespace-nowrap text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                <h1 className="shrink-0 whitespace-nowrap text-lg sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                   {monthLabel(month, locale)}
                 </h1>
               )}
-              <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+              <p className="min-w-0 truncate text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                <span aria-hidden>· </span>
                 {scopeLabel}
               </p>
             </div>
@@ -1191,7 +1193,7 @@ export default function AppShell({ user, onLogout }: Props) {
                     return new Date(n.getFullYear(), n.getMonth(), 1);
                   })
                 }
-                className="whitespace-nowrap rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="whitespace-nowrap rounded-lg px-1.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 {tCommon("thisMonth")}
               </button>
