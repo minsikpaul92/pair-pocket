@@ -131,6 +131,9 @@ async def list_subscriptions(
     account_type: AccountType = AccountType.PERSONAL,
     currency: Currency | None = None,
     month: str | None = Query(default=None, description="YYYY-MM"),
+    hide_zero: bool = Query(
+        default=False, description="Drop items whose next charge is $0 (dashboard)"
+    ),
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> list[dict]:
@@ -146,6 +149,10 @@ async def list_subscriptions(
     today = datetime.utcnow()
     filtered: list[dict] = []
     for doc in docs:
+        if hide_zero and (
+            amount_for_due_date(doc, doc.get("next_due_date") or doc["start_date"]) <= 0
+        ):
+            continue
         if month:
             if subscription_visible_in_month(doc, month):
                 filtered.append(doc)
@@ -645,6 +652,7 @@ async def update_subscription(
 @router.post("/{subscription_id}/schedule-cancel", response_model=SubscriptionOut)
 async def schedule_cancel_subscription(
     subscription_id: str,
+    as_of: str | None = Query(default=None, description="Client local YYYY-MM-DD"),
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> dict:
@@ -678,7 +686,9 @@ async def schedule_cancel_subscription(
         await generate_occurrences(db, subscription=updated)
         return _serialize_sub(updated)
 
-    updated = await schedule_subscription_cancel(db, subscription=existing)
+    updated = await schedule_subscription_cancel(
+        db, subscription=existing, as_of=as_of
+    )
     return _serialize_sub(updated)
 
 
