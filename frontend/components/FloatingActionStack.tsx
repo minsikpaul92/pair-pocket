@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   useCallback,
@@ -40,8 +40,8 @@ function isPhone() {
 }
 
 /**
- * Camera and add buttons in one row as small clear Liquid Glass controls.
- * On phones the row folds into a toggle, and the whole group can be picked up
+ * Camera and add buttons, stacked on phones and in one row on desktop, as small clear Liquid Glass controls.
+ * On phones the stack folds into a toggle that opens it up or down, and the whole group can be picked up
  * with a long press and dropped in any screen corner. Desktop always shows
  * both buttons.
  */
@@ -112,7 +112,7 @@ export default function FloatingActionStack({
     window.localStorage.setItem(FAB_EXPANDED_KEY, String(next));
   }
 
-  // The row grows toward the screen center, so a left corner needs a new offset.
+  // The stack grows away from the toggle, so the group needs a new offset to keep the toggle in place.
   useLayoutEffect(() => {
     const target = cornerOffsets()?.[corner];
     if (target) applyOffset(target);
@@ -223,7 +223,9 @@ export default function FloatingActionStack({
   const reduceMotion =
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const isLeft = corner === "tl" || corner === "bl";
+  const isTop = corner === "tl" || corner === "tr";
+  // Buttons appear with a short ease-out, away from the toggle.
+  const appear = `animate-in fade-in ${isTop ? "slide-in-from-top-2" : "slide-in-from-bottom-2"} duration-200 motion-reduce:animate-none`;
   const moved = offset.x !== 0 || offset.y !== 0 || dragging;
 
   return (
@@ -254,14 +256,14 @@ export default function FloatingActionStack({
             }
           : undefined
       }
-      className="fixed bottom-[calc(4.35rem+max(0.5rem,env(safe-area-inset-bottom)))] md:bottom-8 right-4 md:right-5 z-40 flex select-none items-center gap-2 md:gap-3 [-webkit-touch-callout:none]"
+      className="fixed bottom-[calc(4.35rem+max(0.5rem,env(safe-area-inset-bottom)))] md:bottom-8 right-4 md:right-5 z-40 flex select-none flex-col items-center gap-2 md:flex-row md:gap-3 [-webkit-touch-callout:none]"
     >
       <button
         type="button"
         onClick={onCamera}
         disabled={cameraBusy}
         aria-label={cameraLabel}
-        className={`glass-fab ${expanded ? "" : "max-md:hidden"}`}
+        className={`glass-fab ${expanded ? appear : "max-md:hidden"}`}
       >
         {cameraBusy && cameraBusyIcon ? (
           cameraBusyIcon
@@ -274,7 +276,7 @@ export default function FloatingActionStack({
         onClick={onAdd}
         aria-label={addLabel}
         data-tour="fab-add"
-        className={`glass-fab glass-fab-primary ${expanded ? "" : "max-md:hidden"}`}
+        className={`glass-fab glass-fab-primary ${expanded ? `${appear} [animation-delay:50ms]` : "max-md:hidden"}`}
       >
         <AddIcon className="h-6 w-6" />
       </button>
@@ -283,13 +285,13 @@ export default function FloatingActionStack({
         onClick={() => setExpandedPersist(!expanded)}
         aria-label={expanded ? t("collapseActions") : t("expandActions")}
         aria-expanded={expanded}
-        className={`glass-fab h-11 w-11 md:hidden ${isLeft ? "order-first" : ""}`}
+        className={`glass-fab h-11 w-11 md:hidden ${isTop ? "order-first" : ""}`}
       >
-        {/* The arrow points where the row will open (or close). */}
-        {expanded === isLeft ? (
-          <ChevronLeft className="h-5 w-5" />
+        {/* The arrow points where the buttons will open (or close). */}
+        {expanded === isTop ? (
+          <ChevronUp className="h-5 w-5" />
         ) : (
-          <ChevronRight className="h-5 w-5" />
+          <ChevronDown className="h-5 w-5" />
         )}
       </button>
     </div>

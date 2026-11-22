@@ -1508,7 +1508,7 @@ export default function AppShell({ user, onLogout }: Props) {
 
       {/* Scan Options Popover */}
       {scanMenuOpen && (
-        <div className={`fixed ${fabCorner[0] === "t" ? "top-[calc(env(safe-area-inset-top)+8.6rem)]" : "bottom-[calc(8.5rem+max(0.5rem,env(safe-area-inset-bottom)))]"} ${fabCorner[1] === "l" ? "left-4" : "right-4"} md:top-auto md:left-auto md:bottom-28 md:right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200`}>
+        <div className={`fixed ${fabCorner[0] === "t" ? "top-[calc(env(safe-area-inset-top)+15.5rem)]" : "bottom-[calc(14.6rem+max(0.5rem,env(safe-area-inset-bottom)))]"} ${fabCorner[1] === "l" ? "left-4" : "right-4"} md:top-auto md:left-auto md:bottom-28 md:right-5 z-40 w-52 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl p-1.5 space-y-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200`}>
           <button
             type="button"
             onClick={() => {
