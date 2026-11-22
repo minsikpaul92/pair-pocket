@@ -172,6 +172,7 @@
     "shared": "공유"
   },
   "calendar": {
+    "entryCount": "{count}건",
     "weekdays": {
       "sun": "일",
       "mon": "월",

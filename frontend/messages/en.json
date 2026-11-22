@@ -172,6 +172,7 @@
     "shared": "Shared"
   },
   "calendar": {
+    "entryCount": "×{count}",
     "weekdays": {
       "sun": "Sun",
       "mon": "Mon",
