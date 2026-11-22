@@ -511,8 +511,8 @@ export default function ListView({
           </button>
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="grid grid-cols-4 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 sm:flex sm:shrink-0">
           {TYPE_TABS.map((t) => (
             <button
               key={t}
@@ -522,7 +522,7 @@ export default function ListView({
                 setCategoryFilter("all");
                 setSubCategoryFilter("all");
               }}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`min-w-0 truncate rounded-lg px-1 py-2.5 text-xs min-[360px]:py-2 min-[360px]:text-sm sm:px-3 sm:py-1.5 font-medium whitespace-nowrap transition-colors ${
                 typeFilter === t
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                   : "text-gray-500 dark:text-gray-400"
@@ -533,12 +533,13 @@ export default function ListView({
           ))}
         </div>
 
+        <div className="grid grid-cols-3 gap-2 sm:contents">
         <Dropdown
           value={accountFilter}
           onChange={setAccountFilter}
           ariaLabel={tList("account")}
           size="sm"
-          className="w-auto min-w-[8rem] max-w-[14rem]"
+          className="px-2 sm:px-3 sm:w-auto sm:min-w-[8rem] sm:max-w-[14rem]"
           options={[
             { value: "all", label: tList("allAccounts") },
             ...accounts.map((a) => ({ value: a.id, label: accountPickerLabel(a) })),
@@ -553,7 +554,7 @@ export default function ListView({
           }}
           ariaLabel={tList("category")}
           size="sm"
-          className="w-auto min-w-[8rem]"
+          className="px-2 sm:px-3 sm:w-auto sm:min-w-[8rem]"
           options={[
             { value: "all", label: tList("allCategories") },
             ...allCategories.map((c) => ({
@@ -568,7 +569,7 @@ export default function ListView({
           onChange={setSubCategoryFilter}
           ariaLabel={tList("subCategory")}
           size="sm"
-          className="w-auto min-w-[8rem]"
+          className="px-2 sm:px-3 sm:w-auto sm:min-w-[8rem]"
           disabled={categoryFilter === "all" && subCategoryOptions.length === 0}
           options={[
             { value: "all", label: tList("allSubCategories") },
@@ -579,7 +580,10 @@ export default function ListView({
           ]}
         />
 
-        <div ref={searchContainerRef} className="relative flex-1 min-w-[10rem]">
+        </div>
+
+        <div className="flex items-center gap-2 sm:contents">
+        <div ref={searchContainerRef} className="relative flex-1 min-w-0 sm:min-w-[10rem]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
           <input
             value={merchantQuery}
@@ -624,6 +628,7 @@ export default function ListView({
             <span className="whitespace-nowrap">{tList("add")}</span>
           </button>
         )}
+        </div>
       </div>
 
       <div className="mt-4 card-inset overflow-hidden flex flex-col max-h-[32rem]">
