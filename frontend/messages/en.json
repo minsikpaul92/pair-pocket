@@ -172,6 +172,7 @@
     "shared": "Shared"
   },
   "calendar": {
+    "entryCount": "×{count}",
     "weekdays": {
       "sun": "Sun",
       "mon": "Mon",
@@ -1362,6 +1363,10 @@
   },
   "whatsNew": {
     "items": {
+      "softerCalendarLook": {
+        "title": "A nicer calendar and buttons",
+        "description": "Today now stands out with a bold blue number and underline, and days with entries show how many there are. There is less empty space under the calendar, and the camera and add buttons look like clear water droplets. Numbers now share the same width, so amounts line up neatly."
+      },
       "multiReceiptSave": {
         "title": "Every scanned receipt gets saved",
         "description": "When you scan several receipts at once, Save & next saves each one in turn, and Skip leaves out the ones you don't want. Manual entry now starts with the cursor in the amount."
