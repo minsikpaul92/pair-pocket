@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import DayPicker from "@/components/DayPicker";
 import { AccountType, Currency, SettleableExpense, formatAmount } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import { merchantLabel, realMerchant } from "@/lib/merchant";
 import { dayKey, formatDayLabel, isoDayKey, parseDate } from "@/lib/date";
 
 interface Props {
@@ -24,14 +25,14 @@ function formatOptionLabel(
   exp: SettleableExpense,
   currency: Currency,
   locale: string,
-  tCommon: (key: string, values?: Record<string, string | number>) => string
+  tCommon: (key: string, values?: Record<string, string | number>) => string,
+  merchant: string
 ): string {
   const dateStr = new Intl.DateTimeFormat(locale, {
     month: "numeric",
     day: "numeric",
   }).format(new Date(exp.date));
   const remaining = formatAmount(exp.remaining_amount, currency);
-  const merchant = exp.merchant || tCommon("unspecified");
   return `${dateStr} · ${merchant} · ${tCommon("remaining", { amount: remaining })}`;
 }
 
@@ -51,6 +52,8 @@ export default function SettlementExpenseSelect({
   const tCategories = useTranslations("categories");
   const tSubCategories = useTranslations("subCategories");
   const tAccountType = useTranslations("accountType");
+  const label = (exp: SettleableExpense) =>
+    merchantLabel(exp, tCategories, tSubCategories, tCommon("unspecified"));
 
   const [open, setOpen] = useState(false);
   const [filterDate, setFilterDate] = useState<string | null>(null);
@@ -74,7 +77,7 @@ export default function SettlementExpenseSelect({
       if (filterDate && isoDayKey(exp.date) !== filterDate) return false;
       if (!q) return true;
       return [
-        exp.merchant,
+        realMerchant(exp.merchant),
         translateCategory(exp.category, tCategories),
         translateSubCategory(exp.sub_category, tSubCategories),
         String(exp.amount),
@@ -118,7 +121,7 @@ export default function SettlementExpenseSelect({
             <>
               <Receipt className="h-5 w-5 text-gray-500 dark:text-gray-400 shrink-0" />
               <span className="truncate">
-                {formatOptionLabel(selected, currency, locale, tCommon)}
+                {formatOptionLabel(selected, currency, locale, tCommon, label(selected))}
               </span>
             </>
           ) : (
@@ -216,7 +219,7 @@ export default function SettlementExpenseSelect({
                       <Receipt className="h-5 w-5 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
-                          {exp.merchant || tCommon("unspecified")}
+                          {label(exp)}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {formatDayLabel(new Date(exp.date), locale)} ·{" "}

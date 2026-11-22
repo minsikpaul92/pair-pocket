@@ -10,6 +10,7 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: WhatsNewEntry[] = [
   { id: "calendarFitsScreen", version: "0.27.0", date: "2026-11-21" },
+  { id: "quickAmountEntry", version: "0.26.0", date: "2026-11-21" },
   { id: "scanQueueEnglishText", version: "0.25.1", date: "2026-11-21" },
   { id: "resettlePayment", version: "0.25.0", date: "2026-11-12" },
   { id: "pullToRefresh", version: "0.24.0", date: "2026-11-08" },

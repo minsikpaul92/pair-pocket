@@ -30,18 +30,14 @@ import {
   subCategoriesFor,
 } from "@/lib/api";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
+import { merchantLabel, realMerchant } from "@/lib/merchant";
 import { parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
-/** The add-transaction form saves the localized "unspecified" label when merchant is left empty. */
-const UNSPECIFIED_MERCHANTS = new Set(["미지정", "Unspecified"]);
-
-/** Merchant wins over note; a placeholder merchant counts as missing. */
-function rowTitle(tx: Transaction, fallback: string): string {
-  const merchant = tx.merchant?.trim();
-  if (merchant && !UNSPECIFIED_MERCHANTS.has(merchant)) return merchant;
-  return tx.note?.trim() || merchant || fallback;
+/** Merchant wins over note; a blank or placeholder merchant counts as missing. */
+function rowTitle(tx: Transaction, fallback: (tx: Transaction) => string): string {
+  return realMerchant(tx.merchant) || tx.note?.trim() || fallback(tx);
 }
 
 /** The note shown beside the category, unless it is already the row title. */
@@ -678,7 +674,9 @@ export default function ListView({
               const tx = item.tx;
               const settled = hasSettlement(tx);
               const transfer = isNonCashflowTransaction(tx);
-              const title = rowTitle(tx, tCommon("unspecified"));
+              const title = rowTitle(tx, (t) =>
+                merchantLabel(t, tCategories, tSubCategories, tCommon("unspecified"))
+              );
               const note = rowNote(tx, title);
               const effective = item.effectiveAmount;
               return (
@@ -708,8 +706,12 @@ export default function ListView({
                         {tx.origin && (
                           <p className="text-xs text-blue-500 truncate">
                             {tList("settlesOrigin", {
-                              merchant:
-                                tx.origin.merchant || tCommon("unspecified"),
+                              merchant: merchantLabel(
+                                tx.origin,
+                                tCategories,
+                                tSubCategories,
+                                tCommon("unspecified")
+                              ),
                               date: formatDay(tx.origin.date),
                               amount: formatAmount(
                                 tx.origin.amount,

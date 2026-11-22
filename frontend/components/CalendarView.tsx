@@ -20,12 +20,7 @@ import {
   isSameMonth,
   isoDayKey,
 } from "@/lib/date";
-import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
-import en from "@/messages/en.json";
-import ko from "@/messages/ko.json";
-
-/** The add-transaction form saves the localized "unspecified" label when merchant is left empty. */
-const UNSPECIFIED_MERCHANTS = new Set([ko.common.unspecified, en.common.unspecified]);
+import { merchantLabel } from "@/lib/merchant";
 
 /** Short amount for a narrow day cell: $1.2K, ₩12M, $45. */
 function formatDayAmount(amount: number, currency: Currency): string {
@@ -165,16 +160,6 @@ export default function CalendarView({
     return map;
   }, [transactions]);
 
-  // shortcut: local copy of the merchant fallback in ListView (and lib/merchant.ts once #146 lands), unify then.
-  function entryName(tx: Transaction): string {
-    const merchant = tx.merchant?.trim();
-    if (merchant && !UNSPECIFIED_MERCHANTS.has(merchant)) return merchant;
-    if (tx.sub_category?.trim())
-      return translateSubCategory(tx.sub_category, tSubCategories);
-    if (tx.category?.trim()) return translateCategory(tx.category, tCategories);
-    return tCommon("unspecified");
-  }
-
   const pendingByDay = useMemo(() => {
     const map = new Map<string, SubscriptionOccurrence[]>();
     for (const occ of pendingOccurrences) {
@@ -257,7 +242,12 @@ export default function CalendarView({
                   <span className="mt-0.5 w-full min-w-0 overflow-hidden px-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                     {hasTx && firstByDay.get(key) ? (
                       <span className="block w-full min-w-0 truncate whitespace-nowrap text-center text-[11px]">
-                        {entryName(firstByDay.get(key)!)}
+                        {merchantLabel(
+                          firstByDay.get(key)!,
+                          tCategories,
+                          tSubCategories,
+                          tCommon("unspecified")
+                        )}
                       </span>
                     ) : null}
                     {hasPending ? (

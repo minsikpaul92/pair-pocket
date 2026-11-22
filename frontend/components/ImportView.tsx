@@ -46,6 +46,7 @@ import Dropdown from "@/components/ui/dropdown";
 import BankImportPanel from "@/components/BankImportPanel";
 import InfoTip from "@/components/InfoTip";
 import MonthPicker from "@/components/MonthPicker";
+import { merchantLabel } from "@/lib/merchant";
 import { useLocale, useTranslations } from "next-intl";
 
 /** The transactions API returns at most this many rows per request. */
@@ -223,7 +224,7 @@ export default function ImportView({
       const text = (event.target?.result as string) || "";
       const stamp = Date.now();
       const rows = parseImportCsv(text, {
-        merchant: t("unspecified"),
+        merchant: "",
         category: "식비",
         subCategory: "카페/간식",
         today: new Date().toISOString().split("T")[0],
@@ -543,7 +544,9 @@ export default function ImportView({
                             />
                           </td>
                           <td className="p-2 font-mono">{tx.date}</td>
-                          <td className="p-2 font-semibold">{tx.merchant}</td>
+                          <td className="p-2 font-semibold">
+                            {merchantLabel(tx, tCategories, tSubCategories, tCommon("unspecified"))}
+                          </td>
                           <td className="p-2 text-right font-mono">
                             {tx.currency} {tx.amount.toFixed(2)}
                           </td>

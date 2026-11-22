@@ -324,7 +324,11 @@
     "itemRemove": "Remove item",
     "subtotalLabel": "Subtotal",
     "taxLabel": "Tax (HST 13%)",
-    "totalLabel": "Total",
+    "totalExpense": "Total expense",
+    "totalIncome": "Total income",
+    "totalMove": "Amount",
+    "breakdownSummary": "Subtotal {subtotal} · Tax {tax}",
+    "breakdownNoTax": "Subtotal {subtotal} · No tax",
     "tipLabel": "Tip",
     "tipPercent": "Percent (%)",
     "tipAmount": "Amount",
@@ -1342,6 +1346,10 @@
       "calendarFitsScreen": {
         "title": "Calendar fits your screen",
         "description": "On your phone, the calendar now fits on one screen for most months and fills the width. Each day shows the name of its first entry with a +N for the rest. The camera and add buttons sit side by side in a glass style, and the upload menu has one item for photos and PDFs."
+      },
+      "quickAmountEntry": {
+        "title": "Faster expense entry",
+        "description": "The amount now comes first and is ready to type as soon as you add an entry. Tax is worked out for you with one checkbox, the receipt scan is a single row below the form, and an empty merchant shows the category instead."
       },
       "scanQueueEnglishText": {
         "title": "Receipt scan in English",

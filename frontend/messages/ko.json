@@ -324,7 +324,11 @@
     "itemRemove": "품목 삭제",
     "subtotalLabel": "공급가액 (Subtotal)",
     "taxLabel": "세금 (HST 13%)",
-    "totalLabel": "총 결제액 (Total)",
+    "totalExpense": "총 지출",
+    "totalIncome": "총 수입",
+    "totalMove": "총 금액",
+    "breakdownSummary": "소계 {subtotal} · 세금 {tax}",
+    "breakdownNoTax": "소계 {subtotal} · 세금 없음",
     "tipLabel": "팁",
     "tipPercent": "퍼센트 (%)",
     "tipAmount": "금액",
@@ -1342,6 +1346,10 @@
       "calendarFitsScreen": {
         "title": "캘린더가 한 화면에 들어와요",
         "description": "휴대폰에서 대부분의 달이 스크롤 없이 한 화면에 꽉 차게 보여요. 날짜마다 첫 번째 내역 이름과 나머지 개수(+N)가 보이고, 카메라와 추가 버튼은 유리 느낌으로 나란히 놓였어요. 올리기 메뉴도 사진과 PDF를 한 번에 고를 수 있게 합쳤어요."
+      },
+      "quickAmountEntry": {
+        "title": "더 빠른 지출 입력",
+        "description": "금액이 맨 위에 나오고 입력창을 열면 바로 입력할 수 있어요. 세금은 체크 한 번으로 자동 계산되고, 영수증 스캔은 입력란 아래 한 줄로 줄었어요. 사용처를 비워 두면 카테고리가 대신 표시돼요."
       },
       "scanQueueEnglishText": {
         "title": "영어 화면의 영수증 스캔을 고쳤어요",
