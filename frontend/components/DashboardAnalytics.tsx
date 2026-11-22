@@ -477,6 +477,7 @@ export default function DashboardAnalytics({
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [flow, setFlow] = useState<FlowPoint[]>([]);
   const [flowLoading, setFlowLoading] = useState(true);
+  const [chartView, setChartView] = useState<"donut" | "line">("donut");
   const [flowSeries, setFlowSeries] = useState<"expense" | "income">("expense");
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
     {}
@@ -666,7 +667,7 @@ export default function DashboardAnalytics({
 
   // Income / expense line chart: same period as the pie, one summary per bucket.
   useEffect(() => {
-    if (!showExpense) return;
+    if (!showExpense || chartView !== "line") return;
     let active = true;
     setFlowLoading(true);
 
@@ -723,7 +724,7 @@ export default function DashboardAnalytics({
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expenseRange, weekStartKey, month, version, scope, accountType, displayCurrency, rate, locale, excludeKey, showExpense]);
+  }, [expenseRange, weekStartKey, month, version, scope, accountType, displayCurrency, rate, locale, excludeKey, showExpense, chartView]);
 
   useEffect(() => {
     let active = true;
@@ -853,6 +854,23 @@ export default function DashboardAnalytics({
           </div>
         </div>
 
+        <div className="mt-3 flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5 w-fit">
+          {(["donut", "line"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setChartView(v)}
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                chartView === v
+                  ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              {t(v === "donut" ? "chartDonut" : "chartLine")}
+            </button>
+          ))}
+        </div>
+
         {isWeek && (
           <div className="mt-3 flex items-center justify-center gap-2">
             <button
@@ -885,7 +903,7 @@ export default function DashboardAnalytics({
           </p>
         )}
 
-        {expenseLoading ? (
+        {chartView === "donut" && (expenseLoading ? (
           <div className="mt-4 h-48 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
         ) : pieData.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
@@ -1073,9 +1091,10 @@ export default function DashboardAnalytics({
               })}
             </ul>
           </div>
-        )}
+        ))}
 
-        <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+        {chartView === "line" && (
+        <div className="mt-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
               {t("flowTitle")}
@@ -1149,6 +1168,7 @@ export default function DashboardAnalytics({
             </div>
           )}
         </div>
+        )}
       </section>
       )}
 
