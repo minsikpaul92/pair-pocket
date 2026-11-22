@@ -301,6 +301,7 @@
     "scanCardTitle": "Fill from screenshot / receipt",
     "scanCardCount": "{count} / {max}",
     "scanCardHint": "Drag, paste (Cmd+V), or tap [Add photo] below to add photos or PDF statements. (Up to {max})",
+    "scanCardHintShort": "Tap [Add photo] to pick photos or PDFs. (Up to {max})",
     "scanRemove": "Remove",
     "scanAddPhoto": "Add photo",
     "scanDeep": "Deep AI analysis…",

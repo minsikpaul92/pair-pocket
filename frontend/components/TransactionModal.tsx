@@ -2,7 +2,7 @@
 
 import { Camera, ChevronDown, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { formatTaxPercent } from "@/lib/canada-tax";
 
 import AccountRegisterModal from "@/components/AccountRegisterModal";
@@ -274,18 +274,41 @@ export default function TransactionModal({
   const [queueIndex, setQueueIndex] = useState(0);
   const [scanRetryCount, setScanRetryCount] = useState(0);
   const [isTaxChecked, setIsTaxChecked] = useState(true);
-  // New entries start in the amount field; autoFocus handles the tap that opened the modal,
-  // this covers a modal that stays mounted.
-  useEffect(() => {
+  const amountRowRef = useRef<HTMLDivElement>(null);
+  const [positionTick, setPositionTick] = useState(0);
+  const scrolledByHandRef = useRef(false);
+  // New entries start in the amount field (autoFocus covers the tap that opened the modal). On
+  // phones the scan panel sits above the amount, so the sheet is scrolled to put the amount row at
+  // the top. This runs before paint, jumps without animation, and only once per open or tab switch.
+  useLayoutEffect(() => {
     if (editingTransaction) return;
-    dialogRef.current?.scrollTo(0, 0);
-    amountInputRef.current?.focus({ preventScroll: true });
-  }, [editingTransaction]);
+    const input = amountInputRef.current;
+    input?.focus({ preventScroll: true });
+    scrolledByHandRef.current = false;
+    function position() {
+      const dialog = dialogRef.current;
+      const row = amountRowRef.current;
+      if (!dialog) return;
+      const phone = window.matchMedia("(max-width: 639px)").matches;
+      if (!phone || !row || moveTab) {
+        dialog.scrollTop = 0;
+        return;
+      }
+      const offset =
+        row.getBoundingClientRect().top - dialog.getBoundingClientRect().top + dialog.scrollTop;
+      dialog.scrollTop = Math.max(0, offset - 8);
+    }
+    position();
+    // The iOS keyboard resizes the sheet once; settle again unless the user has scrolled.
+    const frame = requestAnimationFrame(() => {
+      if (!scrolledByHandRef.current) position();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editingTransaction, positionTick]);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [scanOpen, setScanOpen] = useState(false);
   const [dayListOpen, setDayListOpen] = useState(false);
   const [modalDragY, setModalDragY] = useState(0);
   const touchStartY = useRef<number | null>(null);
@@ -613,7 +636,7 @@ export default function TransactionModal({
 
   const HST_RATE = taxPercent / 100;
   // The scan row stays one line until it is tapped or files arrive (picker, paste, drop).
-  const scanExpanded = scanOpen || scanQueue.length > 0 || scanning || dragOverModal || Boolean(scanHint);
+  const scanShown = !isEditing && !moveTab;
   const isIncomeSource = type === "income" && !moveTab;
   const amountLabel = moveTab
     ? tTx("totalMove")
@@ -1281,7 +1304,10 @@ export default function TransactionModal({
     setInstitution("");
     setError(null);
     // The tab tap is a user gesture, so iOS keeps the keyboard up on the amount.
-    if (!isEditing) amountInputRef.current?.focus({ preventScroll: true });
+    if (!isEditing) {
+      amountInputRef.current?.focus({ preventScroll: true });
+      setPositionTick((n) => n + 1);
+    }
   }
 
   function handleSettleableChange(id: string) {
@@ -2130,6 +2156,8 @@ export default function TransactionModal({
     >
       <div
         ref={dialogRef}
+        onWheel={() => (scrolledByHandRef.current = true)}
+        onTouchMove={() => (scrolledByHandRef.current = true)}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -2395,7 +2423,217 @@ export default function TransactionModal({
             </button>
           </div>
 
-          <div>
+
+          {scanShown && (
+            <div
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current += 1;
+                setDragOverModal(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                if (dragDepthRef.current === 0) setDragOverModal(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragDepthRef.current = 0;
+                setDragOverModal(false);
+                addScanQueueFiles(e.dataTransfer.files);
+              }}
+              className={`relative rounded-2xl border-2 border-dashed p-3 space-y-2.5 transition-all duration-150 ${
+                dragOverModal
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500/30 scale-[1.01]"
+                  : "border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/20"
+              }`}
+            >
+              {dragOverModal && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-blue-500/10 dark:bg-blue-400/10">
+                  <span className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
+                    {tTx("scanDropHere")}
+                  </span>
+                </div>
+              )}
+
+              <input
+                ref={scanInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                className="hidden"
+                onChange={(e) => addScanQueueFiles(e.target.files)}
+              />
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Camera className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                    {tTx("scanCardTitle")}
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                  {tTx("scanCardCount", { count: scanQueue.length, max: MAX_IMAGES })}
+                </span>
+              </div>
+
+              {scanQueue.length === 0 ? (
+                <>
+                  <p className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                    {tTx("scanCardHint", { max: MAX_IMAGES })}
+                  </p>
+                  <p className="sm:hidden text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                    {tTx("scanCardHintShort", { max: MAX_IMAGES })}
+                  </p>
+                </>
+              ) : (
+                <ul className="grid grid-cols-5 gap-1.5 pt-1">
+                  {scanQueue.map((q) => (
+                    <li key={q.id} className="relative aspect-square">
+                      {q.previewUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={q.previewUrl}
+                          alt=""
+                          className="h-full w-full rounded-lg object-cover border border-purple-200 dark:border-purple-800"
+                        />
+                      ) : (
+                        <div className="h-full w-full rounded-lg bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-xs font-bold text-purple-700 dark:text-purple-300">
+                          PDF
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        disabled={scanning}
+                        onClick={() => removeQueuedScan(q.id)}
+                        className="absolute -top-1 -right-1 rounded-full bg-gray-900/80 text-white p-0.5 disabled:opacity-50"
+                        aria-label={tTx("scanRemove")}
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={scanning || scanQueue.length >= MAX_IMAGES}
+                  onClick={() => scanInputRef.current?.click()}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold py-2 transition-colors disabled:opacity-50"
+                >
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  {tTx("scanAddPhoto")}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={scanning || scanQueue.length === 0}
+                  onClick={() => void startBatchModalScan(parsedQueue.length > 0 || scannedFile !== null)}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2 transition-colors disabled:opacity-50"
+                >
+                  {scanning ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                  {scanning
+                    ? scanRetryCount >= 2
+                      ? tTx("scanDeep")
+                      : tTx("scanning")
+                    : parsedQueue.length > 0 || scannedFile !== null
+                    ? tTx("scanRetry")
+                    : tTx("scanStart")}
+                </button>
+              </div>
+
+              {scanQueue.length > 0 && !scanning && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={clearScanQueue}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {tTx("scanClear")}
+                  </button>
+                </div>
+              )}
+
+              {scanHint && (
+                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                  {scanHint}
+                </p>
+              )}
+            </div>
+          )}
+
+          {parsedQueue.length > 1 && (
+            <div className="flex items-center justify-between rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 p-3 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-purple-700 dark:text-purple-300">
+                <span>📋</span>
+                <span>
+                  {tTx("scanQueueProgress", {
+                    total: parsedQueue.length,
+                    current: queueIndex + 1,
+                  })}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={queueIndex === 0}
+                  onClick={() => {
+                    const prev = queueIndex - 1;
+                    setQueueIndex(prev);
+                    applyParsedTransaction(parsedQueue[prev]);
+                  }}
+                  className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
+                >
+                  {tTx("scanPrev")}
+                </button>
+                <button
+                  type="button"
+                  disabled={queueIndex >= parsedQueue.length - 1}
+                  onClick={() => {
+                    const next = queueIndex + 1;
+                    setQueueIndex(next);
+                    applyParsedTransaction(parsedQueue[next]);
+                  }}
+                  className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
+                >
+                  {tTx("scanNext")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const remaining = parsedQueue.filter((_, i) => i !== queueIndex);
+                    setParsedQueue(remaining);
+                    if (remaining.length === 0) {
+                      setScanHint(null);
+                    } else {
+                      const nextIdx = Math.min(queueIndex, remaining.length - 1);
+                      setQueueIndex(nextIdx);
+                      applyParsedTransaction(remaining[nextIdx]);
+                    }
+                  }}
+                  className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-semibold"
+                >
+                  {tTx("scanSkip")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div ref={amountRowRef}>
             <div className="mb-1.5 flex items-center gap-2">
               <label
                 htmlFor={amountId}
@@ -2617,230 +2855,6 @@ export default function TransactionModal({
           )}
 
           {detailFields()}
-
-          {!isEditing && !moveTab && (
-            <div
-              onDragEnter={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dragDepthRef.current += 1;
-                setDragOverModal(true);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-                if (dragDepthRef.current === 0) setDragOverModal(false);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dragDepthRef.current = 0;
-                setDragOverModal(false);
-                addScanQueueFiles(e.dataTransfer.files);
-              }}
-              className={`relative rounded-2xl border-2 border-dashed transition-all duration-150 ${
-                scanExpanded ? "p-3 space-y-2.5" : ""
-              } ${
-                dragOverModal
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500/30 scale-[1.01]"
-                  : "border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/20"
-              }`}
-            >
-              {dragOverModal && (
-                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-blue-500/10 dark:bg-blue-400/10">
-                  <span className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
-                    {tTx("scanDropHere")}
-                  </span>
-                </div>
-              )}
-
-              <input
-                ref={scanInputRef}
-                type="file"
-                accept="image/*,application/pdf"
-                multiple
-                className="hidden"
-                onChange={(e) => addScanQueueFiles(e.target.files)}
-              />
-
-              {!scanExpanded && (
-                <button
-                  type="button"
-                  onClick={() => setScanOpen(true)}
-                  className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left"
-                >
-                  <Camera className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
-                  <span className="min-w-0 flex-1 truncate text-xs font-bold text-gray-800 dark:text-gray-200">
-                    {tTx("scanCardTitle")}
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
-                </button>
-              )}
-
-              {scanExpanded && (
-                <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Camera className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                  <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                    {tTx("scanCardTitle")}
-                  </span>
-                </div>
-                <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
-                  {tTx("scanCardCount", { count: scanQueue.length, max: MAX_IMAGES })}
-                </span>
-              </div>
-
-              {scanQueue.length === 0 ? (
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
-                  {tTx("scanCardHint", { max: MAX_IMAGES })}
-                </p>
-              ) : (
-                <ul className="grid grid-cols-5 gap-1.5 pt-1">
-                  {scanQueue.map((q) => (
-                    <li key={q.id} className="relative aspect-square">
-                      {q.previewUrl ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={q.previewUrl}
-                          alt=""
-                          className="h-full w-full rounded-lg object-cover border border-purple-200 dark:border-purple-800"
-                        />
-                      ) : (
-                        <div className="h-full w-full rounded-lg bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-xs font-bold text-purple-700 dark:text-purple-300">
-                          PDF
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        disabled={scanning}
-                        onClick={() => removeQueuedScan(q.id)}
-                        className="absolute -top-1 -right-1 rounded-full bg-gray-900/80 text-white p-0.5 disabled:opacity-50"
-                        aria-label={tTx("scanRemove")}
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  disabled={scanning || scanQueue.length >= MAX_IMAGES}
-                  onClick={() => scanInputRef.current?.click()}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-300 text-xs font-semibold py-2 transition-colors disabled:opacity-50"
-                >
-                  <ImagePlus className="h-3.5 w-3.5" />
-                  {tTx("scanAddPhoto")}
-                </button>
-
-                <button
-                  type="button"
-                  disabled={scanning || scanQueue.length === 0}
-                  onClick={() => void startBatchModalScan(parsedQueue.length > 0 || scannedFile !== null)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2 transition-colors disabled:opacity-50"
-                >
-                  {scanning ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Play className="h-3.5 w-3.5" />
-                  )}
-                  {scanning
-                    ? scanRetryCount >= 2
-                      ? tTx("scanDeep")
-                      : tTx("scanning")
-                    : parsedQueue.length > 0 || scannedFile !== null
-                    ? tTx("scanRetry")
-                    : tTx("scanStart")}
-                </button>
-              </div>
-
-              {scanQueue.length > 0 && !scanning && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={clearScanQueue}
-                    className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    {tTx("scanClear")}
-                  </button>
-                </div>
-              )}
-
-              {scanHint && (
-                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
-                  {scanHint}
-                </p>
-              )}
-                </>
-              )}
-            </div>
-          )}
-
-          {parsedQueue.length > 1 && (
-            <div className="flex items-center justify-between rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 p-3 text-xs">
-              <div className="flex items-center gap-1.5 font-bold text-purple-700 dark:text-purple-300">
-                <span>📋</span>
-                <span>
-                  {tTx("scanQueueProgress", {
-                    total: parsedQueue.length,
-                    current: queueIndex + 1,
-                  })}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={queueIndex === 0}
-                  onClick={() => {
-                    const prev = queueIndex - 1;
-                    setQueueIndex(prev);
-                    applyParsedTransaction(parsedQueue[prev]);
-                  }}
-                  className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
-                >
-                  {tTx("scanPrev")}
-                </button>
-                <button
-                  type="button"
-                  disabled={queueIndex >= parsedQueue.length - 1}
-                  onClick={() => {
-                    const next = queueIndex + 1;
-                    setQueueIndex(next);
-                    applyParsedTransaction(parsedQueue[next]);
-                  }}
-                  className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
-                >
-                  {tTx("scanNext")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const remaining = parsedQueue.filter((_, i) => i !== queueIndex);
-                    setParsedQueue(remaining);
-                    if (remaining.length === 0) {
-                      setScanHint(null);
-                    } else {
-                      const nextIdx = Math.min(queueIndex, remaining.length - 1);
-                      setQueueIndex(nextIdx);
-                      applyParsedTransaction(remaining[nextIdx]);
-                    }
-                  }}
-                  className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-semibold"
-                >
-                  {tTx("scanSkip")}
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Sub-items (소분류 세부항목) Expandable Section */}
           {!moveTab && (
