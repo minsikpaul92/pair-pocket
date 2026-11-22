@@ -15,6 +15,7 @@ import MerchantSelect from "@/components/MerchantSelect";
 import { merchantLabel, realMerchant } from "@/lib/merchant";
 import { useAccountDefaults } from "@/lib/useAccountDefaults";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { cn } from "@/lib/utils";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import Dropdown from "@/components/ui/dropdown";
@@ -87,6 +88,18 @@ const NO_SPIN =
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 const ITEM_GRID =
   "grid grid-cols-[minmax(6.5rem,2fr)_minmax(5.5rem,1.5fr)_minmax(3.5rem,0.8fr)_minmax(5.5rem,1.2fr)_minmax(4.5rem,1fr)_minmax(4.5rem,1fr)_2rem] gap-2";
+
+type QueueDraft = ParsedTransaction & { note?: string };
+type QueueStatus = "saved" | "skipped" | undefined;
+
+/** Next tab that is neither saved nor skipped, searching forward from `from` and wrapping; -1 when all are done. */
+function nextOpenTab(status: QueueStatus[], total: number, from: number): number {
+  for (let step = 1; step <= total; step++) {
+    const i = (from + step) % total;
+    if (!status[i]) return i;
+  }
+  return -1;
+}
 
 interface Props {
   currency: Currency;
@@ -279,8 +292,10 @@ export default function TransactionModal({
   const [tipAmount, setTipAmount] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanHint, setScanHint] = useState<string | null>(null);
-  const [parsedQueue, setParsedQueue] = useState<ParsedTransaction[]>([]);
+  // One draft per scanned receipt; edits are written back when leaving a tab.
+  const [parsedQueue, setParsedQueue] = useState<QueueDraft[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+  const [queueStatus, setQueueStatus] = useState<QueueStatus[]>([]);
   const [scanRetryCount, setScanRetryCount] = useState(0);
   const [isTaxChecked, setIsTaxChecked] = useState(true);
   const amountRowRef = useRef<HTMLDivElement>(null);
@@ -310,11 +325,13 @@ export default function TransactionModal({
     const timer = setTimeout(done, 700);
     vv.addEventListener("resize", onResize);
   }
-  // Desktop keeps the cursor in the amount on open; phones wait for a tap so the keyboard stays closed.
+  // Manual entry opens with the cursor in the amount. Opening with scanned data (or editing) does
+  // not, so a filled form is reviewed first. On phones the amount's onFocus scrolls it into view.
   useEffect(() => {
-    if (editingTransaction || !window.matchMedia("(min-width: 640px)").matches) return;
+    if (editingTransaction || parsedTransaction) return;
     amountInputRef.current?.focus({ preventScroll: true });
-  }, [editingTransaction]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountId = useId();
@@ -322,6 +339,7 @@ export default function TransactionModal({
   const [dayListAll, setDayListAll] = useState(false);
   const [amountFocused, setAmountFocused] = useState(false);
   const [modalDragY, setModalDragY] = useState(0);
+  const dragYRef = useRef(0);
   const touchStartY = useRef<number | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
   const [itemsScanning, setItemsScanning] = useState(false);
@@ -458,10 +476,11 @@ export default function TransactionModal({
       setScannedFile(files[0] || null);
       setParsedQueue(flat);
       setQueueIndex(0);
+      setQueueStatus([]);
       applyParsedTransaction(flat[0]);
       setScanHint(
         flat.length > 1
-          ? `총 ${flat.length}건의 거래를 인식했습니다. 순서대로 검토 후 저장해 주세요.`
+          ? tTx("scanQueueFound", { count: flat.length })
           : nextRetry >= 2
           ? "고성능 AI 모델로 인식 완료!"
           : tTx("scanFilled")
@@ -863,7 +882,7 @@ export default function TransactionModal({
       .catch((err) => console.error("Failed to fetch holdings in modal", err));
   }, [accountType]);
 
-  useEscapeKey(onClose);
+  useEscapeKey(handleClose);
 
   useEffect(() => {
     let active = true;
@@ -1083,6 +1102,78 @@ export default function TransactionModal({
     if (!parsedTransaction) return;
     applyParsedTransaction(parsedTransaction);
   }, [parsedTransaction, applyParsedTransaction]);
+
+  // Several scanned receipts: each tab is saved or skipped on its own, and the modal stays open
+  // until every tab is handled (the parent closes it on onSaved).
+  const inQueue = parsedQueue.length > 1 && !editingTransaction;
+  const queueSavedCount = queueStatus.filter((s) => s === "saved").length;
+  const queueOpenCount = parsedQueue.length - queueStatus.filter(Boolean).length;
+  const currentTabSaved = inQueue && queueStatus[queueIndex] === "saved";
+
+  function formDraft(base: QueueDraft): QueueDraft {
+    return {
+      ...base,
+      amount: parseAmountInput(amount) || 0,
+      merchant,
+      currency: txCurrency,
+      category,
+      sub_category: subCategory,
+      items,
+      subtotal: parseAmountInput(subtotal) || null,
+      tax_amount: taxAmount === "" ? null : parseAmountInput(taxAmount),
+      tip_amount: parseAmountInput(tipAmount) || null,
+      tip_percent: Number(tipPercent) || null,
+      date: dateStr,
+      note,
+    };
+  }
+
+  function goToTab(index: number) {
+    if (index === queueIndex) return;
+    const queue = parsedQueue.map((d, i) => (i === queueIndex ? formDraft(d) : d));
+    setParsedQueue(queue);
+    setQueueIndex(index);
+    applyParsedTransaction(queue[index]);
+    setNote(queue[index].note ?? "");
+    setError(null);
+  }
+
+  function closeQueue(status: QueueStatus[]) {
+    clearScanQueue();
+    setScannedFile(null);
+    setParsedQueue([]);
+    setQueueStatus([]);
+    if (status.includes("saved")) onSaved();
+    else onClose();
+  }
+
+  function finishQueueStep(mark: QueueStatus) {
+    const status = [...queueStatus];
+    status[queueIndex] = mark;
+    setQueueStatus(status);
+    const next = nextOpenTab(status, parsedQueue.length, queueIndex);
+    if (next < 0) closeQueue(status);
+    else goToTab(next);
+  }
+
+  function handleClose() {
+    if (!inQueue || queueSavedCount === 0) {
+      onClose();
+      return;
+    }
+    if (
+      queueOpenCount > 0 &&
+      !window.confirm(tTx("scanCloseConfirm", { saved: queueSavedCount, left: queueOpenCount }))
+    ) {
+      return;
+    }
+    // Saved receipts stay saved; onSaved refreshes the lists.
+    onSaved();
+  }
+  const closeRef = useRef(handleClose);
+  useEffect(() => {
+    closeRef.current = handleClose;
+  });
 
   async function handleModalScan(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -1400,6 +1491,7 @@ export default function TransactionModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (currentTabSaved) return;
 
     const numericAmount = parseAmountInput(amount);
     if (!numericAmount || numericAmount <= 0) {
@@ -1594,14 +1686,9 @@ export default function TransactionModal({
         alert(`거래가 ${formatted} 날짜로 저장되었습니다. (현재 화면에 선택된 월과 다른 달입니다)`);
       }
 
-      const remainingQueue = parsedQueue.filter((_, i) => i !== queueIndex);
-      if (remainingQueue.length > 0 && !editingTransaction) {
-        setParsedQueue(remainingQueue);
-        const nextIdx = Math.min(queueIndex, remainingQueue.length - 1);
-        setQueueIndex(nextIdx);
-        applyParsedTransaction(remainingQueue[nextIdx]);
-        onSaved();
-        setScanHint(`저장 완료! (남은 ${remainingQueue.length}건 거래 검토 중)`);
+      if (inQueue) {
+        // Stay open for the next receipt; the parent closes the modal on onSaved.
+        finishQueueStep("saved");
       } else {
         clearScanQueue();
         setScannedFile(null);
@@ -2116,6 +2203,7 @@ export default function TransactionModal({
   const updateDrag = (clientY: number) => {
     if (!isDraggingModal.current) return;
     const deltaY = clientY - dragStartY.current;
+    dragYRef.current = Math.max(0, deltaY);
     if (deltaY > 0) {
       setModalDragY(deltaY);
     } else {
@@ -2126,12 +2214,12 @@ export default function TransactionModal({
   const finishDrag = () => {
     if (!isDraggingModal.current) return;
     isDraggingModal.current = false;
-    setModalDragY((currentDragY) => {
-      if (currentDragY > 60) {
-        onClose();
-      }
-      return 0;
-    });
+    // Decide outside the state updater: closing may ask for confirmation.
+    const shouldClose = dragYRef.current > 60;
+    dragYRef.current = 0;
+    setModalDragY(0);
+    // The mouseup listener is bound once, so read the latest close handler from a ref.
+    if (shouldClose) closeRef.current();
   };
 
   useEffect(() => {
@@ -2163,7 +2251,7 @@ export default function TransactionModal({
       }}
       onClick={(e) => {
         if (pressStartedOnBackdrop.current && e.target === e.currentTarget) {
-          onClose();
+          handleClose();
         }
       }}
     >
@@ -2205,7 +2293,7 @@ export default function TransactionModal({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               aria-label={tCommon("close")}
               className="-m-3 shrink-0 p-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
             >
@@ -2577,56 +2665,50 @@ export default function TransactionModal({
             </div>
           )}
 
-          {parsedQueue.length > 1 && (
-            <div className="flex items-center justify-between rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 p-3 text-xs">
-              <div className="flex items-center gap-1.5 font-bold text-purple-700 dark:text-purple-300">
-                <span>📋</span>
-                <span>
+          {inQueue && (
+            <div className="space-y-2 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate font-bold text-purple-700 dark:text-purple-300">
                   {tTx("scanQueueProgress", {
                     total: parsedQueue.length,
                     current: queueIndex + 1,
                   })}
                 </span>
+                <span className="shrink-0 whitespace-nowrap text-purple-600 dark:text-purple-400">
+                  {tTx("scanQueueSaved", { count: queueSavedCount })}
+                </span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                  {parsedQueue.map((_, i) => {
+                    const st = queueStatus[i];
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => goToTab(i)}
+                        aria-current={i === queueIndex ? "step" : undefined}
+                        aria-label={`${i + 1}${st ? ` (${tTx(st === "saved" ? "scanTabSaved" : "scanTabSkipped")})` : ""}`}
+                        className={cn(
+                          "h-7 min-w-7 rounded-lg border px-1.5 font-semibold whitespace-nowrap",
+                          st === "saved"
+                            ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : st === "skipped"
+                              ? "border-gray-200 bg-gray-100 text-gray-400 line-through dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500"
+                              : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300",
+                          i === queueIndex && "ring-2 ring-purple-500"
+                        )}
+                      >
+                        {st === "saved" ? "✓" : i + 1}
+                      </button>
+                    );
+                  })}
+                </div>
                 <button
                   type="button"
-                  disabled={queueIndex === 0}
-                  onClick={() => {
-                    const prev = queueIndex - 1;
-                    setQueueIndex(prev);
-                    applyParsedTransaction(parsedQueue[prev]);
-                  }}
-                  className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
-                >
-                  {tTx("scanPrev")}
-                </button>
-                <button
-                  type="button"
-                  disabled={queueIndex >= parsedQueue.length - 1}
-                  onClick={() => {
-                    const next = queueIndex + 1;
-                    setQueueIndex(next);
-                    applyParsedTransaction(parsedQueue[next]);
-                  }}
-                  className="px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
-                >
-                  {tTx("scanNext")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const remaining = parsedQueue.filter((_, i) => i !== queueIndex);
-                    setParsedQueue(remaining);
-                    if (remaining.length === 0) {
-                      setScanHint(null);
-                    } else {
-                      const nextIdx = Math.min(queueIndex, remaining.length - 1);
-                      setQueueIndex(nextIdx);
-                      applyParsedTransaction(remaining[nextIdx]);
-                    }
-                  }}
-                  className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-semibold"
+                  disabled={currentTabSaved || submitting}
+                  onClick={() => finishQueueStep("skipped")}
+                  className="shrink-0 whitespace-nowrap px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold disabled:opacity-40"
                 >
                   {tTx("scanSkip")}
                 </button>
@@ -3239,14 +3321,18 @@ export default function TransactionModal({
             )}
             <button
               type="submit"
-              disabled={submitting || deleting}
+              disabled={submitting || deleting || currentTabSaved}
               className="flex-1 btn-primary disabled:opacity-50"
             >
               {submitting
                 ? tCommon("saving")
                 : isEditing
                   ? tTx("editSave")
-                  : tCommon("save")}
+                  : currentTabSaved
+                    ? tTx("scanTabSaved")
+                    : inQueue && queueOpenCount > 1
+                      ? tTx("scanSaveNext")
+                      : tCommon("save")}
             </button>
           </div>
         </form>
