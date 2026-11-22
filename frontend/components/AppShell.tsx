@@ -1104,7 +1104,12 @@ export default function AppShell({ user, onLogout }: Props) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-3xl px-4 sm:px-6 py-5 pb-32 md:pb-10">
+        <main
+          className={`mx-auto max-w-3xl px-4 sm:px-6 py-5 md:pb-10 ${
+            // Calendar on phones: only clear the fixed tab bar so the grid can fill the screen.
+            view === "calendar" ? "pb-[calc(4.1rem+max(0.5rem,env(safe-area-inset-bottom)))]" : "pb-32"
+          }`}
+        >
           <PullToRefresh
             onRefresh={handlePullRefresh}
             disabled={

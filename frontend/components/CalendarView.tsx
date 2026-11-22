@@ -159,7 +159,8 @@ export default function CalendarView({
   }, [pendingOccurrences]);
 
   return (
-    <section className="card-inset p-2 sm:p-5">
+    // Phones: full bleed and at least one screen tall (page padding 1rem undone, header + tab bar subtracted).
+    <section className="card-inset -mx-4 flex min-h-[calc(100dvh-env(safe-area-inset-top)-8.1rem-4.1rem-max(0.5rem,env(safe-area-inset-bottom)))] flex-col rounded-none p-0.5 shadow-none sm:mx-0 sm:min-h-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
       <div className="grid grid-cols-7 gap-px mb-1 sm:mb-2">
         {weekdays.map((w, i) => (
           <div
@@ -177,7 +178,7 @@ export default function CalendarView({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
+      <div className="grid flex-1 auto-rows-[minmax(4rem,1fr)] grid-cols-7 gap-0.5 sm:auto-rows-auto sm:flex-none sm:gap-2">
         {cells.map((cell) => {
           const key = dayKey(cell);
           const inMonth = isSameMonth(cell, month);
@@ -202,14 +203,14 @@ export default function CalendarView({
               key={key}
               type="button"
               onClick={() => onDayClick(cell)}
-              className={`group relative flex flex-col items-center rounded-2xl border transition-all active:scale-[0.97] min-h-[4.5rem] sm:min-h-[7rem] py-1 sm:py-2 px-0.5 ${
+              className={`group relative flex flex-col items-center rounded-2xl border transition-all active:scale-[0.97] sm:min-h-[7rem] py-1 sm:py-2 px-0.5 ${
                 inMonth
                   ? "border-transparent hover:border-gray-200 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   : "border-transparent opacity-35"
               } ${hasTx || hasPending ? "bg-gray-50/80 dark:bg-gray-900/40" : ""}`}
             >
               <span
-                className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-sm font-medium ${
+                className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-base sm:text-sm font-medium ${
                   isToday
                     ? "bg-blue-500 font-bold text-white shadow-sm"
                     : "text-gray-800 dark:text-gray-100"
@@ -269,7 +270,7 @@ export default function CalendarView({
                       </span>
                     ) : null}
                   </span>
-                  <div className="mt-auto flex w-full flex-col items-center gap-0.5 px-0.5">
+                  <div className="mt-0.5 sm:mt-auto flex w-full flex-col items-center gap-0.5 px-0.5">
                     {hasTx && totals && scope === "ALL" ? (
                       <>
                         {(totals as AllDayTotals).cadIncome > 0 && (
