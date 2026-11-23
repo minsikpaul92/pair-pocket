@@ -41,7 +41,7 @@ Make the top header (navigation bar) and bottom tab bar translucent so content s
 Apply smooth, rounded corners to all interactive elements.
 * **Primary Action Button:** Use the signature tint color (System Blue).
   * *Classes:* `bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-xl px-4 py-3 transition-colors`
-* **Inputs & Selects:** No visible border in light mode (a transparent one keeps the size the same); a light `dark:border-gray-600` border in dark mode so the field stays visible. Add a soft focus ring. `Dropdown` and `Segmented` use `border-gray-200` in light mode and the same `dark:border-gray-600`.
+* **Inputs & Selects:** No visible border in light mode (a transparent one keeps the size the same). In dark mode a text input sits on the same color as the sheet behind it, so it gets a light `dark:border-gray-600` border. `Dropdown`, `Segmented` and buttons use a different fill, so they have no dark border (`Dropdown` and `Segmented` keep `border-gray-200` in light mode). Add a border only where the edge cannot be seen. Add a soft focus ring.
   * *Classes:* `bg-gray-50 dark:bg-gray-900 border border-transparent dark:border-gray-600 rounded-xl px-4 py-2.5 min-h-12 focus:ring-2 focus:ring-blue-500`
 * **Control height:** Form controls (`.input-field`, `Dropdown`, `Segmented`, `.btn-primary`, `Button size="lg"`) are 48px (`h-12` / `min-h-12`). Dense rows (`Dropdown size="sm"`, `Button size="sm"`, table-row inputs) are 36px (`h-9`). Tabs and chips have their own step. The Amount input in the settle/move modal keeps its large size.
 
