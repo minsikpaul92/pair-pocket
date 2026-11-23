@@ -162,7 +162,7 @@ export default function CalendarView({
 
   return (
     // Phones: 8px side margin (page padding mostly undone) and it takes all the height the page layout leaves.
-    <section className="card-inset -mx-2 flex min-h-0 flex-col rounded-3xl p-1 shadow-none sm:mx-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
+    <section className="card-inset -mx-2 flex min-h-0 flex-1 flex-col md:flex-none rounded-3xl p-1 shadow-none sm:mx-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
       <div className="grid grid-cols-7 gap-px mb-1 sm:mb-2">
         {weekdays.map((w, i) => (
           <div
@@ -180,7 +180,7 @@ export default function CalendarView({
         ))}
       </div>
 
-      <div className="grid auto-rows-[minmax(4rem,5.25rem)] grid-cols-7 gap-0.5 sm:auto-rows-auto sm:gap-2">
+      <div className="grid flex-1 auto-rows-[minmax(4rem,1fr)] grid-cols-7 gap-0.5 sm:auto-rows-auto sm:flex-none sm:gap-2">
         {cells.map((cell) => {
           const key = dayKey(cell);
           const inMonth = isSameMonth(cell, month);
