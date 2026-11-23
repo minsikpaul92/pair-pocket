@@ -66,6 +66,7 @@ import {
   resolveLayout,
   scopeCurrencies,
 } from "@/lib/dashboard-layout";
+import type { ChartPeriod } from "@/lib/chart-transactions";
 import { addMonths, monthKey, monthLabel } from "@/lib/date";
 
 type StockTotalMode = "all" | "KRW" | "CAD" | "USD";
@@ -82,7 +83,8 @@ interface Props {
   onNavigateToList?: (
     category?: string,
     subCategory?: string,
-    fromExpenseChart?: boolean
+    fromExpenseChart?: boolean,
+    period?: ChartPeriod
   ) => void;
 }
 

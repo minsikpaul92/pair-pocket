@@ -9,6 +9,7 @@ export interface WhatsNewEntry {
 }
 
 export const WHATS_NEW: WhatsNewEntry[] = [
+  { id: "chartDetailsMatchPeriod", version: "0.32.1", date: "2026-11-23" },
   { id: "settingsRework", version: "0.32.0", date: "2026-11-23" },
   { id: "lineChartCategoryDetails", version: "0.31.0", date: "2026-11-22" },
   { id: "lineChartPointDetails", version: "0.30.0", date: "2026-11-22" },

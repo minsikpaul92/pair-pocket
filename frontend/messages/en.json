@@ -1383,6 +1383,10 @@
   },
   "whatsNew": {
     "items": {
+      "chartDetailsMatchPeriod": {
+        "title": "Chart details match the period",
+        "description": "When you view the expense chart by quarter, half-year or year, the items under a slice and the list you open from it now cover the same period and add up to the same amount as the chart."
+      },
       "settingsRework": {
         "title": "Tidier settings and sub-category exclusions",
         "description": "You can now leave single sub-categories out of spending. The Partner tab shows your connection date and shared ledger start date and lets you disconnect. The App tab is reordered, and hidden accounts move to the bottom of the list. Dollar amounts in the calendar show two decimals, and donut chart icons appear right away."
