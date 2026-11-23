@@ -1121,7 +1121,7 @@ export default function DashboardView({
             {tDashboard("addGeneric")}
           </button>
         </div>
-        <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <ul className="mt-3 grid grid-cols-1 items-stretch sm:grid-cols-3 gap-3">
           {liabilityAccounts.length === 0 ? (
             <li className="col-span-full rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-6 text-center text-xs text-gray-500 dark:text-gray-400">
               {tDashboard("emptyCards")}
@@ -1132,6 +1132,7 @@ export default function DashboardView({
               // Negative card balance = overpaid / credit; keep blue, show a minus.
               const credit = acc.balance < 0;
               const isDragging = dragCardId === acc.account_id;
+              const defaults = renderDefaults(acc.account_id);
               return (
                 <li
                   key={acc.account_id}
@@ -1146,7 +1147,7 @@ export default function DashboardView({
                     e.preventDefault();
                     handleCardDrop(acc.account_id);
                   }}
-                  className={`relative ${isDragging ? "opacity-50" : ""}`}
+                  className={`relative h-full ${isDragging ? "opacity-50" : ""}`}
                 >
                   <button
                     type="button"
@@ -1157,7 +1158,7 @@ export default function DashboardView({
                       }
                       openAccountEdit(acc.account_id);
                     }}
-                    className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors"
+                    className="flex h-full w-full flex-col rounded-xl bg-gray-50 dark:bg-gray-900/50 px-3 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <GripVertical className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400 shrink-0 cursor-grab" />
@@ -1179,11 +1180,11 @@ export default function DashboardView({
                     >
                       {formatAmount(acc.balance, acc.currency)}
                     </p>
-                    {renderDefaults(acc.account_id)?.badges}
+                    {defaults?.badges ? (
+                      <div className="mt-1.5">{defaults.badges}</div>
+                    ) : null}
                   </button>
-                  <div className="absolute right-1.5 top-1.5">
-                    {renderDefaults(acc.account_id)?.menu}
-                  </div>
+                  <div className="absolute right-1.5 top-1.5">{defaults?.menu}</div>
                 </li>
               );
             })

@@ -193,6 +193,19 @@ def _month_bounds(month: str) -> tuple[datetime, datetime]:
     return start, end
 
 
+def _hide_from(sub: dict) -> datetime | None:
+    """First day a scheduled cancellation hides the item.
+
+    The end date is what the user sees ("hidden after"), and it can be edited after
+    scheduling, so it wins over cancel_effective_date (older rows may only have it).
+    """
+    end = sub.get("end_date")
+    if end and sub.get("status") == SubscriptionStatus.CANCEL_SCHEDULED.value:
+        return _calendar_day(end) + timedelta(days=1)
+    cancel_eff = sub.get("cancel_effective_date")
+    return _calendar_day(cancel_eff) if cancel_eff else None
+
+
 def subscription_visible_now(sub: dict, today: datetime | None = None) -> bool:
     today = _calendar_day(today or datetime.utcnow())
     status = sub.get("status", SubscriptionStatus.ACTIVE.value)
@@ -201,8 +214,8 @@ def subscription_visible_now(sub: dict, today: datetime | None = None) -> bool:
         SubscriptionStatus.COMPLETED.value,
     ):
         return False
-    cancel_eff = sub.get("cancel_effective_date")
-    if cancel_eff and today >= _calendar_day(cancel_eff):
+    hide_from = _hide_from(sub)
+    if hide_from and today >= hide_from:
         return False
     return True
 
@@ -215,9 +228,9 @@ def subscription_visible_in_month(
     if sub_start >= end:
         return False
 
-    cancel_eff = sub.get("cancel_effective_date")
+    cancel_eff = _hide_from(sub)
     if cancel_eff:
-        ce = _calendar_day(cancel_eff)
+        ce = cancel_eff
         if ce <= start:
             return False
         today_day = _calendar_day(today or datetime.utcnow())

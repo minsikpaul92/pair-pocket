@@ -273,6 +273,29 @@ export default function AppShell({ user, onLogout }: Props) {
     undefined
   );
   const [fromExpenseChart, setFromExpenseChart] = useState(false);
+  // Bumped when the List tab is opened, so it starts fresh (all accounts and categories).
+  const [listKey, setListKey] = useState(0);
+  // The list keeps the dashboard's scroll position otherwise, so open it at the top.
+  useEffect(() => {
+    if (view === "list") window.scrollTo({ top: 0 });
+  }, [view]);
+  // Going back from a chart's detail list lands on the expense ratio card, not the top.
+  const [scrollToExpense, setScrollToExpense] = useState(false);
+  useEffect(() => {
+    if (!scrollToExpense || view !== "dashboard") return;
+    // The card renders after the dashboard data loads, so wait for it.
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const card = document.getElementById("expense-ratio-card");
+      tries += 1;
+      if (card) card.scrollIntoView({ block: "start" });
+      if (card || tries >= 30) {
+        window.clearInterval(timer);
+        setScrollToExpense(false);
+      }
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [scrollToExpense, view]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingOccurrences, setPendingOccurrences] = useState<
     SubscriptionOccurrence[]
@@ -655,6 +678,13 @@ export default function AppShell({ user, onLogout }: Props) {
       if (view !== "settings") setPreviousView(view);
       setView("settings");
       return;
+    }
+    if (next === "list") {
+      setListCategoryFilter(undefined);
+      setListSubCategoryFilter(undefined);
+      setFromExpenseChart(false);
+      setListKey((k) => k + 1);
+      bumpVersion();
     }
     setView(next);
   }
@@ -1258,6 +1288,7 @@ export default function AppShell({ user, onLogout }: Props) {
             />
           ) : view === "list" ? (
             <ListView
+              key={listKey}
               scope={scope}
               accountType={accountType}
               presets={presets}
@@ -1273,6 +1304,7 @@ export default function AppShell({ user, onLogout }: Props) {
               onBackToDashboard={() => {
                 setView("dashboard");
                 setFromExpenseChart(false);
+                setScrollToExpense(true);
               }}
             />
           ) : view === "subscriptions" ? (

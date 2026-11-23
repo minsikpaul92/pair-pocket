@@ -371,7 +371,6 @@
     "sourceLabel": "Source",
     "selectSource": "Select source",
     "addSource": "Add source",
-    "dayMore": "+{count} more",
     "note": "Note / Description",
     "notePlaceholder": "Enter brief note or items (e.g. Groceries, Dinner)",
     "institution": "Institution / account",
@@ -1372,6 +1371,10 @@
   },
   "whatsNew": {
     "items": {
+      "lineChartCategoryDetails": {
+        "title": "Line chart categories work like the donut",
+        "description": "Under a tapped line chart point, each category now has its icon, shows its top spending when you hover, and opens its sub-categories when you tap, so you can jump to the list. The category list in the donut is more compact, a busy day in a new entry shows three rows before it scrolls, a cancelled fixed expense now disappears after its last day, and opening the List tab starts fresh with all accounts and categories."
+      },
       "lineChartPointDetails": {
         "title": "See spending for a point on the line chart",
         "description": "Tap a point on the line chart to see how much you spent in each category in that period. Categories you hid in settings, such as rent, are left out of the line chart too, just like the donut."
