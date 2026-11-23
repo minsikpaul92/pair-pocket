@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import SettlementExpenseSelect from "@/components/SettlementExpenseSelect";
 import SubCategorySelect from "@/components/SubCategorySelect";
 import Dropdown from "@/components/ui/dropdown";
+import Segmented from "@/components/ui/segmented";
 import SwipeableRow from "@/components/SwipeableRow";
 import {
   AccountType,
@@ -31,7 +32,9 @@ import {
   SUB_CATEGORY_SETTLEMENT,
   TRANSFER_CATEGORY,
   TRANSFER_SUB_CARD_REPAYMENT,
-  TRANSFER_SUB_INVESTMENT_FUNDING,
+  TRANSFER_SUB_ACCOUNT_TRANSFER,
+  TRANSFER_SUB_SHARED_FUNDING,
+  TRANSFER_SUB_SHARED_WITHDRAWAL,
   SettleableExpense,
   NewTransaction,
   SubscriptionOccurrence,
@@ -155,8 +158,9 @@ function convertCurrency(
   return amount;
 }
 
-/** Option value for settlements in the Settle/Move kind list; transfers use their sub-category name. */
+/** Settle/Move kind buttons: settlement, card repayment (its sub-category name) and one account move. */
 const MOVE_KIND_SETTLEMENT = "settlement";
+const MOVE_KIND_ACCOUNT = "move";
 
 /** Big amount: shrinks by length so a long number never overflows (never below 28px, above the iOS zoom limit). */
 function amountFontPx(length: number, focused: boolean): number {
@@ -556,26 +560,11 @@ export default function TransactionModal({
     [presets, type, category]
   );
 
-  /**
-   * Each side of a personal ↔ shared transfer is made together, so a ledger
-   * offers only the one that leaves it (공용 계좌 입금 from personal, 개인 계좌로
-   * 인출 from shared). An entry being edited keeps its own kind.
-   */
-  const moveKindOptions = useMemo(() => {
-    const editingSub = normalizeTransferSubCategory(editingTransaction?.sub_category ?? "");
-    const transfers = subCategoriesFor(presets, "expense", TRANSFER_CATEGORY).filter((sub) => {
-      const pair = pairedTransferLedgers(sub);
-      if (!pair) return true;
-      return ledgerTransfersAvailable && (pair[0] === accountType || sub === editingSub);
-    });
-    return [MOVE_KIND_SETTLEMENT, ...transfers].map((value) => ({
-      value,
-      label: translateSubCategory(
-        value === MOVE_KIND_SETTLEMENT ? SUB_CATEGORY_SETTLEMENT : value,
-        tSubCategories
-      ),
-    }));
-  }, [presets, ledgerTransfersAvailable, accountType, editingTransaction, tSubCategories]);
+  const moveKindOptions = [
+    { value: MOVE_KIND_SETTLEMENT, label: tTx("moveKindSettlement") },
+    { value: TRANSFER_SUB_CARD_REPAYMENT, label: tTx("moveKindCard") },
+    { value: MOVE_KIND_ACCOUNT, label: tTx("moveKindTransfer") },
+  ];
 
   const isInvestment =
     type === "expense" && category === EXPENSE_CATEGORY_INVESTMENT;
@@ -587,7 +576,9 @@ export default function TransactionModal({
 
   const moveKind =
     category === TRANSFER_CATEGORY
-      ? normalizeTransferSubCategory(subCategory)
+      ? normalizeTransferSubCategory(subCategory) === TRANSFER_SUB_CARD_REPAYMENT
+        ? TRANSFER_SUB_CARD_REPAYMENT
+        : MOVE_KIND_ACCOUNT
       : isSettlement
         ? MOVE_KIND_SETTLEMENT
         : "";
@@ -598,14 +589,12 @@ export default function TransactionModal({
     category === TRANSFER_CATEGORY ? pairedTransferLedgers(normalizedSub) : null;
   const isLedgerTransfer = ledgerPair !== null;
   const otherLedger: AccountType = accountType === "personal" ? "shared" : "personal";
+  // Where an account move lands: the receiving ledger of a personal ↔ shared pair, else this ledger.
+  const moveDestination: AccountType = ledgerPair ? ledgerPair[1] : accountType;
   const isCardRepayment =
     type === "expense" &&
     category === TRANSFER_CATEGORY &&
     subCategory === TRANSFER_SUB_CARD_REPAYMENT;
-  const isInvestmentFunding =
-    type === "expense" &&
-    category === TRANSFER_CATEGORY &&
-    subCategory === TRANSFER_SUB_INVESTMENT_FUNDING;
   // From/to account UI for internal moves + ledger transfers.
   const isTransfer =
     (type === "expense" && category === TRANSFER_CATEGORY) ||
@@ -862,7 +851,6 @@ export default function TransactionModal({
   const fromAccountFilter = (acc: FinancialAccount) => !acc.is_liability;
   const toAccountFilter = (acc: FinancialAccount) => {
     if (isCardRepayment) return acc.is_liability;
-    if (isInvestmentFunding) return acc.kind === "investment";
     return !acc.is_liability;
   };
   const ledgerAccounts: Record<AccountType, FinancialAccount[]> = {
@@ -1423,6 +1411,7 @@ export default function TransactionModal({
   }
 
   function handleMoveKindChange(next: string) {
+    if (next === moveKind) return;
     setSettlesExpenseId("");
     setMerchantHints([]);
     setInstitution("");
@@ -1431,12 +1420,27 @@ export default function TransactionModal({
       setCategory(INCOME_CATEGORY_SETTLEMENT);
       setSubCategory(SUB_CATEGORY_SETTLEMENT);
     } else {
-      const pair = pairedTransferLedgers(next);
-      setType(pair && accountType === pair[1] ? "income" : "expense");
+      setType("expense");
       setCategory(TRANSFER_CATEGORY);
-      setSubCategory(next);
+      setSubCategory(next === MOVE_KIND_ACCOUNT ? TRANSFER_SUB_ACCOUNT_TRANSFER : next);
     }
     // Keep saved transfer accounts when editing; only clear on create.
+    if (!isEditing) setCounterAccountId(ACCOUNT_NONE);
+    setError(null);
+  }
+
+  /** Same ledger is a balance-only move; the other ledger is stored as a linked pair. */
+  function handleMoveDestinationChange(next: AccountType) {
+    if (next === moveDestination) return;
+    setType("expense");
+    setCategory(TRANSFER_CATEGORY);
+    setSubCategory(
+      next === accountType
+        ? TRANSFER_SUB_ACCOUNT_TRANSFER
+        : accountType === "personal"
+          ? TRANSFER_SUB_SHARED_FUNDING
+          : TRANSFER_SUB_SHARED_WITHDRAWAL
+    );
     if (!isEditing) setCounterAccountId(ACCOUNT_NONE);
     setError(null);
   }
@@ -2920,17 +2924,35 @@ export default function TransactionModal({
           )}
 
           {moveTab ? (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {tTx("moveKind")}
-              </label>
-              <Dropdown
-                value={moveKind}
-                options={moveKindOptions}
-                onChange={handleMoveKindChange}
-                ariaLabel={tTx("moveKind")}
-                placeholder={tTx("moveKindPlaceholder")}
-              />
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {tTx("moveKind")}
+                </label>
+                <Segmented
+                  value={moveKind}
+                  options={moveKindOptions}
+                  onChange={handleMoveKindChange}
+                  ariaLabel={tTx("moveKind")}
+                />
+              </div>
+              {moveKind === MOVE_KIND_ACCOUNT && ledgerTransfersAvailable && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {tTx("moveDestination")}
+                  </label>
+                  <Segmented
+                    value={moveDestination}
+                    options={[
+                      { value: "personal" as const, label: tTx("moveDestinationPersonal") },
+                      { value: "shared" as const, label: tTx("moveDestinationShared") },
+                    ]}
+                    onChange={handleMoveDestinationChange}
+                    ariaLabel={tTx("moveDestination")}
+                    disabled={isEditing && isLedgerTransfer}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -3182,7 +3204,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("name", e.target.value)
                               }
-                              className="input-field py-1.5 text-base sm:text-xs"
+                              className="input-field min-h-9 py-1.5 text-base sm:text-xs"
                             />
                             <input
                               type="text"
@@ -3191,7 +3213,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("standardized_name", e.target.value)
                               }
-                              className="input-field py-1.5 text-base sm:text-xs"
+                              className="input-field min-h-9 py-1.5 text-base sm:text-xs"
                             />
                             <input
                               type="text"
@@ -3200,7 +3222,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("quantity", e.target.value)
                               }
-                              className={`input-field py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
+                              className={`input-field min-h-9 py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
                             />
                             <select
                               value={item.unit || "개"}
@@ -3211,7 +3233,7 @@ export default function TransactionModal({
                                   updateItem("unit", e.target.value);
                                 }
                               }}
-                              className="input-field py-1.5 px-1 text-base sm:text-xs w-full cursor-pointer bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                              className="input-field min-h-9 py-1.5 px-1 text-base sm:text-xs w-full cursor-pointer bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                             >
                               {availableUnits.map((u) => (
                                 <option key={u} value={u} className="text-xs py-1">
@@ -3229,7 +3251,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("unit_price", e.target.value)
                               }
-                              className={`input-field py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
+                              className={`input-field min-h-9 py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
                             />
                             <input
                               type="text"
@@ -3238,7 +3260,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("total_price", e.target.value)
                               }
-                              className={`input-field py-1.5 text-base sm:text-xs text-right font-semibold ${NO_SPIN}`}
+                              className={`input-field min-h-9 py-1.5 text-base sm:text-xs text-right font-semibold ${NO_SPIN}`}
                             />
                             <button
                               type="button"

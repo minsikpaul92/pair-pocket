@@ -593,7 +593,7 @@ export default function ListView({
             }}
             onFocus={() => setShowSearchDropdown(true)}
             placeholder={tList("searchMerchantOrNote")}
-            className="input-field pl-9 py-2 text-base sm:text-sm"
+            className="input-field border-gray-300 dark:border-gray-600 pl-9 py-2 text-base sm:text-sm"
           />
           {showSearchDropdown && searchSuggestions.length > 0 && (
             <div className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">

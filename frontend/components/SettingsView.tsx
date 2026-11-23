@@ -1142,7 +1142,7 @@ export default function SettingsView({
                     value={resetConfirmText}
                     onChange={(e) => setResetConfirmText(e.target.value)}
                     placeholder={resetPhrase}
-                    className="w-full rounded-xl border-0 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-base sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full min-h-12 rounded-xl border border-transparent dark:border-transparent bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                 </div>
 

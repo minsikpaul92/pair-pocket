@@ -391,7 +391,12 @@
     "settlementPairNote": "This entry is linked to a personal/shared settlement. Only the amount, date and note can be changed, and deleting it also deletes its counterpart.",
     "typeMove": "Settle/Move",
     "moveKind": "Kind",
-    "moveKindPlaceholder": "Select a kind",
+    "moveKindSettlement": "Settle",
+    "moveKindCard": "Card payoff",
+    "moveKindTransfer": "Transfer",
+    "moveDestination": "Move to",
+    "moveDestinationPersonal": "Personal",
+    "moveDestinationShared": "Shared",
     "settlementReceiveIn": "Receiving account ({ledger})",
     "settlementOtherLedgerHint": "This expense is in the {ledger} ledger. The account at the top pays for it.",
     "settlementOriginTitle": "Original expense",
@@ -1387,6 +1392,14 @@
   },
   "whatsNew": {
     "items": {
+      "clearerInputBorders": {
+        "title": "Easier to see inputs in dark mode",
+        "description": "In dark mode, input boxes and pickers now have a light border, so it is easy to see where to type."
+      },
+      "simplerMoveForm": {
+        "title": "Settle/Move is simpler to fill in",
+        "description": "Pick the kind with buttons. One Transfer option now covers moves between your accounts, to an investment account, and between personal and shared. Choose where it goes with the Personal or Shared button."
+      },
       "scanFinishesAllPhotos": {
         "title": "Scanning several photos now finishes",
         "description": "Scanning several photos no longer stops halfway with a \"network\" error. When a scan does fail, the photo card now says why, such as too many requests or a missing key."
