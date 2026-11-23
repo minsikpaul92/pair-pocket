@@ -1383,6 +1383,10 @@
   },
   "whatsNew": {
     "items": {
+      "settingsRework": {
+        "title": "Tidier settings and sub-category exclusions",
+        "description": "You can now leave single sub-categories out of spending. The Partner tab shows your connection date and shared ledger start date and lets you disconnect. The App tab is reordered, and hidden accounts move to the bottom of the list. Dollar amounts in the calendar show two decimals, and donut chart icons appear right away."
+      },
       "lineChartCategoryDetails": {
         "title": "Line chart categories work like the donut",
         "description": "Under a tapped line chart point, each category now has its icon, shows its top spending when you hover, and opens its sub-categories when you tap, so you can jump to the list. The category list in the donut is more compact, a busy day in a new entry shows three rows before it scrolls, a cancelled fixed expense now disappears after its last day, and opening the List tab starts fresh with all accounts and categories."

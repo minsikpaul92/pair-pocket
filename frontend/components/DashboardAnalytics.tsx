@@ -1031,6 +1031,7 @@ export default function DashboardAnalytics({
                     minAngle={3}
                     cornerRadius={4}
                     stroke="none"
+                    isAnimationActive={false}
                     labelLine={false}
                     label={(props: {
                       index: number;

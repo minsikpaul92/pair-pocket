@@ -281,22 +281,22 @@ export default function CalendarView({
                     {hasTx && totals && scope === "ALL" ? (
                       <>
                         {(totals as AllDayTotals).cadIncome > 0 && (
-                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-blue-500">
+                          <span className="max-w-full truncate text-[10px] sm:text-xs font-semibold tracking-tight whitespace-nowrap text-blue-500">
                             {formatDayAmount((totals as AllDayTotals).cadIncome, "CAD")}
                           </span>
                         )}
                         {(totals as AllDayTotals).krwIncome > 0 && (
-                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-blue-500">
+                          <span className="max-w-full truncate text-[10px] sm:text-xs font-semibold tracking-tight whitespace-nowrap text-blue-500">
                             {formatDayAmount((totals as AllDayTotals).krwIncome, "KRW")}
                           </span>
                         )}
                         {(totals as AllDayTotals).cadExpense > 0 && (
-                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-red-500">
+                          <span className="max-w-full truncate text-[10px] sm:text-xs font-semibold tracking-tight whitespace-nowrap text-red-500">
                             {formatDayAmount((totals as AllDayTotals).cadExpense, "CAD")}
                           </span>
                         )}
                         {(totals as AllDayTotals).krwExpense > 0 && (
-                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-red-500">
+                          <span className="max-w-full truncate text-[10px] sm:text-xs font-semibold tracking-tight whitespace-nowrap text-red-500">
                             {formatDayAmount((totals as AllDayTotals).krwExpense, "KRW")}
                           </span>
                         )}
@@ -304,12 +304,12 @@ export default function CalendarView({
                     ) : hasTx && totals ? (
                       <>
                         {(totals as SingleDayTotals).income > 0 && (
-                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-blue-500">
+                          <span className="max-w-full truncate text-[10px] sm:text-xs font-semibold tracking-tight whitespace-nowrap text-blue-500">
                             {formatDayAmount((totals as SingleDayTotals).income, displayCurrency)}
                           </span>
                         )}
                         {(totals as SingleDayTotals).expense > 0 && (
-                          <span className="max-w-full truncate text-xs font-semibold whitespace-nowrap text-red-500">
+                          <span className="max-w-full truncate text-[10px] sm:text-xs font-semibold tracking-tight whitespace-nowrap text-red-500">
                             {formatDayAmount((totals as SingleDayTotals).expense, displayCurrency)}
                           </span>
                         )}
