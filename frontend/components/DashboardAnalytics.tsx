@@ -105,6 +105,8 @@ interface FlowPoint {
   fullLabel: string;
   income: number;
   expense: number;
+  /** Expense by category, counted like the donut (hidden categories left out). */
+  categories: Map<string, number>;
 }
 
 interface CategorySlice {
@@ -518,6 +520,7 @@ export default function DashboardAnalytics({
   const [flowLoading, setFlowLoading] = useState(true);
   const [chartView, setChartView] = useState<"donut" | "line">("donut");
   const [flowSeries, setFlowSeries] = useState<"expense" | "income">("expense");
+  const [flowSelected, setFlowSelected] = useState<number | null>(null);
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
     {}
   );
@@ -722,7 +725,7 @@ export default function DashboardAnalytics({
 
     async function loadBucket(b: (typeof buckets)[number]): Promise<FlowPoint> {
       let income = 0;
-      let expense = 0;
+      const maps: Map<string, number>[] = [];
       for (const cur of ["CAD", "KRW"] as const) {
         if (scope !== "ALL" && scope !== cur) continue;
         const stats = await fetchStatsSummary({
@@ -734,8 +737,11 @@ export default function DashboardAnalytics({
         }).catch(() => null);
         if (!stats) continue;
         income += convertAmount(stats.total_income, cur, displayCurrency, rate);
-        expense += convertAmount(stats.adjusted_expense, cur, displayCurrency, rate);
+        maps.push(statsToExpenseMap(stats, cur, displayCurrency, rate, hiddenCategories));
       }
+      // Same total as the donut, so a tapped point adds up to its breakdown.
+      const categories = mergeExpenseMaps(maps);
+      const expense = [...categories.values()].reduce((sum, v) => sum + v, 0);
       const label =
         b.unit === "day"
           ? dayLabel.format(b.date)
@@ -748,9 +754,10 @@ export default function DashboardAnalytics({
           : b.unit === "week"
             ? `${dateLabel.format(b.date)} – ${dateLabel.format(new Date(b.end + "T00:00:00"))}`
             : `${dateLabel.format(b.date)} ${dayLabel.format(b.date)}`;
-      return { label, fullLabel, income, expense };
+      return { label, fullLabel, income, expense, categories };
     }
 
+    setFlowSelected(null);
     Promise.all(buckets.map(loadBucket))
       .then((rows) => {
         if (active) setFlow(rows);
@@ -766,7 +773,7 @@ export default function DashboardAnalytics({
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expenseRange, weekStartKey, month, version, scope, accountType, displayCurrency, rate, locale, excludeKey, showExpense, chartView]);
+  }, [expenseRange, weekStartKey, month, version, scope, accountType, displayCurrency, rate, locale, excludeKey, showExpense, chartView, hiddenCategories]);
 
   useEffect(() => {
     let active = true;
@@ -1209,7 +1216,15 @@ export default function DashboardAnalytics({
           ) : (
             <div className="mt-3 h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={flow} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <LineChart
+                  data={flow}
+                  margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                  onClick={(state) => {
+                    const i = state?.activeTooltipIndex;
+                    if (typeof i === "number") setFlowSelected(i === flowSelected ? null : i);
+                  }}
+                  className="cursor-pointer"
+                >
                   <CartesianGrid
                     strokeDasharray="3 3"
                     className="stroke-gray-200 dark:stroke-gray-700"
@@ -1248,13 +1263,70 @@ export default function DashboardAnalytics({
                     dataKey={flowSeries}
                     stroke={`var(--flow-${flowSeries})`}
                     strokeWidth={2}
-                    dot={{ r: 2.5 }}
+                    dot={(props: { cx?: number; cy?: number; index?: number }) => (
+                      <circle
+                        key={props.index}
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={props.index === flowSelected ? 5 : 2.5}
+                        fill={props.index === flowSelected ? `var(--flow-${flowSeries})` : "white"}
+                        stroke={`var(--flow-${flowSeries})`}
+                        strokeWidth={2}
+                      />
+                    )}
+                    activeDot={{ r: 5 }}
                     isAnimationActive={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           )}
+          {!flowLoading && (() => {
+            const point = flowSelected !== null ? flow[flowSelected] : undefined;
+            if (!point) {
+              return (
+                <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                  {t("flowTapHint")}
+                </p>
+              );
+            }
+            const rows = toSlices(point.categories, translate, categoryColors);
+            return (
+              <div className="mt-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {point.fullLabel}
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums text-[color:var(--flow-expense)]">
+                    {formatAmount(point.expense, displayCurrency)}
+                  </p>
+                </div>
+                {rows.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5">
+                    {rows.map((row) => (
+                      <li key={row.category} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: row.color }}
+                          />
+                          <span className="truncate text-gray-700 dark:text-gray-200">{row.name}</span>
+                        </span>
+                        <span className="shrink-0 tabular-nums text-gray-600 dark:text-gray-300">
+                          {formatAmount(row.amount, displayCurrency)}
+                          <span className="ml-1.5 text-gray-400 dark:text-gray-500">
+                            {Math.round(row.percent)}%
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t("flowNoExpense")}</p>
+                )}
+              </div>
+            );
+          })()}
         </div>
         )}
       </section>

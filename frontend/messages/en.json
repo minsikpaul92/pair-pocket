@@ -251,6 +251,8 @@
     "categoryBreakdown": "Spending by category",
     "chartDonut": "Donut",
     "chartLine": "Line",
+    "flowTapHint": "Tap a point to see what you spent on",
+    "flowNoExpense": "No spending in this period",
     "flowTitle": "Income & expenses over time",
     "trendTitle": "Income & expense trend",
     "trendRange": "{months} mo",
@@ -1370,6 +1372,10 @@
   },
   "whatsNew": {
     "items": {
+      "lineChartPointDetails": {
+        "title": "See spending for a point on the line chart",
+        "description": "Tap a point on the line chart to see how much you spent in each category in that period. Categories you hid in settings, such as rent, are left out of the line chart too, just like the donut."
+      },
       "incomeExpenseLine": {
         "title": "Income and expenses over time",
         "description": "The expense mix card can now switch between the donut and a line chart. The line chart follows the same period tabs and shows how your expenses (red) or income (blue) move by day, week or month. Tap Expense or Income to switch. Small donut slices and their icons now respond to taps, and the i next to Spending and the expense mix explains what is included."
