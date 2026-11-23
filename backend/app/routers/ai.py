@@ -103,6 +103,8 @@ async def parse_items_endpoint(
 async def parse_receipts_or_statements_stream(
     file: UploadFile = File(...),
     flow_type: str = Query("expense", description="expense | income"),
+    retry_count: int = Query(0, description="Retry count for model escalation"),
+    force_model: str | None = Query(None, description="Force specific Gemini model"),
     current_user: UserOut = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
@@ -129,10 +131,12 @@ async def parse_receipts_or_statements_stream(
                 content_type,
                 file.filename,
                 flow_type=normalized_flow,
+                retry_count=retry_count,
+                force_model=force_model,
             ):
                 yield f"data: {json.dumps(update)}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'event': 'error', 'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'event': 'error', 'reason': 'failed', 'error': str(e)})}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
 

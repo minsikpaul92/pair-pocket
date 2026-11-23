@@ -463,7 +463,7 @@ export default function AppShell({ user, onLogout }: Props) {
       }
     } catch (err: any) {
       console.error(err);
-      setScanQueueError(err.message || tScan("errorFailed"));
+      setScanQueueError(translateError(err, tErrors, "aiFailed"));
     } finally {
       setAiParsing(false);
     }

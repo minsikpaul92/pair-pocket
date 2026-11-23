@@ -851,6 +851,7 @@ async def parse_receipt_or_statement_stream(
         )
         yield {
             "event": "error",
+            "reason": "no_key",
             "error": err_msg,
             "log_id": str(log_id),
         }
@@ -858,6 +859,7 @@ async def parse_receipt_or_statement_stream(
 
     payload = _build_single_file_payload(file_bytes, mime_type, flow_type=flow_type)
     last_error: str | None = None
+    hit_quota = False
 
     async for event in generate_content_with_routing(
         db, owner_id, api_key, payload, retry_count=retry_count, force_model=force_model
@@ -900,6 +902,8 @@ async def parse_receipt_or_statement_stream(
             )
             yield {
                 "event": "error",
+                # Lets the app say "too many requests" instead of a generic failure.
+                "reason": "quota" if hit_quota else "failed",
                 "error": last_error,
                 "log_id": str(log_id),
             }
@@ -907,6 +911,10 @@ async def parse_receipt_or_statement_stream(
 
         if event["event"] == "failed":
             last_error = event.get("error", last_error)
+            if event.get("status_code") == 429:
+                hit_quota = True
+        elif event["event"] == "quota_fallback":
+            hit_quota = True
 
         yield event
 

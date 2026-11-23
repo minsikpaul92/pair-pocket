@@ -2269,31 +2269,101 @@ export interface ParsedTransaction {
   tip_percent?: number | null;
 }
 
-export async function parseReceiptsOrStatements(
-  files: File[],
-  options?: { flowType?: "expense" | "income"; retryCount?: number; forceModel?: string }
-): Promise<ParsedTransaction[]> {
+/** Error codes (in `errors`) for a failed scan, keyed by the server's reason. */
+const SCAN_ERROR_CODES: Record<string, string> = {
+  quota: "aiQuota",
+  no_key: "aiNoKey",
+};
+const SCAN_CONCURRENCY = 3;
+
+/**
+ * Scan one file over the streaming endpoint. The server sends progress right
+ * away, so a slow AI answer is not cut off by the host's 30-second limit on
+ * the first byte, which the browser would report as a network error.
+ */
+async function parseOneReceiptOrStatement(
+  file: File,
+  query: string
+): Promise<ParsedTransaction> {
   const formData = new FormData();
-  files.forEach((file) => {
-    formData.append("files", file);
-  });
-  const flowType = options?.flowType ?? "expense";
-  const retryCount = options?.retryCount ?? 0;
-  let url = `${API_BASE_URL}/api/ai/parse?flow_type=${encodeURIComponent(flowType)}&retry_count=${retryCount}`;
-  if (options?.forceModel) {
-    url += `&force_model=${encodeURIComponent(options.forceModel)}`;
-  }
-  const res = await apiFetch(url, {
+  formData.append("file", file);
+  const res = await apiFetch(`${API_BASE_URL}/api/ai/parse-stream?${query}`, {
     method: "POST",
     headers: { ...authHeaders() },
     body: formData,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => null);
-    throw new Error(err?.detail || "AI analysis failed");
+  if (!res.ok || !res.body) throw new ApiError("aiFailed");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch {
+      throw new ApiError("network");
+    }
+    if (chunk.done) break;
+    buffer += decoder.decode(chunk.value, { stream: true });
+    const messages = buffer.split("\n\n");
+    buffer = messages.pop() || "";
+    for (const message of messages) {
+      const line = message.split("\n").find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      let payload: { event?: string; reason?: string; result?: ParsedTransaction };
+      try {
+        payload = JSON.parse(line.slice(5).trim());
+      } catch {
+        continue;
+      }
+      if (payload.event === "success" && payload.result) {
+        return { ...payload.result, file_name: file.name };
+      }
+      if (payload.event === "error") {
+        throw new ApiError(SCAN_ERROR_CODES[payload.reason ?? ""] ?? "aiFailed");
+      }
+    }
   }
-  const data = await res.json();
-  return data.results as ParsedTransaction[];
+  // The stream ended without a result: the connection dropped mid-scan.
+  throw new ApiError("network");
+}
+
+/**
+ * Scan receipts or statements, a few files at a time. Files that fail are
+ * left out; if every file fails, the first file's error is thrown.
+ */
+export async function parseReceiptsOrStatements(
+  files: File[],
+  options?: { flowType?: "expense" | "income"; retryCount?: number; forceModel?: string }
+): Promise<ParsedTransaction[]> {
+  const params = new URLSearchParams({
+    flow_type: options?.flowType ?? "expense",
+    retry_count: String(options?.retryCount ?? 0),
+  });
+  if (options?.forceModel) params.set("force_model", options.forceModel);
+  const query = params.toString();
+
+  const outcomes: PromiseSettledResult<ParsedTransaction>[] = new Array(files.length);
+  let next = 0;
+  async function worker() {
+    while (next < files.length) {
+      const index = next++;
+      outcomes[index] = await parseOneReceiptOrStatement(files[index], query).then(
+        (value) => ({ status: "fulfilled", value }) as const,
+        (reason: unknown) => ({ status: "rejected", reason }) as const
+      );
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(SCAN_CONCURRENCY, files.length) }, worker)
+  );
+
+  const results = outcomes.flatMap((o) => (o.status === "fulfilled" ? [o.value] : []));
+  if (results.length === 0 && outcomes.length > 0) {
+    throw (outcomes[0] as PromiseRejectedResult).reason;
+  }
+  return results;
 }
 
 export async function parseReceiptItems(
