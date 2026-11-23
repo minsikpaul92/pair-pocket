@@ -918,7 +918,7 @@ export default function DashboardAnalytics({
   return (
     <div className="space-y-4">
       {showExpense && (
-      <section className="card-inset p-4 sm:p-5">
+      <section id="expense-ratio-card" className="card-inset p-4 sm:p-5 scroll-mt-20">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="flex items-center gap-1 text-sm font-semibold text-gray-700 dark:text-gray-200">
             {t("expenseRatio")}
@@ -1368,7 +1368,7 @@ export default function DashboardAnalytics({
                               </span>
                             </span>
                           </button>
-                          <div className="pointer-events-none absolute bottom-full right-0 z-20 hidden pb-1 group-hover:block">
+                          <div className="pointer-events-none absolute bottom-full left-1/2 z-20 hidden -translate-x-1/2 pb-1 group-hover:block">
                             <PieExpenseTooltip
                               active
                               payload={[{ payload: row, color: row.color }]}
