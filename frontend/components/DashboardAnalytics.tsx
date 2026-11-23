@@ -103,6 +103,8 @@ interface TrendPoint {
 interface FlowPoint {
   label: string;
   fullLabel: string;
+  start: string;
+  end: string;
   income: number;
   expense: number;
   /** Expense by category, counted like the donut (hidden categories left out). */
@@ -521,6 +523,8 @@ export default function DashboardAnalytics({
   const [chartView, setChartView] = useState<"donut" | "line">("donut");
   const [flowSeries, setFlowSeries] = useState<"expense" | "income">("expense");
   const [flowSelected, setFlowSelected] = useState<number | null>(null);
+  // Transactions of the tapped line point; they feed the row hover card and the sub-category popover.
+  const [pointTxs, setPointTxs] = useState<Transaction[] | null>(null);
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
     {}
   );
@@ -549,9 +553,22 @@ export default function DashboardAnalytics({
     [isWeek, weekTransactions, transactions, hiddenCategories]
   );
 
+  const flowPoint = flowSelected !== null ? flow[flowSelected] : undefined;
+  const flowPointTxs = useMemo(
+    () =>
+      (pointTxs ?? []).filter(
+        (tx) =>
+          !hiddenCategories.has(tx.category) &&
+          !hiddenCategories.has(hiddenSubKey(tx.category, tx.sub_category))
+      ),
+    [pointTxs, hiddenCategories]
+  );
+  const popoverSourceTxs =
+    chartView === "line" ? flowPointTxs : periodTransactions;
+
   const subCategoryGroupMap = useMemo(() => {
     if (!popoverCategory) return [];
-    const catTxs = (periodTransactions || []).filter(
+    const catTxs = (popoverSourceTxs || []).filter(
       (tx) => tx.category === popoverCategory && tx.type === "expense"
     );
     const map = new Map<string, { total: number; txs: Transaction[] }>();
@@ -567,7 +584,7 @@ export default function DashboardAnalytics({
       total: data.total,
       txs: data.txs,
     }));
-  }, [popoverCategory, periodTransactions]);
+  }, [popoverCategory, popoverSourceTxs]);
 
   const translate = (cat: string) => translateCategory(cat, tCategories);
 
@@ -710,6 +727,27 @@ export default function DashboardAnalytics({
     hiddenCategories,
   ]);
 
+  useEffect(() => {
+    setPointTxs(null);
+    if (!flowPoint) return;
+    let active = true;
+    fetchTransactions({
+      accountType,
+      start: flowPoint.start,
+      end: flowPoint.end,
+      currency: scope === "ALL" ? undefined : scope,
+    })
+      .then((rows) => {
+        if (active) setPointTxs(rows);
+      })
+      .catch(() => {
+        if (active) setPointTxs([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [flowPoint, accountType, scope]);
+
   // Income / expense line chart: same period as the pie, one summary per bucket.
   useEffect(() => {
     if (!showExpense || chartView !== "line") return;
@@ -754,7 +792,7 @@ export default function DashboardAnalytics({
           : b.unit === "week"
             ? `${dateLabel.format(b.date)} – ${dateLabel.format(new Date(b.end + "T00:00:00"))}`
             : `${dateLabel.format(b.date)} ${dayLabel.format(b.date)}`;
-      return { label, fullLabel, income, expense, categories };
+      return { label, fullLabel, start: b.start, end: b.end, income, expense, categories };
     }
 
     setFlowSelected(null);
@@ -1087,14 +1125,14 @@ export default function DashboardAnalytics({
                 </div>
               )}
             </div>
-            <ul className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+            <ul className="space-y-0 max-h-56 overflow-y-auto pr-1">
               {displaySlices.map((row) => {
                 const Icon = categoryIcon(row.category);
                 return (
                   <li
                     key={row.category}
                     onClick={() => setPopoverCategory(row.category)}
-                    className="flex items-center justify-between gap-3 min-w-0 p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800/80 cursor-pointer transition-colors group"
+                    className="flex items-center justify-between gap-3 min-w-0 px-1.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/80 cursor-pointer transition-colors group"
                   >
                     <div className="flex items-center gap-2 min-w-0 relative">
                       <button
@@ -1303,23 +1341,46 @@ export default function DashboardAnalytics({
                 </div>
                 {rows.length > 0 ? (
                   <ul className="mt-2 space-y-1.5">
-                    {rows.map((row) => (
-                      <li key={row.category} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: row.color }}
-                          />
-                          <span className="truncate text-gray-700 dark:text-gray-200">{row.name}</span>
-                        </span>
-                        <span className="shrink-0 tabular-nums text-gray-600 dark:text-gray-300">
-                          {formatAmount(row.amount, displayCurrency)}
-                          <span className="ml-1.5 text-gray-400 dark:text-gray-500">
-                            {Math.round(row.percent)}%
-                          </span>
-                        </span>
-                      </li>
-                    ))}
+                    {rows.map((row) => {
+                      const Icon = categoryIcon(row.category);
+                      return (
+                        <li key={row.category} className="group relative">
+                          <button
+                            type="button"
+                            onClick={() => setPopoverCategory(row.category)}
+                            className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span
+                                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                                  isLightColor(row.color) ? "text-gray-950" : "text-white"
+                                }`}
+                                style={{ backgroundColor: row.color }}
+                              >
+                                <Icon className="h-3 w-3" strokeWidth={2.25} />
+                              </span>
+                              <span className="truncate text-gray-700 dark:text-gray-200">{row.name}</span>
+                            </span>
+                            <span className="shrink-0 tabular-nums text-gray-600 dark:text-gray-300">
+                              {formatAmount(row.amount, displayCurrency)}
+                              <span className="ml-1.5 text-gray-400 dark:text-gray-500">
+                                {Math.round(row.percent)}%
+                              </span>
+                            </span>
+                          </button>
+                          <div className="pointer-events-none absolute bottom-full right-0 z-20 hidden pb-1 group-hover:block">
+                            <PieExpenseTooltip
+                              active
+                              payload={[{ payload: row, color: row.color }]}
+                              totalExpense={point.expense}
+                              displayCurrency={displayCurrency}
+                              monthTransactions={flowPointTxs}
+                              tCategories={tCategories}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t("flowNoExpense")}</p>

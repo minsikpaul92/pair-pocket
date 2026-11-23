@@ -273,6 +273,8 @@ export default function AppShell({ user, onLogout }: Props) {
     undefined
   );
   const [fromExpenseChart, setFromExpenseChart] = useState(false);
+  // Bumped when the List tab is opened, so it starts fresh (all accounts and categories).
+  const [listKey, setListKey] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingOccurrences, setPendingOccurrences] = useState<
     SubscriptionOccurrence[]
@@ -655,6 +657,13 @@ export default function AppShell({ user, onLogout }: Props) {
       if (view !== "settings") setPreviousView(view);
       setView("settings");
       return;
+    }
+    if (next === "list") {
+      setListCategoryFilter(undefined);
+      setListSubCategoryFilter(undefined);
+      setFromExpenseChart(false);
+      setListKey((k) => k + 1);
+      bumpVersion();
     }
     setView(next);
   }
@@ -1258,6 +1267,7 @@ export default function AppShell({ user, onLogout }: Props) {
             />
           ) : view === "list" ? (
             <ListView
+              key={listKey}
               scope={scope}
               accountType={accountType}
               presets={presets}

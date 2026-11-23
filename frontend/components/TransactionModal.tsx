@@ -164,9 +164,6 @@ function amountFontPx(length: number, focused: boolean): number {
   return Math.max(28, Math.min(max, Math.floor(240 / (Math.max(length, 1) * 0.6))));
 }
 
-/** Busy days show this many entries before "+N more". */
-const DAY_LIST_CAP = 4;
-
 export default function TransactionModal({
   currency,
   taxPercent = 13,
@@ -336,7 +333,6 @@ export default function TransactionModal({
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [dayListAll, setDayListAll] = useState(false);
   const [amountFocused, setAmountFocused] = useState(false);
   const [modalDragY, setModalDragY] = useState(0);
   const dragYRef = useRef(0);
@@ -2391,8 +2387,8 @@ export default function TransactionModal({
         )}
 
         {dayTransactions.length > 0 && (
-          <ul className="mt-2 card-inset divide-y divide-gray-100 dark:divide-gray-700">
-            {(dayListAll ? dayTransactions : dayTransactions.slice(0, DAY_LIST_CAP)).map((tx) => {
+          <ul className="mt-2 card-inset divide-y divide-gray-100 dark:divide-gray-700 max-h-28 overflow-y-auto">
+            {dayTransactions.map((tx) => {
               const settled = hasSettlement(tx);
               const nonCashflow = isNonCashflowTransaction(tx);
               const isSubscription = Boolean(tx.subscription_id);
@@ -2461,17 +2457,6 @@ export default function TransactionModal({
                 </li>
               );
             })}
-            {!dayListAll && dayTransactions.length > DAY_LIST_CAP && (
-              <li>
-                <button
-                  type="button"
-                  onClick={() => setDayListAll(true)}
-                  className="w-full whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-blue-600 dark:text-blue-400"
-                >
-                  {tTx("dayMore", { count: dayTransactions.length - DAY_LIST_CAP })}
-                </button>
-              </li>
-            )}
           </ul>
         )}
 

@@ -211,3 +211,15 @@ def test_dashboard_list_hides_zero_but_tab_keeps_it(db):
     dash = client.get("/api/subscriptions", params={"hide_zero": "true"}).json()
     assert len(tab) == 2
     assert [s["name"] for s in dash] == ["Paid"]
+
+
+def test_legacy_cancel_scheduled_without_effective_date_is_hidden():
+    sub = {
+        "start_date": datetime(2025, 1, 2),
+        "status": "cancel_scheduled",
+        "end_date": datetime(2026, 10, 31),
+    }
+    today = datetime(2026, 11, 22)
+    assert svc.subscription_visible_in_month(sub, "2026-10", today)
+    assert not svc.subscription_visible_in_month(sub, "2026-11", today)
+    assert not svc.subscription_visible_now(sub, today)
