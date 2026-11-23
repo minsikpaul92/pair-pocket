@@ -1393,8 +1393,8 @@
   "whatsNew": {
     "items": {
       "clearerInputBorders": {
-        "title": "입력창 테두리",
-        "description": "입력창과 선택 상자에 테두리가 생겨서 어디에 입력하는지 한눈에 보여요."
+        "title": "다크 모드 입력창이 더 잘 보여요",
+        "description": "다크 모드에서 입력창과 선택 상자에 연한 테두리가 생겨서 어디에 입력하는지 한눈에 보여요."
       },
       "simplerMoveForm": {
         "title": "정산/이동 입력이 더 간단해졌어요",

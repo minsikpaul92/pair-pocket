@@ -1393,8 +1393,8 @@
   "whatsNew": {
     "items": {
       "clearerInputBorders": {
-        "title": "Clearer input borders",
-        "description": "Input boxes and pickers now have a visible border, so it is easy to see where to type."
+        "title": "Easier to see inputs in dark mode",
+        "description": "In dark mode, input boxes and pickers now have a light border, so it is easy to see where to type."
       },
       "simplerMoveForm": {
         "title": "Settle/Move is simpler to fill in",
