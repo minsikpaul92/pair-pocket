@@ -88,6 +88,7 @@ const CATEGORY_DEFAULT_COLORS: Record<string, string> = {
 };
 
 /** Show icon inside pie slice only when the slice is large enough. */
+/** Slices under this share are too thin for an icon inside; theirs sits just outside the ring. */
 const PIE_ICON_MIN_PERCENT = 12;
 
 type PeriodRange = 1 | 3 | 6 | 12;
@@ -467,9 +468,11 @@ function PieSliceIcon({
   category: string;
   color: string;
 }) {
-  if (percent * 100 < PIE_ICON_MIN_PERCENT) return null;
   const RADIAN = Math.PI / 180;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const outside = percent * 100 < PIE_ICON_MIN_PERCENT;
+  const radius = outside
+    ? outerRadius + 11
+    : innerRadius + (outerRadius - innerRadius) * 0.5;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
   const Icon = categoryIcon(category);
@@ -477,8 +480,11 @@ function PieSliceIcon({
   return (
     <g transform={`translate(${x - 8},${y - 8})`} pointerEvents="none">
       <foreignObject width={16} height={16}>
-        <div className={`flex h-4 w-4 items-center justify-center ${isLight ? "text-gray-950" : "text-white"}`}>
-          <Icon className="h-3.5 w-3.5" strokeWidth={2.25} />
+        <div
+          className={`flex h-4 w-4 items-center justify-center rounded-full ${isLight ? "text-gray-950" : "text-white"}`}
+          style={outside ? { backgroundColor: color } : undefined}
+        >
+          <Icon className={outside ? "h-2.5 w-2.5" : "h-3.5 w-3.5"} strokeWidth={2.25} />
         </div>
       </foreignObject>
     </g>

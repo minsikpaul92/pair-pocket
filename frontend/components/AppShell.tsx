@@ -275,6 +275,10 @@ export default function AppShell({ user, onLogout }: Props) {
   const [fromExpenseChart, setFromExpenseChart] = useState(false);
   // Bumped when the List tab is opened, so it starts fresh (all accounts and categories).
   const [listKey, setListKey] = useState(0);
+  // The list keeps the dashboard's scroll position otherwise, so open it at the top.
+  useEffect(() => {
+    if (view === "list") window.scrollTo({ top: 0 });
+  }, [view]);
   // Going back from a chart's detail list lands on the expense ratio card, not the top.
   const [scrollToExpense, setScrollToExpense] = useState(false);
   useEffect(() => {
