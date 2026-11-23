@@ -13,9 +13,9 @@ interface Props {
 export default function SubscriptionOffer({ count, onStart, onDismiss }: Props) {
   const t = useTranslations("subscriptionOffer");
   return (
-    <div className="fixed inset-x-4 bottom-24 z-[120] mx-auto max-w-md rounded-2xl border border-indigo-100 bg-white p-4 shadow-xl dark:border-indigo-900/50 dark:bg-gray-900 lg:bottom-6">
+    <div className="fixed inset-x-4 bottom-24 z-[120] mx-auto max-w-md rounded-2xl border border-blue-100 bg-white p-4 shadow-xl dark:border-blue-900/50 dark:bg-gray-900 lg:bottom-6">
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300">
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
           <Repeat className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
@@ -27,7 +27,7 @@ export default function SubscriptionOffer({ count, onStart, onDismiss }: Props) 
             <button
               type="button"
               onClick={onStart}
-              className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+              className="rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700"
             >
               {t("register")}
             </button>

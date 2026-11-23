@@ -214,7 +214,7 @@ function PieExpenseTooltip({
   })();
 
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-gray-700/80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-3.5 shadow-2xl min-w-[13.5rem] transition-all">
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700/80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-3.5 shadow-2xl min-w-[13.5rem] transition">
       <div className="flex items-center justify-between gap-3 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           <span
@@ -225,13 +225,13 @@ function PieExpenseTooltip({
             {slice.name}
           </p>
         </div>
-        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded-full tabular-nums">
+        <span className="text-xs font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded-full tabular-nums">
           {percentText}%
         </span>
       </div>
 
       <div className="mt-2.5 border-t border-gray-100 dark:border-gray-800/80 pt-2">
-        <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+        <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5">
           {t("topSpending")}
         </p>
         {topItems.length > 0 ? (
@@ -261,8 +261,8 @@ function PieExpenseTooltip({
         <span className="font-semibold text-gray-500 dark:text-gray-400 tabular-nums">
           {formatAmount(slice.amount, displayCurrency)}
         </span>
-        <span className="text-xs font-black tracking-widest text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.5 rounded uppercase">
-          CLICK
+        <span className="text-xs font-semibold text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-1.5 py-0.5 rounded whitespace-nowrap">
+          {t("clickHint")}
         </span>
       </div>
     </div>
@@ -1010,7 +1010,7 @@ export default function DashboardAnalytics({
             >
               {/* Centered Total Summary (z-0 so tooltip floats on top) */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
-                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
                   {t("expenseMixTotal")}
                 </span>
                 <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums mt-0.5">
@@ -1195,7 +1195,7 @@ export default function DashboardAnalytics({
                                       handleColorChange(row.category, color);
                                       setActiveColorPicker(null);
                                     }}
-                                    className={`h-9 w-9 rounded-full border border-black/10 dark:border-white/10 transition-all hover:scale-110 active:scale-90 ${
+                                    className={`h-9 w-9 rounded-full border border-black/10 dark:border-white/10 transition hover:scale-110 active:scale-90 ${
                                       row.color.toLowerCase() === color.toLowerCase()
                                         ? "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-950 scale-105"
                                         : ""
@@ -1210,7 +1210,7 @@ export default function DashboardAnalytics({
                         </>
                       )}
 
-                      <span className="truncate text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      <span className="truncate text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {row.name}
                       </span>
                     </div>
@@ -1507,7 +1507,7 @@ export default function DashboardAnalytics({
           >
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
               <div className="flex items-center gap-2">
-                <span id="category-breakdown-title" className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                <span id="category-breakdown-title" className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold text-sm">
                   {translateCategory(popoverCategory, tCategories)}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("subCategoryBreakdown")}</span>
@@ -1534,10 +1534,10 @@ export default function DashboardAnalytics({
                       onCategoryClick?.(popoverCategory, subVal, true);
                       setPopoverCategory(null);
                     }}
-                    className="p-3 rounded-xl bg-gray-50 hover:bg-indigo-50/60 dark:bg-gray-800/60 dark:hover:bg-gray-800 transition-colors cursor-pointer border border-gray-100 dark:border-gray-700/60 group"
+                    className="p-3 rounded-xl bg-gray-50 hover:bg-blue-50/60 dark:bg-gray-800/60 dark:hover:bg-gray-800 transition-colors cursor-pointer border border-gray-100 dark:border-gray-700/60 group"
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400">
                         {subCategory === NO_SUB_CATEGORY
                           ? t("uncategorized")
                           : translateSubCategory(subCategory, tSubCategories)} ›
@@ -1554,7 +1554,7 @@ export default function DashboardAnalytics({
                         </li>
                       ))}
                       {txs.length > 3 && (
-                        <li className="text-xs text-indigo-500 font-semibold text-right pt-0.5">
+                        <li className="text-xs text-blue-500 font-semibold text-right pt-0.5">
                           {t("moreTransactions", { count: txs.length - 3 })}
                         </li>
                       )}

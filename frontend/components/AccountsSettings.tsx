@@ -270,7 +270,8 @@ export default function AccountsSettings({
         </p>
       ) : (
         <ul className="space-y-2">
-          {accounts.map((a) => {
+          {/* Hidden accounts go last; the sort is stable, so each group keeps its order. */}
+          {[...accounts].sort((x, y) => Number(y.is_active) - Number(x.is_active)).map((a) => {
             const balance = balances[a.id];
             const number = a.last_four
               ? `···${a.last_four}`

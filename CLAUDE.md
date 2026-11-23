@@ -17,6 +17,10 @@ The UI language only changes text. Read `docs/i18n-and-layout.md` before touchin
 - Keep tab, toggle and button labels short, and never let a label wrap.
 - Run `npm run check:i18n` in `frontend` before opening a pull request, and look at the screens you changed in both languages.
 
+## Amounts
+
+Dollar amounts (CAD and USD) always show two decimals everywhere an amount is displayed: lists, cards, charts, tooltips, the calendar and modals ($45.00, not $45). Won (KRW) has no decimals. Use `formatAmount` from `frontend/lib/api.ts`; if a narrow space needs a compact form (such as a calendar cell), keep the two decimals ($1.23K, $45.00). Do not add `maximumFractionDigits: 0` or `Math.round` to a dollar amount while editing a screen.
+
 ## Dropdowns
 
 Choose a single value from a list with `frontend/components/ui/dropdown.tsx` (`Dropdown`), not a raw `<select>`. It keeps every list looking and behaving the same, in both themes and at phone width. Use `size="sm"` in dense rows. Existing raw selects are being replaced over time; `npm run check:ui` fails if a file gains one.

@@ -909,7 +909,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           {selectedAccountIdFilter !== "ALL" && (
             <button
               onClick={() => setSelectedAccountIdFilter("ALL")}
-              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline transition-all bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md"
+              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline transition bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md"
             >
               {t("showAll")}
             </button>
@@ -920,7 +920,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           {/* 1. 전체 계좌 통합 카드 */}
           <button
             onClick={() => setSelectedAccountIdFilter("ALL")}
-            className={`text-left p-3.5 rounded-2xl transition-all border shrink-0 w-[148px] sm:w-[160px] snap-start ${
+            className={`text-left p-3.5 rounded-2xl transition border shrink-0 w-[148px] sm:w-[160px] snap-start ${
               selectedAccountIdFilter === "ALL"
                 ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm"
                 : "bg-gray-50 dark:bg-gray-900 border-transparent hover:border-gray-200 dark:hover:border-gray-700"
@@ -1014,7 +1014,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") setEditingAccount(acc);
                   }}
-                  className={`text-left p-3.5 rounded-2xl transition-all border w-full cursor-pointer ${
+                  className={`text-left p-3.5 rounded-2xl transition border w-full cursor-pointer ${
                     isSelected
                       ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm"
                       : "bg-gray-50 dark:bg-gray-900 border-transparent hover:border-gray-200 dark:hover:border-gray-700"
@@ -1231,7 +1231,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
           <div className="flex shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 shadow-inner">
             <button
               onClick={() => setViewMode("valuation")}
-              className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold transition ${
                 viewMode === "valuation"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1241,7 +1241,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
             </button>
             <button
               onClick={() => setViewMode("price")}
-              className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold transition ${
                 viewMode === "price"
                   ? "bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-white"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300"
@@ -1275,7 +1275,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
               resetAddForm();
               setShowAddModal(true);
             }}
-            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl shadow-md transition-all active:scale-95"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl shadow-md transition active:scale-95"
           >
             <Plus className="h-3.5 w-3.5" />
             {t("addShort")}
@@ -1573,14 +1573,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-bold py-2.5 rounded-xl transition-all"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-bold py-2.5 rounded-xl transition"
                 >
                   {t("cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-50"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-xl transition disabled:opacity-50"
                 >
                   {submitting ? t("submitting") : t("submitAdd")}
                 </button>
@@ -1676,7 +1676,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                 <button
                   type="button"
                   onClick={() => handleDeleteHolding(selectedHolding.id)}
-                  className="bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-500 p-2.5 rounded-xl transition-all"
+                  className="bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-500 p-2.5 rounded-xl transition"
                   title={t("delete")}
                 >
                   <Trash2 className="h-5 w-5" />
@@ -1688,14 +1688,14 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       setShowEditModal(false);
                       setSelectedHoldingGroup(null);
                     }}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-bold py-2.5 rounded-xl transition-all"
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-bold py-2.5 rounded-xl transition"
                   >
                     {t("cancel")}
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-50"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-xl transition disabled:opacity-50"
                   >
                     {submitting ? t("submitting") : t("submitSave")}
                   </button>
@@ -1707,7 +1707,7 @@ export default function StocksView({ accountType, ledgerScope, version, onChange
                       resetAddForm();
                       setShowAddModal(true);
                     }}
-                    className="shrink-0 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 text-blue-600 dark:text-blue-400 p-2.5 rounded-xl transition-all"
+                    className="shrink-0 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 text-blue-600 dark:text-blue-400 p-2.5 rounded-xl transition"
                     title={t("addHolding")}
                   >
                     <Plus className="h-5 w-5" />

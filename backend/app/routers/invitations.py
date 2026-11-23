@@ -82,11 +82,15 @@ async def invitation_status(
             }
         )
         if partner_doc:
+            group = await db.shared_groups.find_one(
+                {"_id": current_user.shared_group_id}
+            )
             partner = {
                 "id": str(partner_doc["_id"]),
                 "email": partner_doc["email"],
                 "name": partner_doc["name"],
                 "picture": partner_doc.get("picture"),
+                "connected_at": group.get("created_at") if group else None,
             }
 
     pending = await db[COLLECTION].find_one(

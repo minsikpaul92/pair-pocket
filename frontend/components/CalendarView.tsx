@@ -24,9 +24,12 @@ import {
 /** Short amount for a narrow day cell: $1.2K, ₩12M, $45. */
 function formatDayAmount(amount: number, currency: Currency): string {
   const symbol = currency === "KRW" ? "\u20A9" : currency === "USD" ? "US$" : "$";
+  // Dollars always show 2 decimals ($45.00, $1.23K); won has none.
+  const dollars = currency !== "KRW";
   const body = new Intl.NumberFormat("en", {
     notation: "compact",
-    maximumFractionDigits: amount >= 1000 ? 1 : 0,
+    minimumFractionDigits: dollars ? 2 : 0,
+    maximumFractionDigits: dollars ? 2 : amount >= 1000 ? 1 : 0,
   }).format(amount);
   return symbol + body;
 }
@@ -202,7 +205,7 @@ export default function CalendarView({
               key={key}
               type="button"
               onClick={() => onDayClick(cell)}
-              className={`group relative flex flex-col items-center rounded-2xl border transition-all active:scale-[0.97] sm:min-h-[7rem] py-0.5 sm:py-2 px-0.5 ${
+              className={`group relative flex flex-col items-center rounded-2xl border transition active:scale-[0.97] sm:min-h-[7rem] py-0.5 sm:py-2 px-0.5 ${
                 inMonth
                   ? "border-transparent hover:border-gray-200 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   : "border-transparent opacity-35"

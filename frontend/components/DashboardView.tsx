@@ -36,7 +36,7 @@ import {
   NetWorthSummary,
   StatsSummary,
   TRANSFER_CATEGORY,
-  normalizeTransferCategory,
+  isSpendingExcluded,
   Transaction,
   fetchAccounts,
   fetchExchangeRate,
@@ -178,8 +178,14 @@ export default function DashboardView({
   const [settingsReady, setSettingsReady] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const { defaults } = useAccountDefaults(accountType, version);
+  // Asset moves and card payments are never spending, so they are always left out.
   const excluded = useMemo(
-    () => userSettings?.spending_excluded_categories ?? [TRANSFER_CATEGORY],
+    () => [
+      ...new Set([
+        TRANSFER_CATEGORY,
+        ...(userSettings?.spending_excluded_categories ?? []),
+      ]),
+    ],
     [userSettings]
   );
   const excludeKey =
@@ -667,7 +673,7 @@ export default function DashboardView({
             t.type === "expense" &&
             t.kind !== "transfer" &&
             !t.is_stock_trade &&
-            !excluded.includes(normalizeTransferCategory(t.category))
+            !isSpendingExcluded(excluded, t.category, t.sub_category)
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
     [transactions, excluded]
@@ -1289,7 +1295,7 @@ export default function DashboardView({
                         }
                         openAccountEdit(account.account_id);
                       }}
-                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 text-left hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-all border border-gray-100 dark:border-gray-800/80"
+                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 text-left hover:shadow-sm hover:bg-gray-100 dark:hover:bg-gray-800/70 transition border border-gray-100 dark:border-gray-800/80"
                     >
                       <div className="flex items-center justify-between gap-2 min-w-0">
                         <span className="flex items-center gap-1 min-w-0 text-xs font-bold text-gray-700 dark:text-gray-300">
