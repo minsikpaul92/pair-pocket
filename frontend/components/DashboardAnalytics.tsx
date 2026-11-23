@@ -40,6 +40,13 @@ import {
 import { useEscapeKey } from "@/lib/useEscapeKey";
 import { translateCategory, translateSubCategory } from "@/lib/category-i18n";
 import { realMerchant } from "@/lib/merchant";
+import {
+  ChartPeriod,
+  ChartRules,
+  fetchChartTransactions,
+  isChartExpense,
+  loadChartRules,
+} from "@/lib/chart-transactions";
 import { addDays, addMonths, dayKey, monthKey, weekStart } from "@/lib/date";
 import { trendBuckets } from "@/lib/trend-buckets";
 
@@ -286,7 +293,8 @@ interface Props {
   onCategoryClick?: (
     category: string,
     subCategory?: string,
-    fromExpenseChart?: boolean
+    fromExpenseChart?: boolean,
+    period?: ChartPeriod
   ) => void;
 }
 
@@ -515,7 +523,9 @@ export default function DashboardAnalytics({
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() =>
     weekStart(new Date())
   );
-  const [weekTransactions, setWeekTransactions] = useState<Transaction[]>([]);
+  // Chart entries of the shown period (the month comes from the `transactions` prop).
+  const [rangeTransactions, setRangeTransactions] = useState<Transaction[]>([]);
+  const [chartRules, setChartRules] = useState<ChartRules | null>(null);
   const [trendRange, setTrendRange] = useState<PeriodRange>(6);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [trendLoading, setTrendLoading] = useState(true);
@@ -545,26 +555,35 @@ export default function DashboardAnalytics({
   const weekStartKey = dayKey(selectedWeekStart);
   const weekEndKey = dayKey(addDays(selectedWeekStart, 6));
   const isCurrentWeek = weekStartKey === dayKey(weekStart(new Date()));
-  // Tooltip / sub-category popover read the shown period, minus hidden entries.
+  const currencyFilter = scope === "ALL" ? undefined : scope;
+  // The days the shown slices cover; the details and the list opened from them use the same days.
+  const period = useMemo<ChartPeriod>(() => {
+    if (expenseRange === "week") {
+      return { start: weekStartKey, end: weekEndKey, currency: currencyFilter };
+    }
+    return {
+      start: dayKey(addMonths(month, 1 - expenseRange)),
+      end: dayKey(new Date(month.getFullYear(), month.getMonth() + 1, 0)),
+      currency: currencyFilter,
+    };
+  }, [expenseRange, weekStartKey, weekEndKey, month, currencyFilter]);
+
+  // Tooltip / sub-category popover read the shown period, with the chart's own filters.
   const periodTransactions = useMemo(
     () =>
-      (isWeek ? weekTransactions : transactions ?? []).filter(
-        (tx) =>
-          !hiddenCategories.has(tx.category) &&
-          !hiddenCategories.has(hiddenSubKey(tx.category, tx.sub_category))
-      ),
-    [isWeek, weekTransactions, transactions, hiddenCategories]
+      expenseRange === 1
+        ? (transactions ?? []).filter(
+            (tx) => chartRules && isChartExpense(tx, chartRules)
+          )
+        : rangeTransactions,
+    [expenseRange, transactions, rangeTransactions, chartRules]
   );
 
   const flowPoint = flowSelected !== null ? flow[flowSelected] : undefined;
   const flowPointTxs = useMemo(
     () =>
-      (pointTxs ?? []).filter(
-        (tx) =>
-          !hiddenCategories.has(tx.category) &&
-          !hiddenCategories.has(hiddenSubKey(tx.category, tx.sub_category))
-      ),
-    [pointTxs, hiddenCategories]
+      (pointTxs ?? []).filter((tx) => chartRules && isChartExpense(tx, chartRules)),
+    [pointTxs, chartRules]
   );
   const popoverSourceTxs =
     chartView === "line" ? flowPointTxs : periodTransactions;
@@ -636,6 +655,35 @@ export default function DashboardAnalytics({
       });
   }, [version]);
 
+  useEffect(() => {
+    let active = true;
+    loadChartRules(accountType ?? "personal").then((rules) => {
+      if (active) setChartRules(rules);
+    });
+    return () => {
+      active = false;
+    };
+  }, [version, accountType]);
+
+  // Entries behind the slices of a week or multi-month period.
+  useEffect(() => {
+    if (expenseRange === 1 || !chartRules) {
+      setRangeTransactions([]);
+      return;
+    }
+    let active = true;
+    fetchChartTransactions(accountType ?? "personal", period, chartRules)
+      .then((rows) => {
+        if (active) setRangeTransactions(rows);
+      })
+      .catch(() => {
+        if (active) setRangeTransactions([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [expenseRange, period, chartRules, accountType, version]);
+
   // Week (Sun–Sat, independent of month) or multi-month breakdown.
   useEffect(() => {
     if (expenseRange === 1) {
@@ -651,18 +699,6 @@ export default function DashboardAnalytics({
     const periods: Period[] = [];
     if (expenseRange === "week") {
       periods.push({ start: weekStartKey, end: weekEndKey });
-      fetchTransactions({
-        accountType,
-        start: weekStartKey,
-        end: weekEndKey,
-        currency: scope === "ALL" ? undefined : scope,
-      })
-        .then((rows) => {
-          if (active) setWeekTransactions(rows);
-        })
-        .catch(() => {
-          if (active) setWeekTransactions([]);
-        });
     } else {
       for (let i = expenseRange - 1; i >= 0; i -= 1) {
         periods.push({ month: monthKey(addMonths(month, -i)) });
@@ -677,6 +713,7 @@ export default function DashboardAnalytics({
           currency: "CAD",
           accountType,
           excludeCategories,
+          applyAccountExclusions: true,
         }).catch(() => null);
         maps.push(
           statsToExpenseMap(cad, "CAD", displayCurrency, rate, hiddenCategories)
@@ -688,6 +725,7 @@ export default function DashboardAnalytics({
           currency: "KRW",
           accountType,
           excludeCategories,
+          applyAccountExclusions: true,
         }).catch(() => null);
         maps.push(
           statsToExpenseMap(krw, "KRW", displayCurrency, rate, hiddenCategories)
@@ -775,6 +813,7 @@ export default function DashboardAnalytics({
           currency: cur,
           accountType,
           excludeCategories,
+          applyAccountExclusions: true,
         }).catch(() => null);
         if (!stats) continue;
         income += convertAmount(stats.total_income, cur, displayCurrency, rate);
@@ -1532,7 +1571,15 @@ export default function DashboardAnalytics({
                     key={subCategory}
                     onClick={() => {
                       const subVal = subCategory === NO_SUB_CATEGORY ? undefined : subCategory;
-                      onCategoryClick?.(popoverCategory, subVal, true);
+                      onCategoryClick?.(
+                        popoverCategory,
+                        subVal,
+                        true,
+                        // A tapped line point is a shorter period than the shown range.
+                        chartView === "line" && flowPoint
+                          ? { start: flowPoint.start, end: flowPoint.end, currency: currencyFilter }
+                          : period
+                      );
                       setPopoverCategory(null);
                     }}
                     className="p-3 rounded-xl bg-gray-50 hover:bg-blue-50/60 dark:bg-gray-800/60 dark:hover:bg-gray-800 transition-colors cursor-pointer border border-gray-100 dark:border-gray-700/60 group"
