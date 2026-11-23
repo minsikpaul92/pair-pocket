@@ -161,8 +161,8 @@ export default function CalendarView({
   }, [pendingOccurrences]);
 
   return (
-    // Phones: 8px side margin (page padding mostly undone) and it takes all the height the page layout leaves.
-    <section className="card-inset -mx-2 flex min-h-0 flex-1 flex-col md:flex-none rounded-3xl p-1 shadow-none sm:mx-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
+    // Phones: 12px margin on every side, rounded corners (page padding mostly undone) and it takes all the height the page layout leaves.
+    <section className="card-inset -mx-1 mt-1 mb-3 flex min-h-0 flex-1 flex-col md:mt-0 md:mb-0 md:flex-none rounded-[2rem] p-1 shadow-none sm:mx-0 sm:rounded-2xl sm:p-5 sm:shadow-sm">
       <div className="grid grid-cols-7 gap-px mb-1 sm:mb-2">
         {weekdays.map((w, i) => (
           <div
