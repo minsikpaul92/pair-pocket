@@ -577,6 +577,7 @@
     "dividends": "투자 배당금",
     "bankInterest": "은행 이자",
     "taxRefund": "정부 환급금(HST/Tax Refund)",
+    "expenseReimbursement": "비용 환급",
     "sharedWithdrawal": "개인 계좌로 인출"
   },
   "subscriptions": {
@@ -1386,6 +1387,10 @@
       "settlementReceiveAccount": {
         "title": "정산금 받을 계좌를 고를 수 있어요",
         "description": "정산을 입력할 때 정산금을 낸 곳 바로 아래에서 돈을 받은 계좌를 고를 수 있어요. 고른 계좌 잔액에 정산금이 더해져요."
+      },
+      "reimbursementCategory": {
+        "title": "비용 환급 분류가 생겼어요",
+        "description": "수입의 금융/기타에서 비용 환급을 고를 수 있어요. 앱에 지출로 적지 않은 돈을 돌려받았을 때 쓰면 돼요."
       },
       "chartDetailsMatchPeriod": {
         "title": "차트 상세가 기간과 일치해요",

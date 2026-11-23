@@ -10,6 +10,7 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: WhatsNewEntry[] = [
   { id: "settlementReceiveAccount", version: "0.34.0", date: "2026-11-24" },
+  { id: "reimbursementCategory", version: "0.33.0", date: "2026-11-24" },
   { id: "chartDetailsMatchPeriod", version: "0.32.1", date: "2026-11-23" },
   { id: "settingsRework", version: "0.32.0", date: "2026-11-23" },
   { id: "lineChartCategoryDetails", version: "0.31.0", date: "2026-11-22" },

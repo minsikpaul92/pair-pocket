@@ -577,6 +577,7 @@
     "dividends": "Investment dividends",
     "bankInterest": "Bank interest",
     "taxRefund": "Government refund (HST/Tax)",
+    "expenseReimbursement": "Reimbursements",
     "sharedWithdrawal": "Shared to personal transfer"
   },
   "subscriptions": {
@@ -1386,6 +1387,10 @@
       "settlementReceiveAccount": {
         "title": "Choose where a settlement lands",
         "description": "When you enter a settlement, pick the account that received the money right below where it came from. The amount is added to that account balance."
+      },
+      "reimbursementCategory": {
+        "title": "New Reimbursements category",
+        "description": "You can now pick Reimbursements under Finance/Other income. Use it for money paid back for costs you did not log as expenses."
       },
       "chartDetailsMatchPeriod": {
         "title": "Chart details match the period",
