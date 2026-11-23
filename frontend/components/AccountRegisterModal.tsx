@@ -338,7 +338,7 @@ export default function AccountRegisterModal({
               <select
                 value={selectedCurrency}
                 onChange={(e) => setSelectedCurrency(e.target.value as Currency)}
-                className="input-field bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-3.5 py-2 text-base sm:text-sm focus:border-blue-500 focus:outline-none dark:text-white"
+                className="input-field rounded-xl px-3.5 py-2 text-base sm:text-sm focus:border-blue-500 focus:outline-none dark:text-white"
               >
                 <option value="KRW">KRW (₩)</option>
                 <option value="CAD">CAD (C$)</option>

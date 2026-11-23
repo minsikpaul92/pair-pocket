@@ -1392,6 +1392,10 @@
   },
   "whatsNew": {
     "items": {
+      "clearerInputBorders": {
+        "title": "Clearer input borders",
+        "description": "Input boxes and pickers now have a visible border, so it is easy to see where to type."
+      },
       "simplerMoveForm": {
         "title": "Settle/Move is simpler to fill in",
         "description": "Pick the kind with buttons. One Transfer option now covers moves between your accounts, to an investment account, and between personal and shared. Choose where it goes with the Personal or Shared button."

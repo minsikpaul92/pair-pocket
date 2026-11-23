@@ -160,7 +160,7 @@ body {
 
   /* design.md §4-C inputs; at least 16px on phones so iOS does not zoom on focus */
   .input-field {
-    @apply w-full bg-gray-50 dark:bg-gray-900 border-0 rounded-xl px-4 py-3 max-sm:text-base focus:ring-2 focus:ring-blue-500 outline-none;
+    @apply w-full min-h-12 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2.5 max-sm:text-base focus:ring-2 focus:ring-blue-500 outline-none;
   }
 
   /* design.md §6 placeholders use the secondary text color */
@@ -175,7 +175,7 @@ body {
 
   /* design.md §4-C primary button */
   .btn-primary {
-    @apply bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-xl px-4 py-3 transition-colors;
+    @apply bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-xl px-4 py-2.5 min-h-12 transition-colors;
   }
 }
 

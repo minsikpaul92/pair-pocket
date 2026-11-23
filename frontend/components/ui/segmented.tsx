@@ -25,10 +25,10 @@ export default function Segmented<T extends string>({
           disabled={disabled}
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`flex-1 whitespace-nowrap rounded-xl border px-2 py-3 text-sm font-semibold shadow-sm transition-all duration-100 enabled:active:translate-y-px enabled:active:scale-95 enabled:active:shadow-none disabled:cursor-not-allowed ${
+          className={`flex-1 whitespace-nowrap rounded-xl border px-2 h-12 text-sm font-semibold shadow-sm transition-all duration-100 enabled:active:translate-y-px enabled:active:scale-95 enabled:active:shadow-none disabled:cursor-not-allowed ${
             value === o.value
               ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500"
-              : "border-gray-200 bg-white text-gray-600 enabled:hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:enabled:hover:bg-gray-700"
+              : "border-gray-300 bg-white text-gray-600 enabled:hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:enabled:hover:bg-gray-700"
           } ${disabled && value !== o.value ? "opacity-50" : ""}`}
         >
           {o.label}
