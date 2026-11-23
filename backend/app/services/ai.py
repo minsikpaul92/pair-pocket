@@ -315,7 +315,7 @@ def _receipt_prompt(flow_type: str = "expense") -> str:
             "- Category: '부수입' -> sub_category must be exactly one of: '파트타임', '부업', '중고거래', '팁(Tip)'\n"
             "- Category: '정산' -> sub_category must be exactly: 'N빵 정산/환급'\n"
             "- Category: '금융/기타' -> sub_category must be exactly one of: "
-            "'주식 판매수익', '투자 배당금', '은행 이자', '정부 환급금(HST/Tax Refund)'\n"
+            "'주식 판매수익', '투자 배당금', '은행 이자', '정부 환급금(HST/Tax Refund)', '비용 환급'\n"
             "Ignore expense receipts; only extract income / deposit / payroll / refund style amounts.\n"
         )
         merchant_hint = (

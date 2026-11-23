@@ -84,6 +84,7 @@ export const SUB_CATEGORY_KEY_BY_VALUE: Record<string, string> = {
   "투자 배당금": "dividends",
   "은행 이자": "bankInterest",
   "정부 환급금(HST/Tax Refund)": "taxRefund",
+  "비용 환급": "expenseReimbursement",
 };
 
 export function categoryI18nKey(value: string): string | null {
@@ -198,6 +199,7 @@ const SUB_CATEGORY_VALUE_BY_ENGLISH: Record<string, string> = {
   "Investment dividends": "투자 배당금",
   "Bank interest": "은행 이자",
   "Government refund (HST/Tax)": "정부 환급금(HST/Tax Refund)",
+  Reimbursements: "비용 환급",
 };
 
 /** Map CSV/UI category text (KO or EN) to the canonical Korean value. */
