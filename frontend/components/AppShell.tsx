@@ -88,6 +88,11 @@ import {
   Subscription,
   SubscriptionDraft,
 } from "@/lib/api";
+import {
+  ChartPeriod,
+  fetchChartTransactions,
+  loadChartRules,
+} from "@/lib/chart-transactions";
 import { addMonths, dayKey, isoDayKey, monthKey, monthLabel, parseDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
@@ -273,6 +278,9 @@ export default function AppShell({ user, onLogout }: Props) {
     undefined
   );
   const [fromExpenseChart, setFromExpenseChart] = useState(false);
+  // The days a tapped chart slice covers; the list then shows that period's chart entries.
+  const [listPeriod, setListPeriod] = useState<ChartPeriod | null>(null);
+  const [chartListTxs, setChartListTxs] = useState<Transaction[]>([]);
   // Bumped when the List tab is opened, so it starts fresh (all accounts and categories).
   const [listKey, setListKey] = useState(0);
   // The list keeps the dashboard's scroll position otherwise, so open it at the top.
@@ -683,6 +691,7 @@ export default function AppShell({ user, onLogout }: Props) {
       setListCategoryFilter(undefined);
       setListSubCategoryFilter(undefined);
       setFromExpenseChart(false);
+      setListPeriod(null);
       setListKey((k) => k + 1);
       bumpVersion();
     }
@@ -725,6 +734,23 @@ export default function AppShell({ user, onLogout }: Props) {
       /* non-blocking */
     });
   }, [accountType, tabsReady]);
+
+  // A list opened from a chart slice shows the entries the slices were built from.
+  useEffect(() => {
+    if (!listPeriod || view !== "list") return;
+    let active = true;
+    loadChartRules(accountType)
+      .then((rules) => fetchChartTransactions(accountType, listPeriod, rules))
+      .then((rows) => {
+        if (active) setChartListTxs(rows);
+      })
+      .catch(() => {
+        if (active) setChartListTxs([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [listPeriod, view, accountType, version]);
 
   // Load ledger transactions / pending for the selected month & scope.
   useEffect(() => {
@@ -1292,8 +1318,8 @@ export default function AppShell({ user, onLogout }: Props) {
               scope={scope}
               accountType={accountType}
               presets={presets}
-              transactions={transactions}
-              pendingOccurrences={pendingOccurrences}
+              transactions={listPeriod ? chartListTxs : transactions}
+              pendingOccurrences={listPeriod ? [] : pendingOccurrences}
               onEditTransaction={openEdit}
               onAddTransaction={() => openModal(new Date())}
               onDeleted={bumpVersion}
@@ -1367,10 +1393,12 @@ export default function AppShell({ user, onLogout }: Props) {
                 setSettingsTab("dashboard");
                 setView("settings");
               }}
-              onNavigateToList={(cat, subCat, fromChart) => {
+              onNavigateToList={(cat, subCat, fromChart, period) => {
                 setListCategoryFilter(cat);
                 setListSubCategoryFilter(subCat || "all");
                 setFromExpenseChart(!!fromChart);
+                setChartListTxs([]);
+                setListPeriod(fromChart ? period ?? null : null);
                 setView("list");
               }}
             />
