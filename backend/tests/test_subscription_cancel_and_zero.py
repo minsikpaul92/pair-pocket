@@ -223,3 +223,13 @@ def test_legacy_cancel_scheduled_without_effective_date_is_hidden():
     assert svc.subscription_visible_in_month(sub, "2026-10", today)
     assert not svc.subscription_visible_in_month(sub, "2026-11", today)
     assert not svc.subscription_visible_now(sub, today)
+
+
+def test_edited_end_date_wins_over_cancel_effective_date():
+    sub = {
+        "start_date": datetime(2026, 9, 2),
+        "status": "cancel_scheduled",
+        "end_date": datetime(2026, 10, 31),
+        "cancel_effective_date": datetime(2026, 12, 2),
+    }
+    assert not svc.subscription_visible_in_month(sub, "2026-11", datetime(2026, 11, 22))

@@ -194,14 +194,16 @@ def _month_bounds(month: str) -> tuple[datetime, datetime]:
 
 
 def _hide_from(sub: dict) -> datetime | None:
-    """First day a scheduled cancellation hides the item (older rows only stored end_date, the day before)."""
-    cancel_eff = sub.get("cancel_effective_date")
-    if cancel_eff:
-        return _calendar_day(cancel_eff)
+    """First day a scheduled cancellation hides the item.
+
+    The end date is what the user sees ("hidden after"), and it can be edited after
+    scheduling, so it wins over cancel_effective_date (older rows may only have it).
+    """
     end = sub.get("end_date")
     if end and sub.get("status") == SubscriptionStatus.CANCEL_SCHEDULED.value:
         return _calendar_day(end) + timedelta(days=1)
-    return None
+    cancel_eff = sub.get("cancel_effective_date")
+    return _calendar_day(cancel_eff) if cancel_eff else None
 
 
 def subscription_visible_now(sub: dict, today: datetime | None = None) -> bool:
