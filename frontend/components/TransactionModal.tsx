@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, ChevronDown, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateCw } from "lucide-react";
+import { Camera, Check, ChevronDown, Loader2, SkipForward, Trash2, X, Plus, ImagePlus, Play, RotateCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatTaxPercent } from "@/lib/canada-tax";
@@ -445,7 +445,7 @@ export default function TransactionModal({
     setScanning(true);
     setScanHint(
       nextRetry >= 2
-        ? "⚡ 고성능 AI 모델(gemini-3.8-flash)로 정밀 스캔 중..."
+        ? tTx("scanningRetry")
         : tTx("scanning")
     );
     setError(null);
@@ -2523,7 +2523,7 @@ export default function TransactionModal({
                 setDragOverModal(false);
                 addScanQueueFiles(e.dataTransfer.files);
               }}
-              className={`relative rounded-2xl border-2 border-dashed p-2.5 space-y-2 transition-all duration-150 ${
+              className={`relative rounded-2xl border-2 border-dashed p-2.5 space-y-2 transition duration-150 ${
                 dragOverModal
                   ? "border-blue-500 bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500/30 scale-[1.01]"
                   : "border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/20"
@@ -2684,7 +2684,7 @@ export default function TransactionModal({
                           i === queueIndex && "ring-2 ring-purple-500"
                         )}
                       >
-                        {st === "saved" ? "✓" : i + 1}
+                        {st === "saved" ? <Check className="mx-auto h-3.5 w-3.5" aria-hidden /> : i + 1}
                       </button>
                     );
                   })}
@@ -2969,7 +2969,7 @@ export default function TransactionModal({
                       ]);
                     }
                   }}
-                  className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold shrink-0"
+                  className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shrink-0"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {tTx("itemsAdd")}
@@ -2994,7 +2994,7 @@ export default function TransactionModal({
                     disabled={itemsScanning}
                     onClick={() => itemsScanInputRef.current?.click()}
                     title="영수증 촬영"
-                    className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                    className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-40 transition-colors"
                   >
                     <Camera className="h-4 w-4" />
                   </button>
@@ -3003,7 +3003,7 @@ export default function TransactionModal({
                     disabled={itemsScanning}
                     onClick={() => itemsScanInputRef.current?.click()}
                     title="사진 선택"
-                    className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                    className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-40 transition-colors"
                   >
                     <ImagePlus className="h-4 w-4" />
                   </button>
@@ -3034,7 +3034,7 @@ export default function TransactionModal({
                       disabled={itemsScanning}
                       onClick={() => itemsScanInputRef.current?.click()}
                       title="영수증 촬영"
-                      className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                      className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-40 transition-colors"
                     >
                       <Camera className="h-4 w-4" />
                     </button>
@@ -3043,7 +3043,7 @@ export default function TransactionModal({
                       disabled={itemsScanning}
                       onClick={() => itemsScanInputRef.current?.click()}
                       title="사진 선택"
-                      className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 disabled:opacity-40 transition-colors"
+                      className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-40 transition-colors"
                     >
                       <ImagePlus className="h-4 w-4" />
                     </button>
@@ -3062,7 +3062,7 @@ export default function TransactionModal({
                           },
                         ]);
                       }}
-                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold flex items-center gap-0.5 ml-1"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold flex items-center gap-0.5 ml-1"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       {tCommon("add")}
@@ -3189,7 +3189,7 @@ export default function TransactionModal({
                                   {u}
                                 </option>
                               ))}
-                              <option value="__add__" className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 py-1">
+                              <option value="__add__" className="text-xs font-semibold text-blue-600 dark:text-blue-400 py-1">
                                 + 단위 추가
                               </option>
                             </select>

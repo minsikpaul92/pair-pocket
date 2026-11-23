@@ -278,7 +278,7 @@ export default function TourOverlay({
 
   if (typeof document === "undefined") return null;
 
-  const scrim = "pointer-events-auto fixed bg-black/60 motion-safe:transition-all motion-safe:duration-200";
+  const scrim = "pointer-events-auto fixed bg-black/60 motion-safe:transition-[top,left,width,height] motion-safe:duration-200";
   const cardStyle: CSSProperties | undefined =
     layout === "float"
       ? {
@@ -314,7 +314,7 @@ export default function TourOverlay({
           />
           <div
             aria-hidden
-            className="pointer-events-none fixed rounded-xl ring-2 ring-white/90 shadow-[0_0_0_4px_rgba(59,130,246,0.55)] motion-safe:transition-all motion-safe:duration-200"
+            className="pointer-events-none fixed rounded-xl ring-2 ring-white/90 shadow-[0_0_0_4px_rgba(59,130,246,0.55)] motion-safe:transition-[top,left,width,height] motion-safe:duration-200"
             style={{ top: hole.top, left: hole.left, width: hole.width, height: hole.height }}
           />
         </>

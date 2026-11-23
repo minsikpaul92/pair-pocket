@@ -27,6 +27,8 @@ class PartnerSummary(BaseModel):
     email: EmailStr
     name: str
     picture: str | None = None
+    # When the two of you linked; None right after accepting (the client refetches).
+    connected_at: datetime | None = None
 
 
 class InvitationOut(BaseModel):

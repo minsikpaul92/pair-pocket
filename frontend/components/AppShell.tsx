@@ -940,7 +940,7 @@ export default function AppShell({ user, onLogout }: Props) {
   return (
     <div className="min-h-dvh bg-gray-50 dark:bg-black">
       <aside
-        className={`hidden md:flex fixed inset-y-0 left-0 ${sidebarWidth} flex-col border-r glass-bar bg-white/60 dark:bg-gray-900/40 backdrop-blur-xl px-3 py-6 transition-all duration-200`}
+        className={`hidden md:flex fixed inset-y-0 left-0 ${sidebarWidth} flex-col border-r glass-bar bg-white/60 dark:bg-gray-900/40 backdrop-blur-xl px-3 py-6 transition-[width] duration-200`}
       >
         <div
           className={`flex ${navCollapsed ? "flex-col items-center gap-2" : "items-center gap-2"} px-1`}
@@ -1058,7 +1058,7 @@ export default function AppShell({ user, onLogout }: Props) {
       </aside>
 
       <div
-        className={`${mainPad} transition-all duration-200 ${
+        className={`${mainPad} transition-[padding] duration-200 ${
           // Calendar on phones: the page is exactly one screen tall and the grid takes what is left.
           view === "calendar" ? "max-md:flex max-md:min-h-dvh max-md:flex-col" : ""
         }`}
@@ -1348,6 +1348,7 @@ export default function AppShell({ user, onLogout }: Props) {
               onChanged={bumpVersion}
               onInvite={handleInvite}
               onLogout={handleLogout}
+              onUnlinked={handleInviteUnlinked}
               partner={partner}
               accountType={accountType}
               scope={scope}
@@ -1465,7 +1466,7 @@ export default function AppShell({ user, onLogout }: Props) {
             )}
 
             {scanRestored > 0 && (
-              <p className="text-xs text-indigo-600 dark:text-indigo-400">
+              <p className="text-xs text-blue-600 dark:text-blue-400">
                 {tScan("restored", { count: scanRestored })}
               </p>
             )}

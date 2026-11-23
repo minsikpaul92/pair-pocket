@@ -271,6 +271,7 @@
     "nextWeek": "다음 주",
     "hiddenCategoriesNote": "설정에서 숨긴 카테고리 {count}개는 제외됩니다.",
     "topSpending": "주요 사용처",
+    "clickHint": "탭하여 보기",
     "otherSpending": "기타",
     "subCategoryBreakdown": "소비 내역 (중분류)",
     "uncategorized": "미분류",
@@ -305,6 +306,7 @@
     "scanExpense": "지출 영수증 / 명세서 스캔",
     "scanIncome": "수입 전표 / 입금 스캔",
     "scanning": "분석 중…",
+    "scanningRetry": "고성능 AI 모델(gemini-3.8-flash)로 정밀 스캔 중...",
     "scanFilled": "스캔 결과로 항목을 채웠어요. 확인 후 저장하세요.",
     "scanEmpty": "스캔 결과에서 거래를 찾지 못했어요.",
     "scanFailed": "AI 스캔에 실패했습니다.",
@@ -1031,7 +1033,7 @@
     "budgetAccountsTitle": "예산에 포함할 계좌",
     "budgetAccountsHelp": "체크한 계좌에서 쓴 지출만 월 예산과 대시보드 지출에 잡혀요. 처음에는 저축 계좌만 빠져 있어요.",
     "excludeTitle": "지출에서 제외할 항목",
-    "excludeHelp": "체크한 카테고리는 대시보드의 지출, 예산 계산, 지출 비율 차트, 지출 내역에서 빠져요. 카드값 결제 같은 자산 이동은 기본으로 제외돼요.",
+    "excludeHelp": "눌러서 제외한 카테고리나 중분류는 대시보드의 지출, 예산 계산, 지출 비율 차트, 지출 내역에서 빠져요. 카드값 결제 같은 자산 이동은 항상 제외돼서 고르지 않아도 돼요.",
     "layoutTitle": "대시보드 카드",
     "layoutHelp": "보일 카드를 고르세요. 순서는 대시보드에서 손잡이를 끌어 바꾸고, 모바일에서는 카드를 꾹 누른 채 옮기세요.",
     "layoutReset": "기본값으로 되돌리기",
@@ -1117,12 +1119,12 @@
         "hint": "원화 계좌와 내역"
       }
     },
-    "salesTaxTitle": "판매세",
+    "salesTaxTitle": "세금 지역",
     "salesTaxHelp": "거주하는 주를 고르세요. 지출을 추가할 때 그 주의 GST, HST, PST 세율로 세금을 추정해요. 세금은 직접 고칠 수도 있어요.",
     "salesTaxRate": "세율: {rate}%",
     "salesTaxError": "저장하지 못했습니다. 다시 시도해 주세요.",
-    "expenseRatioHiddenTitle": "지출 비율에서 숨길 카테고리",
-    "expenseRatioHiddenHelp": "선택한 카테고리나 중분류는 대시보드 지출 비율 차트에서 빠집니다. 월세처럼 큰 고정비를 빼면 나머지 소비 흐름이 잘 보입니다. 지출 합계와 내역에는 그대로 남습니다.",
+    "expenseRatioHiddenTitle": "차트에서 숨길 카테고리",
+    "expenseRatioHiddenHelp": "선택한 카테고리나 중분류는 대시보드 차트에서 빠집니다. 월세처럼 큰 고정비를 빼면 나머지 소비 흐름이 잘 보입니다. 지출 합계와 내역에는 그대로 남습니다.",
     "expenseRatioHiddenError": "저장하지 못했습니다. 다시 시도해 주세요.",
     "expenseRatioHiddenSubToggle": "중분류",
     "expenseRatioHiddenSubCount": "중분류 {count}개 숨김",
@@ -1167,7 +1169,17 @@
     "matchError": "저장하지 못했어요. 다시 시도해 주세요.",
     "partnerTitle": "파트너",
     "partnerHelp": "파트너를 초대하면 공유 가계부를 함께 쓰고 정산할 수 있어요.",
-    "partnerConnected": "{name}님과 연결되어 있어요. 공유 가계부와 정산을 함께 쓰고 있어요."
+    "partnerConnected": "{name}님과 연결되어 있어요. 공유 가계부와 정산을 함께 쓰고 있어요.",
+    "excludeSubCount": "중분류 {count}개 제외",
+    "partnerConnectedSince": "연결일",
+    "partnerUnlink": "연결 해제",
+    "partnerUnlinkConfirm": "{name}님과의 파트너 연결을 해제할까요?",
+    "partnerUnlinkInfoLabel": "연결 해제 안내",
+    "partnerUnlinkInfo": "연결을 해제해도 공유 가계부 기록은 지워지지 않고 보관돼요. 다시 연결하면 새 공유 가계부로 시작해요.",
+    "partnerUnlinked": "파트너 연결을 해제했어요.",
+    "deleteAccountTitle": "계정 삭제",
+    "deleteAccountHelp": "계정과 모든 데이터를 영구적으로 삭제해요. 아직 준비 중이에요.",
+    "deleteAccountSoon": "준비 중"
   },
   "onboarding": {
     "title": "시작하기",
@@ -1371,6 +1383,10 @@
   },
   "whatsNew": {
     "items": {
+      "settingsRework": {
+        "title": "설정 정리와 중분류 제외",
+        "description": "지출에서 제외할 항목을 중분류까지 고를 수 있어요. 파트너 탭에서 연결일과 공유 가계부 시작일을 보고, 연결을 해제할 수 있어요. 앱 탭은 업데이트, 언어, 국가 순으로 다시 정리했고, 숨긴 계좌는 목록 맨 아래로 가요. 달력의 달러 금액에는 소수점 둘째 자리까지 보이고, 도넛 차트의 아이콘은 바로 나타나요."
+      },
       "lineChartCategoryDetails": {
         "title": "선형 차트도 도넛처럼 눌러서 보기",
         "description": "선형 차트에서 점을 누르면 카테고리마다 아이콘이 보이고, 마우스를 올리면 상위 지출이, 누르면 중분류가 나와 목록으로 바로 이동할 수 있어요. 도넛의 카테고리 목록은 더 촘촘해졌고, 새 거래에서 같은 날 내역은 3개까지 보이고 그 이상은 스크롤로 볼 수 있어요. 해지 예정인 고정지출은 마지막 날 이후 사라지고, 목록 탭을 열면 전체 계좌와 전체 카테고리로 새로 시작해요."

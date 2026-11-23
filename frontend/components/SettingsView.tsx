@@ -20,6 +20,8 @@ import {
   Globe,
   Receipt,
   RefreshCw,
+  Trash2,
+  Unlink,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -31,11 +33,14 @@ import ThemeToggle from "@/components/ThemeToggle";
 import DayPicker from "@/components/DayPicker";
 import GeminiKeyGuide from "@/components/GeminiKeyGuide";
 import ExpenseRatioHiddenSettings from "@/components/ExpenseRatioHiddenSettings";
+import InfoTip from "@/components/InfoTip";
+import Dropdown from "@/components/ui/dropdown";
 import {
   fetchUserSettings,
   saveGeminiApiKey,
   setSalesTaxProvince,
   setShareGeminiApiKey,
+  unlinkPartnership,
   updateLedgerStartDate,
   resetUserData,
   updateActiveLocale,
@@ -55,6 +60,7 @@ import {
   salesTaxPercent,
 } from "@/lib/canada-tax";
 import { dayKey } from "@/lib/date";
+import { translateError } from "@/lib/errors";
 import { rememberUserLocale } from "@/lib/user-locale";
 import type { BankCountry } from "@/lib/banks";
 import {
@@ -70,6 +76,7 @@ interface Props {
   onChanged: () => void;
   onInvite?: () => void;
   onLogout?: () => void;
+  onUnlinked?: () => void;
   partner?: PartnerSummary | null;
   accountType: AccountType;
   scope: LedgerScope;
@@ -138,10 +145,21 @@ function parseISODate(value: string | null | undefined): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+/** The server sends UTC without a zone mark; read it as UTC so the day is right. */
+function formatConnectedDate(iso: string, locale: string): string {
+  const zoned = /(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`;
+  return new Date(zoned).toLocaleDateString(locale, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export default function SettingsView({
   onChanged,
   onInvite,
   onLogout,
+  onUnlinked,
   partner = null,
   accountType,
   scope,
@@ -152,6 +170,7 @@ export default function SettingsView({
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
   const tProvinces = useTranslations("provinces");
+  const tErrors = useTranslations("errors");
   const locale = useLocale() as AppLocale;
   const pathname = usePathname();
   const router = useRouter();
@@ -292,6 +311,25 @@ export default function SettingsView({
       setErrorMsg(message || t("shareKeyError"));
     } finally {
       setSharingKey(false);
+    }
+  }
+
+  const [unlinking, setUnlinking] = useState(false);
+
+  async function handleUnlink() {
+    if (!partner || unlinking) return;
+    if (!window.confirm(t("partnerUnlinkConfirm", { name: partner.name }))) return;
+    setUnlinking(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await unlinkPartnership();
+      setSuccessMsg(t("partnerUnlinked"));
+      onUnlinked?.();
+    } catch (err) {
+      setErrorMsg(translateError(err, tErrors, "unlinkPartnership"));
+    } finally {
+      setUnlinking(false);
     }
   }
 
@@ -463,47 +501,6 @@ export default function SettingsView({
             onChanged={onChanged}
           />
                 <AccountDefaultsSettings accountType={accountType} scope={scope} />
-                <section className="card-inset p-5 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-                    <CalendarDays className="h-5 w-5 text-blue-500" />
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {hasPartner ? t("personalStartDateTitle") : t("startDateTitle")}
-                    </h2>
-                    {savingStartDate && (
-                      <Loader2 className="ml-auto h-4 w-4 animate-spin text-blue-500" />
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {hasPartner ? t("personalStartDateHelp") : t("startDateHelp")}
-                  </p>
-                  <DayPicker
-                    value={parseISODate(settings?.ledger_start_date)}
-                    onChange={(next) => handleStartDateChange(next, "personal")}
-                    locale={locale}
-                    disabled={savingStartDate}
-                  />
-                </section>
-                {hasPartner && (
-                  <section className="card-inset p-5 space-y-3">
-                    <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-                      <CalendarDays className="h-5 w-5 text-blue-500" />
-                      <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                        {t("sharedStartDateTitle")}
-                      </h2>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                      {t("sharedStartDateHelp")}
-                    </p>
-                    <DayPicker
-                      value={parseISODate(
-                        settings?.shared_ledger_start_date || settings?.ledger_start_date
-                      )}
-                      onChange={(next) => handleStartDateChange(next, "shared")}
-                      locale={locale}
-                      disabled={savingStartDate}
-                    />
-                  </section>
-                )}
         </>
       )}
 
@@ -532,19 +529,16 @@ export default function SettingsView({
                   <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                     {t("salesTaxHelp")}
                   </p>
-                  <select
+                  <Dropdown
                     value={salesTaxProvince}
-                    onChange={(e) => void changeSalesTaxProvince(e.target.value)}
+                    onChange={(code) => void changeSalesTaxProvince(code)}
                     disabled={savingProvince}
-                    aria-label={t("salesTaxTitle")}
-                    className="input-field"
-                  >
-                    {CANADA_PROVINCES.map((p) => (
-                      <option key={p.code} value={p.code}>
-                        {tProvinces(p.code)}
-                      </option>
-                    ))}
-                  </select>
+                    ariaLabel={t("salesTaxTitle")}
+                    options={CANADA_PROVINCES.map((p) => ({
+                      value: p.code,
+                      label: tProvinces(p.code),
+                    }))}
+                  />
                   <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
                     {t("salesTaxRate", {
                       rate: formatTaxPercent(salesTaxPercent(salesTaxProvince)),
@@ -623,7 +617,7 @@ export default function SettingsView({
                     <button
                       type="submit"
                       disabled={savingKey || !apiKey.trim()}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 font-semibold text-white py-2.5 text-sm transition-all duration-200 shadow-sm"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 font-semibold text-white py-2.5 text-sm transition duration-200 shadow-sm"
                     >
                       {savingKey ? (
                         <>
@@ -686,94 +680,140 @@ export default function SettingsView({
 
       {tab === "partner" && (
         <>
-                <section className="card-inset p-5 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-                    <Users className="h-5 w-5 text-blue-500" />
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {t("partnerTitle")}
-                    </h2>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {partner
-                      ? t("partnerConnected", { name: partner.name })
-                      : t("partnerHelp")}
-                  </p>
-                  {onInvite && (
-                    <button
-                      type="button"
-                      onClick={onInvite}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
-                    >
-                      <UserPlus className="h-4 w-4 shrink-0" />
-                      {partner ? t("invitePartnerDone") : t("invitePartner")}
-                    </button>
-                  )}
-                </section>
+                {partner ? (
+                  <>
+                    <section className="card-inset p-5 space-y-4">
+                      <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                        <Users className="h-5 w-5 text-blue-500" />
+                        <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                          {t("partnerTitle")}
+                        </h2>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {partner.picture ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={partner.picture}
+                            alt={partner.name}
+                            className="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-white dark:ring-gray-900"
+                          />
+                        ) : (
+                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-200 text-base font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                            {(partner.name || "?").slice(0, 1)}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                            {partner.name}
+                          </p>
+                          <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                            {partner.email}
+                          </p>
+                        </div>
+                      </div>
+                      {partner.connected_at && (
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("partnerConnectedSince")}
+                          </span>
+                          <span className="font-medium tabular-nums text-gray-900 dark:text-white">
+                            {formatConnectedDate(partner.connected_at, locale)}
+                          </span>
+                        </div>
+                      )}
+                    </section>
+                  <section className="card-inset p-5 space-y-3">
+                    <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                      <CalendarDays className="h-5 w-5 text-blue-500" />
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                        {t("sharedStartDateTitle")}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      {t("sharedStartDateHelp")}
+                    </p>
+                    <DayPicker
+                      value={parseISODate(
+                        settings?.shared_ledger_start_date || settings?.ledger_start_date
+                      )}
+                      onChange={(next) => handleStartDateChange(next, "shared")}
+                      locale={locale}
+                      disabled={savingStartDate}
+                    />
+                  </section>
+                    <section className="card-inset p-5 space-y-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {t("partnerUnlinkInfoLabel")}
+                        </span>
+                        <InfoTip label={t("partnerUnlinkInfoLabel")} icon="info">
+                          {t("partnerUnlinkInfo")}
+                        </InfoTip>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleUnlink()}
+                        disabled={unlinking}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 py-2.5 text-sm font-semibold whitespace-nowrap text-red-600 transition-colors hover:bg-red-100 active:bg-red-200 disabled:opacity-60 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                      >
+                        {unlinking ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Unlink className="h-4 w-4 shrink-0" />
+                        )}
+                        {t("partnerUnlink")}
+                      </button>
+                    </section>
+                  </>
+                ) : (
+                  <section className="card-inset p-5 space-y-3">
+                    <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                      <Users className="h-5 w-5 text-blue-500" />
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                        {t("partnerTitle")}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      {t("partnerHelp")}
+                    </p>
+                    {onInvite && (
+                      <button
+                        type="button"
+                        onClick={onInvite}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
+                      >
+                        <UserPlus className="h-4 w-4 shrink-0" />
+                        {t("invitePartner")}
+                      </button>
+                    )}
+                  </section>
+                )}
         </>
       )}
 
       {tab === "app" && (
         <>
-                {/* Mobile-only: controls removed from the compact top bar */}
-                <section className="card-inset p-5 space-y-1 md:hidden">
-                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3 mb-1">
-                    <Settings className="h-5 w-5 text-blue-500" />
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <RefreshCw className="h-5 w-5 text-blue-500" />
                     <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {t("preferencesTitle")}
+                      {t("updateTitle")}
                     </h2>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 py-3">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                      {t("themeLabel")}
+                    <span className="ml-auto text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                      v{WHATS_NEW[0].version}
                     </span>
-                    <ThemeToggle />
                   </div>
-
-                  {(onInvite || onLogout) && (
-                    <div className="border-t border-gray-100 dark:border-gray-800 pt-1 mt-1">
-                      <p className="pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        {t("accountSection")}
-                      </p>
-                      {onInvite && (
-                        <button
-                          type="button"
-                          onClick={onInvite}
-                          className="w-full flex items-center gap-3 rounded-xl py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
-                        >
-                          {partner ? (
-                            partner.picture ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={partner.picture}
-                                alt={partner.name}
-                                className="h-8 w-8 rounded-full object-cover shrink-0 ring-2 ring-white dark:ring-gray-900"
-                              />
-                            ) : (
-                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold shrink-0">
-                                {(partner.name || "?").slice(0, 1)}
-                              </span>
-                            )
-                          ) : (
-                            <UserPlus className="h-5 w-5 text-blue-500 shrink-0" />
-                          )}
-                          <span className="truncate">
-                            {partner ? t("invitePartnerDone") : t("invitePartner")}
-                          </span>
-                        </button>
-                      )}
-                      {onLogout && (
-                        <button
-                          type="button"
-                          onClick={onLogout}
-                          className="w-full flex items-center gap-3 rounded-xl py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                        >
-                          <LogOut className="h-5 w-5 shrink-0" />
-                          <span className="truncate">{tNav("logout")}</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("updateHelp")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
+                  >
+                    <RefreshCw className="h-4 w-4 shrink-0" />
+                    {t("updateCta")}
+                  </button>
                 </section>
                 <section className="card-inset p-5 space-y-3">
                   <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
@@ -857,27 +897,20 @@ export default function SettingsView({
                     <p className="text-xs text-red-500">{t("countriesError")}</p>
                   )}
                 </section>
-                <section className="card-inset p-5 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
-                    <RefreshCw className="h-5 w-5 text-blue-500" />
+                {/* Mobile-only: controls removed from the compact top bar */}
+                <section className="card-inset p-5 space-y-1 md:hidden">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3 mb-1">
+                    <Settings className="h-5 w-5 text-blue-500" />
                     <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {t("updateTitle")}
+                      {t("preferencesTitle")}
                     </h2>
-                    <span className="ml-auto text-xs tabular-nums text-gray-500 dark:text-gray-400">
-                      v{WHATS_NEW[0].version}
-                    </span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {t("updateHelp")}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => window.location.reload()}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors border border-blue-200/80 dark:border-blue-800/50"
-                  >
-                    <RefreshCw className="h-4 w-4 shrink-0" />
-                    {t("updateCta")}
-                  </button>
+                  <div className="flex items-center justify-between gap-3 py-3">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                      {t("themeLabel")}
+                    </span>
+                    <ThemeToggle />
+                  </div>
                 </section>
                 <section className="card-inset p-5 space-y-3">
                   <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
@@ -899,6 +932,26 @@ export default function SettingsView({
                     <span className="truncate">{t("supportCta")}</span>
                   </a>
                 </section>
+                <section className="card-inset p-5 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <CalendarDays className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {hasPartner ? t("personalStartDateTitle") : t("startDateTitle")}
+                    </h2>
+                    {savingStartDate && (
+                      <Loader2 className="ml-auto h-4 w-4 animate-spin text-blue-500" />
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {hasPartner ? t("personalStartDateHelp") : t("startDateHelp")}
+                  </p>
+                  <DayPicker
+                    value={parseISODate(settings?.ledger_start_date)}
+                    onChange={(next) => handleStartDateChange(next, "personal")}
+                    locale={locale}
+                    disabled={savingStartDate}
+                  />
+                </section>
                 <section className="card-inset p-5 space-y-4 border border-red-200/50 dark:border-red-950/30">
                   <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
                     <RotateCcw className="h-5 w-5 text-red-500" />
@@ -915,11 +968,41 @@ export default function SettingsView({
                     type="button"
                     onClick={openResetModal}
                     disabled={resetting}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 dark:bg-red-950/20 dark:hover:bg-red-900/30 dark:active:bg-red-900/40 text-red-600 dark:text-red-400 font-semibold py-2.5 text-sm transition-all duration-200 border border-red-200 dark:border-red-900/30"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 dark:bg-red-950/20 dark:hover:bg-red-900/30 dark:active:bg-red-900/40 text-red-600 dark:text-red-400 font-semibold py-2.5 text-sm transition duration-200 border border-red-200 dark:border-red-900/30"
                   >
                     {t("resetButton")}
                   </button>
                 </section>
+                <section className="card-inset p-5 space-y-3 border border-red-200/50 dark:border-red-950/30">
+                  <div className="flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <Trash2 className="h-5 w-5 text-red-500" />
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {t("deleteAccountTitle")}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("deleteAccountHelp")}
+                  </p>
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-100 py-2.5 text-sm font-semibold text-gray-400 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-500"
+                  >
+                    {t("deleteAccountSoon")}
+                  </button>
+                </section>
+                {onLogout && (
+                  <section className="card-inset p-5">
+                    <button
+                      type="button"
+                      onClick={onLogout}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-100 hover:bg-gray-200 active:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold py-2.5 text-sm whitespace-nowrap transition-colors"
+                    >
+                      <LogOut className="h-4 w-4 shrink-0" />
+                      {tNav("logout")}
+                    </button>
+                  </section>
+                )}
         </>
       )}
 

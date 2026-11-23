@@ -221,7 +221,8 @@ class DashboardLayoutBody(BaseModel):
 
 
 class SpendingExclusionsBody(BaseModel):
-    categories: list[str] = Field(default_factory=list, max_length=100)
+    # Whole categories and "category › sub_category" entries.
+    categories: list[str] = Field(default_factory=list, max_length=400)
 
 
 class SpendingAccountExclusionsBody(BaseModel):

@@ -524,7 +524,7 @@ export default function BankImportPanel({
               checked={r.include}
               onChange={(e) => patch(r.key, { include: e.target.checked })}
               aria-label={t("includeRow")}
-              className="mt-0.5 rounded text-indigo-600"
+              className="mt-0.5 rounded text-blue-600"
             />
           )}
           <span className="min-w-0 flex-1">
@@ -675,7 +675,7 @@ export default function BankImportPanel({
           <p className="text-xs text-red-500">{t("needsChoice")}</p>
         )}
         {r.mine === false && (
-          <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-300">
             {t("fromPartner")}
           </p>
         )}
@@ -759,7 +759,7 @@ export default function BankImportPanel({
       <div className="space-y-4 rounded-2xl border border-gray-150 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
         <div>
           <h2 className="flex items-center gap-2 text-base font-bold text-gray-800 dark:text-white">
-            <FileSpreadsheet className="h-5 w-5 shrink-0 text-indigo-500" />
+            <FileSpreadsheet className="h-5 w-5 shrink-0 text-blue-500" />
             {t("title")}
           </h2>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("subtitle")}</p>
@@ -788,9 +788,9 @@ export default function BankImportPanel({
             setDragging(false);
             pickFile(e.dataTransfer.files?.[0]);
           }}
-          className={`flex min-h-[130px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition-all ${
+          className={`flex min-h-[130px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition ${
             dragging
-              ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/20"
+              ? "border-blue-500 bg-blue-50/60 dark:bg-blue-950/20"
               : file
                 ? "border-emerald-300 bg-emerald-50/30 dark:border-emerald-800 dark:bg-emerald-950/10"
                 : "border-gray-300 bg-gray-50/50 dark:border-gray-700 dark:bg-gray-800/10"
@@ -853,7 +853,7 @@ export default function BankImportPanel({
           type="button"
           onClick={() => void analyze()}
           disabled={busy || !file || !accountId}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-3 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {busy && !preview ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {t("analyze")}
@@ -957,7 +957,7 @@ export default function BankImportPanel({
                 type="button"
                 onClick={() => void save()}
                 disabled={busy || chosen.length === 0 || incomplete > 0}
-                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-3 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {t("save", { count: chosen.length })}

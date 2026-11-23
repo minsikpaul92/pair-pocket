@@ -100,7 +100,7 @@ export default function InfoTip({ label, children, className, icon = "help" }: P
         onPointerLeave={(e) => e.pointerType === "mouse" && setHovered(false)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:text-indigo-500 focus-visible:text-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400"
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:text-blue-500 focus-visible:text-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:text-gray-400"
       >
         {icon === "info" ? (
           <Info className="h-4 w-4" aria-hidden />

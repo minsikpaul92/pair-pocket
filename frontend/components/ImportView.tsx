@@ -406,7 +406,7 @@ export default function ImportView({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-150 dark:border-gray-800 pb-4 min-w-0">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2 min-w-0">
-            <Sparkles className="h-6 w-6 shrink-0 text-indigo-500 animate-pulse" />
+            <Sparkles className="h-6 w-6 shrink-0 text-blue-500 animate-pulse" />
             <span className="break-words min-w-0" title={t("title")}>
               {t("title")}
             </span>
@@ -419,7 +419,7 @@ export default function ImportView({
         <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800/60 p-1 self-start sm:self-auto overflow-x-auto max-w-full">
           <button
             onClick={() => setActiveSubTab("bank")}
-            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
+            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition whitespace-nowrap shrink-0 ${
               activeSubTab === "bank"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -429,7 +429,7 @@ export default function ImportView({
           </button>
           <button
             onClick={() => setActiveSubTab("csv")}
-            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
+            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition whitespace-nowrap shrink-0 ${
               activeSubTab === "csv"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -439,7 +439,7 @@ export default function ImportView({
           </button>
           <button
             onClick={() => setActiveSubTab("logs")}
-            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
+            className={`rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold transition whitespace-nowrap shrink-0 ${
               activeSubTab === "logs"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -472,7 +472,7 @@ export default function ImportView({
           <div className="rounded-2xl border border-gray-150 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-4">
             <div>
               <h2 className="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5 shrink-0 text-indigo-500" />
+                <FileSpreadsheet className="h-5 w-5 shrink-0 text-blue-500" />
                 <span className="min-w-0">{t("csvImportTitle")}</span>
                 <InfoTip label={t("csvImportTipLabel")}>{t("csvImportHint")}</InfoTip>
               </h2>
@@ -483,7 +483,7 @@ export default function ImportView({
                 <button
                   type="button"
                   onClick={downloadCSVTemplate}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold px-3.5 py-2 transition-all"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold px-3.5 py-2 transition"
                 >
                   <Download className="h-3.5 w-3.5 shrink-0" />
                   <span className="whitespace-nowrap">{t("csvDownloadTemplate")}</span>
@@ -497,13 +497,13 @@ export default function ImportView({
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleCSVDrop}
-              className="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/10 hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800/20 p-8 text-center transition-all flex flex-col items-center justify-center min-h-[150px]"
+              className="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/10 hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800/20 p-8 text-center transition flex flex-col items-center justify-center min-h-[150px]"
             >
               <UploadCloud className="h-8 w-8 text-gray-500 dark:text-gray-400 mb-2" />
               <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
                 {csvFile ? csvFile.name : t("csvDrop")}
               </span>
-              <label className="mt-3 rounded-lg bg-gray-150 hover:bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-xs font-semibold px-3.5 py-2 cursor-pointer transition-all">
+              <label className="mt-3 rounded-lg bg-gray-150 hover:bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-xs font-semibold px-3.5 py-2 cursor-pointer transition">
                 {t("csvChoose")}
                 <input
                   type="file"
@@ -540,14 +540,14 @@ export default function ImportView({
                                 newPrev[idx].selected = e.target.checked;
                                 setCsvPreview(newPrev);
                               }}
-                              className="rounded text-indigo-600"
+                              className="rounded text-blue-600"
                             />
                           </td>
-                          <td className="p-2 font-mono">{tx.date}</td>
+                          <td className="p-2 tabular-nums">{tx.date}</td>
                           <td className="p-2 font-semibold">
                             {merchantLabel(tx, tCategories, tSubCategories, tCommon("unspecified"))}
                           </td>
-                          <td className="p-2 text-right font-mono">
+                          <td className="p-2 text-right tabular-nums">
                             {tx.currency} {tx.amount.toFixed(2)}
                           </td>
                           <td className="p-2 text-gray-500 dark:text-gray-400">{tx.category}</td>
@@ -569,7 +569,7 @@ export default function ImportView({
                   </button>
                   <button
                     onClick={saveCSVTransactions}
-                    className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 transition-all flex items-center gap-1"
+                    className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 transition flex items-center gap-1"
                   >
                     {loading && <Loader2 className="h-3 w-3 animate-spin" />}
                     {t("csvBulkSave")}
@@ -583,7 +583,7 @@ export default function ImportView({
           <div className="rounded-2xl border border-gray-150 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-5">
             <div>
               <h2 className="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <Download className="h-5 w-5 shrink-0 text-indigo-500" />
+                <Download className="h-5 w-5 shrink-0 text-blue-500" />
                 <span className="min-w-0">{t("csvExportTitle")}</span>
                 <InfoTip label={t("csvExportTipLabel")}>{t("csvExportHint")}</InfoTip>
               </h2>
@@ -631,7 +631,7 @@ export default function ImportView({
                       type="checkbox"
                       checked={exportAllTime}
                       onChange={(e) => setExportAllTime(e.target.checked)}
-                      className="rounded text-indigo-600"
+                      className="rounded text-blue-600"
                     />
                     <span className="whitespace-nowrap">{t("exportAllTime")}</span>
                   </label>
@@ -680,7 +680,7 @@ export default function ImportView({
 
             <button
               onClick={exportToCSV}
-              className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-3 transition-all flex items-center justify-center gap-1 shadow-sm"
+              className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-3 transition flex items-center justify-center gap-1 shadow-sm"
               disabled={loading}
             >
               {loading ? (
@@ -720,7 +720,7 @@ export default function ImportView({
 
           {loadingLogs ? (
             <div className="flex h-48 items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600 dark:text-blue-400" />
             </div>
           ) : logs.length === 0 ? (
             <div className="text-sm text-gray-500 dark:text-gray-400 py-12 text-center italic">
@@ -741,14 +741,14 @@ export default function ImportView({
                 <tbody className="divide-y divide-gray-150 dark:divide-gray-800/80">
                   {logs.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50/50">
-                      <td className="p-3 font-mono text-gray-500 dark:text-gray-400">
+                      <td className="p-3 tabular-nums text-gray-500 dark:text-gray-400">
                         {new Date(log.timestamp).toLocaleString()}
                       </td>
                       <td className="p-3 font-semibold text-gray-800 dark:text-white">
                         {log.file_name}
                       </td>
-                      <td className="p-3 font-mono text-xs">
-                        <span className="rounded bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 border border-indigo-100 dark:border-indigo-900/40">
+                      <td className="p-3 tabular-nums text-xs">
+                        <span className="rounded bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 border border-blue-100 dark:border-blue-900/40">
                           {log.model_used || t("unknownModel")}
                         </span>
                       </td>

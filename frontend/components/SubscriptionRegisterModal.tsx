@@ -715,7 +715,7 @@ export default function SubscriptionRegisterModal({
                           setNextDueDate(dayKey(nextYear));
                         }
                       }}
-                      className={`rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all border ${
+                      className={`rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold whitespace-nowrap transition border ${
                         active
                           ? "bg-blue-50 dark:bg-blue-500/20 border-blue-500 text-blue-600 dark:text-blue-400 shadow-xs"
                           : "bg-gray-50 dark:bg-gray-800 border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"

@@ -245,7 +245,7 @@ export default function OnboardingScreenshotScan({
         if (!canPick) return;
         addFiles(e.dataTransfer.files);
       }}
-      className={`relative rounded-2xl border-2 border-dashed p-4 space-y-3 transition-all duration-150 ${
+      className={`relative rounded-2xl border-2 border-dashed p-4 space-y-3 transition duration-150 ${
         dragging
           ? "border-blue-500 bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-500/30 scale-[1.01]"
           : "border-gray-300 dark:border-gray-600 bg-white/60 dark:bg-gray-800/60"

@@ -119,6 +119,14 @@ def _is_transfer_category(category: str) -> bool:
     return normalize_transfer_category(category) == TRANSFER_CATEGORY
 
 
+def _is_excluded(excluded: set[str], category: str, sub_category: str) -> bool:
+    """A whole category, or one "category › sub_category" entry, is left out."""
+    return (
+        normalize_transfer_category(category) in excluded
+        or f"{category} › {sub_category}" in excluded
+    )
+
+
 async def budget_excluded_account_ids(
     db: AsyncIOMotorDatabase,
     *,
@@ -168,7 +176,8 @@ async def compute_stats(
       expenses (out-of-pocket spend; a refund counts in the month of the expense
       it pays back, not the month it was received)
     - pure_consumption: total_expense − 투자/저축 (spending charts, excludes transfers)
-    - exclude_categories: expense categories left out of every expense figure
+    - exclude_categories: expense categories left out of every expense figure;
+      an entry "category › sub_category" leaves out just that sub-category
     - exclude_account_ids: leave out expenses paid from these accounts (budget view)
     """
     excluded = {normalize_transfer_category(c) for c in (exclude_categories or [])}
@@ -245,7 +254,7 @@ async def compute_stats(
                 by_sub_category.get(f"{cat} › {sub}", 0) + amount
             )
         elif tx_type == TransactionType.EXPENSE.value:
-            if normalize_transfer_category(cat) in excluded:
+            if _is_excluded(excluded, cat, sub):
                 continue
             total_expense += amount
             if is_investment_expense(cat):
@@ -283,7 +292,7 @@ async def compute_stats(
     for doc in expense_docs:
         cat = doc.get("category", "")
         sub = doc.get("sub_category", "")
-        if normalize_transfer_category(cat) in excluded:
+        if _is_excluded(excluded, cat, sub):
             continue
         exp_id = str(doc["_id"])
         settled = settled_map.get(exp_id, 0.0)

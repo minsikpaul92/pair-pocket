@@ -815,6 +815,18 @@ export function hiddenSubKey(category: string, subCategory: string): string {
   return `${category} › ${subCategory}`;
 }
 
+/** Entries are a category, or one sub-category written with `hiddenSubKey`. */
+export function isSpendingExcluded(
+  excluded: readonly string[],
+  category: string,
+  subCategory: string | null | undefined
+): boolean {
+  return (
+    excluded.includes(normalizeTransferCategory(category)) ||
+    excluded.includes(hiddenSubKey(category, subCategory ?? ""))
+  );
+}
+
 export async function setExpenseRatioHiddenCategories(
   categories: string[]
 ): Promise<UserSettings> {
@@ -2001,6 +2013,8 @@ export interface PartnerSummary {
   email: string;
   name: string;
   picture: string | null;
+  /** When the two of you linked (ISO). Missing right after accepting. */
+  connected_at?: string | null;
 }
 
 export interface InvitationOut {

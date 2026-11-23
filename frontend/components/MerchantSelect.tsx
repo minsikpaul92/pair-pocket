@@ -88,7 +88,7 @@ export default function MerchantSelect({
         <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">
           <div className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700/60 flex justify-between items-center">
             <span>{t("merchantRecent", { noun })}</span>
-            <span className="text-xs font-normal text-indigo-500">{t("merchantListTag")}</span>
+            <span className="text-xs font-normal text-blue-500">{t("merchantListTag")}</span>
           </div>
 
           {matchingOptions.length > 0 || otherOptions.length > 0 ? (
@@ -101,14 +101,14 @@ export default function MerchantSelect({
                       onChange(opt);
                       setOpen(false);
                     }}
-                    className="w-full flex items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-gray-800 dark:text-gray-200 transition-colors"
+                    className="w-full flex items-center justify-between px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-950/40 text-gray-800 dark:text-gray-200 transition-colors"
                   >
                     <span className="flex items-center gap-2 truncate">
-                      <Store className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                      <Store className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                       <span className="truncate">{opt}</span>
                     </span>
                     {value === opt && (
-                      <Check className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0 ml-1" />
+                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 ml-1" />
                     )}
                   </button>
                 </li>
@@ -153,7 +153,7 @@ export default function MerchantSelect({
                   onAdd(value.trim());
                   setOpen(false);
                 }}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-colors"
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {t("merchantAddNew", { name: value.trim(), noun })}
