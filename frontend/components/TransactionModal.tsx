@@ -3204,7 +3204,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("name", e.target.value)
                               }
-                              className="input-field py-1.5 text-base sm:text-xs"
+                              className="input-field min-h-9 py-1.5 text-base sm:text-xs"
                             />
                             <input
                               type="text"
@@ -3213,7 +3213,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("standardized_name", e.target.value)
                               }
-                              className="input-field py-1.5 text-base sm:text-xs"
+                              className="input-field min-h-9 py-1.5 text-base sm:text-xs"
                             />
                             <input
                               type="text"
@@ -3222,7 +3222,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("quantity", e.target.value)
                               }
-                              className={`input-field py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
+                              className={`input-field min-h-9 py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
                             />
                             <select
                               value={item.unit || "개"}
@@ -3233,7 +3233,7 @@ export default function TransactionModal({
                                   updateItem("unit", e.target.value);
                                 }
                               }}
-                              className="input-field py-1.5 px-1 text-base sm:text-xs w-full cursor-pointer bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                              className="input-field min-h-9 py-1.5 px-1 text-base sm:text-xs w-full cursor-pointer bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                             >
                               {availableUnits.map((u) => (
                                 <option key={u} value={u} className="text-xs py-1">
@@ -3251,7 +3251,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("unit_price", e.target.value)
                               }
-                              className={`input-field py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
+                              className={`input-field min-h-9 py-1.5 text-base sm:text-xs text-right ${NO_SPIN}`}
                             />
                             <input
                               type="text"
@@ -3260,7 +3260,7 @@ export default function TransactionModal({
                               onChange={(e) =>
                                 updateItem("total_price", e.target.value)
                               }
-                              className={`input-field py-1.5 text-base sm:text-xs text-right font-semibold ${NO_SPIN}`}
+                              className={`input-field min-h-9 py-1.5 text-base sm:text-xs text-right font-semibold ${NO_SPIN}`}
                             />
                             <button
                               type="button"

@@ -241,7 +241,7 @@ export default function InviteModal({ onClose, onLinked, onUnlinked }: Props) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t("emailPlaceholder")}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border-0 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                  className="w-full min-h-12 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
                 />
               </label>
               <div className="space-y-1.5">

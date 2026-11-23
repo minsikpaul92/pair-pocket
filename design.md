@@ -41,8 +41,9 @@ Make the top header (navigation bar) and bottom tab bar translucent so content s
 Apply smooth, rounded corners to all interactive elements.
 * **Primary Action Button:** Use the signature tint color (System Blue).
   * *Classes:* `bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-xl px-4 py-3 transition-colors`
-* **Inputs & Selects:** Remove default borders and add a soft focus ring.
-  * *Classes:* `bg-gray-50 dark:bg-gray-900 border-0 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500`
+* **Inputs & Selects:** Always show a border (`border border-gray-300 dark:border-gray-600`) so the user can see where to type, and add a soft focus ring. Inputs, `Dropdown` and `Segmented` share this border color.
+  * *Classes:* `bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2.5 min-h-12 focus:ring-2 focus:ring-blue-500`
+* **Control height:** Form controls (`.input-field`, `Dropdown`, `Segmented`, `.btn-primary`, `Button size="lg"`) are 48px (`h-12` / `min-h-12`). Dense rows (`Dropdown size="sm"`, `Button size="sm"`, table-row inputs) are 36px (`h-9`). Tabs and chips have their own step. The Amount input in the settle/move modal keeps its large size.
 
 ## 5. PWA (Progressive Web App) Meta Tags
 Include these tags in the HTML `<head>` to ensure a native-like full-screen experience on mobile devices.

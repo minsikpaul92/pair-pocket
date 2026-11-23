@@ -75,8 +75,8 @@ export default function Dropdown({
           aria-expanded={open}
           data-tour={dataTour}
           className={cn(
-            "flex w-full min-w-0 items-center gap-2 rounded-xl border border-gray-200 bg-white text-left font-semibold text-gray-800 transition-colors hover:border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600",
-            size === "sm" ? "px-3 py-2 text-xs" : "px-3.5 py-3 text-sm",
+            "flex w-full min-w-0 items-center gap-2 rounded-xl border border-gray-300 bg-white text-left font-semibold text-gray-800 transition-colors hover:border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500",
+            size === "sm" ? "h-9 px-3 text-xs" : "h-12 px-3.5 text-sm",
             className
           )}
         >
