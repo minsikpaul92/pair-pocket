@@ -1724,6 +1724,17 @@ export default function TransactionModal({
   const segmentBase =
     "flex-1 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors";
 
+  // A pair settlement moves money between asset accounts; an outside refund may also land on a card.
+  const settlementAccountOptions = (assetsOnly: boolean) =>
+    accounts
+      .filter(
+        (a) =>
+          a.is_active &&
+          a.currency === currency &&
+          (!assetsOnly || (!a.is_liability && a.kind !== "investment"))
+      )
+      .map((a) => ({ value: a.id, label: accountLabel(a) }));
+
   const settlementField = isSettlement && (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -1758,70 +1769,79 @@ export default function TransactionModal({
           </span>
         </p>
       )}
-      {settlesOtherLedger && (
-        <div className="mt-3">
-          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            {tTx("settlementReceiveIn", { ledger: tAccountType(otherLedger) })}
-          </label>
-          <Dropdown
-            value={payFromId}
-            onChange={setPayFromId}
-            ariaLabel={tTx("settlementReceiveIn", { ledger: tAccountType(otherLedger) })}
-            placeholder={tTx("settlementSelectReceiveAccount")}
-            options={payAccounts.map((a) => ({ value: a.id, label: accountLabel(a) }))}
-          />
-          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            {tTx("settlementOtherLedgerHint", { ledger: tAccountType(otherLedger) })}
-          </p>
-        </div>
-      )}
-      {!isEditing && hasPartner && payAccounts.length > 0 && !settlesOtherLedger && (
-        <div className="mt-3">
-          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            {tTx("settlementPaidFrom")}
-          </label>
-          <Dropdown
-            value={payFromId}
-            onChange={setPayFromId}
-            ariaLabel={tTx("settlementPaidFrom")}
-            options={[
-              { value: "", label: tTx("settlementPaidExternal") },
-              ...payAccounts.map((a) => ({
-                value: a.id,
-                label: `${tTx(
-                  otherLedger === "personal"
-                    ? "settlementPaidFromPersonal"
-                    : "settlementPaidFromShared"
-                )} · ${accountLabel(a)}`,
-              })),
-            ]}
-          />
-          {payFromId && (
-            <>
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                {tTx("settlementPaidHint", { ledger: tAccountType(otherLedger) })}
-              </p>
-              <label className="mb-1.5 mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                {tTx("settlementReceiveAccount")}
+      {settlesOtherLedger ? (
+        <>
+          <div className="mt-3">
+            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              {tTx("settlementPaidFrom")}
+            </label>
+            <Dropdown
+              value={accountId}
+              onChange={pickAccount}
+              ariaLabel={tTx("settlementPaidFrom")}
+              placeholder={tTx("selectFromAccount")}
+              options={settlementAccountOptions(true)}
+            />
+          </div>
+          <div className="mt-3">
+            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              {tTx("settlementReceiveIn", { ledger: tAccountType(otherLedger) })}
+            </label>
+            <Dropdown
+              value={payFromId}
+              onChange={setPayFromId}
+              ariaLabel={tTx("settlementReceiveIn", { ledger: tAccountType(otherLedger) })}
+              placeholder={tTx("settlementSelectReceiveAccount")}
+              options={payAccounts.map((a) => ({ value: a.id, label: accountLabel(a) }))}
+            />
+            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              {tTx("settlementOtherLedgerHint", { ledger: tAccountType(otherLedger) })}
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          {!isEditing && hasPartner && payAccounts.length > 0 && (
+            <div className="mt-3">
+              <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {tTx("settlementPaidFrom")}
               </label>
               <Dropdown
-                value={accountId}
-                onChange={pickAccount}
-                ariaLabel={tTx("settlementReceiveAccount")}
-                placeholder={tTx("settlementSelectReceiveAccount")}
-                options={accounts
-                  .filter(
-                    (a) =>
-                      a.is_active &&
-                      !a.is_liability &&
-                      a.kind !== "investment" &&
-                      a.currency === currency
-                  )
-                  .map((a) => ({ value: a.id, label: accountLabel(a) }))}
+                value={payFromId}
+                onChange={setPayFromId}
+                ariaLabel={tTx("settlementPaidFrom")}
+                options={[
+                  { value: "", label: tTx("settlementPaidExternal") },
+                  ...payAccounts.map((a) => ({
+                    value: a.id,
+                    label: `${tTx(
+                      otherLedger === "personal"
+                        ? "settlementPaidFromPersonal"
+                        : "settlementPaidFromShared"
+                    )} · ${accountLabel(a)}`,
+                  })),
+                ]}
               />
-            </>
+              {payFromId && (
+                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {tTx("settlementPaidHint", { ledger: tAccountType(otherLedger) })}
+                </p>
+              )}
+            </div>
           )}
-        </div>
+          <div className="mt-3">
+            <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
+              {tTx("settlementReceiveAccount")}
+            </label>
+            <Dropdown
+              value={accountId}
+              onChange={pickAccount}
+              ariaLabel={tTx("settlementReceiveAccount")}
+              placeholder={tTx("settlementSelectReceiveAccount")}
+              options={settlementAccountOptions(Boolean(payFromId))}
+            />
+          </div>
+        </>
       )}
     </div>
   );
@@ -2309,7 +2329,7 @@ export default function TransactionModal({
                   ))}
                 </div>
               )}
-              {!isTransfer && !isStock && (
+              {!isTransfer && !isStock && !isSettlement && (
                 <div className="min-w-0 flex-1">
                   <AccountSelect
                     accounts={accounts}

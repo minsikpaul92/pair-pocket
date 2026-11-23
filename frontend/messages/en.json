@@ -1383,6 +1383,10 @@
   },
   "whatsNew": {
     "items": {
+      "settlementReceiveAccount": {
+        "title": "Choose where a settlement lands",
+        "description": "When you enter a settlement, pick the account that received the money right below where it came from. The amount is added to that account balance."
+      },
       "chartDetailsMatchPeriod": {
         "title": "Chart details match the period",
         "description": "When you view the expense chart by quarter, half-year or year, the items under a slice and the list you open from it now cover the same period and add up to the same amount as the chart."
