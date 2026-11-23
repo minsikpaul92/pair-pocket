@@ -69,6 +69,7 @@ INCOME_PRESETS: dict[str, list[str]] = {
         "투자 배당금",
         "은행 이자",
         "정부 환급금(HST/Tax Refund)",
+        "비용 환급",
     ],
     # Receiving side of personal↔shared transfers (linked to an expense twin).
     TRANSFER_CATEGORY: [TRANSFER_SUB_SHARED_FUNDING, TRANSFER_SUB_SHARED_WITHDRAWAL],

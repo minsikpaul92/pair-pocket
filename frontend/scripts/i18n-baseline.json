@@ -9,7 +9,7 @@
     "components/TransactionModal.tsx": 63,
     "lib/api.ts": 37,
     "lib/banks.ts": 51,
-    "lib/category-i18n.ts": 156,
+    "lib/category-i18n.ts": 158,
     "i18n/locales.ts": 1
   },
   "localeBranch": {

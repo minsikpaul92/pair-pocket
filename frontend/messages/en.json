@@ -577,6 +577,7 @@
     "dividends": "Investment dividends",
     "bankInterest": "Bank interest",
     "taxRefund": "Government refund (HST/Tax)",
+    "expenseReimbursement": "Reimbursements",
     "sharedWithdrawal": "Shared to personal transfer"
   },
   "subscriptions": {
@@ -1383,6 +1384,10 @@
   },
   "whatsNew": {
     "items": {
+      "reimbursementCategory": {
+        "title": "New Reimbursements category",
+        "description": "You can now pick Reimbursements under Finance/Other income. Use it for money paid back for costs you did not log as expenses."
+      },
       "chartDetailsMatchPeriod": {
         "title": "Chart details match the period",
         "description": "When you view the expense chart by quarter, half-year or year, the items under a slice and the list you open from it now cover the same period and add up to the same amount as the chart."
