@@ -54,3 +54,58 @@ def test_compute_resume_at_daily_quota_uses_pacific_midnight():
     )
     # Should be in the future (next PT midnight).
     assert resume > datetime.now(timezone.utc)
+
+
+def _collect_stream_events(routing_events, chain):
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    from app.services import ai
+
+    async def fake_routing(*args, **kwargs):
+        for event in routing_events:
+            yield event
+
+    db = MagicMock()
+    db.__getitem__.return_value.insert_one = AsyncMock()
+
+    async def run():
+        with patch.object(ai, "resolve_gemini_api_key_chain", AsyncMock(return_value=chain)), patch.object(
+            ai, "generate_content_with_routing", fake_routing
+        ):
+            return [
+                e
+                async for e in ai.parse_receipt_or_statement_stream(
+                    db, "u1", b"img", "image/png", "a.png"
+                )
+            ]
+
+    return asyncio.run(run())
+
+
+def test_stream_error_reason_quota_after_rate_limit():
+    events = _collect_stream_events(
+        [
+            {"event": "failed", "model": PRIMARY_MODEL, "error": "429", "status_code": 429},
+            {"event": "error", "error": "All models failed"},
+        ],
+        [{"api_key": "k", "key_owner_id": "u1", "source": "own"}],
+    )
+    assert events[-1]["event"] == "error"
+    assert events[-1]["reason"] == "quota"
+
+
+def test_stream_error_reason_failed_without_quota():
+    events = _collect_stream_events(
+        [
+            {"event": "failed", "model": PRIMARY_MODEL, "error": "bad json", "status_code": 500},
+            {"event": "error", "error": "All models failed"},
+        ],
+        [{"api_key": "k", "key_owner_id": "u1", "source": "own"}],
+    )
+    assert events[-1]["reason"] == "failed"
+
+
+def test_stream_error_reason_no_key():
+    events = _collect_stream_events([], [])
+    assert len(events) == 1 and events[0]["reason"] == "no_key"

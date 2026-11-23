@@ -742,7 +742,10 @@
     "promoEndAfterStart": "Promo end date must be after the start date.",
     "promoAmountLessThanRegular": "Promo amount must be less than the regular amount.",
     "completedLessThanTotal": "Paid installments must be less than total installments.",
-    "testLoginFailed": "Wrong test account or password."
+    "testLoginFailed": "Wrong test account or password.",
+    "aiQuota": "Too many AI requests right now. Try again in about a minute.",
+    "aiNoKey": "No Gemini API key yet. Add one in Settings first.",
+    "aiFailed": "The AI couldn't read these photos. Please try again."
   },
   "stocks": {
     "tabName": "Stocks",
@@ -1384,6 +1387,10 @@
   },
   "whatsNew": {
     "items": {
+      "scanFinishesAllPhotos": {
+        "title": "Scanning several photos now finishes",
+        "description": "Scanning several photos no longer stops halfway with a \"network\" error. When a scan does fail, the photo card now says why, such as too many requests or a missing key."
+      },
       "settlementReceiveAccount": {
         "title": "Choose where a settlement lands",
         "description": "When you enter a settlement, pick the account that received the money right below where it came from. The amount is added to that account balance."

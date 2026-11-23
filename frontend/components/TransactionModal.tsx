@@ -289,6 +289,8 @@ export default function TransactionModal({
   const [tipAmount, setTipAmount] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanHint, setScanHint] = useState<string | null>(null);
+  // Scan failures are shown in the scan card, not in the form's error line.
+  const [scanError, setScanError] = useState<string | null>(null);
   // One draft per scanned receipt; edits are written back when leaving a tab.
   const [parsedQueue, setParsedQueue] = useState<QueueDraft[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
@@ -368,6 +370,7 @@ export default function TransactionModal({
   }
 
   function clearScanQueue() {
+    setScanError(null);
     setScanQueue((prev) => {
       prev.forEach((q) => {
         if (q.previewUrl) URL.revokeObjectURL(q.previewUrl);
@@ -449,6 +452,7 @@ export default function TransactionModal({
         : tTx("scanning")
     );
     setError(null);
+    setScanError(null);
     const files = scanQueue.map((q) => q.file);
     try {
       const results = await parseReceiptsOrStatements(files, {
@@ -466,7 +470,8 @@ export default function TransactionModal({
         }
       }
       if (flat.length === 0) {
-        setError(tTx("scanEmpty"));
+        setScanHint(null);
+        setScanError(tTx("scanEmpty"));
         return;
       }
       setScannedFile(files[0] || null);
@@ -482,7 +487,8 @@ export default function TransactionModal({
           : tTx("scanFilled")
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : tTx("scanFailed"));
+      setScanHint(null);
+      setScanError(translateError(err, tErrors, "aiFailed"));
     } finally {
       setScanning(false);
     }
@@ -2624,7 +2630,11 @@ export default function TransactionModal({
                 <button
                   type="button"
                   disabled={scanning || scanQueue.length === 0}
-                  onClick={() => void startBatchModalScan(parsedQueue.length > 0 || scannedFile !== null)}
+                  onClick={() =>
+                    void startBatchModalScan(
+                      parsedQueue.length > 0 || scannedFile !== null || scanError !== null
+                    )
+                  }
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2 transition-colors disabled:opacity-50"
                 >
                   {scanning ? (
@@ -2636,7 +2646,7 @@ export default function TransactionModal({
                     ? scanRetryCount >= 2
                       ? tTx("scanDeep")
                       : tTx("scanning")
-                    : parsedQueue.length > 0 || scannedFile !== null
+                    : parsedQueue.length > 0 || scannedFile !== null || scanError !== null
                     ? tTx("scanRetry")
                     : tTx("scanStart")}
                 </button>
@@ -2655,10 +2665,16 @@ export default function TransactionModal({
                 </div>
               )}
 
-              {scanHint && (
-                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
-                  {scanHint}
+              {scanError ? (
+                <p className="text-xs text-red-500 font-medium" role="alert">
+                  {scanError}
                 </p>
+              ) : (
+                scanHint && (
+                  <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                    {scanHint}
+                  </p>
+                )
               )}
             </div>
           )}

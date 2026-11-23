@@ -742,7 +742,10 @@
     "promoEndAfterStart": "프로모션 종료일은 시작일 이후여야 합니다.",
     "promoAmountLessThanRegular": "프로모션 금액은 정상 금액보다 작아야 합니다.",
     "completedLessThanTotal": "이미 납부 회차는 총 회차보다 작아야 합니다.",
-    "testLoginFailed": "테스트 계정 또는 비밀번호가 올바르지 않습니다."
+    "testLoginFailed": "테스트 계정 또는 비밀번호가 올바르지 않습니다.",
+    "aiQuota": "지금 AI 분석 요청이 많아요. 1분쯤 뒤에 다시 시도해 주세요.",
+    "aiNoKey": "Gemini API 키가 없어요. 설정에서 키를 먼저 등록해 주세요.",
+    "aiFailed": "AI가 사진을 분석하지 못했어요. 다시 시도해 주세요."
   },
   "stocks": {
     "tabName": "증권",
@@ -1384,6 +1387,10 @@
   },
   "whatsNew": {
     "items": {
+      "scanFinishesAllPhotos": {
+        "title": "사진 여러 장도 끝까지 분석해요",
+        "description": "사진을 여러 장 넣으면 분석이 중간에 끊기고 'network' 오류가 나던 문제를 고쳤어요. 분석이 안 될 때는 요청이 많은지, 키가 없는지 같은 이유를 사진 카드에 바로 알려 드려요."
+      },
       "settlementReceiveAccount": {
         "title": "정산금 받을 계좌를 고를 수 있어요",
         "description": "정산을 입력할 때 정산금을 낸 곳 바로 아래에서 돈을 받은 계좌를 고를 수 있어요. 고른 계좌 잔액에 정산금이 더해져요."
