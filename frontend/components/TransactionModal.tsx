@@ -82,7 +82,8 @@ import {
   SubscriptionDraft,
 } from "@/lib/api";
 import { isSubscriptionEntry, translateCategory, translateSubCategory } from "@/lib/category-i18n";
-import { dayKey, parseDate } from "@/lib/date";
+import { showToast } from "@/components/ui/toast";
+import { dayKey, parseDate, scanDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
@@ -269,6 +270,9 @@ export default function TransactionModal({
   >("primary");
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // The date text the scan read when it looked wrong ("" if none); saving waits until it is checked.
+  const [dateCheck, setDateCheck] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hydratedEditId, setHydratedEditId] = useState<string | null>(null);
@@ -1078,12 +1082,9 @@ export default function TransactionModal({
         setTipPercent("");
       }
 
-      if (parsed.date) {
-        const d = parseDate(parsed.date);
-        if (d && !isNaN(d.getTime())) {
-          onDateChange(d);
-        }
-      }
+      const scanned = scanDate(parsed.date);
+      onDateChange(scanned.date);
+      setDateCheck(scanned.adjusted ? (parsed.date ?? "") : null);
     },
     [transactionCurrency, currency, onDateChange, HST_RATE]
   );
@@ -1498,6 +1499,10 @@ export default function TransactionModal({
     e.preventDefault();
     setError(null);
     if (currentTabSaved) return;
+    if (dateCheck !== null) {
+      setError(tTx("dateCheckRequired"));
+      return;
+    }
 
     const numericAmount = parseAmountInput(amount);
     if (!numericAmount || numericAmount <= 0) {
@@ -1683,14 +1688,25 @@ export default function TransactionModal({
       }
 
       const savedDate = parseDate(dateStr);
+      // defaultDate is the picked date itself, so compare with the current month instead.
+      const now = new Date();
+      let otherMonth = false;
       if (
-        savedDate &&
-        (savedDate.getMonth() !== defaultDate.getMonth() ||
-          savedDate.getFullYear() !== defaultDate.getFullYear())
+        savedDate.getMonth() !== now.getMonth() ||
+        savedDate.getFullYear() !== now.getFullYear()
       ) {
-        const formatted = `${savedDate.getFullYear()}년 ${savedDate.getMonth() + 1}월 ${savedDate.getDate()}일`;
-        alert(`거래가 ${formatted} 날짜로 저장되었습니다. (현재 화면에 선택된 월과 다른 달입니다)`);
+        otherMonth = true;
       }
+      showToast({
+        kind: "success",
+        title: tTx(editingTransaction ? "toastUpdated" : "toastSaved"),
+        lines: [
+          [dateStr, formatAmount(numericAmount, currentCurrency), payload.merchant]
+            .filter(Boolean)
+            .join(" · "),
+          ...(otherMonth ? [tTx("savedOtherMonth")] : []),
+        ],
+      });
 
       if (inQueue) {
         // Stay open for the next receipt; the parent closes the modal on onSaved.
@@ -1702,13 +1718,21 @@ export default function TransactionModal({
         onSaved();
       }
     } catch (err) {
-      setError(
-        translateError(
-          err,
-          tErrors,
-          editingTransaction ? "updateTransaction" : "saveTransaction"
-        )
+      const message = translateError(
+        err,
+        tErrors,
+        editingTransaction ? "updateTransaction" : "saveTransaction"
       );
+      setError(message);
+      showToast({
+        kind: "error",
+        title: tTx("toastFailed"),
+        lines: [message],
+        action: {
+          label: tTx("toastRetry"),
+          onClick: () => formRef.current?.requestSubmit(),
+        },
+      });
     } finally {
       setSubmitting(false);
     }
@@ -1723,9 +1747,12 @@ export default function TransactionModal({
     setError(null);
     try {
       await deleteTransaction(editingTransaction.id);
+      showToast({ kind: "success", title: tTx("toastDeleted") });
       onSaved();
     } catch (err) {
-      setError(translateError(err, tErrors, "deleteTransaction"));
+      const message = translateError(err, tErrors, "deleteTransaction");
+      setError(message);
+      showToast({ kind: "error", title: tTx("toastDeleteFailed"), lines: [message] });
     } finally {
       setDeleting(false);
     }
@@ -2358,10 +2385,33 @@ export default function TransactionModal({
           )}
         </div>
 
+        {dateCheck !== null && (
+          <div
+            role="alert"
+            className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            <span className="min-w-0">
+              {dateCheck
+                ? tTx("dateCheckRead", { read: dateCheck })
+                : tTx("dateCheckMissing")}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDateCheck(null)}
+              className="shrink-0 whitespace-nowrap font-semibold underline"
+            >
+              {tTx("dateCheckOk")}
+            </button>
+          </div>
+        )}
+
         <div className="mt-2">
           <DayPicker
             value={defaultDate}
-            onChange={onDateChange}
+            onChange={(d) => {
+              setDateCheck(null);
+              onDateChange(d);
+            }}
             locale={locale}
           />
         </div>
@@ -2483,7 +2533,7 @@ export default function TransactionModal({
           </ul>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-3 space-y-3">
+        <form ref={formRef} onSubmit={handleSubmit} className="mt-3 space-y-3">
           <div className="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
             <button
               type="button"

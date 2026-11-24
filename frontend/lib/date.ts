@@ -42,6 +42,23 @@ export function parseDate(iso: string | Date | null | undefined): Date {
   return isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
+/**
+ * A scanned receipt date. It is `adjusted` (today is used and the user must check it)
+ * when the date is missing, unreadable, in the future, or in an earlier year and more
+ * than 6 months back (a misread year).
+ */
+export function scanDate(raw: string | null | undefined): { date: Date; adjusted: boolean } {
+  const now = new Date();
+  if (!raw || !/^\d{4}[/-]\d{1,2}[/-]\d{1,2}/.test(raw.trim())) {
+    return { date: now, adjusted: true };
+  }
+  const d = parseDate(raw);
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+  const misreadYear = d.getFullYear() !== now.getFullYear() && d < sixMonthsAgo;
+  if (d.getTime() > now.getTime() || misreadYear) return { date: now, adjusted: true };
+  return { date: d, adjusted: false };
+}
+
 export function isoDayKey(iso: string): string {
   // Transaction dates come back as ISO strings; take the local day key.
   return dayKey(parseDate(iso));
