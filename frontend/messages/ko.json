@@ -309,6 +309,7 @@
     "scanningRetry": "고성능 AI 모델(gemini-3.8-flash)로 정밀 스캔 중...",
     "scanFilled": "스캔 결과로 항목을 채웠어요. 확인 후 저장하세요.",
     "scanEmpty": "스캔 결과에서 거래를 찾지 못했어요.",
+    "savedOtherMonth": "거래가 {year}년 {month}월 {day}일 날짜로 저장되었습니다. 이번 달이 아니니 해당 월에서 확인하세요.",
     "scanFailed": "AI 스캔에 실패했습니다.",
     "scanCardTitle": "스크린샷 / 영수증으로 채우기",
     "scanCardCount": "{count} / {max}장",
@@ -1392,6 +1393,10 @@
   },
   "whatsNew": {
     "items": {
+      "scanDateFallback": {
+        "title": "영수증 날짜를 더 안전하게 처리해요",
+        "description": "영수증에서 날짜를 읽지 못하거나 미래 날짜로 읽으면 오늘 날짜로 저장돼요. 이번 달이 아닌 날짜로 저장되면 안내도 보여 드려요."
+      },
       "clearerInputBorders": {
         "title": "다크 모드 입력창이 더 잘 보여요",
         "description": "다크 모드에서 입력창과 선택 상자에 연한 테두리가 생겨서 어디에 입력하는지 한눈에 보여요."

@@ -309,6 +309,7 @@
     "scanningRetry": "Running a precise scan with the high-accuracy AI model (gemini-3.8-flash)...",
     "scanFilled": "Fields filled from scan. Review and save.",
     "scanEmpty": "No transaction found in the scan result.",
+    "savedOtherMonth": "Saved with the date {month}/{day}/{year}. It is not in the current month, so look for it in that month.",
     "scanFailed": "AI scan failed.",
     "scanCardTitle": "Fill from screenshot / receipt",
     "scanCardCount": "{count} / {max}",
@@ -1392,6 +1393,10 @@
   },
   "whatsNew": {
     "items": {
+      "scanDateFallback": {
+        "title": "Safer dates on scanned receipts",
+        "description": "If a receipt date can't be read or comes out in the future, it now saves with today's date. You also get a notice when a transaction is saved outside the current month."
+      },
       "clearerInputBorders": {
         "title": "Easier to see inputs in dark mode",
         "description": "In dark mode, input boxes and pickers now have a light border, so it is easy to see where to type."

@@ -42,6 +42,12 @@ export function parseDate(iso: string | Date | null | undefined): Date {
   return isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
+/** A scanned receipt date: today when it is missing or unreadable, never in the future. */
+export function scanDate(raw: string | null | undefined): Date {
+  const d = parseDate(raw);
+  return d.getTime() > Date.now() ? new Date() : d;
+}
+
 export function isoDayKey(iso: string): string {
   // Transaction dates come back as ISO strings; take the local day key.
   return dayKey(parseDate(iso));

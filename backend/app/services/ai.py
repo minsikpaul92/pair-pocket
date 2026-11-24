@@ -378,6 +378,7 @@ def _receipt_prompt(flow_type: str = "expense") -> str:
         f"  * Pay attention to text month names (e.g., 'NOV 07, 2025' or '07-NOV-2025' -> 2025-11-07).\n"
         f"  * Separate date from timestamps (e.g. '2025-11-07 14:32:05' -> date is 2025-11-07).\n"
         f"- Only if NO year is printed on the receipt at all (e.g., 'AUG 02 14:30'), infer the year using current reference date {today_str}.\n"
+        f"- If NO date is printed anywhere, output an empty string for the date. Never guess or invent a date.\n"
     )
 
     return (

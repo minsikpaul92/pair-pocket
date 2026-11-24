@@ -93,7 +93,7 @@ import {
   fetchChartTransactions,
   loadChartRules,
 } from "@/lib/chart-transactions";
-import { addMonths, dayKey, isoDayKey, monthKey, monthLabel, parseDate } from "@/lib/date";
+import { addMonths, dayKey, isoDayKey, monthKey, monthLabel, parseDate, scanDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { formatSubscriptionDate } from "@/lib/subscription-i18n";
 import { hasUnseenWhatsNew } from "@/lib/whats-new";
@@ -453,8 +453,7 @@ export default function AppShell({ user, onLogout }: Props) {
       if (flat.length > 0) {
         const parsed = flat[0];
         setParsedData(parsed);
-        const txDate = parseDate(parsed.date);
-        setModalDate(txDate);
+        setModalDate(scanDate(parsed.date));
         setModalCurrency(parsed.currency || "CAD");
         setScanQueueOpen(false);
         clearScanQueue(true);

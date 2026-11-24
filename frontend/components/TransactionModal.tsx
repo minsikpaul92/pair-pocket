@@ -82,7 +82,7 @@ import {
   SubscriptionDraft,
 } from "@/lib/api";
 import { isSubscriptionEntry, translateCategory, translateSubCategory } from "@/lib/category-i18n";
-import { dayKey, parseDate } from "@/lib/date";
+import { dayKey, parseDate, scanDate } from "@/lib/date";
 import { translateError } from "@/lib/errors";
 import { translateSubscriptionSource } from "@/lib/subscription-i18n";
 
@@ -1078,12 +1078,7 @@ export default function TransactionModal({
         setTipPercent("");
       }
 
-      if (parsed.date) {
-        const d = parseDate(parsed.date);
-        if (d && !isNaN(d.getTime())) {
-          onDateChange(d);
-        }
-      }
+      onDateChange(scanDate(parsed.date));
     },
     [transactionCurrency, currency, onDateChange, HST_RATE]
   );
@@ -1683,13 +1678,19 @@ export default function TransactionModal({
       }
 
       const savedDate = parseDate(dateStr);
+      // defaultDate is the picked date itself, so compare with the current month instead.
+      const now = new Date();
       if (
-        savedDate &&
-        (savedDate.getMonth() !== defaultDate.getMonth() ||
-          savedDate.getFullYear() !== defaultDate.getFullYear())
+        savedDate.getMonth() !== now.getMonth() ||
+        savedDate.getFullYear() !== now.getFullYear()
       ) {
-        const formatted = `${savedDate.getFullYear()}년 ${savedDate.getMonth() + 1}월 ${savedDate.getDate()}일`;
-        alert(`거래가 ${formatted} 날짜로 저장되었습니다. (현재 화면에 선택된 월과 다른 달입니다)`);
+        alert(
+          tTx("savedOtherMonth", {
+            year: savedDate.getFullYear(),
+            month: savedDate.getMonth() + 1,
+            day: savedDate.getDate(),
+          })
+        );
       }
 
       if (inQueue) {
