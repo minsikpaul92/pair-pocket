@@ -55,7 +55,7 @@ export function Toaster() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-4 bottom-[calc(4.35rem+max(0.5rem,env(safe-area-inset-bottom)))] z-[60] flex flex-col items-center gap-2 md:bottom-8">
+    <div className="pointer-events-none fixed inset-x-4 bottom-[calc(4.35rem+max(0.5rem,env(safe-area-inset-bottom)))] z-[110] flex flex-col items-center gap-2 md:bottom-8">
       {toasts.map((t) => {
         const ok = t.kind === "success";
         const Icon = ok ? CheckCircle2 : AlertCircle;
@@ -76,7 +76,10 @@ export function Toaster() {
               {t.lines?.map((line, i) => (
                 <p
                   key={i}
-                  className="truncate text-xs tabular-nums text-gray-500 dark:text-gray-400"
+                  // The first success line is data (merchant) and may be long; other lines are messages.
+                  className={`text-xs tabular-nums text-gray-500 dark:text-gray-400 ${
+                    ok && i === 0 ? "truncate" : "break-words"
+                  }`}
                 >
                   {line}
                 </p>
