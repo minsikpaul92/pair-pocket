@@ -86,6 +86,22 @@ export default function MerchantSelect({
 
       {open && (
         <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/10 dark:ring-white/10 py-1">
+          {value.trim() && !isExactMatch && onAdd && (
+            <div className="sticky top-0 z-10 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onAdd(value.trim());
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t("merchantAddNew", { name: value.trim(), noun })}
+              </button>
+            </div>
+          )}
+
           <div className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700/60 flex justify-between items-center">
             <span>{t("merchantRecent", { noun })}</span>
             <span className="text-xs font-normal text-blue-500">{t("merchantListTag")}</span>
@@ -142,22 +158,6 @@ export default function MerchantSelect({
           ) : (
             <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 text-center">
               {t("merchantNoSuggestions")}
-            </div>
-          )}
-
-          {value.trim() && !isExactMatch && onAdd && (
-            <div className="border-t border-gray-100 dark:border-gray-700 p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  onAdd(value.trim());
-                  setOpen(false);
-                }}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {t("merchantAddNew", { name: value.trim(), noun })}
-              </button>
             </div>
           )}
         </div>
