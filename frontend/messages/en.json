@@ -278,6 +278,8 @@
     "moreTransactions": "{count, plural, one {View # more transaction} other {View # more transactions}}"
   },
   "list": {
+    "stampSettled": "Settled",
+    "stampPartial": "Partial",
     "allAccounts": "All accounts",
     "account": "Account",
     "allCategories": "All categories",
@@ -298,6 +300,7 @@
     "count": "{count, plural, one {· # item} other {· # items}}"
   },
   "transaction": {
+    "settleThis": "Settle this",
     "new": "New transaction",
     "edit": "Edit transaction",
     "editSave": "Save changes",
@@ -1403,6 +1406,10 @@
   },
   "whatsNew": {
     "items": {
+      "settleFromExpense": {
+        "title": "Settle right from an expense",
+        "description": "Open an expense and tap Settle this to start a settlement with that expense already picked. The list now stamps settled expenses, so you can see at a glance if one is fully or partly settled."
+      },
       "saveToast": {
         "title": "See the result when you save",
         "description": "After you save, a notice shows the date, amount and merchant. If saving fails, you see why and can try again."
