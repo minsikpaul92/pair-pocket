@@ -353,6 +353,7 @@ export default function AppShell({ user, onLogout }: Props) {
   const [fabCorner, setFabCorner] = useState<FabCorner>("br");
   const [aiParsing, setAiParsing] = useState(false);
   const [parsedData, setParsedData] = useState<any>(null);
+  const [settleExpense, setSettleExpense] = useState<Transaction | null>(null);
   const [scanQueue, setScanQueue] = useState<
     { id: string; file: File; previewUrl: string | null }[]
   >([]);
@@ -853,6 +854,7 @@ export default function AppShell({ user, onLogout }: Props) {
   function handleSaved() {
     setModalDate(null);
     setEditingTransaction(null);
+    setSettleExpense(null);
     setParsedData(null);
     bumpVersion();
     signal("txSaved");
@@ -861,6 +863,7 @@ export default function AppShell({ user, onLogout }: Props) {
   function closeModal() {
     setModalDate(null);
     setEditingTransaction(null);
+    setSettleExpense(null);
     setParsedData(null);
   }
 
@@ -868,6 +871,7 @@ export default function AppShell({ user, onLogout }: Props) {
   const [subscriptionQueue, setSubscriptionQueue] = useState<SubscriptionDraft[]>([]);
 
   function openModal(date: Date) {
+    setSettleExpense(null);
     setEditingTransaction(null);
     setModalDate(date);
     if (scope !== "ALL") setModalCurrency(scope);
@@ -884,7 +888,16 @@ export default function AppShell({ user, onLogout }: Props) {
     setView("subscriptions");
   }
 
+  // Leave the edit screen and open a new entry on the Settle tab for this expense.
+  function startSettle(tx: Transaction) {
+    setEditingTransaction(null);
+    setSettleExpense(tx);
+    setModalCurrency(tx.currency);
+    setModalDate(new Date());
+  }
+
   function openEdit(tx: Transaction) {
+    setSettleExpense(null);
     setEditingTransaction(tx);
     setModalCurrency(tx.currency);
     setModalDate(parseDate(tx.date));
@@ -1669,6 +1682,9 @@ export default function AppShell({ user, onLogout }: Props) {
 
       {modalDate && presets && (
         <TransactionModal
+          key={settleExpense?.id ?? "entry"}
+          settleExpense={settleExpense}
+          onStartSettle={startSettle}
           currency={modalCurrency}
           taxPercent={taxPercent}
           ledgerScope={scope}

@@ -114,6 +114,10 @@ interface Props {
   /** Personal ↔ shared transfers need a linked partner. */
   hasPartner?: boolean;
   parsedTransaction?: ParsedTransaction | null;
+  /** Open on the Settle tab with this expense already picked. */
+  settleExpense?: Transaction | null;
+  /** Editing an expense: close this and start settling it. */
+  onStartSettle?: (tx: Transaction) => void;
   allowCurrencyPick?: boolean;
   onCurrencyChange?: (currency: Currency) => void;
   presets: CategoryPresets;
@@ -176,6 +180,8 @@ export default function TransactionModal({
   accountType = "personal",
   hasPartner = false,
   parsedTransaction = null,
+  settleExpense = null,
+  onStartSettle,
   allowCurrencyPick = false,
   onCurrencyChange,
   presets,
@@ -204,6 +210,16 @@ export default function TransactionModal({
   const titleId = useId();
 
   const isEditing = Boolean(editingTransaction);
+  // Only an existing expense with money left to settle (not a transfer, settlement or stock trade).
+  const canSettleThis = Boolean(
+    onStartSettle &&
+      editingTransaction &&
+      editingTransaction.type === "expense" &&
+      !editingTransaction.pair_kind &&
+      !editingTransaction.is_stock_trade &&
+      !isNonCashflowTransaction(editingTransaction) &&
+      effectiveExpenseAmount(editingTransaction) > 0
+  );
 
   const [type, setType] = useState<TransactionType>("expense");
   /** The Settle/Move tab: settlements and transfers are picked by kind, not by category. */
@@ -332,10 +348,22 @@ export default function TransactionModal({
     const timer = setTimeout(done, 700);
     vv.addEventListener("resize", onResize);
   }
+  // Opened from an expense's "Settle this": start on the Settle tab with that expense picked.
+  useEffect(() => {
+    if (!settleExpense) return;
+    setMoveTab(true);
+    setType("income");
+    setCategory(INCOME_CATEGORY_SETTLEMENT);
+    setSubCategory(SUB_CATEGORY_SETTLEMENT);
+    setSettlesExpenseId(settleExpense.id);
+    setAmount(amountToInput(effectiveExpenseAmount(settleExpense), settleExpense.currency));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Manual entry opens with the cursor in the amount. Opening with scanned data (or editing) does
   // not, so a filled form is reviewed first. On phones the amount's onFocus scrolls it into view.
   useEffect(() => {
-    if (editingTransaction || parsedTransaction) return;
+    if (editingTransaction || parsedTransaction || settleExpense) return;
     amountInputRef.current?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1319,7 +1347,8 @@ export default function TransactionModal({
   useEffect(() => {
     if (!isSettlement) {
       setSettleableExpenses([]);
-      if (!isEditing) setSettlesExpenseId("");
+      // Not on the first render of "Settle this", which seeds the picked expense in an effect.
+      if (!isEditing && !settleExpense) setSettlesExpenseId("");
       return;
     }
     let active = true;
@@ -3392,6 +3421,16 @@ export default function TransactionModal({
               </div>
             )}
           {error && <p className="text-sm text-red-500" role="alert">{error}</p>}
+
+          {canSettleThis && editingTransaction && (
+            <button
+              type="button"
+              onClick={() => onStartSettle?.(editingTransaction)}
+              className="w-full whitespace-nowrap rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              {tTx("settleThis")}
+            </button>
+          )}
 
           <div className="flex gap-2">
             {isEditing && (

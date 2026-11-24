@@ -655,6 +655,12 @@ export function hasSettlement(tx: Transaction): boolean {
   );
 }
 
+/** Stamp for the list: "full" when nothing is left to pay, "partial" when some of it was settled. */
+export function settlementStamp(tx: Transaction): "full" | "partial" | null {
+  if (!hasSettlement(tx)) return null;
+  return (tx.effective_amount ?? tx.amount) <= 0.005 ? "full" : "partial";
+}
+
 export async function fetchCategoryPresets(): Promise<CategoryPresets> {
   const res = await apiFetch(`${API_BASE_URL}/api/categories`, {
     headers: authHeaders(),

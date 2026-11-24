@@ -24,6 +24,7 @@ import {
   FinancialAccount,
   formatAmount,
   hasSettlement,
+  settlementStamp,
   isMoveTransaction,
   isNonCashflowTransaction,
   isSubscriptionDueOrPast,
@@ -678,6 +679,7 @@ export default function ListView({
 
               const tx = item.tx;
               const settled = hasSettlement(tx);
+              const stamp = settlementStamp(tx);
               const transfer = isNonCashflowTransaction(tx);
               const title = rowTitle(tx, (t) =>
                 merchantLabel(t, tCategories, tSubCategories, tCommon("unspecified"))
@@ -696,11 +698,18 @@ export default function ListView({
                       className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-bold truncate text-gray-900 dark:text-white">
-                          {showCurrencyCol &&
-                            (tx.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
-                          {title}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="min-w-0 text-sm font-bold truncate text-gray-900 dark:text-white">
+                            {showCurrencyCol &&
+                              (tx.currency === "CAD" ? "🇨🇦 " : "🇰🇷 ")}
+                            {title}
+                          </p>
+                          {stamp && (
+                            <span className="shrink-0 -rotate-6 whitespace-nowrap rounded border-2 border-red-500/70 px-1 py-px text-[10px] font-extrabold leading-none text-red-500/80">
+                              {tList(stamp === "full" ? "stampSettled" : "stampPartial")}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {formatDay(tx.date)} · {translateCategory(tx.category, tCategories)}
                           {tx.sub_category

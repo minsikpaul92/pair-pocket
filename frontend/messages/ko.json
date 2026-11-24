@@ -278,6 +278,8 @@
     "moreTransactions": "외 {count}건 더보기 (클릭)"
   },
   "list": {
+    "stampSettled": "정산완료",
+    "stampPartial": "정산",
     "allAccounts": "전체 계좌",
     "account": "계좌",
     "allCategories": "전체 대분류",
@@ -298,6 +300,7 @@
     "count": "· {count}건"
   },
   "transaction": {
+    "settleThis": "이 지출 정산하기",
     "new": "새 거래",
     "edit": "거래 수정",
     "editSave": "수정 저장",
@@ -1403,6 +1406,10 @@
   },
   "whatsNew": {
     "items": {
+      "settleFromExpense": {
+        "title": "지출에서 바로 정산해요",
+        "description": "기존 지출을 열고 ‘이 지출 정산하기’를 누르면 그 지출이 선택된 채로 정산을 시작해요. 목록에는 정산된 지출에 도장이 찍혀서, 일부만 정산했는지 모두 정산했는지 바로 알 수 있어요."
+      },
       "saveToast": {
         "title": "저장 결과를 바로 알려줘요",
         "description": "거래를 저장하면 날짜, 금액, 사용처와 함께 저장되었다는 알림이 떠요. 저장에 실패하면 이유와 함께 다시 시도할 수 있어요."
