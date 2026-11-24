@@ -309,7 +309,17 @@
     "scanningRetry": "고성능 AI 모델(gemini-3.8-flash)로 정밀 스캔 중...",
     "scanFilled": "스캔 결과로 항목을 채웠어요. 확인 후 저장하세요.",
     "scanEmpty": "스캔 결과에서 거래를 찾지 못했어요.",
-    "savedOtherMonth": "거래가 {year}년 {month}월 {day}일 날짜로 저장되었습니다. 이번 달이 아니니 해당 월에서 확인하세요.",
+    "savedOtherMonth": "이번 달이 아니에요. 해당 월에서 확인하세요.",
+    "toastSaved": "저장되었습니다",
+    "toastUpdated": "수정되었습니다",
+    "toastDeleted": "삭제되었습니다",
+    "toastFailed": "저장하지 못했어요",
+    "toastDeleteFailed": "삭제하지 못했어요",
+    "toastRetry": "다시 시도",
+    "dateCheckRead": "영수증에서 날짜를 {read}로 읽었어요. 날짜를 확인해 주세요.",
+    "dateCheckMissing": "영수증에서 날짜를 찾지 못했어요. 날짜를 확인해 주세요.",
+    "dateCheckOk": "맞아요",
+    "dateCheckRequired": "날짜를 확인해 주세요.",
     "scanFailed": "AI 스캔에 실패했습니다.",
     "scanCardTitle": "스크린샷 / 영수증으로 채우기",
     "scanCardCount": "{count} / {max}장",
@@ -1393,9 +1403,13 @@
   },
   "whatsNew": {
     "items": {
+      "saveToast": {
+        "title": "저장 결과를 바로 알려줘요",
+        "description": "거래를 저장하면 날짜, 금액, 사용처와 함께 저장되었다는 알림이 떠요. 저장에 실패하면 이유와 함께 다시 시도할 수 있어요."
+      },
       "scanDateFallback": {
-        "title": "영수증 날짜를 더 안전하게 처리해요",
-        "description": "영수증에서 날짜를 읽지 못하거나 미래 날짜로 읽으면 오늘 날짜로 저장돼요. 이번 달이 아닌 날짜로 저장되면 안내도 보여 드려요."
+        "title": "영수증 날짜를 한 번 더 확인해요",
+        "description": "영수증 날짜를 읽지 못했거나 이상하게 읽었을 때는 저장하기 전에 날짜를 확인해 달라고 알려 드려요. 이번 달이 아닌 날짜로 저장되면 안내도 보여 드려요."
       },
       "clearerInputBorders": {
         "title": "다크 모드 입력창이 더 잘 보여요",

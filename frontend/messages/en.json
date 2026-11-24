@@ -309,7 +309,17 @@
     "scanningRetry": "Running a precise scan with the high-accuracy AI model (gemini-3.8-flash)...",
     "scanFilled": "Fields filled from scan. Review and save.",
     "scanEmpty": "No transaction found in the scan result.",
-    "savedOtherMonth": "Saved with the date {month}/{day}/{year}. It is not in the current month, so look for it in that month.",
+    "savedOtherMonth": "Not in the current month. Look for it in that month.",
+    "toastSaved": "Saved",
+    "toastUpdated": "Updated",
+    "toastDeleted": "Deleted",
+    "toastFailed": "Could not save",
+    "toastDeleteFailed": "Could not delete",
+    "toastRetry": "Try again",
+    "dateCheckRead": "The receipt date was read as {read}. Please check the date.",
+    "dateCheckMissing": "No date found on the receipt. Please check the date.",
+    "dateCheckOk": "Looks right",
+    "dateCheckRequired": "Please check the date.",
     "scanFailed": "AI scan failed.",
     "scanCardTitle": "Fill from screenshot / receipt",
     "scanCardCount": "{count} / {max}",
@@ -1393,9 +1403,13 @@
   },
   "whatsNew": {
     "items": {
+      "saveToast": {
+        "title": "See the result when you save",
+        "description": "After you save, a notice shows the date, amount and merchant. If saving fails, you see why and can try again."
+      },
       "scanDateFallback": {
-        "title": "Safer dates on scanned receipts",
-        "description": "If a receipt date can't be read or comes out in the future, it now saves with today's date. You also get a notice when a transaction is saved outside the current month."
+        "title": "Double-check receipt dates",
+        "description": "When a receipt date can't be read or looks wrong, you are asked to check the date before saving. You also get a notice when a transaction is saved outside the current month."
       },
       "clearerInputBorders": {
         "title": "Easier to see inputs in dark mode",

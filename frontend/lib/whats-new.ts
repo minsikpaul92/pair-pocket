@@ -9,6 +9,7 @@ export interface WhatsNewEntry {
 }
 
 export const WHATS_NEW: WhatsNewEntry[] = [
+  { id: "saveToast", version: "0.36.0", date: "2026-11-23" },
   { id: "scanDateFallback", version: "0.35.2", date: "2026-11-23" },
   { id: "clearerInputBorders", version: "0.35.1", date: "2026-11-23" },
   { id: "simplerMoveForm", version: "0.35.0", date: "2026-11-23" },
